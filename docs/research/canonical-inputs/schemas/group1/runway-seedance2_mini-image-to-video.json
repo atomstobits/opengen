@@ -1,0 +1,162 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://docs.dev.runwayml.com/api/",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "promptImage": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 13,
+                "maxLength": 2048,
+                "pattern": "^https:\\/\\/.*"
+              },
+              {
+                "type": "string",
+                "minLength": 13,
+                "maxLength": 5000,
+                "pattern": "^runway:\\/\\/.*"
+              },
+              {
+                "type": "string",
+                "minLength": 13,
+                "maxLength": 5242880,
+                "pattern": "^data:image\\/.*"
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 13,
+                      "maxLength": 2048,
+                      "pattern": "^https:\\/\\/.*"
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 13,
+                      "maxLength": 5000,
+                      "pattern": "^runway:\\/\\/.*"
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 13,
+                      "maxLength": 5242880,
+                      "pattern": "^data:image\\/.*"
+                    }
+                  ]
+                },
+                "position": {
+                  "type": "string",
+                  "enum": ["first", "last"]
+                }
+              },
+              "required": ["uri"]
+            }
+          }
+        ]
+      },
+      "promptText": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 3500
+      },
+      "audio": {
+        "default": true,
+        "type": "boolean"
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "bitrate": {
+        "default": "standard",
+        "type": "string",
+        "enum": ["standard", "high"]
+      },
+      "duration": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 15
+          },
+          {
+            "type": "string",
+            "const": "auto"
+          }
+        ]
+      },
+      "ratio": {
+        "type": "string",
+        "enum": [
+          "992:432",
+          "864:496",
+          "752:560",
+          "640:640",
+          "560:752",
+          "496:864",
+          "1470:630",
+          "1280:720",
+          "1112:834",
+          "960:960",
+          "834:1112",
+          "720:1280"
+        ]
+      },
+      "referenceAudio": {
+        "maxItems": 3,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "audio"
+            },
+            "uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 2048,
+                  "pattern": "^https:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5000,
+                  "pattern": "^runway:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5242880,
+                  "pattern": "^data:audio\\/.*"
+                }
+              ]
+            }
+          },
+          "required": ["type", "uri"]
+        }
+      },
+      "model": {
+        "type": "string",
+        "const": "seedance2_mini"
+      }
+    },
+    "required": ["promptImage", "model"],
+    "additionalProperties": false
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}

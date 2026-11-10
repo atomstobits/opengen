@@ -1,0 +1,79 @@
+{
+  "source": "https://dev.pika.art/openapi.json",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "maxLength": 7000,
+        "minLength": 1
+      },
+      "duration": {
+        "type": "integer",
+        "maximum": 15.0,
+        "minimum": 4.0,
+        "default": 5
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["768P", "2K"],
+        "default": "2K"
+      },
+      "seed": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "maximum": 4294967295.0,
+            "minimum": -1.0
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "aigc_watermark": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "first_frame_image": {
+        "type": "string",
+        "pattern": "^https?://",
+        "media_kinds": ["image"]
+      },
+      "last_frame_image": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "webhook_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": ["prompt", "first_frame_image"]
+  },
+  "components": {
+    "schemas": {}
+  }
+}

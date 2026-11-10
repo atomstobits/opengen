@@ -1,0 +1,71 @@
+{
+  "source": "https://dev.pika.art/openapi.json",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "oneOf": [
+      {
+        "properties": {
+          "input_url": {
+            "type": "string"
+          }
+        },
+        "required": ["input_url"]
+      },
+      {
+        "properties": {
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": ["request_id"]
+      }
+    ],
+    "properties": {
+      "input_url": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 4096,
+            "pattern": "^https?://",
+            "media_kinds": ["audio", "video"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "request_id": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "channel_mode": {
+        "type": "string",
+        "enum": ["stereo", "mono"],
+        "default": "mono"
+      },
+      "webhook_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "type": "object"
+  },
+  "components": {
+    "schemas": {}
+  }
+}

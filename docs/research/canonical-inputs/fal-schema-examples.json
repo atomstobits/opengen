@@ -1,0 +1,73 @@
+{
+  "checkedAt": "2026-11-03",
+  "note": "Interface facts only; long vendor descriptions/examples removed. Prose constraints must be read with each model report.",
+  "examples": [
+    {
+      "endpointId": "bytedance/seedance-2.5/image-to-video",
+      "scope": "initial OpenGen scope",
+      "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fimage-to-video",
+      "schemaFile": "schemas/fal-reference/bytedance__seedance-2.5__image-to-video.json",
+      "inputSchemaName": "Seedance25ImageToVideoInput",
+      "required": ["image_url"],
+      "fields": [
+        "codec",
+        "image_url",
+        "generate_audio",
+        "end_image_url",
+        "aspect_ratio",
+        "draft",
+        "prompt",
+        "duration",
+        "end_user_id",
+        "resolution",
+        "bitrate_mode"
+      ]
+    },
+    {
+      "endpointId": "fal-ai/kling-video/v3/4k/image-to-video",
+      "scope": "fal mechanism example only; not an initial OpenGen model",
+      "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai%2Fkling-video%2Fv3%2F4k%2Fimage-to-video",
+      "schemaFile": "schemas/fal-reference/fal-ai__kling-video__v3__4k__image-to-video.json",
+      "inputSchemaName": "KlingVideoV34kImageToVideoInput",
+      "required": ["start_image_url"],
+      "fields": [
+        "negative_prompt",
+        "elements",
+        "cfg_scale",
+        "enable_safety_checker",
+        "generate_audio",
+        "shot_type",
+        "prompt",
+        "duration",
+        "start_image_url",
+        "multi_prompt",
+        "end_image_url"
+      ]
+    },
+    {
+      "endpointId": "google/nano-banana-2.1/edit",
+      "scope": "initial OpenGen scope",
+      "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google%2Fnano-banana-2.1%2Fedit",
+      "schemaFile": "schemas/fal-reference/google__nano-banana-2.1__edit.json",
+      "inputSchemaName": "NanoBanana21EditInput",
+      "required": ["prompt"],
+      "fields": [
+        "thinking_level",
+        "sync_mode",
+        "pdf_url",
+        "image_urls",
+        "num_images",
+        "system_prompt",
+        "resolution",
+        "seed",
+        "video_url",
+        "output_format",
+        "limit_generations",
+        "prompt",
+        "aspect_ratio",
+        "enable_web_search",
+        "safety_tolerance"
+      ]
+    }
+  ]
+}

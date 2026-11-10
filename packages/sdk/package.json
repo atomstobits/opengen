@@ -1,0 +1,19 @@
+{
+  "name": "@media-router/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Thin, typed client for the OpenGen REST API.",
+  "exports": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "@media-router/contracts": "*"
+  }
+}

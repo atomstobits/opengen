@@ -1,0 +1,35 @@
+node_modules/
+.next/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+*.tsbuildinfo
+.local/
+playwright-report/
+test-results/
+.DS_Store
+docs/evidence/
+.vercel/
+infra/.local/
+*.pem
+*.key
+*-service-account.json
+service-account*.json
+credentials*.json
+.vercel
+
+# Private backups and generated release artifacts
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+*.tar.gz
+backups/
+
+# Standalone CLI release bundles (generated locally; never source assets)
+artifacts/cli/
+*.tgz

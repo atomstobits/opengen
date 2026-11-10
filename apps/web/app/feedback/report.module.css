@@ -1,0 +1,126 @@
+.page {
+  max-width: 960px;
+  padding-block: clamp(36px, 6vw, 80px);
+}
+.page h1 {
+  max-width: 17ch;
+  font-size: clamp(38px, 6vw, 64px);
+  line-height: 1.08;
+  margin-block: 18px;
+  text-wrap: balance;
+}
+.page p {
+  color: var(--muted);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+.intro {
+  max-width: 62ch;
+  font-size: 19px;
+}
+.form,
+.preview,
+.notice {
+  margin-block: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(20px, 3vw, 32px);
+  background: var(--surface);
+}
+.form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.form legend,
+.preview h2,
+.notice h2 {
+  font-size: 24px;
+  font-weight: 650;
+  margin-block: 0 18px;
+  text-wrap: balance;
+}
+.form fieldset:disabled {
+  opacity: 0.7;
+}
+.form label {
+  display: block;
+  margin-block: 0 20px;
+}
+.form input,
+.form textarea,
+.form select {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+}
+.form textarea {
+  resize: vertical;
+}
+.form details {
+  border-block: 1px solid var(--line);
+  margin-block: 22px;
+  padding-block: 18px;
+}
+.form summary {
+  cursor: pointer;
+}
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.preview {
+  border-color: var(--accent);
+}
+.preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--canvas);
+  border-radius: 8px;
+  padding: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.preview strong,
+.notice strong,
+.notice code {
+  overflow-wrap: anywhere;
+}
+.check {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  margin-block: 24px;
+  line-height: 1.6;
+}
+.check input {
+  accent-color: var(--accent);
+  margin-top: 6px;
+}
+.links {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 32px;
+}
+.page :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+@media (max-width: 600px) {
+  .columns {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .preview pre {
+    padding: 12px;
+  }
+}

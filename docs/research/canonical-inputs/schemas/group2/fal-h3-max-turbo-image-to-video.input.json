@@ -1,0 +1,83 @@
+{
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/image-to-video",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "enable_safety_checker": {
+        "type": "boolean",
+        "default": true
+      },
+      "prompt_expansion_mode": {
+        "type": "string",
+        "default": "balanced"
+      },
+      "seed": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "prompt": {
+        "minLength": 1,
+        "type": "string",
+        "maxLength": 50000
+      },
+      "image_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "end_image_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "duration": {
+        "maximum": 15,
+        "type": "number",
+        "minimum": 0.92,
+        "default": 5
+      },
+      "resolution": {
+        "enum": ["480P", "768P", "1080P"],
+        "type": "string",
+        "default": "768P"
+      },
+      "target_audio_url": {
+        "anyOf": [
+          {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "sync_mode": {
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "required": ["prompt", "prompt_expansion_mode"]
+  },
+  "components": {
+    "schemas": {}
+  }
+}

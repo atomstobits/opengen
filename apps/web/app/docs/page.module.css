@@ -1,0 +1,13 @@
+.paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.body h3 {
+  margin-top: 32px;
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 500;
+}

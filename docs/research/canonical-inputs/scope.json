@@ -1,0 +1,1000 @@
+{
+  "checkedAt": "2026-11-03",
+  "scope": "Owner initial model list, exact variants and existing documented route baseline; additional newly documented endpoints recorded separately",
+  "models": [
+    {
+      "id": "bytedance/seedance-2.5",
+      "name": "Seedance 2.5",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5",
+      "series": ["bytedance/seedance-2.5"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.5",
+        "runway-undisclosed/bytedance-seedance-2.5",
+        "replicate-undisclosed/bytedance-seedance-2.5",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5",
+        "fal-undisclosed/bytedance/seedance-2.5/text-to-video",
+        "fal-undisclosed/bytedance/seedance-2.5/image-to-video",
+        "fal-undisclosed/bytedance/seedance-2.5/reference-to-video"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2.0",
+      "name": "Seedance 2.0",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+      "series": ["bytedance/seedance-2.0"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.0",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0",
+        "fal-undisclosed/bytedance/seedance-2.0/text-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/image-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/reference-to-video",
+        "fal-seedance-us-account-enabled/bytedance-seedance-2.0"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2.0-fast",
+      "name": "Seedance 2.0 Fast",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+      "series": ["bytedance/seedance-2.0"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.0-fast",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0-fast",
+        "fal-undisclosed/bytedance/seedance-2.0/fast/text-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/fast/image-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/fast/reference-to-video"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2.0-mini",
+      "name": "Seedance 2.0 Mini",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+      "series": ["bytedance/seedance-2.0"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.0-mini",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0-mini"
+      ]
+    },
+    {
+      "id": "kling/kling-4.0",
+      "name": "Kling 4.0",
+      "creator": "Kling AI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://kling.ai/dev/model-release/kling-4",
+      "series": ["kling/kling-4.0"],
+      "existingRouteIds": ["runway-undisclosed/kling-kling-4.0"]
+    },
+    {
+      "id": "alibaba/wan-3.0",
+      "name": "Wan 3.0",
+      "creator": "Alibaba",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video",
+      "series": ["alibaba/wan-3.0"],
+      "existingRouteIds": [
+        "alibaba/cn-beijing/wan-3.0",
+        "alibaba/ap-southeast-1/wan-3.0",
+        "alibaba/ap-northeast-1/wan-3.0",
+        "alibaba/eu-central-1/wan-3.0",
+        "alibaba/us-east-1/wan-3.0",
+        "alibaba/cn-hongkong/wan-3.0"
+      ]
+    },
+    {
+      "id": "alibaba/wan-3.0-prime",
+      "name": "Wan 3.0 Prime",
+      "creator": "Alibaba",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime",
+      "series": ["alibaba/wan-3.0"],
+      "existingRouteIds": [
+        "alibaba/cn-beijing/wan-3.0-prime",
+        "alibaba/ap-southeast-1/wan-3.0-prime",
+        "alibaba/ap-northeast-1/wan-3.0-prime",
+        "alibaba/eu-central-1/wan-3.0-prime",
+        "alibaba/us-east-1/wan-3.0-prime",
+        "alibaba/cn-hongkong/wan-3.0-prime"
+      ]
+    },
+    {
+      "id": "minimax/h3",
+      "name": "MiniMax H3",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://design.minimax.io/h3",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3"]
+    },
+    {
+      "id": "minimax/h3-highspeed",
+      "name": "MiniMax H3 Highspeed",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3-highspeed"]
+    },
+    {
+      "id": "minimax/h3-lite",
+      "name": "MiniMax H3 Lite",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3-lite"]
+    },
+    {
+      "id": "minimax/h3-max",
+      "name": "MiniMax H3 Max · MiniMax",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3-max"]
+    },
+    {
+      "id": "fal/h3-max",
+      "name": "H3 Max · fal",
+      "creator": "fal",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://fal.ai/models/minimax/h3-max/text-to-video",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["fal-undisclosed/fal-h3-max"]
+    },
+    {
+      "id": "fal/h3-max-turbo",
+      "name": "H3 Max Turbo · fal",
+      "creator": "fal",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://fal.ai/models/minimax/h3-max-turbo/text-to-video",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["fal-undisclosed/fal-h3-max-turbo"]
+    },
+    {
+      "id": "pika/h3-flex",
+      "name": "H3 Flex · Pika",
+      "creator": "Pika",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://pika.art/pika-h3-flex",
+      "series": ["minimax/h3"],
+      "existingRouteIds": [
+        "pika-undisclosed/pika-h3-flex",
+        "pika-undisclosed/pika-h3-flex-reference-to-video"
+      ]
+    },
+    {
+      "id": "google/gemini-omni-1.1-flash",
+      "name": "Gemini Omni 1.1 Flash",
+      "creator": "Google",
+      "modality": "video",
+      "aliases": ["Gemini Omni Flash", "gemini-omni-1.1-flash"],
+      "source": "https://aistudio.google.com/docs/models/gemini-omni-flash",
+      "series": ["google/gemini-omni-1.1-flash"],
+      "existingRouteIds": ["google-undisclosed/google-gemini-omni-1.1-flash"]
+    },
+    {
+      "id": "xai/grok-imagine-video-1.5",
+      "name": "Grok Imagine Video 1.5",
+      "creator": "xAI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview",
+      "series": ["xai/grok-imagine-video"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-video-1.5"]
+    },
+    {
+      "id": "xai/grok-imagine-video-1.5-lite",
+      "name": "Grok Imagine Video 1.5 Lite",
+      "creator": "xAI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview",
+      "series": ["xai/grok-imagine-video"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-video-1.5-lite"]
+    },
+    {
+      "id": "xai/grok-imagine-video",
+      "name": "Grok Imagine Video · Edit / Extend",
+      "creator": "xAI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview",
+      "series": ["xai/grok-imagine-video"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-video"]
+    },
+    {
+      "id": "openai/gpt-image-2.5-sunburst",
+      "name": "GPT Image 2.5 Sunburst",
+      "creator": "OpenAI",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst",
+      "series": ["openai/gpt-image-2.5"],
+      "existingRouteIds": [
+        "openai-undisclosed/openai-gpt-image-2.5-sunburst",
+        "fal-undisclosed/openai/gpt-image-2.5/sunburst/text-to-image",
+        "fal-undisclosed/openai/gpt-image-2.5/sunburst/edit"
+      ]
+    },
+    {
+      "id": "openai/gpt-image-2.5-flare",
+      "name": "GPT Image 2.5 Flare",
+      "creator": "OpenAI",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2.5-flare",
+      "series": ["openai/gpt-image-2.5"],
+      "existingRouteIds": [
+        "openai-undisclosed/openai-gpt-image-2.5-flare",
+        "fal-undisclosed/openai/gpt-image-2.5/flare/text-to-image",
+        "fal-undisclosed/openai/gpt-image-2.5/flare/edit"
+      ]
+    },
+    {
+      "id": "openai/gpt-image-2",
+      "name": "GPT Image 2",
+      "creator": "OpenAI",
+      "modality": "image",
+      "aliases": ["GPT Image 2.0", "gpt-image-2"],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2",
+      "series": ["openai/gpt-image-2"],
+      "existingRouteIds": ["openai-undisclosed/openai-gpt-image-2"]
+    },
+    {
+      "id": "google/nano-banana-2.1",
+      "name": "Nano Banana 2.1",
+      "creator": "Google",
+      "modality": "image",
+      "aliases": ["gemini-nano-banana-2.1"],
+      "source": "https://ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1",
+      "series": ["google/nano-banana-2.1"],
+      "existingRouteIds": [
+        "google-undisclosed/google-nano-banana-2.1",
+        "fal-undisclosed/google/nano-banana-2.1",
+        "fal-undisclosed/google/nano-banana-2.1/edit"
+      ]
+    },
+    {
+      "id": "xai/grok-imagine-image-2.0",
+      "name": "Grok Imagine Image 2.0",
+      "creator": "xAI",
+      "modality": "image",
+      "aliases": ["Grok Image 2.0"],
+      "source": "https://docs.x.ai/developers/models/grok-imagine-image-2.0",
+      "series": ["xai/grok-imagine-image-2.0"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-image-2.0"]
+    },
+    {
+      "id": "bytedance/seedream-5.0-pro",
+      "name": "Seedream 5.0 Pro",
+      "creator": "ByteDance",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro",
+      "series": ["bytedance/seedream-5.0-pro"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedream-5.0-pro",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedream-5.0-pro",
+        "replicate-undisclosed/bytedance-seedream-5.0-pro",
+        "fal-undisclosed/bytedance/seedream/v5/pro/text-to-image",
+        "fal-undisclosed/bytedance/seedream/v5/pro/edit"
+      ]
+    },
+    {
+      "id": "qwen/image-2.1",
+      "name": "Qwen Image 2.1",
+      "creator": "Qwen",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://github.com/QwenLM/Qwen-Image-2.1",
+      "series": ["qwen/image-2.1"],
+      "existingRouteIds": []
+    },
+    {
+      "id": "qwen/image-2.1-turbo",
+      "name": "Qwen Image 2.1 Turbo",
+      "creator": "Qwen",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://github.com/QwenLM/Qwen-Image-2.1",
+      "series": ["qwen/image-2.1"],
+      "existingRouteIds": [
+        "alibaba-model-studio-region-unqualified/qwen-image-2.1-turbo",
+        "alibaba-model-studio-ap-southeast-1/qwen-image-2.1-turbo"
+      ]
+    },
+    {
+      "id": "alibaba/qwen-image-2.1-pro",
+      "name": "Qwen Image 2.1 Pro · Hosted",
+      "creator": "Alibaba",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/text-to-image",
+      "series": ["qwen/image-2.1"],
+      "existingRouteIds": [
+        "alibaba-model-studio-region-unqualified/alibaba-qwen-image-2.1-pro",
+        "alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-2.1-pro"
+      ]
+    },
+    {
+      "id": "alibaba/qwen-image-3.0-pro",
+      "name": "Qwen Image 3.0 Pro",
+      "creator": "Alibaba",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference",
+      "series": ["qwen/image-3.0-pro"],
+      "existingRouteIds": [
+        "alibaba-model-studio-region-unqualified/alibaba-qwen-image-3.0-pro",
+        "alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-3.0-pro"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "alibaba/cn-beijing/wan-3.0",
+      "modelId": "alibaba/wan-3.0",
+      "deploymentId": "alibaba-model-studio-cn-beijing",
+      "upstreamModelId": "wan3.0-video",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/cn-beijing/wan-3.0-prime",
+      "modelId": "alibaba/wan-3.0-prime",
+      "deploymentId": "alibaba-model-studio-cn-beijing",
+      "upstreamModelId": "wan3.0-video-prime",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/ap-southeast-1/wan-3.0",
+      "modelId": "alibaba/wan-3.0",
+      "deploymentId": "alibaba-model-studio-ap-southeast-1",
+      "upstreamModelId": "wan3.0-video",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/ap-southeast-1/wan-3.0-prime",
+      "modelId": "alibaba/wan-3.0-prime",
+      "deploymentId": "alibaba-model-studio-ap-southeast-1",
+      "upstreamModelId": "wan3.0-video-prime",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/ap-northeast-1/wan-3.0",
+      "modelId": "alibaba/wan-3.0",
+      "deploymentId": "alibaba-model-studio-ap-northeast-1",
+      "upstreamModelId": "wan3.0-video",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/ap-northeast-1/wan-3.0-prime",
+      "modelId": "alibaba/wan-3.0-prime",
+      "deploymentId": "alibaba-model-studio-ap-northeast-1",
+      "upstreamModelId": "wan3.0-video-prime",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/eu-central-1/wan-3.0",
+      "modelId": "alibaba/wan-3.0",
+      "deploymentId": "alibaba-model-studio-eu-central-1",
+      "upstreamModelId": "wan3.0-video",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/eu-central-1/wan-3.0-prime",
+      "modelId": "alibaba/wan-3.0-prime",
+      "deploymentId": "alibaba-model-studio-eu-central-1",
+      "upstreamModelId": "wan3.0-video-prime",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/us-east-1/wan-3.0",
+      "modelId": "alibaba/wan-3.0",
+      "deploymentId": "alibaba-model-studio-us-east-1",
+      "upstreamModelId": "wan3.0-video",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/us-east-1/wan-3.0-prime",
+      "modelId": "alibaba/wan-3.0-prime",
+      "deploymentId": "alibaba-model-studio-us-east-1",
+      "upstreamModelId": "wan3.0-video-prime",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/cn-hongkong/wan-3.0",
+      "modelId": "alibaba/wan-3.0",
+      "deploymentId": "alibaba-model-studio-cn-hongkong",
+      "upstreamModelId": "wan3.0-video",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "alibaba/cn-hongkong/wan-3.0-prime",
+      "modelId": "alibaba/wan-3.0-prime",
+      "deploymentId": "alibaba-model-studio-cn-hongkong",
+      "upstreamModelId": "wan3.0-video-prime",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference"
+    },
+    {
+      "id": "byteplus-undisclosed/bytedance-seedance-2.5",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "byteplus-undisclosed",
+      "upstreamModelId": "dreamina-seedance-2-5-260628",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5"
+    },
+    {
+      "id": "byteplus-undisclosed/bytedance-seedance-2.0",
+      "modelId": "bytedance/seedance-2.0",
+      "deploymentId": "byteplus-undisclosed",
+      "upstreamModelId": "dreamina-seedance-2-0-260128",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0"
+    },
+    {
+      "id": "byteplus-undisclosed/bytedance-seedance-2.0-fast",
+      "modelId": "bytedance/seedance-2.0-fast",
+      "deploymentId": "byteplus-undisclosed",
+      "upstreamModelId": "dreamina-seedance-2-0-fast-260128",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0"
+    },
+    {
+      "id": "byteplus-undisclosed/bytedance-seedance-2.0-mini",
+      "modelId": "bytedance/seedance-2.0-mini",
+      "deploymentId": "byteplus-undisclosed",
+      "upstreamModelId": "dreamina-seedance-2-0-mini-260615",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0"
+    },
+    {
+      "id": "runway-undisclosed/bytedance-seedance-2.5",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "runway-undisclosed",
+      "upstreamModelId": "seedance2_5",
+      "operations": ["text-to-video", "image-to-video"],
+      "source": "https://docs.dev.runwayml.com/guides/models/"
+    },
+    {
+      "id": "replicate-undisclosed/bytedance-seedance-2.5",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "replicate-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.5",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://replicate.com/bytedance/seedance-2.5"
+    },
+    {
+      "id": "runway-undisclosed/kling-kling-4.0",
+      "modelId": "kling/kling-4.0",
+      "deploymentId": "runway-undisclosed",
+      "upstreamModelId": "kling_4",
+      "operations": ["text-to-video", "image-to-video", "video-edit"],
+      "source": "https://dev.runwayml.com/learn/kling-4-0-api"
+    },
+    {
+      "id": "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "byteplus-modelark-ap-southeast-1",
+      "upstreamModelId": "dreamina-seedance-2-5-260628",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api"
+    },
+    {
+      "id": "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0",
+      "modelId": "bytedance/seedance-2.0",
+      "deploymentId": "byteplus-modelark-ap-southeast-1",
+      "upstreamModelId": "dreamina-seedance-2-0-260128",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api"
+    },
+    {
+      "id": "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0-fast",
+      "modelId": "bytedance/seedance-2.0-fast",
+      "deploymentId": "byteplus-modelark-ap-southeast-1",
+      "upstreamModelId": "dreamina-seedance-2-0-fast-260128",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api"
+    },
+    {
+      "id": "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0-mini",
+      "modelId": "bytedance/seedance-2.0-mini",
+      "deploymentId": "byteplus-modelark-ap-southeast-1",
+      "upstreamModelId": "dreamina-seedance-2-0-mini-260615",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.5/text-to-video",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.5/text-to-video",
+      "operations": ["text-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.5/text-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.5/image-to-video",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.5/image-to-video",
+      "operations": ["image-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.5/image-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.5/reference-to-video",
+      "modelId": "bytedance/seedance-2.5",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.5/reference-to-video",
+      "operations": ["reference-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.0/text-to-video",
+      "modelId": "bytedance/seedance-2.0",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.0/text-to-video",
+      "operations": ["text-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.0/text-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.0/image-to-video",
+      "modelId": "bytedance/seedance-2.0",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.0/image-to-video",
+      "operations": ["image-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.0/image-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.0/reference-to-video",
+      "modelId": "bytedance/seedance-2.0",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.0/reference-to-video",
+      "operations": ["reference-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.0/reference-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.0/fast/text-to-video",
+      "modelId": "bytedance/seedance-2.0-fast",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.0/fast/text-to-video",
+      "operations": ["text-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.0/fast/text-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.0/fast/image-to-video",
+      "modelId": "bytedance/seedance-2.0-fast",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.0/fast/image-to-video",
+      "operations": ["image-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.0/fast/image-to-video/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedance-2.0/fast/reference-to-video",
+      "modelId": "bytedance/seedance-2.0-fast",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedance-2.0/fast/reference-to-video",
+      "operations": ["reference-to-video"],
+      "source": "https://fal.ai/models/bytedance/seedance-2.0/fast/reference-to-video/api"
+    },
+    {
+      "id": "fal-seedance-us-account-enabled/bytedance-seedance-2.0",
+      "modelId": "bytedance/seedance-2.0",
+      "deploymentId": "fal-seedance-us-account-enabled",
+      "upstreamModelId": "account-enabled-seedance-2.0-us",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://fal.ai/seedance-2.0-us-hosting"
+    },
+    {
+      "id": "minimax-undisclosed/minimax-h3",
+      "modelId": "minimax/h3",
+      "deploymentId": "minimax-undisclosed",
+      "upstreamModelId": "MiniMax-H3",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create"
+    },
+    {
+      "id": "minimax-undisclosed/minimax-h3-highspeed",
+      "modelId": "minimax/h3-highspeed",
+      "deploymentId": "minimax-undisclosed",
+      "upstreamModelId": "MiniMax-H3-Highspeed",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create"
+    },
+    {
+      "id": "minimax-undisclosed/minimax-h3-lite",
+      "modelId": "minimax/h3-lite",
+      "deploymentId": "minimax-undisclosed",
+      "upstreamModelId": "MiniMax-H3-Lite",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create"
+    },
+    {
+      "id": "minimax-undisclosed/minimax-h3-max",
+      "modelId": "minimax/h3-max",
+      "deploymentId": "minimax-undisclosed",
+      "upstreamModelId": "MiniMax-H3-Max",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create"
+    },
+    {
+      "id": "fal-undisclosed/fal-h3-max",
+      "modelId": "fal/h3-max",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "minimax/h3-max/text-to-video",
+      "operations": ["text-to-video"],
+      "source": "https://fal.ai/models/minimax/h3-max/text-to-video"
+    },
+    {
+      "id": "fal-undisclosed/fal-h3-max-turbo",
+      "modelId": "fal/h3-max-turbo",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "minimax/h3-max-turbo/text-to-video",
+      "operations": ["text-to-video"],
+      "source": "https://fal.ai/models/minimax/h3-max-turbo/text-to-video"
+    },
+    {
+      "id": "pika-undisclosed/pika-h3-flex",
+      "modelId": "pika/h3-flex",
+      "deploymentId": "pika-undisclosed",
+      "upstreamModelId": "pika/pika-h3-flex/text-to-video",
+      "operations": ["text-to-video"],
+      "source": "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video"
+    },
+    {
+      "id": "pika-undisclosed/pika-h3-flex-reference-to-video",
+      "modelId": "pika/h3-flex",
+      "deploymentId": "pika-undisclosed",
+      "upstreamModelId": "pika/pika-h3-flex/reference-to-video",
+      "operations": ["reference-to-video"],
+      "source": "https://dev.pika.art/models/pika/pika-h3-flex/reference-to-video/api"
+    },
+    {
+      "id": "google-undisclosed/google-gemini-omni-1.1-flash",
+      "modelId": "google/gemini-omni-1.1-flash",
+      "deploymentId": "google-undisclosed",
+      "upstreamModelId": "gemini-omni-1.1-flash",
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video-edit",
+        "video-extend"
+      ],
+      "source": "https://aistudio.google.com/docs/models/gemini-omni-flash"
+    },
+    {
+      "id": "xai-undisclosed/xai-grok-imagine-video-1.5",
+      "modelId": "xai/grok-imagine-video-1.5",
+      "deploymentId": "xai-undisclosed",
+      "upstreamModelId": "grok-imagine-video-1.5",
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview"
+    },
+    {
+      "id": "xai-undisclosed/xai-grok-imagine-video-1.5-lite",
+      "modelId": "xai/grok-imagine-video-1.5-lite",
+      "deploymentId": "xai-undisclosed",
+      "upstreamModelId": "grok-imagine-video-1.5-lite",
+      "operations": ["text-to-video", "image-to-video"],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview"
+    },
+    {
+      "id": "xai-undisclosed/xai-grok-imagine-video",
+      "modelId": "xai/grok-imagine-video",
+      "deploymentId": "xai-undisclosed",
+      "upstreamModelId": "grok-imagine-video",
+      "operations": ["video-edit", "video-extend"],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview"
+    },
+    {
+      "id": "openai-undisclosed/openai-gpt-image-2.5-sunburst",
+      "modelId": "openai/gpt-image-2.5-sunburst",
+      "deploymentId": "openai-undisclosed",
+      "upstreamModelId": "gpt-image-2.5-sunburst",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst"
+    },
+    {
+      "id": "openai-undisclosed/openai-gpt-image-2.5-flare",
+      "modelId": "openai/gpt-image-2.5-flare",
+      "deploymentId": "openai-undisclosed",
+      "upstreamModelId": "gpt-image-2.5-flare",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2.5-flare"
+    },
+    {
+      "id": "openai-undisclosed/openai-gpt-image-2",
+      "modelId": "openai/gpt-image-2",
+      "deploymentId": "openai-undisclosed",
+      "upstreamModelId": "gpt-image-2",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2"
+    },
+    {
+      "id": "google-undisclosed/google-nano-banana-2.1",
+      "modelId": "google/nano-banana-2.1",
+      "deploymentId": "google-undisclosed",
+      "upstreamModelId": "gemini-nano-banana-2.1",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1"
+    },
+    {
+      "id": "xai-undisclosed/xai-grok-imagine-image-2.0",
+      "modelId": "xai/grok-imagine-image-2.0",
+      "deploymentId": "xai-undisclosed",
+      "upstreamModelId": "grok-imagine-image-2.0",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://docs.x.ai/developers/models/grok-imagine-image-2.0"
+    },
+    {
+      "id": "byteplus-undisclosed/bytedance-seedream-5.0-pro",
+      "modelId": "bytedance/seedream-5.0-pro",
+      "deploymentId": "byteplus-undisclosed",
+      "upstreamModelId": "dola-seedream-5-0-pro-260628",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro"
+    },
+    {
+      "id": "byteplus-modelark-ap-southeast-1/bytedance-seedream-5.0-pro",
+      "modelId": "bytedance/seedream-5.0-pro",
+      "deploymentId": "byteplus-modelark-ap-southeast-1",
+      "upstreamModelId": "dola-seedream-5-0-pro-260628",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro"
+    },
+    {
+      "id": "replicate-undisclosed/bytedance-seedream-5.0-pro",
+      "modelId": "bytedance/seedream-5.0-pro",
+      "deploymentId": "replicate-undisclosed",
+      "upstreamModelId": "bytedance/seedream-5-pro",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://replicate.com/bytedance/seedream-5-pro/readme"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedream/v5/pro/text-to-image",
+      "modelId": "bytedance/seedream-5.0-pro",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedream/v5/pro/text-to-image",
+      "operations": ["text-to-image"],
+      "source": "https://fal.ai/models/bytedance/seedream/v5/pro/text-to-image/api"
+    },
+    {
+      "id": "fal-undisclosed/bytedance/seedream/v5/pro/edit",
+      "modelId": "bytedance/seedream-5.0-pro",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "bytedance/seedream/v5/pro/edit",
+      "operations": ["image-edit"],
+      "source": "https://fal.ai/models/bytedance/seedream/v5/pro/edit/api"
+    },
+    {
+      "id": "fal-undisclosed/openai/gpt-image-2.5/flare/text-to-image",
+      "modelId": "openai/gpt-image-2.5-flare",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "openai/gpt-image-2.5/flare/text-to-image",
+      "operations": ["text-to-image"],
+      "source": "https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api"
+    },
+    {
+      "id": "fal-undisclosed/openai/gpt-image-2.5/flare/edit",
+      "modelId": "openai/gpt-image-2.5-flare",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "openai/gpt-image-2.5/flare/edit",
+      "operations": ["image-edit"],
+      "source": "https://fal.ai/models/openai/gpt-image-2.5/flare/edit/api"
+    },
+    {
+      "id": "fal-undisclosed/openai/gpt-image-2.5/sunburst/text-to-image",
+      "modelId": "openai/gpt-image-2.5-sunburst",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "openai/gpt-image-2.5/sunburst/text-to-image",
+      "operations": ["text-to-image"],
+      "source": "https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image/api"
+    },
+    {
+      "id": "fal-undisclosed/openai/gpt-image-2.5/sunburst/edit",
+      "modelId": "openai/gpt-image-2.5-sunburst",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "openai/gpt-image-2.5/sunburst/edit",
+      "operations": ["image-edit"],
+      "source": "https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api"
+    },
+    {
+      "id": "fal-undisclosed/google/nano-banana-2.1",
+      "modelId": "google/nano-banana-2.1",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "google/nano-banana-2.1",
+      "operations": ["text-to-image"],
+      "source": "https://fal.ai/models/google/nano-banana-2.1/api"
+    },
+    {
+      "id": "fal-undisclosed/google/nano-banana-2.1/edit",
+      "modelId": "google/nano-banana-2.1",
+      "deploymentId": "fal-undisclosed",
+      "upstreamModelId": "google/nano-banana-2.1/edit",
+      "operations": ["image-edit"],
+      "source": "https://fal.ai/models/google/nano-banana-2.1/edit/api"
+    },
+    {
+      "id": "alibaba-model-studio-region-unqualified/qwen-image-2.1-turbo",
+      "modelId": "qwen/image-2.1-turbo",
+      "deploymentId": "alibaba-model-studio-region-unqualified",
+      "upstreamModelId": "qwen-image-2.1-turbo",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/text-to-image"
+    },
+    {
+      "id": "alibaba-model-studio-region-unqualified/alibaba-qwen-image-2.1-pro",
+      "modelId": "alibaba/qwen-image-2.1-pro",
+      "deploymentId": "alibaba-model-studio-region-unqualified",
+      "upstreamModelId": "qwen-image-2.1-pro",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/text-to-image"
+    },
+    {
+      "id": "alibaba-model-studio-region-unqualified/alibaba-qwen-image-3.0-pro",
+      "modelId": "alibaba/qwen-image-3.0-pro",
+      "deploymentId": "alibaba-model-studio-region-unqualified",
+      "upstreamModelId": "qwen-image-3.0-pro",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference"
+    },
+    {
+      "id": "alibaba-model-studio-ap-southeast-1/qwen-image-2.1-turbo",
+      "modelId": "qwen/image-2.1-turbo",
+      "deploymentId": "alibaba-model-studio-ap-southeast-1",
+      "upstreamModelId": "qwen-image-2.1-turbo",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference"
+    },
+    {
+      "id": "alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-2.1-pro",
+      "modelId": "alibaba/qwen-image-2.1-pro",
+      "deploymentId": "alibaba-model-studio-ap-southeast-1",
+      "upstreamModelId": "qwen-image-2.1-pro",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference"
+    },
+    {
+      "id": "alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-3.0-pro",
+      "modelId": "alibaba/qwen-image-3.0-pro",
+      "deploymentId": "alibaba-model-studio-ap-southeast-1",
+      "upstreamModelId": "qwen-image-3.0-pro",
+      "operations": ["text-to-image", "image-edit"],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference"
+    }
+  ]
+}

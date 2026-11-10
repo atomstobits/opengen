@@ -1,0 +1,27 @@
+.git
+node_modules
+**/.next
+.env
+.env.*
+!.env.example
+.local
+docs/evidence
+test-results
+
+# Private backups and generated release artifacts
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+*.tar.gz
+backups/
+
+# Local cloud receipts, nested credentials and release-review artifacts
+**/.local
+**/.env
+**/.env.*
+!**/.env.example
+artifacts
+*.tgz
+**/*.tgz

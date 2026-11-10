@@ -1,0 +1,200 @@
+{
+  "source": "https://dev.pika.art/openapi.json",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": ["fl2va", "ref2va"],
+        "default": "fl2va"
+      },
+      "prompt": {
+        "type": "string",
+        "maxLength": 8000,
+        "minLength": 1
+      },
+      "duration": {
+        "type": "integer",
+        "maximum": 15.0,
+        "minimum": 5.0,
+        "default": 5
+      },
+      "aspect_ratio": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "3:2",
+              "4:3",
+              "5:4",
+              "1:1",
+              "4:5",
+              "3:4",
+              "2:3",
+              "9:16",
+              "9:21"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "image": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "last_frame_image": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "references": {
+        "items": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/RewriteImageReference"
+            },
+            {
+              "$ref": "#/components/schemas/RewriteVideoReference"
+            },
+            {
+              "$ref": "#/components/schemas/RewriteAudioReference"
+            }
+          ],
+          "discriminator": {
+            "propertyName": "type",
+            "mapping": {
+              "audio": "#/components/schemas/RewriteAudioReference",
+              "image": "#/components/schemas/RewriteImageReference",
+              "video": "#/components/schemas/RewriteVideoReference"
+            }
+          }
+        },
+        "type": "array",
+        "maxItems": 12
+      },
+      "webhook_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": ["prompt"]
+  },
+  "components": {
+    "schemas": {
+      "RewriteAudioReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "audio"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["audio"]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,47}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["type", "url"]
+      },
+      "RewriteVideoReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "video"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["video"]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,47}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["type", "url"]
+      },
+      "RewriteImageReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "image"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,47}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["type", "url"]
+      }
+    }
+  }
+}

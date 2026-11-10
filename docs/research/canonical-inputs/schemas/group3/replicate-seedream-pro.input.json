@@ -1,0 +1,52 @@
+{
+  "endpointId": "bytedance/seedream-5-pro",
+  "source": {
+    "url": "https://replicate.com/bytedance/seedream-5-pro/api/schema",
+    "title": "Official Replicate model input schema; embedded dereferenced OpenAPI read",
+    "checkedAt": "2026-11-03"
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "size": {
+        "enum": ["1K", "1.5K", "2K", "auto"],
+        "type": "string",
+        "default": "2K",
+        "x-order": 3
+      },
+      "prompt": {
+        "type": "string",
+        "default": "",
+        "x-order": 0,
+        "maxLength": 4000
+      },
+      "image_input": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uri"
+        },
+        "default": [],
+        "x-order": 1
+      },
+      "aspect_ratio": {
+        "enum": ["match_input_image", "1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9"],
+        "type": "string",
+        "default": "match_input_image",
+        "x-order": 4
+      },
+      "output_format": {
+        "enum": ["png", "jpeg"],
+        "type": "string",
+        "default": "png",
+        "x-order": 5
+      },
+      "layer_decomposition": {
+        "type": "boolean",
+        "default": false,
+        "x-order": 2
+      }
+    }
+  },
+  "rawSha256": "5a5594b6587d28ed1b832c2a6474e567d6f7fc8d6f2a3460006a1c2c13cb93dd"
+}

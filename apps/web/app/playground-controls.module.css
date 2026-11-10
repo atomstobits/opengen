@@ -1,0 +1,176 @@
+.controls {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.field,
+.wide {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.wide {
+  grid-column: 1 / -1;
+}
+.label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 5px 12px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+}
+.optional,
+.note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.note {
+  margin: 0;
+}
+.controls textarea,
+.controls input,
+.controls select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.controls textarea {
+  resize: vertical;
+}
+.controls label.field,
+.controls label.wide,
+.controls label.label {
+  margin-bottom: 0;
+}
+.controls input:focus-visible,
+.controls textarea:focus-visible,
+.controls select:focus-visible,
+.controls button:focus-visible,
+.controls summary:focus-visible {
+  outline: 2px solid var(--panel-agent);
+  outline-offset: 3px;
+}
+.structured {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.structured textarea {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.actions button,
+.remove {
+  background: var(--raised);
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  padding: 7px 11px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.advanced {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+.advanced summary {
+  cursor: pointer;
+  color: var(--panel-agent);
+  font-weight: 600;
+}
+.advanced[open] summary {
+  margin-bottom: 18px;
+}
+.asset {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 8px;
+}
+.intake {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.intake :global(.upload-picker):focus-within {
+  outline: 2px solid var(--panel-agent);
+  outline-offset: 3px;
+}
+.uploadStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.attachment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.error {
+  color: var(--danger);
+  border-left: 2px solid var(--danger-line);
+  padding-left: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.unsupported {
+  border: 1px solid var(--warning-line);
+  border-radius: 10px;
+  padding: 14px;
+}
+.unsupported p {
+  color: var(--warning);
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.unsupported code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .asset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

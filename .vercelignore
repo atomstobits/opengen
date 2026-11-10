@@ -1,0 +1,24 @@
+.git
+node_modules
+**/.next
+.env
+.env.*
+infra/.local
+docs/evidence
+test-results
+**/test-results
+playwright-report
+*.pem
+*.key
+*-service-account.json
+service-account*.json
+credentials*.json
+
+# Private backups and generated release artifacts
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+*.tar.gz
+backups/

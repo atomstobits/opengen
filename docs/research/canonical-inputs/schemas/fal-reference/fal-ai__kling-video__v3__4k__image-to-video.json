@@ -1,0 +1,280 @@
+{
+  "checkedAt": "2026-11-03",
+  "endpointId": "fal-ai/kling-video/v3/4k/image-to-video",
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai%2Fkling-video%2Fv3%2F4k%2Fimage-to-video",
+  "rawSourceSha256": "51682edc14df53a8f7a67b1be109af133da63a2aafbd3fcf77c3d6c65e45095c",
+  "inputSchemaName": "KlingVideoV34kImageToVideoInput",
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization"
+      }
+    },
+    "schemas": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED"]
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "response_url": {
+            "type": "string"
+          },
+          "status_url": {
+            "type": "string"
+          },
+          "cancel_url": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "queue_position": {
+            "type": "integer"
+          }
+        },
+        "required": ["status", "request_id"]
+      },
+      "KlingVideoV34kImageToVideoInput": {
+        "properties": {
+          "negative_prompt": {
+            "maxLength": 2500,
+            "default": "blur, distort, and low quality",
+            "type": "string"
+          },
+          "elements": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/KlingV3ComboElementInput"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cfg_scale": {
+            "default": 0.5,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "enable_safety_checker": {
+            "default": true,
+            "type": "boolean"
+          },
+          "generate_audio": {
+            "default": true,
+            "type": "boolean"
+          },
+          "shot_type": {
+            "default": "customize",
+            "enum": ["customize", "intelligent"],
+            "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "maxLength": 2500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration": {
+            "default": "5",
+            "type": "string",
+            "enum": ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
+          },
+          "start_image_url": {
+            "type": "string",
+            "limit_description": "Max file size: 50.0MB, Min width: 300px, Min height: 300px, Min aspect ratio: 0.40, Max aspect ratio: 2.50, Timeout: 20.0s"
+          },
+          "multi_prompt": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/KlingV3MultiPromptElement"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_image_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "ui": {
+                  "field": "image"
+                },
+                "limit_description": "Max file size: 50.0MB, Min width: 300px, Min height: 300px, Min aspect ratio: 0.40, Max aspect ratio: 2.50, Timeout: 20.0s"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["start_image_url"]
+      },
+      "KlingVideoV34kImageToVideoOutput": {
+        "properties": {
+          "video": {
+            "$ref": "#/components/schemas/File"
+          }
+        },
+        "type": "object",
+        "required": ["video"]
+      },
+      "KlingV3ComboElementInput": {
+        "properties": {
+          "reference_image_urls": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "ui": {
+                    "field": "image"
+                  },
+                  "_fal_ui_field": "image",
+                  "limit_description": "Max file size: 50.0MB, Min width: 300px, Min height: 300px, Min aspect ratio: 0.40, Max aspect ratio: 2.50, Timeout: 20.0s"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "video_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "ui": {
+                  "field": "video"
+                },
+                "limit_description": "Max file size: 200.0MB, Min width: 720px, Min height: 720px, Max width: 2160px, Max height: 2160px, Min duration: 3.0s, Max duration: 10.05s, Min FPS: 24.0, Max FPS: 60.0, Timeout: 30.0s"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frontal_image_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "ui": {
+                  "field": "image"
+                },
+                "limit_description": "Max file size: 50.0MB, Min width: 300px, Min height: 300px, Min aspect ratio: 0.40, Max aspect ratio: 2.50, Timeout: 20.0s"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "KlingV3MultiPromptElement": {
+        "properties": {
+          "prompt": {
+            "type": "string"
+          },
+          "duration": {
+            "default": "5",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": ["prompt"]
+      },
+      "File": {
+        "properties": {
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["url"]
+      }
+    }
+  }
+}

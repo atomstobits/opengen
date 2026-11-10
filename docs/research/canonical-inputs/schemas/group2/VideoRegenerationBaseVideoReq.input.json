@@ -1,0 +1,100 @@
+{
+  "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "type": "object",
+    "required": ["model", "content", "resolution"],
+    "properties": {
+      "model": {
+        "type": "string",
+        "enum": ["MiniMax-H3"]
+      },
+      "content": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RegenContentItem"
+        },
+        "contains": {
+          "type": "object",
+          "required": ["type", "video_url", "role"],
+          "properties": {
+            "type": {
+              "const": "video_url"
+            },
+            "role": {
+              "const": "base_video"
+            }
+          }
+        },
+        "minContains": 1,
+        "maxContains": 1
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["2K"]
+      },
+      "callback_url": {
+        "type": "string"
+      },
+      "aigc_watermark": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RegenContentItem": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["text", "image_url", "video_url", "audio_url"]
+          },
+          "text": {
+            "type": "string"
+          },
+          "image_url": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          "video_url": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          "audio_url": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "base_video",
+              "first_frame",
+              "last_frame",
+              "reference_image",
+              "reference_video",
+              "reference_audio"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "opengen",
+  "version": "0.1.0",
+  "description": "Exact image/video discovery, authorized generation and safe job recovery.",
+  "license": "Apache-2.0",
+  "homepage": "https://opengen.dev/agents/claude-code",
+  "mcpServers": {
+    "opengen": {
+      "type": "http",
+      "url": "https://opengen.dev/mcp"
+    }
+  }
+}

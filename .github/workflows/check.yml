@@ -1,0 +1,173 @@
+name: Checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  provenance:
+    name: Isolated C2PA integration
+    permissions:
+      contents: read
+    uses: ./.github/workflows/provenance.yml
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: opengen
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: opengen_test
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U opengen -d opengen_test" --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://opengen:test-only@127.0.0.1:5432/opengen_test
+      TEST_NATIVE_POSTGRES: 1
+      EXECUTION_NATIVE_DATABASE_URL: postgresql://opengen:test-only@127.0.0.1:5432/opengen_test
+      NEXT_TELEMETRY_DISABLED: 1
+      OPENGEN_PUBLIC_URL: http://127.0.0.1:4320
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: node scripts/build-onboarding.mjs --check
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run catalog:check
+      - run: npm run release:check
+      - run: npm test -- --no-file-parallelism
+      - name: Qualify populated core upgrade and native backup/restore
+        env:
+          OPENGEN_CORE_QUALIFICATION: '1'
+          TEST_DATABASE_URL: postgresql://opengen:test-only@127.0.0.1:5432/opengen_core_qualification_ci
+          OPENGEN_CORE_QUALIFICATION_PG_BIN: ${{ runner.temp }}/opengen-core-pg-tools
+        run: |
+          mkdir -p "$OPENGEN_CORE_QUALIFICATION_PG_BIN"
+          cat > "$OPENGEN_CORE_QUALIFICATION_PG_BIN/pg_dump" <<'DUMP'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec docker exec -i -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGCONNECT_TIMEOUT '${{ job.services.postgres.id }}' pg_dump "$@"
+          DUMP
+          cat > "$OPENGEN_CORE_QUALIFICATION_PG_BIN/pg_restore" <<'RESTORE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec docker exec -i -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGCONNECT_TIMEOUT '${{ job.services.postgres.id }}' pg_restore "$@"
+          RESTORE
+          chmod 700 "$OPENGEN_CORE_QUALIFICATION_PG_BIN/pg_dump" "$OPENGEN_CORE_QUALIFICATION_PG_BIN/pg_restore"
+          docker exec -e PGPASSWORD=test-only '${{ job.services.postgres.id }}' psql -h 127.0.0.1 -U opengen -d opengen_test -v ON_ERROR_STOP=1 -c 'CREATE DATABASE opengen_core_qualification_ci'
+          node --import tsx scripts/qualify-core-postgres.mjs
+          node node_modules/vitest/vitest.mjs run tests/billing-migrations.test.ts tests/terms-receipt-upgrade.test.ts tests/staff-refund-live-upgrade.test.ts tests/aged-cost-relief-upgrade.test.ts tests/aged-cost-relief-native-tools.test.ts --no-file-parallelism
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+      - name: Package standalone CLI without publishing
+        run: npm run cli:package -- --repo-root "$GITHUB_WORKSPACE" --out-dir "$RUNNER_TEMP/opengen-cli-release"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: opengen-cli-review
+          path: |
+            ${{ runner.temp }}/opengen-cli-release/opengen-cli-*.tgz
+            ${{ runner.temp }}/opengen-cli-release/opengen-cli-*.sha256
+            ${{ runner.temp }}/opengen-cli-release/opengen-cli-*.manifest.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stage private onboarding distribution without publishing
+        run: node scripts/package-onboarding.mjs --repo-root "$GITHUB_WORKSPACE" --out-dir "$RUNNER_TEMP/opengen-onboarding-release"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: opengen-onboarding-review
+          path: |
+            ${{ runner.temp }}/opengen-onboarding-release/*.tgz
+            ${{ runner.temp }}/opengen-onboarding-release/install-opengen.mjs
+            ${{ runner.temp }}/opengen-onboarding-release/RELEASE-MANIFEST.json
+            ${{ runner.temp }}/opengen-onboarding-release/PROVENANCE.json
+            ${{ runner.temp }}/opengen-onboarding-release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+      - run: npx playwright install --with-deps chrome
+      - name: Start local read-only catalog services
+        run: |
+          npm run dev:api > /tmp/opengen-api.log 2>&1 &
+          npm run start --workspace @media-router/web > /tmp/opengen-web.log 2>&1 &
+          node scripts/wait-http.mjs http://127.0.0.1:4310/health http://127.0.0.1:4320
+      - run: npx playwright test --config apps/web/playwright.config.ts --workers=1
+      - run: npx playwright test --config apps/web/onboarding.playwright.config.ts --project=phone --workers=1
+      - name: Verify inactive Terms notice through the browser proxy
+        run: |
+          TEST_PUBLIC_ORIGIN=http://127.0.0.1:4323 node --import tsx tests/helpers/terms-browser-server.ts > /tmp/opengen-terms-fixture.log 2>&1 &
+          terms_fixture_pid=$!
+          MEDIA_ROUTER_API_URL=http://127.0.0.1:4313 OPENGEN_PUBLIC_URL=http://127.0.0.1:4323 node node_modules/next/dist/bin/next start apps/web --hostname 127.0.0.1 --port 4323 > /tmp/opengen-terms-web.log 2>&1 &
+          terms_web_pid=$!
+          trap 'kill "$terms_fixture_pid" "$terms_web_pid" 2>/dev/null || true' EXIT
+          node scripts/wait-http.mjs http://127.0.0.1:4313/health http://127.0.0.1:4323/terms
+          OPENGEN_TERMS_BROWSER_FIXTURE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:4323 npx playwright test --config apps/web/playwright.config.ts terms-login.spec.ts --workers=1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: browser-traces
+          path: apps/web/test-results
+          retention-days: 7
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - name: Install checksum-verified Gitleaks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          cd "$RUNNER_TEMP/gitleaks"
+          # Update these pins and scripts/verify-gitleaks.mjs together when upgrading.
+          gitleaks_version=8.30.1
+          archive_asset_id=378332058
+          checksums_asset_id=378333193
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(--header "Authorization: Bearer $GITHUB_TOKEN")
+          fi
+          # --location strips Authorization on cross-origin redirects; never use --location-trusted.
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-redirs 3 \
+            --connect-timeout 10 --max-time 30 --retry 2 --retry-max-time 60 \
+            --user-agent 'OpenGen-CI' --header 'Accept: application/octet-stream' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' "${auth[@]}" \
+            --write-out "Gitleaks $gitleaks_version archive HTTP %{http_code}\n" \
+            --output gitleaks.tar.gz "https://api.github.com/repos/gitleaks/gitleaks/releases/assets/$archive_asset_id"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-redirs 3 \
+            --connect-timeout 10 --max-time 30 --retry 2 --retry-max-time 60 \
+            --user-agent 'OpenGen-CI' --header 'Accept: application/octet-stream' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' "${auth[@]}" \
+            --write-out "Gitleaks $gitleaks_version checksums HTTP %{http_code}\n" \
+            --output checksums.txt "https://api.github.com/repos/gitleaks/gitleaks/releases/assets/$checksums_asset_id"
+          node "$GITHUB_WORKSPACE/scripts/verify-gitleaks.mjs" "$RUNNER_TEMP/gitleaks"
+          tar -xzf gitleaks.tar.gz gitleaks
+          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+      - run: npm run scan:secrets
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - run: node scripts/setup-local.mjs
+      - run: docker compose --env-file .env -f deploy/compose.yaml config --quiet
+      - run: docker compose --env-file .env -f deploy/compose.yaml up --build --detach --wait --wait-timeout 180
+      - run: node scripts/wait-http.mjs http://127.0.0.1:4310/health http://127.0.0.1:4320
+      - name: Check container catalog and generation authentication
+        run: node scripts/container-smoke.mjs
+      - run: node scripts/database-smoke.mjs
+      - name: Stop local containers
+        if: always()
+        run: docker compose --env-file .env -f deploy/compose.yaml down --volumes

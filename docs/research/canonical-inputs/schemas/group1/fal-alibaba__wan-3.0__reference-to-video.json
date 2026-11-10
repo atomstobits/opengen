@@ -1,0 +1,372 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Freference-to-video",
+  "schema": {
+    "input": {
+      "properties": {
+        "file_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution": {
+          "enum": ["480p", "720p", "1080p"],
+          "type": "string",
+          "default": "1080p"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "maximum": 2147483647,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "minimum": 2,
+              "maximum": 30,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 5
+        },
+        "enable_safety_checker": {
+          "type": "boolean",
+          "default": true
+        },
+        "reference_video_urls": {
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reference_audio_urls": {
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enable_prompt_expansion": {
+          "type": "boolean",
+          "default": true
+        },
+        "audio": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_thinking": {
+          "type": "boolean",
+          "default": false
+        },
+        "web_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference_image_urls": {
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "aspect_ratio": {
+          "enum": ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          "type": "string",
+          "default": "adaptive"
+        }
+      },
+      "type": "object"
+    },
+    "components": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED"]
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "response_url": {
+            "type": "string"
+          },
+          "status_url": {
+            "type": "string"
+          },
+          "cancel_url": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "queue_position": {
+            "type": "integer"
+          }
+        },
+        "required": ["status", "request_id"]
+      },
+      "Wan30ReferenceToVideoInput": {
+        "properties": {
+          "file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolution": {
+            "enum": ["480p", "720p", "1080p"],
+            "type": "string",
+            "default": "1080p"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "maximum": 2147483647,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "minimum": 2,
+                "maximum": 30,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 5
+          },
+          "enable_safety_checker": {
+            "type": "boolean",
+            "default": true
+          },
+          "reference_video_urls": {
+            "maxItems": 5,
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reference_audio_urls": {
+            "maxItems": 5,
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enable_prompt_expansion": {
+            "type": "boolean",
+            "default": true
+          },
+          "audio": {
+            "type": "boolean",
+            "default": true
+          },
+          "enable_thinking": {
+            "type": "boolean",
+            "default": false
+          },
+          "web_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reference_image_urls": {
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "aspect_ratio": {
+            "enum": ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+            "type": "string",
+            "default": "adaptive"
+          }
+        },
+        "type": "object"
+      },
+      "Wan30ReferenceToVideoOutput": {
+        "properties": {
+          "video": {
+            "$ref": "#/components/schemas/VideoFile"
+          },
+          "duration": {
+            "type": "number"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "actual_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["video", "seed", "duration"],
+        "type": "object"
+      },
+      "VideoFile": {
+        "properties": {
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "num_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["url"],
+        "type": "object"
+      }
+    }
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}

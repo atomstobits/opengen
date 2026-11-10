@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "evidenceKind": "synthetic",
+  "scope": [
+    {
+      "providerId": "fal",
+      "endpointId": "minimax/h3-max/text-to-video",
+      "modelId": "minimax/h3-max",
+      "deploymentId": "fal-undisclosed"
+    },
+    {
+      "providerId": "fal",
+      "endpointId": "minimax/h3-max-turbo/text-to-video",
+      "modelId": "fal/h3-max-turbo",
+      "deploymentId": "fal-undisclosed"
+    },
+    {
+      "providerId": "fal",
+      "endpointId": "minimax/h3-max/image-to-video",
+      "modelId": "minimax/h3-max",
+      "deploymentId": "fal-undisclosed"
+    }
+  ],
+  "entries": [
+    {
+      "identity": {
+        "providerId": "fal",
+        "endpointId": "minimax/h3-max/text-to-video",
+        "modelId": "minimax/h3-max",
+        "deploymentId": "fal-undisclosed"
+      },
+      "source": {
+        "url": "https://fal.ai/models/minimax/h3-max/text-to-video",
+        "checkedAt": "2026-11-03",
+        "path": "synthetic-0-before.json",
+        "sha256": "ff34bbe14aa8eaf482ebfbf04152564e7ef3f57fbaf7cffabd92bd676cd87b2d"
+      },
+      "inputSchemaPointer": "/input_schema",
+      "facts": {
+        "capabilities": {
+          "audio": true,
+          "references": null
+        },
+        "retirement": {
+          "deprecated": false,
+          "retirementAt": null,
+          "replacementEndpointId": null
+        },
+        "region": {
+          "endpointRegion": null,
+          "inferenceScope": null,
+          "residency": null
+        },
+        "tariff": {
+          "currency": "USD",
+          "rate": "0.05",
+          "unit": "output-second",
+          "rounding": null,
+          "formulaStatus": "unknown",
+          "accountScope": "public-list",
+          "accountRef": null
+        }
+      }
+    },
+    {
+      "identity": {
+        "providerId": "fal",
+        "endpointId": "minimax/h3-max-turbo/text-to-video",
+        "modelId": "fal/h3-max-turbo",
+        "deploymentId": "fal-undisclosed"
+      },
+      "source": {
+        "url": "https://fal.ai/models/minimax/h3-max-turbo/text-to-video",
+        "checkedAt": "2026-11-03",
+        "path": "synthetic-1-before.json",
+        "sha256": "ff34bbe14aa8eaf482ebfbf04152564e7ef3f57fbaf7cffabd92bd676cd87b2d"
+      },
+      "inputSchemaPointer": "/input_schema",
+      "facts": {
+        "capabilities": {
+          "audio": true,
+          "references": null
+        },
+        "retirement": {
+          "deprecated": false,
+          "retirementAt": null,
+          "replacementEndpointId": null
+        },
+        "region": {
+          "endpointRegion": null,
+          "inferenceScope": null,
+          "residency": null
+        },
+        "tariff": {
+          "currency": "USD",
+          "rate": "0.05",
+          "unit": "output-second",
+          "rounding": null,
+          "formulaStatus": "unknown",
+          "accountScope": "public-list",
+          "accountRef": null
+        }
+      }
+    }
+  ]
+}

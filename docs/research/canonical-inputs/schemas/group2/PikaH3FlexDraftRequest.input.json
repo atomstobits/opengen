@@ -1,0 +1,71 @@
+{
+  "source": "https://dev.pika.art/openapi.json",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "oneOf": [
+      {
+        "properties": {
+          "draft_job_id": {
+            "type": "string"
+          }
+        },
+        "required": ["draft_job_id"]
+      },
+      {
+        "properties": {
+          "video": {
+            "type": "string"
+          }
+        },
+        "required": ["video"]
+      }
+    ],
+    "properties": {
+      "draft_job_id": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "video": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 2083,
+            "pattern": "^https?://",
+            "media_kinds": ["video"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["1080p", "2k", "4k"],
+        "default": "2k"
+      },
+      "webhook_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "type": "object"
+  },
+  "components": {
+    "schemas": {}
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "paths": {
+      "@media-router/contracts": ["./packages/contracts/src/index.ts"],
+      "@media-router/catalog": ["./packages/catalog/src/index.ts"],
+      "@media-router/engine": ["./packages/engine/src/index.ts"],
+      "@media-router/sdk": ["./packages/sdk/src/index.ts"],
+      "@media-router/contracts/generation": ["./packages/contracts/src/generation.ts"],
+      "@media-router/contracts/legal-policies": ["./packages/contracts/src/legal-policies.ts"]
+    }
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "scripts/**/*.ts",
+    "examples/**/*.ts"
+  ],
+  "exclude": ["node_modules", "**/.next", "**/dist"]
+}

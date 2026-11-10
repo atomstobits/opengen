@@ -1,0 +1,84 @@
+.example {
+  margin: 0 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.example summary {
+  min-height: 44px;
+  padding: 12px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.example summary span {
+  margin: 0 8px 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
+.body {
+  padding: 0 14px 14px;
+}
+
+.media {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 440px;
+  margin: 6px 0 12px;
+}
+
+.media figure {
+  min-width: 0;
+  margin: 0;
+}
+
+.media figcaption {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.media img,
+.media video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--canvas);
+}
+
+.settings {
+  font: 12px var(--mono);
+}
+
+.prompt {
+  font-size: 14px;
+}
+
+.source,
+.action p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.source a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.action p {
+  margin: 0;
+}

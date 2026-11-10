@@ -1,0 +1,81 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://docs.dev.runwayml.com/api/",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "videoUri": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 13,
+            "maxLength": 2048,
+            "pattern": "^https:\\/\\/.*"
+          },
+          {
+            "type": "string",
+            "minLength": 13,
+            "maxLength": 5000,
+            "pattern": "^runway:\\/\\/.*"
+          },
+          {
+            "type": "string",
+            "minLength": 13,
+            "maxLength": 5242880,
+            "pattern": "^data:video\\/.*"
+          }
+        ]
+      },
+      "promptText": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 26000
+      },
+      "ratio": {
+        "type": "string",
+        "enum": ["auto_720p", "auto_1080p"]
+      },
+      "references": {
+        "minItems": 0,
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 2048,
+                  "pattern": "^https:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5000,
+                  "pattern": "^runway:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5242880,
+                  "pattern": "^data:image\\/.*"
+                }
+              ]
+            }
+          },
+          "required": ["uri"],
+          "additionalProperties": false
+        }
+      },
+      "model": {
+        "type": "string",
+        "const": "kling_4"
+      }
+    },
+    "required": ["videoUri", "promptText", "model"],
+    "additionalProperties": false
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}

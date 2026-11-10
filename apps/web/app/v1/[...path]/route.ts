@@ -1,0 +1,10 @@
+import { nativeGateway } from '../../native-gateway';
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+export const GET = nativeGateway;
+export const HEAD = nativeGateway;
+export const POST = nativeGateway;
+export const PUT = nativeGateway;
+export const PATCH = nativeGateway;
+export const DELETE = nativeGateway;
+export const OPTIONS = nativeGateway;

@@ -1,0 +1,182 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://docs.dev.runwayml.com/api/",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "promptText": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 15000
+      },
+      "audio": {
+        "type": "boolean"
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "outputFormat": {
+        "type": "string",
+        "enum": ["mp4", "mov"]
+      },
+      "duration": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30
+          },
+          {
+            "type": "string",
+            "const": "auto"
+          }
+        ]
+      },
+      "ratio": {
+        "type": "string",
+        "enum": [
+          "992:432",
+          "854:480",
+          "752:560",
+          "640:640",
+          "560:752",
+          "480:854",
+          "1470:630",
+          "1280:720",
+          "1112:834",
+          "960:960",
+          "834:1112",
+          "720:1280",
+          "2206:946",
+          "1920:1080",
+          "1664:1248",
+          "1440:1440",
+          "1248:1664",
+          "1080:1920"
+        ]
+      },
+      "references": {
+        "maxItems": 30,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 2048,
+                  "pattern": "^https:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5000,
+                  "pattern": "^runway:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5242880,
+                  "pattern": "^data:image\\/.*"
+                }
+              ]
+            }
+          },
+          "required": ["uri"],
+          "additionalProperties": false
+        }
+      },
+      "referenceVideos": {
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "video"
+            },
+            "uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 2048,
+                  "pattern": "^https:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5000,
+                  "pattern": "^runway:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5242880,
+                  "pattern": "^data:video\\/.*"
+                }
+              ]
+            }
+          },
+          "required": ["type", "uri"]
+        }
+      },
+      "referenceAudio": {
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "audio"
+            },
+            "uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 2048,
+                  "pattern": "^https:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5000,
+                  "pattern": "^runway:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5242880,
+                  "pattern": "^data:audio\\/.*"
+                }
+              ]
+            }
+          },
+          "required": ["type", "uri"]
+        }
+      },
+      "draft": {
+        "type": "boolean"
+      },
+      "draftTaskId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
+      },
+      "model": {
+        "type": "string",
+        "const": "seedance2_5"
+      }
+    },
+    "required": ["model"],
+    "additionalProperties": false
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}

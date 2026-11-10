@@ -1,0 +1,210 @@
+{
+  "source": "https://dev.pika.art/openapi.json",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "maxLength": 8000,
+        "minLength": 1
+      },
+      "duration": {
+        "type": "integer",
+        "maximum": 15.0,
+        "minimum": 5.0,
+        "default": 5
+      },
+      "aspect_ratio": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "3:2",
+              "4:3",
+              "5:4",
+              "1:1",
+              "4:5",
+              "3:4",
+              "2:3",
+              "9:16",
+              "9:21"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["480p", "768p", "1080p", "2k", "4k"],
+        "default": "768p"
+      },
+      "seed": {
+        "type": "integer",
+        "maximum": 9.223372036854776e18,
+        "minimum": 0.0,
+        "default": 0
+      },
+      "rewrite": {
+        "type": "boolean",
+        "default": true
+      },
+      "output_mode": {
+        "type": "string",
+        "enum": ["video", "audio-stems"],
+        "default": "video"
+      },
+      "channel_mode": {
+        "type": "string",
+        "enum": ["stereo", "mono"],
+        "default": "mono"
+      },
+      "references": {
+        "allOf": [
+          {
+            "contains": {
+              "properties": {
+                "type": {
+                  "const": "image"
+                }
+              },
+              "required": ["type"]
+            },
+            "maxContains": 9,
+            "minContains": 0
+          },
+          {
+            "contains": {
+              "properties": {
+                "type": {
+                  "const": "video"
+                }
+              },
+              "required": ["type"]
+            },
+            "maxContains": 3,
+            "minContains": 0
+          },
+          {
+            "contains": {
+              "properties": {
+                "type": {
+                  "const": "audio"
+                }
+              },
+              "required": ["type"]
+            },
+            "maxContains": 3,
+            "minContains": 0
+          }
+        ],
+        "items": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/H3ImageReference"
+            },
+            {
+              "$ref": "#/components/schemas/H3VideoReference"
+            },
+            {
+              "$ref": "#/components/schemas/H3AudioReference"
+            }
+          ],
+          "discriminator": {
+            "propertyName": "type",
+            "mapping": {
+              "audio": "#/components/schemas/H3AudioReference",
+              "image": "#/components/schemas/H3ImageReference",
+              "video": "#/components/schemas/H3VideoReference"
+            }
+          }
+        },
+        "contains": {
+          "properties": {
+            "type": {
+              "enum": ["image", "video"]
+            }
+          },
+          "required": ["type"]
+        },
+        "type": "array",
+        "maxItems": 12,
+        "minItems": 1,
+        "minContains": 1
+      },
+      "webhook_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": ["prompt", "references"],
+    "native_audio": true
+  },
+  "components": {
+    "schemas": {
+      "H3AudioReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "audio"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["audio"]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["type", "url"]
+      },
+      "H3VideoReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "video"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["video"]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["type", "url"]
+      },
+      "H3ImageReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "image"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["type", "url"]
+      }
+    }
+  }
+}

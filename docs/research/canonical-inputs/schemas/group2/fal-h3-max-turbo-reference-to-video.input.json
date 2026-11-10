@@ -1,0 +1,99 @@
+{
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/reference-to-video",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "enable_safety_checker": {
+        "type": "boolean",
+        "default": true
+      },
+      "reference_audio_urls": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "maxItems": 3
+      },
+      "seed": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "prompt": {
+        "minLength": 1,
+        "type": "string",
+        "maxLength": 50000
+      },
+      "prompt_expansion_mode": {
+        "type": "string",
+        "default": "balanced"
+      },
+      "duration": {
+        "maximum": 15,
+        "type": "number",
+        "minimum": 0.92,
+        "default": 5
+      },
+      "reference_image_urls": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "maxItems": 9
+      },
+      "resolution": {
+        "enum": ["480P", "768P", "1080P"],
+        "type": "string",
+        "default": "768P"
+      },
+      "reference_conditions": {
+        "items": {
+          "$ref": "#/components/schemas/ReferenceCondition"
+        },
+        "type": "array",
+        "maxItems": 12
+      },
+      "reference_video_urls": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "maxItems": 3
+      },
+      "aspect_ratio": {
+        "enum": ["adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+        "type": "string",
+        "default": "adaptive"
+      },
+      "sync_mode": {
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "required": ["prompt", "prompt_expansion_mode"]
+  },
+  "components": {
+    "schemas": {
+      "ReferenceCondition": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "enum": ["image", "video", "audio"],
+            "type": "string"
+          }
+        },
+        "required": ["type", "url"]
+      }
+    }
+  }
+}

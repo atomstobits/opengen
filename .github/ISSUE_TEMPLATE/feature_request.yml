@@ -1,0 +1,13 @@
+name: Feature request
+description: Suggest a focused product or provider improvement
+title: '[Feature] '
+body:
+  - type: textarea
+    id: problem
+    attributes: { label: Problem and proposed behavior }
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Provider/source evidence and alternatives
+      description: Link primary public documentation for new models, regions or capabilities. No keys.

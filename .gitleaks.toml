@@ -1,0 +1,19 @@
+title = "OpenGen secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public environment-variable identifier in the regional adapter fixture, not a credential value"
+regexTarget = "secret"
+regexes = ['''^ALIBABA_AP_SOUTHEAST_1_API_KEY$''']
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Public qualification profile literal in the activation-preflight example, not a credential"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''(^|/)scripts/core-activation-preflight\.mjs$''']
+regexes = ['''^qualification-sg-v1$''']

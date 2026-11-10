@@ -1,0 +1,3247 @@
+{
+  "summary": {
+    "checkedAt": "2026-11-03",
+    "note": "Documentary input inventory. Parameter records include repeated shared/nested/alternative fields across profiles; they are not unique parameters or live-verified capabilities. Classification is an OpenGen design proposal, not a vendor guarantee.",
+    "scopeModels": 28,
+    "auditedModels": 28,
+    "existingCatalogRoutes": 67,
+    "endpointProfiles": 123,
+    "parameterRecords": 1659,
+    "distinctSourceUrls": 128,
+    "classificationCounts": {
+      "commonGeneration": 1125,
+      "modelSpecific": 319,
+      "brokerTransport": 215
+    },
+    "conflicts": 24,
+    "additionalUnqualifiedOfferingProfiles": 3,
+    "additionalUnqualifiedOfferingFields": 25
+  },
+  "models": [
+    {
+      "id": "bytedance/seedance-2.5",
+      "name": "Seedance 2.5",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5",
+      "series": ["bytedance/seedance-2.5"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.5",
+        "runway-undisclosed/bytedance-seedance-2.5",
+        "replicate-undisclosed/bytedance-seedance-2.5",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5",
+        "fal-undisclosed/bytedance/seedance-2.5/text-to-video",
+        "fal-undisclosed/bytedance/seedance-2.5/image-to-video",
+        "fal-undisclosed/bytedance/seedance-2.5/reference-to-video"
+      ],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/draft/complete",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/image-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/reference-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/text-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/us/draft/complete",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/us/image-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/us/reference-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.5/us/text-to-video",
+        "video-seedance-kling-wan:byteplus:dreamina-seedance-2-5-260628",
+        "video-seedance-kling-wan:runway:seedance2_5:text-to-video",
+        "video-seedance-kling-wan:runway:seedance2_5:image-to-video",
+        "video-seedance-kling-wan:runway:seedance2_5:video-to-video",
+        "video-seedance-kling-wan:replicate:seedance2.5"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2.0",
+      "name": "Seedance 2.0",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+      "series": ["bytedance/seedance-2.0"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.0",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0",
+        "fal-undisclosed/bytedance/seedance-2.0/text-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/image-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/reference-to-video",
+        "fal-seedance-us-account-enabled/bytedance-seedance-2.0"
+      ],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/image-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/reference-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/text-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/us/image-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/us/reference-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/us/text-to-video",
+        "video-seedance-kling-wan:byteplus:dreamina-seedance-2-0-260128",
+        "video-seedance-kling-wan:runway:seedance2:text-to-video",
+        "video-seedance-kling-wan:runway:seedance2:image-to-video",
+        "video-seedance-kling-wan:runway:seedance2:video-to-video"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2.0-fast",
+      "name": "Seedance 2.0 Fast",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+      "series": ["bytedance/seedance-2.0"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.0-fast",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0-fast",
+        "fal-undisclosed/bytedance/seedance-2.0/fast/text-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/fast/image-to-video",
+        "fal-undisclosed/bytedance/seedance-2.0/fast/reference-to-video"
+      ],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/fast/image-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/fast/reference-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/fast/text-to-video",
+        "video-seedance-kling-wan:byteplus:dreamina-seedance-2-0-fast-260128",
+        "video-seedance-kling-wan:runway:seedance2_fast:text-to-video",
+        "video-seedance-kling-wan:runway:seedance2_fast:image-to-video",
+        "video-seedance-kling-wan:runway:seedance2_fast:video-to-video"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2.0-mini",
+      "name": "Seedance 2.0 Mini",
+      "creator": "ByteDance",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+      "series": ["bytedance/seedance-2.0"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedance-2.0-mini",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0-mini"
+      ],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/mini/image-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/mini/reference-to-video",
+        "video-seedance-kling-wan:fal:bytedance/seedance-2.0/mini/text-to-video",
+        "video-seedance-kling-wan:byteplus:dreamina-seedance-2-0-mini-260615",
+        "video-seedance-kling-wan:runway:seedance2_mini:text-to-video",
+        "video-seedance-kling-wan:runway:seedance2_mini:image-to-video",
+        "video-seedance-kling-wan:runway:seedance2_mini:video-to-video"
+      ]
+    },
+    {
+      "id": "kling/kling-4.0",
+      "name": "Kling 4.0",
+      "creator": "Kling AI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://kling.ai/dev/model-release/kling-4",
+      "series": ["kling/kling-4.0"],
+      "existingRouteIds": ["runway-undisclosed/kling-kling-4.0"],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:runway:kling_4:text-to-video",
+        "video-seedance-kling-wan:runway:kling_4:image-to-video",
+        "video-seedance-kling-wan:runway:kling_4:video-to-video",
+        "video-seedance-kling-wan:cloudflare:kling4-supplemental",
+        "video-seedance-kling-wan:kling-direct:release-only:text-to-video",
+        "video-seedance-kling-wan:kling-direct:release-only:image-to-video",
+        "video-seedance-kling-wan:kling-direct:release-only:omni-reference-to-video",
+        "video-seedance-kling-wan:runware:kling4-supplemental"
+      ]
+    },
+    {
+      "id": "alibaba/wan-3.0",
+      "name": "Wan 3.0",
+      "creator": "Alibaba",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video",
+      "series": ["alibaba/wan-3.0"],
+      "existingRouteIds": [
+        "alibaba/cn-beijing/wan-3.0",
+        "alibaba/ap-southeast-1/wan-3.0",
+        "alibaba/ap-northeast-1/wan-3.0",
+        "alibaba/eu-central-1/wan-3.0",
+        "alibaba/us-east-1/wan-3.0",
+        "alibaba/cn-hongkong/wan-3.0"
+      ],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:fal:alibaba/wan-3.0/image-to-video",
+        "video-seedance-kling-wan:fal:alibaba/wan-3.0/reference-to-video",
+        "video-seedance-kling-wan:fal:alibaba/wan-3.0/text-to-video",
+        "video-seedance-kling-wan:alibaba:wan3.0-video:cn-beijing",
+        "video-seedance-kling-wan:alibaba:wan3.0-video:ap-southeast-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video:ap-northeast-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video:eu-central-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video:us-east-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video:cn-hongkong"
+      ]
+    },
+    {
+      "id": "alibaba/wan-3.0-prime",
+      "name": "Wan 3.0 Prime",
+      "creator": "Alibaba",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime",
+      "series": ["alibaba/wan-3.0"],
+      "existingRouteIds": [
+        "alibaba/cn-beijing/wan-3.0-prime",
+        "alibaba/ap-southeast-1/wan-3.0-prime",
+        "alibaba/ap-northeast-1/wan-3.0-prime",
+        "alibaba/eu-central-1/wan-3.0-prime",
+        "alibaba/us-east-1/wan-3.0-prime",
+        "alibaba/cn-hongkong/wan-3.0-prime"
+      ],
+      "report": "video-seedance-kling-wan.md",
+      "endpointIds": [
+        "video-seedance-kling-wan:fal:alibaba/wan-3.0-prime/image-to-video",
+        "video-seedance-kling-wan:fal:alibaba/wan-3.0-prime/reference-to-video",
+        "video-seedance-kling-wan:fal:alibaba/wan-3.0-prime/text-to-video",
+        "video-seedance-kling-wan:alibaba:wan3.0-video-prime:cn-beijing",
+        "video-seedance-kling-wan:alibaba:wan3.0-video-prime:ap-southeast-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video-prime:ap-northeast-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video-prime:eu-central-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video-prime:us-east-1",
+        "video-seedance-kling-wan:alibaba:wan3.0-video-prime:cn-hongkong"
+      ]
+    },
+    {
+      "id": "minimax/h3",
+      "name": "MiniMax H3",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://design.minimax.io/h3",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": [
+        "video-h3-omni-grok:minimax.h3.generate",
+        "video-h3-omni-grok:minimax.H3ContextIRReq",
+        "video-h3-omni-grok:minimax.VideoRegenerationSourceTaskReq",
+        "video-h3-omni-grok:minimax.VideoRegenerationBaseVideoReq"
+      ]
+    },
+    {
+      "id": "minimax/h3-highspeed",
+      "name": "MiniMax H3 Highspeed",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3-highspeed"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": ["video-h3-omni-grok:minimax.h3.generate"]
+    },
+    {
+      "id": "minimax/h3-lite",
+      "name": "MiniMax H3 Lite",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3-lite"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": ["video-h3-omni-grok:minimax.h3.generate"]
+    },
+    {
+      "id": "minimax/h3-max",
+      "name": "MiniMax H3 Max · MiniMax",
+      "creator": "MiniMax",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["minimax-undisclosed/minimax-h3-max"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": ["video-h3-omni-grok:minimax.h3.generate"]
+    },
+    {
+      "id": "fal/h3-max",
+      "name": "H3 Max · fal",
+      "creator": "fal",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://fal.ai/models/minimax/h3-max/text-to-video",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["fal-undisclosed/fal-h3-max"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": [
+        "video-h3-omni-grok:fal.h3-max.text-to-video",
+        "video-h3-omni-grok:fal.h3-max.image-to-video",
+        "video-h3-omni-grok:fal.h3-max.reference-to-video"
+      ]
+    },
+    {
+      "id": "fal/h3-max-turbo",
+      "name": "H3 Max Turbo · fal",
+      "creator": "fal",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://fal.ai/models/minimax/h3-max-turbo/text-to-video",
+      "series": ["minimax/h3"],
+      "existingRouteIds": ["fal-undisclosed/fal-h3-max-turbo"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": [
+        "video-h3-omni-grok:fal.h3-max-turbo.text-to-video",
+        "video-h3-omni-grok:fal.h3-max-turbo.image-to-video",
+        "video-h3-omni-grok:fal.h3-max-turbo.reference-to-video"
+      ]
+    },
+    {
+      "id": "pika/h3-flex",
+      "name": "H3 Flex · Pika",
+      "creator": "Pika",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://pika.art/pika-h3-flex",
+      "series": ["minimax/h3"],
+      "existingRouteIds": [
+        "pika-undisclosed/pika-h3-flex",
+        "pika-undisclosed/pika-h3-flex-reference-to-video"
+      ],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": [
+        "video-h3-omni-grok:pika.text-to-video",
+        "video-h3-omni-grok:pika.image-to-video",
+        "video-h3-omni-grok:pika.reference-to-video",
+        "video-h3-omni-grok:pika.draft-to-video",
+        "video-h3-omni-grok:pika.audio-stems",
+        "video-h3-omni-grok:pika.prompt-rewriter"
+      ]
+    },
+    {
+      "id": "google/gemini-omni-1.1-flash",
+      "name": "Gemini Omni 1.1 Flash",
+      "creator": "Google",
+      "modality": "video",
+      "aliases": ["Gemini Omni Flash", "gemini-omni-1.1-flash"],
+      "source": "https://aistudio.google.com/docs/models/gemini-omni-flash",
+      "series": ["google/gemini-omni-1.1-flash"],
+      "existingRouteIds": ["google-undisclosed/google-gemini-omni-1.1-flash"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": [
+        "video-h3-omni-grok:google.omni.text-to-video",
+        "video-h3-omni-grok:google.omni.image-to-video",
+        "video-h3-omni-grok:google.omni.first-last-frame-interpolation",
+        "video-h3-omni-grok:google.omni.reference-to-video",
+        "video-h3-omni-grok:google.omni.video-edit",
+        "video-h3-omni-grok:google.omni.video-extend",
+        "video-h3-omni-grok:google.omni.conversational-video-edit",
+        "video-h3-omni-grok:google.omni.video-upscale"
+      ]
+    },
+    {
+      "id": "xai/grok-imagine-video-1.5",
+      "name": "Grok Imagine Video 1.5",
+      "creator": "xAI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview",
+      "series": ["xai/grok-imagine-video"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-video-1.5"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": ["video-h3-omni-grok:xai/grok-imagine-video-1.5.generate"]
+    },
+    {
+      "id": "xai/grok-imagine-video-1.5-lite",
+      "name": "Grok Imagine Video 1.5 Lite",
+      "creator": "xAI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview",
+      "series": ["xai/grok-imagine-video"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-video-1.5-lite"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": ["video-h3-omni-grok:xai/grok-imagine-video-1.5-lite.generate"]
+    },
+    {
+      "id": "xai/grok-imagine-video",
+      "name": "Grok Imagine Video · Edit / Extend",
+      "creator": "xAI",
+      "modality": "video",
+      "aliases": [],
+      "source": "https://docs.x.ai/developers/model-capabilities/video/overview",
+      "series": ["xai/grok-imagine-video"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-video"],
+      "report": "video-h3-omni-grok.md",
+      "endpointIds": [
+        "video-h3-omni-grok:xai/grok-imagine-video.generate",
+        "video-h3-omni-grok:xai.legacy.video-edit",
+        "video-h3-omni-grok:xai.legacy.video-extend"
+      ]
+    },
+    {
+      "id": "openai/gpt-image-2.5-sunburst",
+      "name": "GPT Image 2.5 Sunburst",
+      "creator": "OpenAI",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst",
+      "series": ["openai/gpt-image-2.5"],
+      "existingRouteIds": [
+        "openai-undisclosed/openai-gpt-image-2.5-sunburst",
+        "fal-undisclosed/openai/gpt-image-2.5/sunburst/text-to-image",
+        "fal-undisclosed/openai/gpt-image-2.5/sunburst/edit"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:openai.gpt25.generate",
+        "image-models:openai.gpt25.edit-json",
+        "image-models:openai.gpt25.edit-multipart",
+        "image-models:openai.gpt25.responses-tool",
+        "image-models:fal.openai/gpt-image-2.5/sunburst/edit",
+        "image-models:fal.openai/gpt-image-2.5/sunburst/text-to-image"
+      ]
+    },
+    {
+      "id": "openai/gpt-image-2.5-flare",
+      "name": "GPT Image 2.5 Flare",
+      "creator": "OpenAI",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2.5-flare",
+      "series": ["openai/gpt-image-2.5"],
+      "existingRouteIds": [
+        "openai-undisclosed/openai-gpt-image-2.5-flare",
+        "fal-undisclosed/openai/gpt-image-2.5/flare/text-to-image",
+        "fal-undisclosed/openai/gpt-image-2.5/flare/edit"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:openai.gpt25.generate",
+        "image-models:openai.gpt25.edit-json",
+        "image-models:openai.gpt25.edit-multipart",
+        "image-models:openai.gpt25.responses-tool",
+        "image-models:fal.openai/gpt-image-2.5/flare/edit",
+        "image-models:fal.openai/gpt-image-2.5/flare/text-to-image"
+      ]
+    },
+    {
+      "id": "openai/gpt-image-2",
+      "name": "GPT Image 2",
+      "creator": "OpenAI",
+      "modality": "image",
+      "aliases": ["GPT Image 2.0", "gpt-image-2"],
+      "source": "https://developers.openai.com/api/docs/models/gpt-image-2",
+      "series": ["openai/gpt-image-2"],
+      "existingRouteIds": ["openai-undisclosed/openai-gpt-image-2"],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:openai.gpt2.generate",
+        "image-models:openai.gpt2.edit-json",
+        "image-models:openai.gpt2.edit-multipart",
+        "image-models:openai.gpt2.responses-tool",
+        "image-models:fal.fal-ai/gpt-image-2",
+        "image-models:fal.fal-ai/gpt-image-2/edit"
+      ]
+    },
+    {
+      "id": "google/nano-banana-2.1",
+      "name": "Nano Banana 2.1",
+      "creator": "Google",
+      "modality": "image",
+      "aliases": ["gemini-nano-banana-2.1"],
+      "source": "https://ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1",
+      "series": ["google/nano-banana-2.1"],
+      "existingRouteIds": [
+        "google-undisclosed/google-nano-banana-2.1",
+        "fal-undisclosed/google/nano-banana-2.1",
+        "fal-undisclosed/google/nano-banana-2.1/edit"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:fal.google/nano-banana-2.1",
+        "image-models:fal.google/nano-banana-2.1/edit",
+        "image-models:google.nano-banana.interactions"
+      ]
+    },
+    {
+      "id": "xai/grok-imagine-image-2.0",
+      "name": "Grok Imagine Image 2.0",
+      "creator": "xAI",
+      "modality": "image",
+      "aliases": ["Grok Image 2.0"],
+      "source": "https://docs.x.ai/developers/models/grok-imagine-image-2.0",
+      "series": ["xai/grok-imagine-image-2.0"],
+      "existingRouteIds": ["xai-undisclosed/xai-grok-imagine-image-2.0"],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:xai.image.generate",
+        "image-models:xai.image.edit",
+        "image-models:fal.xai/grok-imagine-image/v2.0/edit",
+        "image-models:fal.xai/grok-imagine-image/v2.0/text-to-image",
+        "image-models:xai.image.python-grpc"
+      ]
+    },
+    {
+      "id": "bytedance/seedream-5.0-pro",
+      "name": "Seedream 5.0 Pro",
+      "creator": "ByteDance",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro",
+      "series": ["bytedance/seedream-5.0-pro"],
+      "existingRouteIds": [
+        "byteplus-undisclosed/bytedance-seedream-5.0-pro",
+        "byteplus-modelark-ap-southeast-1/bytedance-seedream-5.0-pro",
+        "replicate-undisclosed/bytedance-seedream-5.0-pro",
+        "fal-undisclosed/bytedance/seedream/v5/pro/text-to-image",
+        "fal-undisclosed/bytedance/seedream/v5/pro/edit"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:byteplus.seedream-pro.generate-edit",
+        "image-models:byteplus.seedream-pro.decompose",
+        "image-models:fal.bytedance/seedream/v5/pro/edit",
+        "image-models:fal.bytedance/seedream/v5/pro/text-to-image",
+        "image-models:replicate.seedream-pro"
+      ]
+    },
+    {
+      "id": "qwen/image-2.1",
+      "name": "Qwen Image 2.1",
+      "creator": "Qwen",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://github.com/QwenLM/Qwen-Image-2.1",
+      "series": ["qwen/image-2.1"],
+      "existingRouteIds": [],
+      "report": "image-models.md",
+      "endpointIds": ["image-models:qwen.weights.local-inference"]
+    },
+    {
+      "id": "qwen/image-2.1-turbo",
+      "name": "Qwen Image 2.1 Turbo",
+      "creator": "Qwen",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://github.com/QwenLM/Qwen-Image-2.1",
+      "series": ["qwen/image-2.1"],
+      "existingRouteIds": [
+        "alibaba-model-studio-region-unqualified/qwen-image-2.1-turbo",
+        "alibaba-model-studio-ap-southeast-1/qwen-image-2.1-turbo"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:alibaba.qwen.openai-compatible",
+        "image-models:alibaba.qwen.sync",
+        "image-models:alibaba.qwen.async",
+        "image-models:qwen.weights.local-inference"
+      ]
+    },
+    {
+      "id": "alibaba/qwen-image-2.1-pro",
+      "name": "Qwen Image 2.1 Pro · Hosted",
+      "creator": "Alibaba",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/text-to-image",
+      "series": ["qwen/image-2.1"],
+      "existingRouteIds": [
+        "alibaba-model-studio-region-unqualified/alibaba-qwen-image-2.1-pro",
+        "alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-2.1-pro"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:alibaba.qwen.openai-compatible",
+        "image-models:alibaba.qwen.sync",
+        "image-models:alibaba.qwen.async"
+      ]
+    },
+    {
+      "id": "alibaba/qwen-image-3.0-pro",
+      "name": "Qwen Image 3.0 Pro",
+      "creator": "Alibaba",
+      "modality": "image",
+      "aliases": [],
+      "source": "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference",
+      "series": ["qwen/image-3.0-pro"],
+      "existingRouteIds": [
+        "alibaba-model-studio-region-unqualified/alibaba-qwen-image-3.0-pro",
+        "alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-3.0-pro"
+      ],
+      "report": "image-models.md",
+      "endpointIds": [
+        "image-models:alibaba.qwen.openai-compatible",
+        "image-models:alibaba.qwen.sync",
+        "image-models:alibaba.qwen.async"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:alibaba/wan-3.0-prime/image-to-video",
+      "provider": "fal",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/alibaba/wan-3.0-prime/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0-prime%2Fimage-to-video",
+        "https://fal.ai/models/alibaba/wan-3.0-prime/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:alibaba/wan-3.0-prime/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/alibaba/wan-3.0-prime/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 14,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0-prime%2Freference-to-video",
+        "https://fal.ai/models/alibaba/wan-3.0-prime/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:alibaba/wan-3.0-prime/text-to-video",
+      "provider": "fal",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/alibaba/wan-3.0-prime/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0-prime%2Ftext-to-video",
+        "https://fal.ai/models/alibaba/wan-3.0-prime/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:alibaba/wan-3.0/image-to-video",
+      "provider": "fal",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/alibaba/wan-3.0/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Fimage-to-video",
+        "https://fal.ai/models/alibaba/wan-3.0/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:alibaba/wan-3.0/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/alibaba/wan-3.0/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 14,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Freference-to-video",
+        "https://fal.ai/models/alibaba/wan-3.0/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:alibaba/wan-3.0/text-to-video",
+      "provider": "fal",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/alibaba/wan-3.0/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Ftext-to-video",
+        "https://fal.ai/models/alibaba/wan-3.0/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/fast/image-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/fast/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ffast%2Fimage-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/fast/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/fast/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/fast/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ffast%2Freference-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/fast/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/fast/text-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/fast/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 8,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ffast%2Ftext-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/fast/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/image-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fimage-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/mini/image-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/mini/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Fimage-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/mini/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/mini/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/mini/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Freference-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/mini/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/mini/text-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/mini/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 7,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Ftext-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/mini/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Freference-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/text-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 8,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ftext-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/us/image-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/us/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fus%2Fimage-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/us/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/us/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/us/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fus%2Freference-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/us/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.0/us/text-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.0/us/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 8,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fus%2Ftext-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.0/us/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/draft/complete",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["draft-complete"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/draft/complete",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 3,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fdraft%2Fcomplete",
+        "https://fal.ai/models/bytedance/seedance-2.5/draft/complete/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/image-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fimage-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.5/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 14,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Freference-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/text-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Ftext-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.5/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/us/draft/complete",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["draft-complete"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/us/draft/complete",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 3,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Fdraft%2Fcomplete",
+        "https://fal.ai/models/bytedance/seedance-2.5/us/draft/complete/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/us/image-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/us/image-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Fimage-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.5/us/image-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/us/reference-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["reference-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/us/reference-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 14,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Freference-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.5/us/reference-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "fal:bytedance/seedance-2.5/us/text-to-video",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "US-hosted account route",
+        "accountAccess": "must be verified; a schema is not proof of enabled access"
+      },
+      "endpoint": "https://queue.fal.run/bytedance/seedance-2.5/us/text-to-video",
+      "evidenceStatus": "See existing adapter coverage; these facts include newly discovered or not-yet-implemented fields and operations.",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Ftext-to-video",
+        "https://fal.ai/models/bytedance/seedance-2.5/us/text-to-video/api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "byteplus:dreamina-seedance-2-5-260628",
+      "provider": "BytePlus ModelArk",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-southeast-1",
+        "otherRegions": "not qualified by this Singapore API source"
+      },
+      "endpoint": "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks",
+      "evidenceStatus": "Current adapter supports a narrower generation subset; mixed references/draft/edit/extend/native callbacks are not all implemented.",
+      "fieldCount": 30,
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "byteplus:dreamina-seedance-2-0-260128",
+      "provider": "BytePlus ModelArk",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-southeast-1",
+        "otherRegions": "not qualified by this Singapore API source"
+      },
+      "endpoint": "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks",
+      "evidenceStatus": "Current adapter supports a narrower generation subset; mixed references/draft/edit/extend/native callbacks are not all implemented.",
+      "fieldCount": 30,
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "byteplus:dreamina-seedance-2-0-fast-260128",
+      "provider": "BytePlus ModelArk",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-southeast-1",
+        "otherRegions": "not qualified by this Singapore API source"
+      },
+      "endpoint": "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks",
+      "evidenceStatus": "Current adapter supports a narrower generation subset; mixed references/draft/edit/extend/native callbacks are not all implemented.",
+      "fieldCount": 30,
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "byteplus:dreamina-seedance-2-0-mini-260615",
+      "provider": "BytePlus ModelArk",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-southeast-1",
+        "otherRegions": "not qualified by this Singapore API source"
+      },
+      "endpoint": "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks",
+      "evidenceStatus": "Current adapter supports a narrower generation subset; mixed references/draft/edit/extend/native callbacks are not all implemented.",
+      "fieldCount": 30,
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2:text-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/text_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 15,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_fast:text-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/text_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 15,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_mini:text-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/text_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 15,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_5:text-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/text_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 17,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:kling_4:text-to-video",
+      "provider": "Runway",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["text-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/text_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 7,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/",
+        "https://dev.runwayml.com/learn/kling-4-0-api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2:image-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/image_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 13,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_fast:image-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/image_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 13,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_mini:image-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/image_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 13,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_5:image-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/image_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 14,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:kling_4:image-to-video",
+      "provider": "Runway",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["image-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/image_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 8,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/",
+        "https://dev.runwayml.com/learn/kling-4-0-api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2:video-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0"],
+      "operations": ["video-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/video_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 16,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_fast:video-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0-fast"],
+      "operations": ["video-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/video_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 16,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_mini:video-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.0-mini"],
+      "operations": ["video-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/video_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 16,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:seedance2_5:video-to-video",
+      "provider": "Runway",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["video-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/video_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 18,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runway:kling_4:video-to-video",
+      "provider": "Runway",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["video-to-video"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.dev.runwayml.com/v1/video_to_video",
+      "evidenceStatus": "Kling current adapter onlyusesa narrowT2V/singlefirstframe subset; SeedanceRunwayofferings are newlyqualifieddocumentation andnotimplemented.",
+      "fieldCount": 6,
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/",
+        "https://dev.runwayml.com/learn/kling-4-0-api"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video:cn-beijing",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "cn-beijing",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "mainland-china"
+      },
+      "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video:ap-southeast-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-southeast-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "international"
+      },
+      "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video:ap-northeast-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-northeast-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video:eu-central-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "eu-central-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video:us-east-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "us-east-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video:cn-hongkong",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "cn-hongkong",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video-prime:cn-beijing",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "cn-beijing",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "mainland-china"
+      },
+      "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video-prime:ap-southeast-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-southeast-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "international"
+      },
+      "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video-prime:ap-northeast-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "ap-northeast-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video-prime:eu-central-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "eu-central-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video-prime:us-east-1",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "us-east-1",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "alibaba:wan3.0-video-prime:cn-hongkong",
+      "provider": "Alibaba ModelStudio",
+      "modelIds": ["alibaba/wan-3.0-prime"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "cn-hongkong",
+        "availability": "documented-model-card-and-api-url; account access not live-tested",
+        "inferenceScope": "global"
+      },
+      "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
+      "fieldCount": 14,
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+        "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "replicate:seedance2.5",
+      "provider": "Replicate",
+      "modelIds": ["bytedance/seedance-2.5"],
+      "operations": ["multi-mode"],
+      "region": {
+        "endpointRegion": "not-disclosed",
+        "inferenceScope": "not-disclosed"
+      },
+      "endpoint": "https://api.replicate.com/v1/models/bytedance/seedance-2.5/predictions",
+      "evidenceStatus": "CurrentadapteronlyexecutesnarrowT2V/I2V/image-reference subset.",
+      "fieldCount": 13,
+      "sources": ["https://replicate.com/bytedance/seedance-2.5/api/schema"],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "cloudflare:kling4-supplemental",
+      "provider": "Cloudflare AI",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["text-or-keyframe-video"],
+      "region": null,
+      "endpoint": "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run",
+      "evidenceStatus": "Discovered additionalprovider; no adapterimplementationclaimed.",
+      "fieldCount": 8,
+      "sources": ["https://developers.cloudflare.com/ai/models/klingai/kling-v4/"],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "kling-direct:release-only:text-to-video",
+      "provider": "Kling AI direct",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["text-to-video"],
+      "region": null,
+      "endpoint": null,
+      "evidenceStatus": "Newly release-qualified availability; direct adapter remains unimplemented until the full API contract is audited.",
+      "fieldCount": 0,
+      "sources": [
+        "https://kling.ai/document-api/updates/api?date=2026-02-11",
+        "https://kling.ai/quickstart/kling-4-model-user-guide"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "kling-direct:release-only:image-to-video",
+      "provider": "Kling AI direct",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["image-to-video"],
+      "region": null,
+      "endpoint": null,
+      "evidenceStatus": "Newly release-qualified availability; direct adapter remains unimplemented until the full API contract is audited.",
+      "fieldCount": 0,
+      "sources": [
+        "https://kling.ai/document-api/updates/api?date=2026-02-11",
+        "https://kling.ai/quickstart/kling-4-model-user-guide"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "kling-direct:release-only:omni-reference-to-video",
+      "provider": "Kling AI direct",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["omni-reference-to-video"],
+      "region": null,
+      "endpoint": null,
+      "evidenceStatus": "Newly release-qualified availability; direct adapter remains unimplemented until the full API contract is audited.",
+      "fieldCount": 0,
+      "sources": [
+        "https://kling.ai/document-api/updates/api?date=2026-02-11",
+        "https://kling.ai/quickstart/kling-4-model-user-guide"
+      ],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "id": "runware:kling4-supplemental",
+      "provider": "Runware",
+      "modelIds": ["kling/kling-4.0"],
+      "operations": ["videoInference"],
+      "region": null,
+      "endpoint": "https://api.runware.ai/v1",
+      "evidenceStatus": "Supplemental documented surface only; no execution support claimed.",
+      "fieldCount": 42,
+      "sources": ["https://runware.ai/docs/models/klingai-video-4-0"],
+      "report": "video-seedance-kling-wan.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "minimax.h3.generate",
+      "provider": "MiniMax",
+      "modelIds": ["minimax/h3", "minimax/h3-highspeed", "minimax/h3-lite", "minimax/h3-max"],
+      "operations": [
+        "text-to-video",
+        "first-frame-to-video",
+        "last-frame-to-video",
+        "first-last-frame-to-video",
+        "reference-to-video"
+      ],
+      "region": null,
+      "endpoint": "POST https://api.minimax.io/v2/video_generation",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": ["https://platform.minimax.io/docs/api-reference/video-generation-v2-create"],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "minimax.H3ContextIRReq",
+      "provider": "MiniMax",
+      "modelIds": ["minimax/h3"],
+      "operations": ["prompt-context-rewrite"],
+      "region": null,
+      "endpoint": "POST https://api.minimax.io/v2/h3_context_ir",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 14,
+      "sources": [
+        "https://platform.minimax.io/docs/api-reference/video-generation-v2-h3-context-ir"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "minimax.VideoRegenerationSourceTaskReq",
+      "provider": "MiniMax",
+      "modelIds": ["minimax/h3"],
+      "operations": ["video-regenerate-upscale"],
+      "region": null,
+      "endpoint": "POST https://api.minimax.io/v2/video_regeneration",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 5,
+      "sources": [
+        "https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "minimax.VideoRegenerationBaseVideoReq",
+      "provider": "MiniMax",
+      "modelIds": ["minimax/h3"],
+      "operations": ["video-regenerate-upscale"],
+      "region": null,
+      "endpoint": "POST https://api.minimax.io/v2/video_regeneration",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 14,
+      "sources": [
+        "https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "fal.h3-max.text-to-video",
+      "provider": "fal",
+      "modelIds": ["fal/h3-max"],
+      "operations": ["text-to-video"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/minimax/h3-max/text-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "fal.h3-max.image-to-video",
+      "provider": "fal",
+      "modelIds": ["fal/h3-max"],
+      "operations": ["image-to-video"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/minimax/h3-max/image-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max/image-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "fal.h3-max.reference-to-video",
+      "provider": "fal",
+      "modelIds": ["fal/h3-max"],
+      "operations": ["reference-to-video"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/minimax/h3-max/reference-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 18,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max/reference-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "fal.h3-max-turbo.text-to-video",
+      "provider": "fal",
+      "modelIds": ["fal/h3-max-turbo"],
+      "operations": ["text-to-video"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/minimax/h3-max-turbo/text-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "fal.h3-max-turbo.image-to-video",
+      "provider": "fal",
+      "modelIds": ["fal/h3-max-turbo"],
+      "operations": ["image-to-video"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/minimax/h3-max-turbo/image-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/image-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "fal.h3-max-turbo.reference-to-video",
+      "provider": "fal",
+      "modelIds": ["fal/h3-max-turbo"],
+      "operations": ["reference-to-video"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/minimax/h3-max-turbo/reference-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 14,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/reference-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "pika.text-to-video",
+      "provider": "Pika",
+      "modelIds": ["pika/h3-flex"],
+      "operations": ["text-to-video"],
+      "region": null,
+      "endpoint": "POST https://api.dev.pika.art/v1/media/pika/pika-h3-flex/text-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 9,
+      "sources": [
+        "https://dev.pika.art/openapi.json",
+        "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "pika.image-to-video",
+      "provider": "Pika",
+      "modelIds": ["pika/h3-flex"],
+      "operations": ["image-to-video"],
+      "region": null,
+      "endpoint": "POST https://api.dev.pika.art/v1/media/pika/pika-h3-flex/image-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 11,
+      "sources": [
+        "https://dev.pika.art/openapi.json",
+        "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "pika.reference-to-video",
+      "provider": "Pika",
+      "modelIds": ["pika/h3-flex"],
+      "operations": ["reference-to-video"],
+      "region": null,
+      "endpoint": "POST https://api.dev.pika.art/v1/media/pika/pika-h3-flex/reference-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 16,
+      "sources": [
+        "https://dev.pika.art/openapi.json",
+        "https://dev.pika.art/models/pika/pika-h3-flex/reference-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "pika.draft-to-video",
+      "provider": "Pika",
+      "modelIds": ["pika/h3-flex"],
+      "operations": ["video-upscale"],
+      "region": null,
+      "endpoint": "POST https://api.dev.pika.art/v1/media/pika/pika-h3-flex/draft-to-video",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 4,
+      "sources": [
+        "https://dev.pika.art/openapi.json",
+        "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "pika.audio-stems",
+      "provider": "Pika",
+      "modelIds": ["pika/h3-flex"],
+      "operations": ["audio-separate"],
+      "region": null,
+      "endpoint": "POST https://api.dev.pika.art/v1/media/pika/pika-h3-flex/audio-stems",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 4,
+      "sources": [
+        "https://dev.pika.art/openapi.json",
+        "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "pika.prompt-rewriter",
+      "provider": "Pika",
+      "modelIds": ["pika/h3-flex"],
+      "operations": ["prompt-rewrite"],
+      "region": null,
+      "endpoint": "POST https://api.dev.pika.art/v1/media/pika/pika-h3-flex/prompt-rewriter",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://dev.pika.art/openapi.json",
+        "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.text-to-video",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["text-to-video"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.image-to-video",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["image-to-video"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.first-last-frame-interpolation",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["first-last-frame-interpolation"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.reference-to-video",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["reference-to-video"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.video-edit",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["video-edit"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.video-extend",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["video-extend"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.conversational-video-edit",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["conversational-video-edit"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "google.omni.video-upscale",
+      "provider": "Google",
+      "modelIds": ["google/gemini-omni-1.1-flash"],
+      "operations": ["video-upscale"],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-omni-flash",
+        "https://aistudio.google.com/docs/omni",
+        "https://aistudio.google.com/api-reference/interactions-api",
+        "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "xai/grok-imagine-video-1.5.generate",
+      "provider": "xAI",
+      "modelIds": ["xai/grok-imagine-video-1.5"],
+      "operations": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "last-frame-to-video",
+        "keyframe-to-video"
+      ],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/videos/generations",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 27,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/video/generation",
+        "https://docs.x.ai/developers/model-capabilities/video/overview",
+        "https://docs.x.ai/developers/model-capabilities/video/image-to-video",
+        "https://docs.x.ai/developers/model-capabilities/video/reference-to-video",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/video_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/video.py",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "xai/grok-imagine-video-1.5-lite.generate",
+      "provider": "xAI",
+      "modelIds": ["xai/grok-imagine-video-1.5-lite"],
+      "operations": ["text-to-video", "image-to-video"],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/videos/generations",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 14,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/video/generation",
+        "https://docs.x.ai/developers/model-capabilities/video/overview",
+        "https://docs.x.ai/developers/model-capabilities/video/image-to-video",
+        "https://docs.x.ai/developers/model-capabilities/video/reference-to-video",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/video_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/video.py",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "xai/grok-imagine-video.generate",
+      "provider": "xAI",
+      "modelIds": ["xai/grok-imagine-video"],
+      "operations": ["text-to-video", "image-to-video", "reference-to-video"],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/videos/generations",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 17,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/video/generation",
+        "https://docs.x.ai/developers/model-capabilities/video/overview",
+        "https://docs.x.ai/developers/model-capabilities/video/image-to-video",
+        "https://docs.x.ai/developers/model-capabilities/video/reference-to-video",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/video_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/video.py",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "xai.legacy.video-edit",
+      "provider": "xAI",
+      "modelIds": ["xai/grok-imagine-video"],
+      "operations": ["video-edit"],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/videos/edits",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 10,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/video/editing",
+        "https://docs.x.ai/developers/rest-api-reference/inference/videos",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/video_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "id": "xai.legacy.video-extend",
+      "provider": "xAI",
+      "modelIds": ["xai/grok-imagine-video"],
+      "operations": ["video-extend"],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/videos/extensions",
+      "evidenceStatus": "documented; not live-tested",
+      "fieldCount": 11,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/video/extension",
+        "https://docs.x.ai/developers/rest-api-reference/inference/videos",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/video_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py"
+      ],
+      "report": "video-h3-omni-grok.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt25.generate",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2.5-sunburst", "openai/gpt-image-2.5-flare"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/images/generations",
+      "evidenceStatus": "documented",
+      "fieldCount": 15,
+      "sources": [
+        "https://developers.openai.com/api/reference/resources/images/methods/generate",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt25.edit-json",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2.5-sunburst", "openai/gpt-image-2.5-flare"],
+      "operations": ["image-edit", "masked-edit", "outpaint-by-prompt"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/images/edits",
+      "evidenceStatus": "documented",
+      "fieldCount": 23,
+      "sources": [
+        "https://developers.openai.com/api/reference/resources/images/methods/edit",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt25.edit-multipart",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2.5-sunburst", "openai/gpt-image-2.5-flare"],
+      "operations": ["image-edit", "masked-edit"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/images/edits",
+      "evidenceStatus": "documented",
+      "fieldCount": 16,
+      "sources": [
+        "https://developers.openai.com/api/reference/resources/images/methods/edit",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt25.responses-tool",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2.5-sunburst", "openai/gpt-image-2.5-flare"],
+      "operations": ["text-to-image", "image-edit", "masked-edit", "multi-turn-edit"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/responses",
+      "evidenceStatus": "documented",
+      "fieldCount": 17,
+      "sources": [
+        "https://developers.openai.com/api/docs/guides/tools-image-generation",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt2.generate",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/images/generations",
+      "evidenceStatus": "documented",
+      "fieldCount": 15,
+      "sources": [
+        "https://developers.openai.com/api/reference/resources/images/methods/generate",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt2.edit-json",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2"],
+      "operations": ["image-edit", "masked-edit", "outpaint-by-prompt"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/images/edits",
+      "evidenceStatus": "documented",
+      "fieldCount": 20,
+      "sources": [
+        "https://developers.openai.com/api/reference/resources/images/methods/edit",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt2.edit-multipart",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2"],
+      "operations": ["image-edit", "masked-edit"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/images/edits",
+      "evidenceStatus": "documented",
+      "fieldCount": 16,
+      "sources": [
+        "https://developers.openai.com/api/reference/resources/images/methods/edit",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "openai.gpt2.responses-tool",
+      "provider": "openai",
+      "modelIds": ["openai/gpt-image-2"],
+      "operations": ["text-to-image", "image-edit", "masked-edit", "multi-turn-edit"],
+      "region": null,
+      "endpoint": "POST https://api.openai.com/v1/responses",
+      "evidenceStatus": "documented",
+      "fieldCount": 17,
+      "sources": [
+        "https://developers.openai.com/api/docs/guides/tools-image-generation",
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "xai.image.generate",
+      "provider": "xai",
+      "modelIds": ["xai/grok-imagine-image-2.0"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/images/generations",
+      "evidenceStatus": "documented",
+      "fieldCount": 8,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/images/generation",
+        "https://docs.x.ai/developers/rest-api-reference/inference/images",
+        "https://docs.x.ai/developers/models/grok-imagine-image-2.0"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "xai.image.edit",
+      "provider": "xai",
+      "modelIds": ["xai/grok-imagine-image-2.0"],
+      "operations": ["image-edit", "multi-reference-edit", "iterative-output-as-input-edit"],
+      "region": null,
+      "endpoint": "POST https://api.x.ai/v1/images/edits",
+      "evidenceStatus": "documented",
+      "fieldCount": 16,
+      "sources": [
+        "https://docs.x.ai/developers/model-capabilities/images/editing",
+        "https://docs.x.ai/developers/model-capabilities/images/multi-image-editing",
+        "https://docs.x.ai/developers/model-capabilities/images/generation",
+        "https://docs.x.ai/developers/rest-api-reference/inference/images"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "byteplus.seedream-pro.generate-edit",
+      "provider": "byteplus",
+      "modelIds": ["bytedance/seedream-5.0-pro"],
+      "operations": [
+        "text-to-image",
+        "image-edit",
+        "multi-reference-edit",
+        "transparent-image-edit"
+      ],
+      "region": null,
+      "endpoint": "POST https://ark.ap-southeast.bytepluses.com/api/v3/images/generations",
+      "evidenceStatus": "documented",
+      "fieldCount": 14,
+      "sources": ["https://docs.byteplus.com/en/docs/modelark/image-generation-api"],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "byteplus.seedream-pro.decompose",
+      "provider": "byteplus",
+      "modelIds": ["bytedance/seedream-5.0-pro"],
+      "operations": ["layer-decomposition"],
+      "region": null,
+      "endpoint": "POST https://ark.ap-southeast.bytepluses.com/api/v3/images/generations",
+      "evidenceStatus": "documented",
+      "fieldCount": 14,
+      "sources": ["https://docs.byteplus.com/en/docs/modelark/image-generation-api"],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "alibaba.qwen.openai-compatible",
+      "provider": "alibaba",
+      "modelIds": [
+        "qwen/image-2.1-turbo",
+        "alibaba/qwen-image-2.1-pro",
+        "alibaba/qwen-image-3.0-pro"
+      ],
+      "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
+      "region": null,
+      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+      "evidenceStatus": "documented",
+      "fieldCount": 12,
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference",
+        "https://www.alibabacloud.com/help/en/model-studio/text-to-image"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "alibaba.qwen.sync",
+      "provider": "alibaba",
+      "modelIds": [
+        "qwen/image-2.1-turbo",
+        "alibaba/qwen-image-2.1-pro",
+        "alibaba/qwen-image-3.0-pro"
+      ],
+      "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
+      "region": null,
+      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "evidenceStatus": "documented",
+      "fieldCount": 16,
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "alibaba.qwen.async",
+      "provider": "alibaba",
+      "modelIds": [
+        "qwen/image-2.1-turbo",
+        "alibaba/qwen-image-2.1-pro",
+        "alibaba/qwen-image-3.0-pro"
+      ],
+      "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
+      "region": null,
+      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+      "evidenceStatus": "documented",
+      "fieldCount": 16,
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "qwen.weights.local-inference",
+      "provider": "self-hosted-weights",
+      "modelIds": ["qwen/image-2.1", "qwen/image-2.1-turbo"],
+      "operations": [
+        "text-to-image",
+        "image-conditioned-edit",
+        "multi-reference-edit",
+        "RGBA-generation"
+      ],
+      "region": null,
+      "endpoint": "QwenImage21Pipeline.__call__",
+      "evidenceStatus": "documented",
+      "fieldCount": 22,
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen-Image-2.1",
+        "https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo",
+        "https://huggingface.co/docs/diffusers/v0.42.0/en/api/pipelines/qwenimage21",
+        "https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/qwenimage21/pipeline_qwenimage21.py"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.bytedance/seedream/v5/pro/edit",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedream-5.0-pro"],
+      "operations": ["image-edit"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/bytedance/seedream/v5/pro/edit",
+      "evidenceStatus": "documented",
+      "fieldCount": 12,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance/seedream/v5/pro/edit"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.bytedance/seedream/v5/pro/text-to-image",
+      "provider": "fal",
+      "modelIds": ["bytedance/seedream-5.0-pro"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/bytedance/seedream/v5/pro/text-to-image",
+      "evidenceStatus": "documented",
+      "fieldCount": 10,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance/seedream/v5/pro/text-to-image"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.fal-ai/gpt-image-2",
+      "provider": "fal",
+      "modelIds": ["openai/gpt-image-2"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/fal-ai/gpt-image-2",
+      "evidenceStatus": "documented",
+      "fieldCount": 11,
+      "sources": ["https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/gpt-image-2"],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.fal-ai/gpt-image-2/edit",
+      "provider": "fal",
+      "modelIds": ["openai/gpt-image-2"],
+      "operations": ["image-edit"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/fal-ai/gpt-image-2/edit",
+      "evidenceStatus": "documented",
+      "fieldCount": 13,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/gpt-image-2/edit"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.google/nano-banana-2.1",
+      "provider": "fal",
+      "modelIds": ["google/nano-banana-2.1"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/google/nano-banana-2.1",
+      "evidenceStatus": "documented",
+      "fieldCount": 12,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google/nano-banana-2.1"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.google/nano-banana-2.1/edit",
+      "provider": "fal",
+      "modelIds": ["google/nano-banana-2.1"],
+      "operations": ["image-edit"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/google/nano-banana-2.1/edit",
+      "evidenceStatus": "documented",
+      "fieldCount": 15,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google/nano-banana-2.1/edit"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.openai/gpt-image-2.5/flare/edit",
+      "provider": "fal",
+      "modelIds": ["openai/gpt-image-2.5-flare"],
+      "operations": ["image-edit"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/openai/gpt-image-2.5/flare/edit",
+      "evidenceStatus": "documented",
+      "fieldCount": 13,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/flare/edit"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.openai/gpt-image-2.5/flare/text-to-image",
+      "provider": "fal",
+      "modelIds": ["openai/gpt-image-2.5-flare"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/openai/gpt-image-2.5/flare/text-to-image",
+      "evidenceStatus": "documented",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/flare/text-to-image"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.openai/gpt-image-2.5/sunburst/edit",
+      "provider": "fal",
+      "modelIds": ["openai/gpt-image-2.5-sunburst"],
+      "operations": ["image-edit"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/openai/gpt-image-2.5/sunburst/edit",
+      "evidenceStatus": "documented",
+      "fieldCount": 13,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/sunburst/edit"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.openai/gpt-image-2.5/sunburst/text-to-image",
+      "provider": "fal",
+      "modelIds": ["openai/gpt-image-2.5-sunburst"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/openai/gpt-image-2.5/sunburst/text-to-image",
+      "evidenceStatus": "documented",
+      "fieldCount": 11,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/sunburst/text-to-image"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.xai/grok-imagine-image/v2.0/edit",
+      "provider": "fal",
+      "modelIds": ["xai/grok-imagine-image-2.0"],
+      "operations": ["image-edit"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/xai/grok-imagine-image/v2.0/edit",
+      "evidenceStatus": "documented",
+      "fieldCount": 9,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=xai/grok-imagine-image/v2.0/edit"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "fal.xai/grok-imagine-image/v2.0/text-to-image",
+      "provider": "fal",
+      "modelIds": ["xai/grok-imagine-image-2.0"],
+      "operations": ["text-to-image"],
+      "region": null,
+      "endpoint": "POST https://queue.fal.run/xai/grok-imagine-image/v2.0/text-to-image",
+      "evidenceStatus": "documented",
+      "fieldCount": 8,
+      "sources": [
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=xai/grok-imagine-image/v2.0/text-to-image"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "replicate.seedream-pro",
+      "provider": "replicate",
+      "modelIds": ["bytedance/seedream-5.0-pro"],
+      "operations": ["text-to-image", "image-edit", "multi-reference-edit", "layer-decomposition"],
+      "region": null,
+      "endpoint": "POST https://api.replicate.com/v1/models/bytedance/seedream-5-pro/predictions",
+      "evidenceStatus": "documented",
+      "fieldCount": 6,
+      "sources": ["https://replicate.com/bytedance/seedream-5-pro/api/schema"],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "google.nano-banana.interactions",
+      "provider": "google",
+      "modelIds": ["google/nano-banana-2.1"],
+      "operations": [
+        "text-to-image",
+        "image-edit",
+        "multi-reference-edit",
+        "conversational-edit",
+        "video-or-PDF-context-to-image",
+        "search-grounded-image"
+      ],
+      "region": null,
+      "endpoint": "POST https://generativelanguage.googleapis.com/v1beta/interactions",
+      "evidenceStatus": "documented",
+      "fieldCount": 37,
+      "sources": [
+        "https://aistudio.google.com/docs/models/gemini-nano-banana-2.1",
+        "https://aistudio.google.com/docs/image-generation",
+        "https://aistudio.google.com/api-reference/interactions-api/create-interaction",
+        "https://aistudio.google.com/api-reference/interactions-api#Resource:ResponseFormat"
+      ],
+      "report": "image-models.md"
+    },
+    {
+      "group": "image-models",
+      "id": "xai.image.python-grpc",
+      "provider": "xai",
+      "modelIds": ["xai/grok-imagine-image-2.0"],
+      "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
+      "region": null,
+      "endpoint": "xai_sdk.Client.image.sample / sample_batch",
+      "evidenceStatus": "documented",
+      "fieldCount": 17,
+      "sources": [
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/image.py",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+        "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py"
+      ],
+      "report": "image-models.md"
+    }
+  ],
+  "conflicts": [
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Seedance2.5draftretention",
+      "facts": [
+        "BytePluscurrent14daysfornewdrafts; previous7days",
+        "falcurrentstandard14daysandUS7days",
+        "Runwaycurrent7days",
+        "olderfallearnguidesstill7days"
+      ],
+      "resolution": "Pin continuation to provider/account anduse route-specific retention. FreshAPIreference/OAS wins over staleeditorial.",
+      "sources": [
+        "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5",
+        "https://fal.ai/models/bytedance/seedance-2.5/draft/complete/api",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Seedance2.xseed",
+      "facts": [
+        "BytePluscreateAPI supported-model list excludes2.x",
+        "BytePlus2.5drafttutorial mentions inheritedseed",
+        "fal2.5reference/Replicate/Runwayexposeseed withdifferentbounds"
+      ],
+      "resolution": "Preserveacceptance/supportuncertainty perroute; do not promise crossproviderreproducibility.",
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5",
+        "https://docs.dev.runwayml.com/api/"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Seedance2.5mediawindows",
+      "facts": [
+        "Nativevideo/audio2–30seconds(nonedit), editvideo4–30",
+        "falprose accepts1.8–30.2seconds"
+      ],
+      "resolution": "Do notsilentlyequate numericaltolerances; capabilityschemashouldstoreexactproviderconstraints.",
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Seedance2.5audioonly",
+      "facts": ["Native2.5supportsaudioonly", "Replicateexplicitlyrequiresvisualwithaudio"],
+      "resolution": "Samecanonicalrequestmaybeeligibleforoneproviderandnotanother.",
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://replicate.com/bytedance/seedance-2.5/api/schema"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Generatedschemasomitcrossfieldvalidation",
+      "facts": [
+        "fal2.5referenceOASnoformalmaxItemsalthoughdescriptionscap50",
+        "RunwayKlingarrayitems={}inembeddedOAS althoughguidehasroles/limits",
+        "Replicatedurationnumericrangeaccepts0..3syntacticallybutgenerationrange4..30"
+      ],
+      "resolution": "Captureformalvalidatorandproseconstraintsseparately; do not blindlygeneratecapabilitiesfromJSONSchemaalone.",
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://replicate.com/bytedance/seedance-2.5/api/schema"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Wanratio/thinking",
+      "facts": [
+        "AlibabaAPIratioincludes21:9, falOASdoesnot",
+        "Alibabafile/linkrequiresprompt_extend=true;falrequiresenable_thinking=true andalsoexposesenable_prompt_expansion"
+      ],
+      "resolution": "Do nottreat similarlynamed controls as mechanicallyequivalent withoutverifiedtranslation.",
+      "sources": [
+        "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+        "https://fal.ai/models/alibaba/wan-3.0/reference-to-video/api"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "DirectKlingvsRunwayCloudflare",
+      "facts": [
+        "DirectofficialguideunreadableJSshell",
+        "RunwayverifiedfullAPI",
+        "CloudflareindependentcommonparameterAPIwithdifferentdefaults/countschema"
+      ],
+      "resolution": "Do not label resellercontracts asdirectKlingcontract ormergeconstraintsglobally.",
+      "sources": [
+        "https://kling.ai/document-api/api/usage-guide/kling-4-0",
+        "https://docs.dev.runwayml.com/api/",
+        "https://developers.cloudflare.com/ai/models/klingai/kling-v4/"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Seedance 2.0 Standard 4K dimensions",
+      "facts": [
+        "Native BytePlus 1:1 at 4K is 2880x2880.",
+        "Runway advertises a 3840:3840 ratio in its 4K schema."
+      ],
+      "resolution": "Resolution tier labels do not establish identical explicit pixel dimensions across routes. Retain the exact dimension enum per provider.",
+      "sources": [
+        "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+        "https://docs.dev.runwayml.com/api/"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Draft completion conditional requirement",
+      "facts": [
+        "Runway Seedance2.5 T2V OAS requires promptText.",
+        "The same branch describes draftTaskId as excluding other generation fields."
+      ],
+      "resolution": "Treat completion as a separate conditional operation; verify the provider before generating an executable draft-completion request.",
+      "sources": [
+        "https://docs.dev.runwayml.com/api/",
+        "https://docs.dev.runwayml.com/assets/inputs/"
+      ]
+    },
+    {
+      "group": "video-seedance-kling-wan",
+      "report": "video-seedance-kling-wan.md",
+      "topic": "Native Kling API release versus consumer guide",
+      "facts": [
+        "API changelog2026-10-28 announces fully available4.0 and720P/1080P with4K coming.",
+        "Consumer guide lists4K/HDR and richer voice/element UI capabilities.",
+        "Runware exposes element payloads; Runway strict branch does not."
+      ],
+      "resolution": "Keep API/product/provider evidence separate; no native field names are inferred from these feature lists.",
+      "sources": [
+        "https://kling.ai/document-api/updates/api?date=2026-02-11",
+        "https://kling.ai/quickstart/kling-4-model-user-guide",
+        "https://runware.ai/docs/models/klingai-video-4-0"
+      ]
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "report": "video-h3-omni-grok.md",
+      "id": "minimax-last-only",
+      "sources": ["minimax-create"],
+      "facts": [
+        "Main content combinations explicitly allow a last-frame-only image.",
+        "The child role description says last_frame must be paired with first_frame."
+      ],
+      "resolution": "Unresolved documentation conflict; test/clarify with provider before advertising last-only execution as qualified."
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "report": "video-h3-omni-grok.md",
+      "id": "pika-original-vs-prepared-file",
+      "sources": ["pika-oas", "pika-ref"],
+      "facts": [
+        "The model guide permits an original file <=50 MiB followed by CPU preparation to24 MiB.",
+        "OAS text states24 MiB/file."
+      ],
+      "resolution": "Keep original/prepared budgets separate and verify admission before claiming one universal limit."
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "report": "video-h3-omni-grok.md",
+      "id": "fal-ui-vs-oas-expansion",
+      "sources": ["fal-h3max", "fal-h3turbo"],
+      "facts": [
+        "The OAS marks prompt_expansion_mode required and provides default balanced.",
+        "Its formal schema is string with examples, not enum."
+      ],
+      "resolution": "Preserve both requiredness and default; do not invent a formal enum."
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "report": "video-h3-omni-grok.md",
+      "id": "xai-sdk-ratio-enum-lag",
+      "sources": ["xai-overview", "xai-proto"],
+      "facts": [
+        "REST guide lists 21:9 and 5:2 alongside seven other ratios.",
+        "Checked generated v6 VideoAspectRatio enum lists only the seven earlier ratios."
+      ],
+      "resolution": "Record REST and SDK surfaces separately; do not downgrade REST capability or claim every SDK version exposes all ratios."
+    },
+    {
+      "group": "video-h3-omni-grok",
+      "report": "video-h3-omni-grok.md",
+      "id": "omni-format-type-requiredness",
+      "sources": ["omni-guide", "omni-api"],
+      "facts": [
+        "Omni guide marks response_format.type optional in examples.",
+        "The generic VideoResponseFormat resource marks its discriminator required."
+      ],
+      "resolution": "Explicitly send type=video in OpenGen translation; retain the documented discrepancy."
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "fal-grok-stale-landing",
+      "status": "source_conflict",
+      "sources": [
+        "https://fal.ai/grok-imagine-image-2.0",
+        "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=xai/grok-imagine-image/v2.0/edit"
+      ],
+      "facts": [
+        "Landing copy says 3 references,4 outputs,1K/2K and 13 ratios; current exact OpenAPI says 5 references,10 outputs,1k/1.5k/2k and extra21:9/5:2 ratios."
+      ],
+      "action": "Publish exact schema and source conflict; use conservative admission until runtime qualification."
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "gpt-json-size-vs-binary-file",
+      "status": "different_limits_not_equivalent",
+      "sourceIds": ["openai.edit", "openai.guide"],
+      "facts": [
+        "The 20MiB serialized URI limit and under 50MB binary/mask limit concern different representations."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "fal-image-size-generic",
+      "status": "schema_does_not_encode_all_constraints",
+      "facts": [
+        "Shared ImageSize maximum 14142/default 512 is not a GPT or Seedream model guarantee; model-level area/ratio/edge rules narrow it."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "google-image-formats",
+      "status": "source_conflict",
+      "sourceIds": ["google.format", "google.guide"],
+      "facts": [
+        "Formal ImageResponseFormat enum lists JPEG; image guide contains explicit PNG examples. Generic512 output is not qualified by Nano2.1 model card."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "seedream-1.5k-provider",
+      "status": "provider_difference",
+      "sourceIds": ["byteplus.image", "replicate.seedream"],
+      "facts": [
+        "BytePlus standard Pro supports 1.5K; Replicate standard mode says 1K/2K and reserves1.5K for decomposition."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "seedream-stream-batch",
+      "status": "model_applicability_boundary",
+      "sourceIds": ["byteplus.image"],
+      "facts": [
+        "The generic BytePlus streaming/sequential/max_images fields exclude Pro; fal output count means multiple separate calls."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "qwen-native-vs-hosted",
+      "status": "different_interfaces",
+      "sourceIds": ["qwen.base", "qwen.turbo", "qwen.api"],
+      "facts": [
+        "Weight pipeline exposes guidance/steps/sigma/RGBA controls; hosted API does not automatically expose them. Hosted Pro is not an open checkpoint alias."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "xai-regional-price-row",
+      "status": "insufficient_capability_evidence",
+      "sourceIds": ["xai.generate", "xai.model"],
+      "facts": [
+        "A 1.5K price row does not qualify a native 1.5k request; generic endpoint regions do not establish image/video availability."
+      ]
+    },
+    {
+      "group": "image-models",
+      "report": "image-models.md",
+      "id": "xai-sdk-http-divergence",
+      "status": "source_or_interface_difference",
+      "sourceIds": ["xai.sdk", "xai.proto", "xai.generate"],
+      "facts": [
+        "SDK mapping excludes auto quality and 21:9/5:2 ratios that REST guide supports. Proto HIGH does not make high a supported model setting."
+      ],
+      "action": "Keep SDK transport mappings separate from model and REST capability declarations."
+    }
+  ],
+  "sources": [
+    "https://aistudio.google.com/api-reference/interactions-api",
+    "https://aistudio.google.com/api-reference/interactions-api#Resource:ResponseFormat",
+    "https://aistudio.google.com/api-reference/interactions-api/create-interaction",
+    "https://aistudio.google.com/docs/image-generation",
+    "https://aistudio.google.com/docs/models/gemini-nano-banana-2.1",
+    "https://aistudio.google.com/docs/models/gemini-omni-flash",
+    "https://aistudio.google.com/docs/omni",
+    "https://dev.pika.art/models/pika/pika-h3-flex/reference-to-video",
+    "https://dev.pika.art/models/pika/pika-h3-flex/text-to-video",
+    "https://dev.pika.art/openapi.json",
+    "https://dev.runwayml.com/learn/kling-4-0-api",
+    "https://developers.cloudflare.com/ai/models/klingai/kling-v4/",
+    "https://developers.openai.com/api/docs/guides/image-generation",
+    "https://developers.openai.com/api/docs/guides/tools-image-generation",
+    "https://developers.openai.com/api/reference/resources/images/methods/edit",
+    "https://developers.openai.com/api/reference/resources/images/methods/generate",
+    "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0",
+    "https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5",
+    "https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api",
+    "https://docs.byteplus.com/en/docs/modelark/image-generation-api",
+    "https://docs.dev.runwayml.com/api/",
+    "https://docs.dev.runwayml.com/assets/inputs/",
+    "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/wan3-video-generation-guide",
+    "https://docs.x.ai/developers/model-capabilities/images/editing",
+    "https://docs.x.ai/developers/model-capabilities/images/generation",
+    "https://docs.x.ai/developers/model-capabilities/images/multi-image-editing",
+    "https://docs.x.ai/developers/model-capabilities/video/editing",
+    "https://docs.x.ai/developers/model-capabilities/video/extension",
+    "https://docs.x.ai/developers/model-capabilities/video/generation",
+    "https://docs.x.ai/developers/model-capabilities/video/image-to-video",
+    "https://docs.x.ai/developers/model-capabilities/video/overview",
+    "https://docs.x.ai/developers/model-capabilities/video/reference-to-video",
+    "https://docs.x.ai/developers/models/grok-imagine-image-2.0",
+    "https://docs.x.ai/developers/rest-api-reference/inference/images",
+    "https://docs.x.ai/developers/rest-api-reference/inference/videos",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0-prime%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0-prime%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=alibaba%2Fwan-3.0-prime%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ffast%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ffast%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ffast%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fus%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fus%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fus%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fdraft%2Fcomplete",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Fdraft%2Fcomplete",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Fimage-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Freference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fus%2Ftext-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance/seedream/v5/pro/edit",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance/seedream/v5/pro/text-to-image",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/gpt-image-2",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/gpt-image-2/edit",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google/nano-banana-2.1",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google/nano-banana-2.1/edit",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/image-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/reference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max-turbo/text-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max/image-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max/reference-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3-max/text-to-video",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/flare/edit",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/flare/text-to-image",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/sunburst/edit",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=openai/gpt-image-2.5/sunburst/text-to-image",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=xai/grok-imagine-image/v2.0/edit",
+    "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=xai/grok-imagine-image/v2.0/text-to-image",
+    "https://fal.ai/models/alibaba/wan-3.0-prime/image-to-video/api",
+    "https://fal.ai/models/alibaba/wan-3.0-prime/reference-to-video/api",
+    "https://fal.ai/models/alibaba/wan-3.0-prime/text-to-video/api",
+    "https://fal.ai/models/alibaba/wan-3.0/image-to-video/api",
+    "https://fal.ai/models/alibaba/wan-3.0/reference-to-video/api",
+    "https://fal.ai/models/alibaba/wan-3.0/text-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/fast/image-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/fast/reference-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/fast/text-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/image-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/mini/image-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/mini/reference-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/mini/text-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/reference-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/text-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/us/image-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/us/reference-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.0/us/text-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/draft/complete/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/image-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/text-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/us/draft/complete/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/us/image-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/us/reference-to-video/api",
+    "https://fal.ai/models/bytedance/seedance-2.5/us/text-to-video/api",
+    "https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-omni-flash-api/scripts/video/generate_video.py",
+    "https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/qwenimage21/pipeline_qwenimage21.py",
+    "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/files.py",
+    "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/image.py",
+    "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/image_pb2.pyi",
+    "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/proto/v6/video_pb2.pyi",
+    "https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/video.py",
+    "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+    "https://huggingface.co/Qwen/Qwen-Image-2.1",
+    "https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo",
+    "https://huggingface.co/docs/diffusers/v0.42.0/en/api/pipelines/qwenimage21",
+    "https://kling.ai/document-api/updates/api?date=2026-02-11",
+    "https://kling.ai/quickstart/kling-4-model-user-guide",
+    "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+    "https://platform.minimax.io/docs/api-reference/video-generation-v2-h3-context-ir",
+    "https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration",
+    "https://replicate.com/bytedance/seedance-2.5/api/schema",
+    "https://replicate.com/bytedance/seedream-5-pro/api/schema",
+    "https://runware.ai/docs/models/klingai-video-4-0",
+    "https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference",
+    "https://www.alibabacloud.com/help/en/model-studio/text-to-image",
+    "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video",
+    "https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime"
+  ]
+}

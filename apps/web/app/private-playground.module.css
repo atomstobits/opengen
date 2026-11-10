@@ -1,0 +1,149 @@
+.modeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.modeBar p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.modeBar button {
+  font: inherit;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.modeBar button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.modeBar button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.modeBar button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.jsonEditor {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.jsonEditor textarea {
+  font: 12px/1.6 var(--mono);
+  min-height: 360px;
+  width: 100%;
+  tab-size: 2;
+}
+.incompatibility {
+  border: 1px solid var(--warning);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.scope {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.outputActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.outputActions button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.outputActions button[aria-pressed='true'] {
+  background: var(--raised);
+  border-color: var(--control-line);
+}
+.outputActions button:focus-visible,
+.reuse select:focus-visible,
+.reuse button:focus-visible,
+.responseJson:focus-visible {
+  outline: 2px solid var(--panel-agent);
+  outline-offset: 3px;
+}
+.responseJson {
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  font: 12px/1.55 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lineage {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .modeBar {
+    align-items: flex-start;
+  }
+  .jsonEditor textarea {
+    min-height: 300px;
+  }
+}
+
+.reuse {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  min-width: 0;
+}
+.reuse label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+.reuse select {
+  max-width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--canvas);
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+}
+
+.modeBar[id] {
+  scroll-margin-block: 16px;
+}
+
+.selection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.selection label {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.routeSelect,
+.selectionLink {
+  grid-column: 1 / -1;
+}
+.selectionLink {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}

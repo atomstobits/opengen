@@ -1,0 +1,27 @@
+{
+  "fixtureNotice": "SYNTHETIC: values are test data, not provider support or prices.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "prompt": {
+        "type": "string"
+      },
+      "duration": {
+        "type": "integer",
+        "default": 6,
+        "minimum": 5,
+        "maximum": 12
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["480p", "768p"],
+        "deprecated": true
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "required": ["prompt"]
+  }
+}

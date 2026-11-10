@@ -1,0 +1,250 @@
+{
+  "checkedAt": "2026-11-03",
+  "endpointId": "google/nano-banana-2.1/edit",
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google%2Fnano-banana-2.1%2Fedit",
+  "rawSourceSha256": "0a9b46c2de80ada84cd18402cb6badf072eb0417b672fc949ac03b22007a15f2",
+  "inputSchemaName": "NanoBanana21EditInput",
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization"
+      }
+    },
+    "schemas": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED"]
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "response_url": {
+            "type": "string"
+          },
+          "status_url": {
+            "type": "string"
+          },
+          "cancel_url": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "queue_position": {
+            "type": "integer"
+          }
+        },
+        "required": ["status", "request_id"]
+      },
+      "NanoBanana21EditInput": {
+        "properties": {
+          "thinking_level": {
+            "anyOf": [
+              {
+                "enum": ["minimal", "medium", "high"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "medium"
+          },
+          "sync_mode": {
+            "type": "boolean",
+            "default": false
+          },
+          "pdf_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "image_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "num_images": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          },
+          "system_prompt": {
+            "maxLength": 50000,
+            "type": "string",
+            "default": ""
+          },
+          "resolution": {
+            "enum": ["1K", "2K", "4K"],
+            "type": "string",
+            "default": "1K"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "video_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "output_format": {
+            "enum": ["jpeg", "png", "webp"],
+            "type": "string",
+            "default": "png"
+          },
+          "limit_generations": {
+            "type": "boolean",
+            "default": true
+          },
+          "prompt": {
+            "maxLength": 50000,
+            "minLength": 3,
+            "type": "string"
+          },
+          "aspect_ratio": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "21:9",
+                  "16:9",
+                  "3:2",
+                  "4:3",
+                  "5:4",
+                  "1:1",
+                  "4:5",
+                  "3:4",
+                  "2:3",
+                  "9:16",
+                  "4:1",
+                  "1:4",
+                  "8:1",
+                  "1:8"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "auto"
+          },
+          "enable_web_search": {
+            "type": "boolean",
+            "default": false
+          },
+          "safety_tolerance": {
+            "enum": ["1", "2", "3", "4", "5", "6"],
+            "type": "string",
+            "default": "4"
+          }
+        },
+        "required": ["prompt"],
+        "type": "object"
+      },
+      "NanoBanana21EditOutput": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageFile"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["images", "description"],
+        "type": "object"
+      },
+      "ImageFile": {
+        "properties": {
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["url"],
+        "type": "object"
+      }
+    }
+  }
+}

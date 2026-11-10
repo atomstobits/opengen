@@ -1,0 +1,15 @@
+# gcloud source uploads must preserve the same secret/local-artifact boundary as Git/Docker.
+.git
+.gitignore
+.gcloudignore
+#!include:.gitignore
+node_modules/
+**/node_modules/
+**/.next/
+**/.local/
+**/.env
+**/.env.*
+!**/.env.example
+artifacts/
+*.tgz
+**/*.tgz

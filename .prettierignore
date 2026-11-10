@@ -1,0 +1,10 @@
+node_modules
+**/.next
+package-lock.json
+docs/evidence
+test-results
+playwright-report
+LICENSE
+apps/web/next-env.d.ts
+.vercel
+infra/.local

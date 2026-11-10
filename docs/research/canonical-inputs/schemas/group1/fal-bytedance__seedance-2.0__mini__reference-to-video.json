@@ -1,0 +1,225 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Fmini%2Freference-to-video",
+  "schema": {
+    "input": {
+      "type": "object",
+      "required": ["prompt"],
+      "properties": {
+        "video_urls": {
+          "items": {
+            "type": "string",
+            "_fal_ui_field": "video"
+          },
+          "type": "array",
+          "maxItems": 3
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "end_user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "codec": {
+          "enum": ["auto", "H264", "H265"],
+          "type": "string",
+          "default": "auto"
+        },
+        "duration": {
+          "enum": ["auto", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
+          "type": "string",
+          "default": "auto"
+        },
+        "image_urls": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "maxItems": 9
+        },
+        "resolution": {
+          "enum": ["480p", "720p"],
+          "type": "string",
+          "default": "720p"
+        },
+        "generate_audio": {
+          "type": "boolean",
+          "default": true
+        },
+        "aspect_ratio": {
+          "enum": ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          "type": "string",
+          "default": "auto"
+        },
+        "audio_urls": {
+          "items": {
+            "type": "string",
+            "_fal_ui_field": "audio"
+          },
+          "type": "array",
+          "maxItems": 3
+        }
+      }
+    },
+    "components": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED"]
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "response_url": {
+            "type": "string"
+          },
+          "status_url": {
+            "type": "string"
+          },
+          "cancel_url": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "queue_position": {
+            "type": "integer"
+          }
+        },
+        "required": ["status", "request_id"]
+      },
+      "Seedance20MiniReferenceToVideoInput": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "video_urls": {
+            "items": {
+              "type": "string",
+              "_fal_ui_field": "video"
+            },
+            "type": "array",
+            "maxItems": 3
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "end_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "codec": {
+            "enum": ["auto", "H264", "H265"],
+            "type": "string",
+            "default": "auto"
+          },
+          "duration": {
+            "enum": ["auto", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
+            "type": "string",
+            "default": "auto"
+          },
+          "image_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 9
+          },
+          "resolution": {
+            "enum": ["480p", "720p"],
+            "type": "string",
+            "default": "720p"
+          },
+          "generate_audio": {
+            "type": "boolean",
+            "default": true
+          },
+          "aspect_ratio": {
+            "enum": ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+            "type": "string",
+            "default": "auto"
+          },
+          "audio_urls": {
+            "items": {
+              "type": "string",
+              "_fal_ui_field": "audio"
+            },
+            "type": "array",
+            "maxItems": 3
+          }
+        }
+      },
+      "Seedance20MiniReferenceToVideoOutput": {
+        "type": "object",
+        "required": ["video", "seed"],
+        "properties": {
+          "seed": {
+            "type": "integer"
+          },
+          "video": {
+            "$ref": "#/components/schemas/File"
+          }
+        }
+      },
+      "File": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}

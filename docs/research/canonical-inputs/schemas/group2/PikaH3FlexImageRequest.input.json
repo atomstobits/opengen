@@ -1,0 +1,129 @@
+{
+  "source": "https://dev.pika.art/openapi.json",
+  "checkedAt": "2026-11-03",
+  "schema": {
+    "anyOf": [
+      {
+        "properties": {
+          "image": {
+            "type": "string"
+          }
+        },
+        "required": ["image"]
+      },
+      {
+        "properties": {
+          "last_frame_image": {
+            "type": "string"
+          }
+        },
+        "required": ["last_frame_image"]
+      }
+    ],
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "maxLength": 8000,
+        "minLength": 1
+      },
+      "duration": {
+        "type": "integer",
+        "maximum": 15.0,
+        "minimum": 5.0,
+        "default": 5
+      },
+      "aspect_ratio": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "3:2",
+              "4:3",
+              "5:4",
+              "1:1",
+              "4:5",
+              "3:4",
+              "2:3",
+              "9:16",
+              "9:21"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["480p", "768p", "1080p", "2k", "4k"],
+        "default": "768p"
+      },
+      "seed": {
+        "type": "integer",
+        "maximum": 9.223372036854776e18,
+        "minimum": 0.0,
+        "default": 0
+      },
+      "rewrite": {
+        "type": "boolean",
+        "default": true
+      },
+      "output_mode": {
+        "type": "string",
+        "enum": ["video", "audio-stems"],
+        "default": "video"
+      },
+      "channel_mode": {
+        "type": "string",
+        "enum": ["stereo", "mono"],
+        "default": "mono"
+      },
+      "image": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "last_frame_image": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^https?://",
+            "media_kinds": ["image"]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "webhook_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": ["prompt"],
+    "native_audio": true
+  },
+  "components": {
+    "schemas": {}
+  }
+}

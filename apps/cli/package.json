@@ -1,0 +1,10 @@
+{
+  "name": "@media-router/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@media-router/contracts": "*",
+    "@media-router/sdk": "*"
+  }
+}

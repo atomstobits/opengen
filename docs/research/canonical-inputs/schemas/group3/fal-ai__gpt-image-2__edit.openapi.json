@@ -1,0 +1,214 @@
+{
+  "endpointId": "fal-ai/gpt-image-2/edit",
+  "source": {
+    "url": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/gpt-image-2/edit",
+    "title": "Public exact endpoint OpenAPI3.1 snapshot",
+    "checkedAt": "2026-11-03"
+  },
+  "inputSchemaName": "GptImage2EditInput",
+  "components": {
+    "schemas": {
+      "GptImage2EditInput": {
+        "required": ["prompt", "image_urls"],
+        "x-fal-order-properties": [
+          "prompt",
+          "image_urls",
+          "image_size",
+          "background",
+          "quality",
+          "num_images",
+          "output_format",
+          "output_compression",
+          "sync_mode",
+          "enable_safety_checker",
+          "mask_url"
+        ],
+        "type": "object",
+        "properties": {
+          "num_images": {
+            "minimum": 1,
+            "default": 1,
+            "maximum": 10,
+            "type": "integer"
+          },
+          "image_urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16
+          },
+          "prompt": {
+            "minLength": 1,
+            "maxLength": 32000,
+            "type": "string"
+          },
+          "background": {
+            "enum": ["auto", "transparent", "opaque"],
+            "default": "auto",
+            "type": "string"
+          },
+          "output_format": {
+            "enum": ["jpeg", "png", "webp"],
+            "default": "png",
+            "type": "string"
+          },
+          "image_size": {
+            "default": "auto",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageSize"
+              },
+              {
+                "enum": [
+                  "square_hd",
+                  "square",
+                  "portrait_4_3",
+                  "portrait_16_9",
+                  "landscape_4_3",
+                  "landscape_16_9",
+                  "auto"
+                ],
+                "type": "string"
+              }
+            ]
+          },
+          "enable_safety_checker": {
+            "default": true,
+            "type": "boolean"
+          },
+          "output_compression": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "maximum": 100,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mask_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sync_mode": {
+            "default": false,
+            "type": "boolean"
+          },
+          "quality": {
+            "enum": ["auto", "low", "medium", "high"],
+            "default": "high",
+            "type": "string"
+          }
+        }
+      },
+      "GptImage2EditOutput": {
+        "required": ["images"],
+        "x-fal-order-properties": ["images"],
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImageFile"
+            }
+          }
+        }
+      },
+      "ImageSize": {
+        "properties": {
+          "height": {
+            "maximum": 14142,
+            "default": 512,
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "width": {
+            "maximum": 14142,
+            "default": 512,
+            "type": "integer",
+            "exclusiveMinimum": 0
+          }
+        },
+        "x-fal-order-properties": ["width", "height"],
+        "type": "object"
+      },
+      "ImageFile": {
+        "required": ["url"],
+        "x-fal-order-properties": [
+          "url",
+          "content_type",
+          "file_name",
+          "file_size",
+          "width",
+          "height"
+        ],
+        "type": "object",
+        "properties": {
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "rawSha256": "70f8402cc454f379856e01ca6e1b505b0a95c80d8e00eb41b8e4a57b30d0347e"
+}

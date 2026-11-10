@@ -1,0 +1,47 @@
+{
+  "name": "opengen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An open-source, region-aware image and video API router.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @media-router/web",
+    "dev:api": "npm run dev --workspace @media-router/server",
+    "worker": "npm run worker --workspace @media-router/server",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "catalog:check": "tsx scripts/check-catalog.ts",
+    "cli": "tsx apps/cli/src/index.ts",
+    "cli:build": "node scripts/build-cli.mjs",
+    "cli:package": "node scripts/package-cli.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:sql": "node packages/engine/scripts/test-pglite.mjs",
+    "setup:local": "node scripts/setup-local.mjs",
+    "security:check": "node scripts/security-check.mjs",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "release:check": "node scripts/release-check.mjs",
+    "release:archive": "node scripts/release-archive.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "@electric-sql/pglite-socket": "^0.2.17",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.19.0",
+    "ajv": "^8.20.0",
+    "esbuild": "0.28.2",
+    "prettier": "^3.9.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "notice": "Synthetic qualification inputs only. No provider price, endpoint availability, invoice or approval is asserted.",
+  "syntheticSourceDocuments": {
+    "publicList": "Synthetic public tariff: USD 0.04 per output image; whole output images.",
+    "operatorContract": "Synthetic operator tariff: USD 0.03 per output image; whole output images.",
+    "privateByok": "Synthetic private BYOK tariff: USD 0.02 per output image; whole output images."
+  },
+  "publicList": {
+    "target": {
+      "providerId": "fixture-provider",
+      "endpointId": "fixture/image-v1/text-to-image",
+      "modelId": "fixture/image-v1",
+      "deploymentId": "fixture-eu",
+      "operation": "text-to-image",
+      "endpointRegion": "eu-fixture-1",
+      "inferenceScope": "Global",
+      "scope": { "kind": "public-list" }
+    },
+    "source": {
+      "url": "https://provider.example.invalid/models/fixture/image-v1#pricing",
+      "checkedAt": "2026-11-04",
+      "sha256": "e01f44ad838a334919557a850be5b31b53e72d276eb4b0b63dfb29af1de4d235"
+    },
+    "basis": "published-tariff",
+    "currency": "USD",
+    "rateMicros": 40000,
+    "unit": "output-image",
+    "rounding": "whole output images; no fractional image billing",
+    "formula": {
+      "state": "qualified",
+      "implementationId": "fixture-single-image-v1",
+      "reviewRef": "synthetic-review-only",
+      "testRefs": ["synthetic/single-image-v1"]
+    }
+  },
+  "operatorContract": {
+    "target": {
+      "providerId": "fixture-provider",
+      "endpointId": "fixture/image-v1/text-to-image",
+      "modelId": "fixture/image-v1",
+      "deploymentId": "fixture-eu",
+      "operation": "text-to-image",
+      "endpointRegion": "eu-fixture-1",
+      "inferenceScope": "Global",
+      "scope": { "kind": "operator-contract", "scopeRef": "synthetic-contract-a" }
+    },
+    "source": {
+      "url": "https://operator.example.invalid/contracts/synthetic-tariff",
+      "checkedAt": "2026-11-04",
+      "sha256": "30d77292dba36ad57c380b0301f219a05f7db66974ec7ba260dbe5078b582a56"
+    },
+    "basis": "contract-tariff",
+    "currency": "USD",
+    "rateMicros": 30000,
+    "unit": "output-image",
+    "rounding": "whole output images; no fractional image billing",
+    "formula": {
+      "state": "qualified",
+      "implementationId": "fixture-single-image-v1",
+      "reviewRef": "synthetic-review-only",
+      "testRefs": ["synthetic/single-image-v1"]
+    }
+  },
+  "privateByok": {
+    "target": {
+      "providerId": "fixture-provider",
+      "endpointId": "fixture/image-v1/text-to-image",
+      "modelId": "fixture/image-v1",
+      "deploymentId": "fixture-eu",
+      "operation": "text-to-image",
+      "endpointRegion": "eu-fixture-1",
+      "inferenceScope": "Global",
+      "scope": { "kind": "private-byok", "scopeRef": "synthetic-account-a" }
+    },
+    "source": {
+      "url": "https://account.example.invalid/pricing/synthetic-tariff",
+      "checkedAt": "2026-11-04",
+      "sha256": "80cbb907c7a607690c5e74b81d0f16b2d49e7b67b98bf8d5acfe9dd817702b22"
+    },
+    "basis": "account-tariff",
+    "currency": "USD",
+    "rateMicros": 20000,
+    "unit": "output-image",
+    "rounding": "whole output images; no fractional image billing",
+    "formula": {
+      "state": "qualified",
+      "implementationId": "fixture-single-image-v1",
+      "reviewRef": "synthetic-review-only",
+      "testRefs": ["synthetic/single-image-v1"]
+    }
+  }
+}

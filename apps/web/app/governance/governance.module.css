@@ -1,0 +1,139 @@
+.panel {
+  max-width: 760px;
+  margin-block: 28px;
+}
+.panel h3 {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  margin-bottom: 10px;
+}
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 30px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding-block: 18px;
+  margin-block: 20px;
+}
+.summary div {
+  flex: 1 1 140px;
+}
+.summary dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.summary dd {
+  margin: 0;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.identity {
+  color: var(--subtle);
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.rotation {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.secret {
+  width: 100%;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--canvas);
+  padding: 12px;
+  margin-block: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.restriction {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+}
+.choice {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.choice input {
+  accent-color: var(--accent);
+  flex: none;
+  margin-top: 4px;
+}
+.choice small {
+  display: block;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.exception {
+  border-bottom: 1px solid var(--line);
+  padding-block: 16px;
+}
+.exception > label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-block: 12px;
+}
+.constraints {
+  margin: 18px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.constraints dt {
+  font-weight: 600;
+  color: var(--ink);
+}
+.constraints dd {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.archive {
+  color: var(--danger);
+}
+@media (max-width: 620px) {
+  .actions {
+    align-items: stretch;
+  }
+  .actions button {
+    flex: 1 1 180px;
+  }
+  .summary {
+    gap: 16px;
+  }
+}

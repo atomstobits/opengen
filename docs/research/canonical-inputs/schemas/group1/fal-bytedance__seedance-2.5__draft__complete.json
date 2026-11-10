@@ -1,0 +1,145 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.5%2Fdraft%2Fcomplete",
+  "schema": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "draft_id": {
+          "maxLength": 8192,
+          "type": "string",
+          "minLength": 1
+        },
+        "codec": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "H264", "H265"]
+        },
+        "resolution": {
+          "type": "string",
+          "default": "1080p",
+          "const": "1080p"
+        }
+      },
+      "required": ["draft_id"]
+    },
+    "components": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED"]
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "response_url": {
+            "type": "string"
+          },
+          "status_url": {
+            "type": "string"
+          },
+          "cancel_url": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "queue_position": {
+            "type": "integer"
+          }
+        },
+        "required": ["status", "request_id"]
+      },
+      "Seedance25DraftCompleteInput": {
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "maxLength": 8192,
+            "type": "string",
+            "minLength": 1
+          },
+          "codec": {
+            "type": "string",
+            "default": "auto",
+            "enum": ["auto", "H264", "H265"]
+          },
+          "resolution": {
+            "type": "string",
+            "default": "1080p",
+            "const": "1080p"
+          }
+        },
+        "required": ["draft_id"]
+      },
+      "Seedance25DraftCompleteOutput": {
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "video": {
+            "$ref": "#/components/schemas/File"
+          },
+          "seed": {
+            "type": "integer"
+          }
+        },
+        "required": ["video", "seed"]
+      },
+      "File": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["url"]
+      }
+    }
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}

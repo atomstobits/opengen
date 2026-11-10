@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-11-03",
+  "source": "https://docs.dev.runwayml.com/api/",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "promptImage": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 13,
+                "maxLength": 2048,
+                "pattern": "^https:\\/\\/.*"
+              },
+              {
+                "type": "string",
+                "minLength": 13,
+                "maxLength": 5000,
+                "pattern": "^runway:\\/\\/.*"
+              },
+              {
+                "type": "string",
+                "minLength": 13,
+                "maxLength": 5242880,
+                "pattern": "^data:image\\/.*"
+              }
+            ]
+          },
+          {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {}
+          }
+        ]
+      },
+      "ratio": {
+        "type": "string",
+        "enum": ["auto_720p", "auto_1080p"]
+      },
+      "promptText": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 26000
+      },
+      "duration": {
+        "type": "integer",
+        "minimum": 3,
+        "maximum": 30
+      },
+      "references": {
+        "minItems": 0,
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 2048,
+                  "pattern": "^https:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5000,
+                  "pattern": "^runway:\\/\\/.*"
+                },
+                {
+                  "type": "string",
+                  "minLength": 13,
+                  "maxLength": 5242880,
+                  "pattern": "^data:image\\/.*"
+                }
+              ]
+            }
+          },
+          "required": ["uri"],
+          "additionalProperties": false
+        }
+      },
+      "referenceVideos": {
+        "minItems": 0,
+        "maxItems": 5,
+        "type": "array",
+        "items": {}
+      },
+      "model": {
+        "type": "string",
+        "const": "kling_4"
+      }
+    },
+    "required": ["promptImage", "model"],
+    "additionalProperties": false
+  },
+  "note": "Functional interface facts only; vendor descriptions and examples removed. No generation was executed."
+}
