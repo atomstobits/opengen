@@ -113,11 +113,34 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
               json: {
                 workspaceId,
                 recoveryScope: state.recoveryScope,
-                capabilities: state.capabilities,
+                capabilities: {
+                  read: state.capabilities.read,
+                  manage: state.capabilities.manage,
+                  setup: state.capabilities.setup,
+                },
+                ...(state.capabilities.ownerEnrollment
+                  ? { ownerEnrollment: state.capabilities.ownerEnrollment }
+                  : {}),
               },
             }
           : { status: 404, json: { error: 'Fixture runtime unavailable.' } },
       );
+      return;
+    }
+    if (url.pathname === '/api/billing/owner' && request.method() === 'POST') {
+      const payload = request.postDataJSON() as {
+        expectedAuthorityVersion: number;
+        termsVersion: string;
+        acceptedTerms: boolean;
+      };
+      expect(payload).toEqual({
+        expectedAuthorityVersion:
+          state.capabilities?.ownerEnrollment?.expectedAuthorityVersion ?? 0,
+        termsVersion: state.capabilities?.ownerEnrollment?.terms.version ?? '',
+        acceptedTerms: true,
+      });
+      state.capabilities = { read: true, manage: true, setup: true };
+      await route.fulfill({ json: { workspaceId, authorityVersion: 1 } });
       return;
     }
     if (
@@ -499,6 +522,48 @@ for (const viewport of [
       expect(f.reads.length).toBeGreaterThanOrEqual(2);
       expect(f.creates).toEqual([]);
       expect(f.checkouts).toEqual([]);
+      expect(f.unexpected).toEqual([]);
+    });
+
+    test('a brand-new workspace admin can self-serve enable manual prepaid billing and start checkout', async ({
+      page,
+      baseURL,
+    }) => {
+      const f = await billingFixture(page, baseURL);
+      f.recoveryScope = 'member-fresh-signup-v1';
+      f.capabilities = {
+        read: false,
+        manage: false,
+        setup: false,
+        ownerEnrollment: {
+          eligible: true,
+          expectedAuthorityVersion: 0,
+          terms: {
+            version: 'hosted-manual-prepaid-v1-2026-11-11',
+            text: 'Manual prepaid USD top-ups only; no automatic recurring charges.',
+          },
+        },
+      };
+      await page.goto('/billing');
+      await expect(
+        page.getByRole('heading', { name: /Enable prepaid workspace credit/i }),
+      ).toBeVisible();
+      const enableButton = page.getByRole('button', { name: 'Enable prepaid billing →' });
+      await expect(enableButton).toBeDisabled();
+      await page.getByRole('checkbox').check();
+      await expect(enableButton).toBeEnabled();
+      await enableButton.click();
+      await expect(
+        page.getByText(
+          'Prepaid billing is enabled for this workspace. Choose an amount below to add credit.',
+        ),
+      ).toBeVisible();
+      await page.getByRole('button', { name: 'Continue to Stripe ↗' }).click();
+      await expect(page).toHaveURL(checkoutUrl);
+      await expect(page.getByRole('heading', { name: 'Fixture hosted checkout' })).toBeVisible();
+      expect(f.creates.length).toBe(1);
+      expect(f.creates[0]?.amountCents).toBe(2500);
+      expect(f.hostedVisits).toBe(1);
       expect(f.unexpected).toEqual([]);
     });
   });

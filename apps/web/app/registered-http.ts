@@ -4,6 +4,7 @@ const protocolTargets = [
   { method: 'POST', path: '/webhooks/stripe' },
   { method: 'GET', path: '/v1/billing' },
   { method: 'GET', path: '/v1/billing/access' },
+  { method: 'POST', path: '/v1/billing/owner' },
   { method: 'PUT', path: '/v1/billing/delegations' },
   { method: 'DELETE', path: '/v1/billing/delegations' },
   { method: 'POST', path: '/v1/billing/setup' },

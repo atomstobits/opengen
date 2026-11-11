@@ -1460,5 +1460,495 @@ describe.skipIf(!databaseUrl)(
         await isolated.close();
       }
     });
+
+    it('lets a brand-new external OIDC user self-serve enable manual prepaid billing on personal and team workspaces while failing closed across every non-admin, non-browser, paused, or unaccepted path', async () => {
+      const isolated = await isolatedEngineDatabase(databaseUrl!, 'hosted_self_serve_e2e');
+      const engine = isolated.bind(
+        createEngine({
+          databaseUrl: isolated.databaseUrl,
+          publicUrl: canonicalOrigin,
+          poolSize: 1,
+          providerEnv: { NODE_ENV: 'test' },
+          adapters: [],
+          providerExecutionEnabled: false,
+        }),
+      );
+      try {
+        await engine.initialize();
+        const issuer = 'https://identity.fixture.invalid';
+        const operatorPrincipal = await engine.accounts.identity(
+          issuer,
+          'preseeded-operator-owner',
+        );
+        const environment = {
+          id: `live-selfserve-${randomUUID()}`,
+          accountId: 'acct_selfservefixture',
+          livemode: true,
+        };
+        await registerBillingProcessorEnvironmentInTransaction(engine.pool, environment);
+        const approvalReference = 'reviewed-live-manual-owner-approval';
+        await engine.pool.query(
+          `INSERT INTO mr_billing_owners(workspace_id,membership_id,membership_epoch,authority_version,
+           processor_environment_id,livemode,rails,consent_reference,approval_reference)
+           SELECT workspace_id,id,extract(epoch FROM accepted_at)::text,1,$3,true,$4,
+             'synthetic-owner-consent',$5 FROM mr_memberships
+           WHERE workspace_id=$1 AND id=$2`,
+          [
+            operatorPrincipal.workspaceId,
+            operatorPrincipal.membershipId,
+            environment.id,
+            JSON.stringify({
+              allowsEnabled: false,
+              maxThresholdMicros: 5_000_000,
+              maxAmountCents: 100_000,
+              maxMonthlyCapCents: 100_000,
+              maxAttemptsPerMonth: 4,
+              minCooldownSeconds: 86_400,
+              maxFailureLimit: 3,
+            }),
+            approvalReference,
+          ],
+        );
+
+        const stripe = createStripeClient('local-fixture-noncredential');
+        vi.spyOn(stripe.accounts, 'retrieve').mockResolvedValue({
+          id: environment.accountId,
+          charges_enabled: true,
+        } as Stripe.Response<Stripe.Account>);
+        const checkoutCreate = vi
+          .spyOn(stripe.checkout.sessions, 'create')
+          .mockImplementation((async (params: Stripe.Checkout.SessionCreateParams) => ({
+            id: `cs_live_${String(params.client_reference_id).replaceAll('-', '')}`,
+            mode: 'payment',
+            currency: 'usd',
+            amount_subtotal: Number(params.line_items?.[0]?.price_data?.unit_amount ?? 2500),
+            amount_total: Number(params.line_items?.[0]?.price_data?.unit_amount ?? 2500),
+            payment_status: 'unpaid',
+            status: 'open',
+            client_reference_id: String(params.client_reference_id),
+            payment_intent: null,
+            livemode: true,
+            url: 'https://checkout.stripe.com/c/pay/external_user_live_fixture',
+          })) as never);
+
+        const t0Iso = '2026-11-10T15:00:00.000Z';
+        const t0Ms = Date.parse(t0Iso);
+        let currentClock = t0Ms - 60_000;
+        vi.spyOn(Date, 'now').mockImplementation(() => currentClock);
+
+        const publication = readHostedLegalPublicationConfiguration({
+          OPENGEN_PUBLIC_URL: canonicalOrigin,
+          OPENGEN_LEGAL_PUBLICATION_JSON: serializeHostedLegalPublication(
+            validPublication({
+              publishedAt: '2026-11-10T14:00:00.000Z',
+              effectiveAt: t0Iso,
+            }),
+          ),
+        })!;
+        const humanTermsPolicy = createHostedHumanTermsPolicyReader(publication);
+
+        // Regression guard: keyless hosted legal publication starts cleanly without unscoped PaymentStore
+        const keylessApp = await buildApp({
+          engine,
+          humanTermsPolicy,
+          publicUrl: canonicalOrigin,
+          env: {
+            NODE_ENV: 'test',
+            OPENGEN_PUBLIC_URL: canonicalOrigin,
+            MR_SESSION_SECRET: 's'.repeat(32),
+          },
+        });
+        apps.push(keylessApp);
+        expect((await keylessApp.inject({ url: '/health' })).statusCode).toBe(200);
+
+        const makeManualApp = async (checkoutMode: 'open' | 'paused' = 'open') => {
+          const manualConfig = readBillingManualConfiguration({
+            NODE_ENV: 'production',
+            OPENGEN_BILLING_MANUAL: 'true',
+            STRIPE_LIVEMODE: 'true',
+            STRIPE_SECRET_KEY: ['rk', 'live', 'syntheticfixture'].join('_'),
+            STRIPE_WEBHOOK_SECRET: ['whsec', 'syntheticfixture'].join('_'),
+            OPENGEN_PUBLIC_URL: canonicalOrigin,
+            DATABASE_URL: 'postgresql://localhost/opengen_live_fixture',
+            OPENGEN_BILLING_MANUAL_WORKSPACE: operatorPrincipal.workspaceId,
+            OPENGEN_BILLING_PROCESSOR_ENVIRONMENT: environment.id,
+            OPENGEN_BILLING_PROCESSOR_ACCOUNT: environment.accountId,
+            OPENGEN_BILLING_APPROVAL_REFERENCE: approvalReference,
+            OPENGEN_BILLING_TERMS_VERSION: 'hosted-manual-prepaid-v1-2026-11-11',
+            OPENGEN_BILLING_TERMS_TEXT: 'Prepaid non-recurring Stripe Checkout credit summary.',
+            OPENGEN_BILLING_CHECKOUT: checkoutMode,
+          })!;
+          const runtime = await hostedBillingManual(engine.pool, manualConfig, stripe, {
+            humanTermsPolicy,
+          });
+          const instance = await buildApp({
+            engine,
+            billingRuntime: runtime,
+            humanTermsPolicy,
+            publicUrl: canonicalOrigin,
+            env: {
+              NODE_ENV: 'test',
+              OPENGEN_PUBLIC_URL: canonicalOrigin,
+              OIDC_ISSUER: issuer,
+              OIDC_CLIENT_ID: 'client-fixture',
+              OIDC_CLIENT_SECRET: 'synthetic-server-secret',
+              MR_SESSION_SECRET: 's'.repeat(32),
+            },
+          });
+          apps.push(instance);
+          return instance;
+        };
+
+        const app = await makeManualApp('open');
+        const pausedApp = await makeManualApp('paused');
+
+        const signInAs = async (sub: string, email: string) => {
+          provider.claims = { iss: issuer, sub, email };
+          const start = await app.inject({ url: '/auth/login' });
+          const startCookies = cookieParts(start.headers);
+          const continued = await app.inject({
+            method: 'POST',
+            url: '/auth/login',
+            headers: {
+              origin: canonicalOrigin,
+              cookie: cookieJar(startCookies),
+              'content-type': 'application/x-www-form-urlencoded',
+            },
+            payload: parseContinueForm(start.body).toString(),
+          });
+          const cb = await app.inject({
+            url: '/auth/callback?code=fixture',
+            headers: { cookie: cookieJar(startCookies, cookieParts(continued.headers)) },
+          });
+          expect(cb.statusCode).toBe(302);
+          const sessionCookie = cookieParts(cb.headers).find((c) => c.startsWith('og_session='))!;
+          const rawToken = sessionCookie.slice('og_session='.length);
+          const sessionPrincipal = (await engine.accounts.session(rawToken))!;
+          return {
+            cookie: sessionCookie,
+            principal: sessionPrincipal,
+            headers: {
+              cookie: sessionCookie,
+              'x-opengen-workspace': sessionPrincipal.workspaceId,
+              'x-opengen-recovery-scope': sessionRecoveryScope(sessionPrincipal),
+            },
+          };
+        };
+
+        // 1. External user signs up BEFORE T0 -> workspace created automatically, zero mr_billing_owners row, ownerEnrollment reports terms-inactive
+        const preT0External = await signInAs('external-gmail-user-1', 'newuser@gmail.com');
+        expect(preT0External.principal.workspaceId).toMatch(/^user-/);
+        const preAccess = await app.inject({
+          url: '/v1/billing/access',
+          headers: preT0External.headers,
+        });
+        expect(preAccess.statusCode).toBe(200);
+        expect(preAccess.json()).toEqual({
+          workspaceId: preT0External.principal.workspaceId,
+          recoveryScope: preT0External.headers['x-opengen-recovery-scope'],
+          capabilities: { read: false, manage: false, setup: false },
+          ownerEnrollment: {
+            eligible: false,
+            expectedAuthorityVersion: 0,
+            terms: {
+              version: 'hosted-manual-prepaid-v1-2026-11-11',
+              text: 'Prepaid non-recurring Stripe Checkout credit summary.',
+            },
+            reason: 'terms-inactive',
+          },
+        });
+
+        // 2. Cross T0 without re-signing in -> ownerEnrollment reports terms-required, POST /v1/billing/owner fails closed (403)
+        currentClock = t0Ms + 5_000;
+        const missingReceiptAccess = await app.inject({
+          url: '/v1/billing/access',
+          headers: preT0External.headers,
+        });
+        expect(missingReceiptAccess.json().ownerEnrollment).toMatchObject({
+          eligible: false,
+          reason: 'terms-required',
+        });
+        const missingReceiptEnroll = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...preT0External.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 0,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(missingReceiptEnroll.statusCode).toBe(403);
+        expect(missingReceiptEnroll.json().error.code).toBe('current_human_terms_required');
+
+        // 3. Re-sign in after T0 -> OIDC-verified receipt recorded; ownerEnrollment becomes eligible!
+        const externalAdmin = await signInAs('external-gmail-user-1', 'newuser@gmail.com');
+        const eligibleAccess = await app.inject({
+          url: '/v1/billing/access',
+          headers: externalAdmin.headers,
+        });
+        expect(eligibleAccess.json().ownerEnrollment).toEqual({
+          eligible: true,
+          expectedAuthorityVersion: 0,
+          terms: {
+            version: 'hosted-manual-prepaid-v1-2026-11-11',
+            text: 'Prepaid non-recurring Stripe Checkout credit summary.',
+          },
+        });
+
+        // Paused runtime reports checkout-paused and rejects POST /v1/billing/owner with 503
+        const pausedAccess = await pausedApp.inject({
+          url: '/v1/billing/access',
+          headers: externalAdmin.headers,
+        });
+        expect(pausedAccess.json().ownerEnrollment).toMatchObject({
+          eligible: false,
+          reason: 'checkout-paused',
+        });
+        const pausedEnroll = await pausedApp.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...externalAdmin.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 0,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(pausedEnroll.statusCode).toBe(503);
+        expect(pausedEnroll.json().error.code).toBe('checkout_paused');
+
+        // Rejects API key bearer, wrong Origin, stale recoveryScope, and wrong termsVersion
+        const apiKeyRes = await app.inject({
+          method: 'POST',
+          url: '/v1/keys',
+          headers: { ...externalAdmin.headers, origin: canonicalOrigin },
+          payload: { name: 'cli-agent', scopes: ['read', 'generate'] },
+        });
+        expect(apiKeyRes.statusCode, apiKeyRes.body).toBe(201);
+        const apiKeyToken = apiKeyRes.json().token as string;
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/v1/billing/owner',
+              headers: {
+                authorization: `Bearer ${apiKeyToken}`,
+                origin: canonicalOrigin,
+              },
+              payload: {
+                expectedAuthorityVersion: 0,
+                termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+                acceptedTerms: true,
+              },
+            })
+          ).statusCode,
+        ).toBe(401);
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/v1/billing/owner',
+              headers: { ...externalAdmin.headers, origin: 'https://evil.example' },
+              payload: {
+                expectedAuthorityVersion: 0,
+                termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+                acceptedTerms: true,
+              },
+            })
+          ).statusCode,
+        ).toBe(403);
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/v1/billing/owner',
+              headers: {
+                ...externalAdmin.headers,
+                'x-opengen-recovery-scope': 'stale-recovery-scope',
+                origin: canonicalOrigin,
+              },
+              payload: {
+                expectedAuthorityVersion: 0,
+                termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+                acceptedTerms: true,
+              },
+            })
+          ).statusCode,
+        ).toBe(409);
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/v1/billing/owner',
+              headers: { ...externalAdmin.headers, origin: canonicalOrigin },
+              payload: {
+                expectedAuthorityVersion: 0,
+                termsVersion: 'outdated-terms-v0',
+                acceptedTerms: true,
+              },
+            })
+          ).statusCode,
+        ).toBe(409);
+
+        // 4. Approve self-serve manual prepaid billing on personal workspace -> writes mr_billing_owners (allowsEnabled: false) + audit row + unlocks live Stripe Checkout!
+        const enrolled = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...externalAdmin.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 0,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(enrolled.statusCode, enrolled.body).toBe(200);
+        expect(enrolled.json()).toEqual({
+          workspaceId: externalAdmin.principal.workspaceId,
+          authorityVersion: 1,
+        });
+
+        const ownerRow = (
+          await engine.pool.query(
+            'SELECT livemode, processor_environment_id, rails, approval_reference FROM mr_billing_owners WHERE workspace_id=$1',
+            [externalAdmin.principal.workspaceId],
+          )
+        ).rows[0];
+        expect(ownerRow).toMatchObject({
+          livemode: true,
+          processor_environment_id: environment.id,
+          rails: { allowsEnabled: false, maxAmountCents: 100_000, maxMonthlyCapCents: 100_000 },
+        });
+        expect(ownerRow.approval_reference).toContain('self-serve-manual-v1:');
+
+        const afterAccess = await app.inject({
+          url: '/v1/billing/access',
+          headers: externalAdmin.headers,
+        });
+        expect(afterAccess.json()).toEqual({
+          workspaceId: externalAdmin.principal.workspaceId,
+          recoveryScope: externalAdmin.headers['x-opengen-recovery-scope'],
+          capabilities: { read: true, manage: true, setup: true },
+        });
+
+        const personalOrder = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/orders',
+          headers: {
+            ...externalAdmin.headers,
+            origin: canonicalOrigin,
+            'idempotency-key': 'external-personal-topup-1',
+          },
+          payload: { amountCents: 1000 },
+        });
+        expect(personalOrder.statusCode, personalOrder.body).toBe(201);
+        const personalCheckout = await app.inject({
+          method: 'POST',
+          url: `/v1/billing/orders/${personalOrder.json().id}/checkout`,
+          headers: { ...externalAdmin.headers, origin: canonicalOrigin },
+          payload: {},
+        });
+        expect(personalCheckout.statusCode, personalCheckout.body).toBe(200);
+        expect(personalCheckout.json().status).toBe('checkout_open');
+        expect(checkoutCreate).toHaveBeenCalledOnce();
+
+        // 5. Team workspace: non-admin member gets admin-required; second admin sees owner-already-active after first admin enrolls!
+        const createdTeam = await engine.accounts.createTeam(
+          externalAdmin.principal,
+          'External Studio Team',
+        );
+        const teamId = createdTeam.id;
+        expect(teamId).toMatch(/^team-/);
+
+        const teammate = await signInAs('external-teammate-2', 'member@gmail.com');
+        const secondAdmin = await signInAs('external-co-admin-3', 'coadmin@gmail.com');
+        await engine.pool.query(
+          "INSERT INTO mr_memberships(id,workspace_id,issuer,subject,role,accepted_at) VALUES($1,$2,$3,'external-teammate-2','member',now()),($4,$2,$3,'external-co-admin-3','admin',now())",
+          [randomUUID(), teamId, issuer, randomUUID()],
+        );
+
+        const switchToTeam = async (userHeaders: Record<string, string>) => {
+          const switched = await app.inject({
+            method: 'POST',
+            url: '/v1/session/workspace',
+            headers: { ...userHeaders, origin: canonicalOrigin },
+            payload: { workspaceId: teamId },
+          });
+          expect(switched.statusCode, switched.body).toBe(200);
+          const body = switched.json() as { workspaceId: string; recoveryScope: string };
+          return {
+            cookie: userHeaders.cookie!,
+            headers: {
+              cookie: userHeaders.cookie!,
+              'x-opengen-workspace': body.workspaceId,
+              'x-opengen-recovery-scope': body.recoveryScope,
+            },
+          };
+        };
+
+        const teamMemberSession = await switchToTeam(teammate.headers);
+        const memberAccess = await app.inject({
+          url: '/v1/billing/access',
+          headers: teamMemberSession.headers,
+        });
+        expect(memberAccess.json().ownerEnrollment).toMatchObject({
+          eligible: false,
+          reason: 'admin-required',
+        });
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/v1/billing/owner',
+              headers: { ...teamMemberSession.headers, origin: canonicalOrigin },
+              payload: {
+                expectedAuthorityVersion: 0,
+                termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+                acceptedTerms: true,
+              },
+            })
+          ).statusCode,
+        ).toBe(403);
+
+        const teamAdmin1 = await switchToTeam(externalAdmin.headers);
+        const teamEnrolled = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...teamAdmin1.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 0,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(teamEnrolled.statusCode, teamEnrolled.body).toBe(200);
+
+        const teamAdmin2 = await switchToTeam(secondAdmin.headers);
+        const secondAdminAccess = await app.inject({
+          url: '/v1/billing/access',
+          headers: teamAdmin2.headers,
+        });
+        expect(secondAdminAccess.json().ownerEnrollment).toMatchObject({
+          eligible: false,
+          expectedAuthorityVersion: 1,
+          reason: 'owner-already-active',
+        });
+        const hijackAttempt = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...teamAdmin2.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 1,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(hijackAttempt.statusCode).toBe(409);
+        expect(hijackAttempt.json().error.code).toBe('billing_owner_already_active');
+      } finally {
+        await engine.close();
+        await isolated.close();
+      }
+    });
   },
 );

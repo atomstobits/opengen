@@ -4,10 +4,23 @@ import type {
   BillingPolicy,
   BillingPolicyValues,
 } from '../../../../packages/engine/src/billing-policy';
+export type BillingOwnerEnrollmentReason =
+  | 'admin-required'
+  | 'owner-already-active'
+  | 'checkout-paused'
+  | 'terms-required'
+  | 'terms-inactive';
+export interface BillingOwnerEnrollment {
+  eligible: boolean;
+  expectedAuthorityVersion: number;
+  terms: { version: string; text: string };
+  reason?: BillingOwnerEnrollmentReason;
+}
 export interface BillingCapabilities {
   read: boolean;
   manage: boolean;
   setup: boolean;
+  ownerEnrollment?: BillingOwnerEnrollment;
 }
 export interface BillingPolicyState {
   workspaceId: string;
@@ -32,6 +45,42 @@ export function retrySeconds(value: string | null, now = Date.now()): number {
   const date = value ? Date.parse(value) : NaN;
   return Number.isFinite(date) ? Math.max(1, Math.min(86400, Math.ceil((date - now) / 1000))) : 60;
 }
+const enrollmentReasons = [
+  'admin-required',
+  'owner-already-active',
+  'checkout-paused',
+  'terms-required',
+  'terms-inactive',
+] as const;
+
+function parseOwnerEnrollment(value: unknown): BillingOwnerEnrollment | undefined {
+  if (value === undefined) return undefined;
+  const raw = value as Partial<BillingOwnerEnrollment> | null;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof raw.eligible !== 'boolean' ||
+    typeof raw.expectedAuthorityVersion !== 'number' ||
+    !Number.isSafeInteger(raw.expectedAuthorityVersion) ||
+    raw.expectedAuthorityVersion < 0 ||
+    raw.expectedAuthorityVersion > 2147483646 ||
+    typeof raw.terms?.version !== 'string' ||
+    !raw.terms.version ||
+    raw.terms.version.length > 120 ||
+    typeof raw.terms.text !== 'string' ||
+    !raw.terms.text ||
+    (raw.reason !== undefined &&
+      !enrollmentReasons.includes(raw.reason as BillingOwnerEnrollmentReason))
+  )
+    throw new Error('Your billing access could not be verified.');
+  return {
+    eligible: raw.eligible,
+    expectedAuthorityVersion: raw.expectedAuthorityVersion,
+    terms: { version: raw.terms.version, text: raw.terms.text },
+    ...(raw.reason ? { reason: raw.reason } : {}),
+  };
+}
+
 /** Read current browser capabilities without persisting the response or trusting URL state. */
 export async function readBillingAccess(
   authority: { workspaceId: string; recoveryScope: string },
@@ -58,7 +107,50 @@ export async function readBillingAccess(
     typeof capabilities.setup !== 'boolean'
   )
     throw new Error('Your billing access could not be verified.');
-  return { read: capabilities.read, manage: capabilities.manage, setup: capabilities.setup };
+  const ownerEnrollment = parseOwnerEnrollment(access.ownerEnrollment);
+  return {
+    read: capabilities.read,
+    manage: capabilities.manage,
+    setup: capabilities.setup,
+    ...(ownerEnrollment ? { ownerEnrollment } : {}),
+  };
+}
+
+export async function enrollBillingOwner(input: {
+  workspaceId: string;
+  recoveryScope: string;
+  expectedAuthorityVersion: number;
+  termsVersion: string;
+  request?: typeof fetch;
+}): Promise<{ workspaceId: string; authorityVersion: number }> {
+  if (
+    !Number.isSafeInteger(input.expectedAuthorityVersion) ||
+    input.expectedAuthorityVersion < 0 ||
+    input.expectedAuthorityVersion > 2147483646 ||
+    !input.termsVersion ||
+    input.termsVersion.length > 120
+  )
+    throw new Error('Refresh this workspace’s billing terms before enabling prepaid billing.');
+  const result = await policyRequest<{ workspaceId: string; authorityVersion: number }>(
+    input.workspaceId,
+    '/api/billing/owner',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-opengen-recovery-scope': input.recoveryScope,
+      },
+      body: JSON.stringify({
+        expectedAuthorityVersion: input.expectedAuthorityVersion,
+        termsVersion: input.termsVersion,
+        acceptedTerms: true,
+      }),
+    },
+    input.request,
+  );
+  if (!Number.isSafeInteger(result.authorityVersion) || result.authorityVersion <= 0)
+    throw new Error('Your workspace funding approval could not be verified. Refresh this page.');
+  return result;
 }
 
 /** Reuses the existing workspace-bound, no-store, HttpOnly-cookie request helper. */
