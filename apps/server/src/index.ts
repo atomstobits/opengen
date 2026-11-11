@@ -65,18 +65,39 @@ const payments =
         livemode: paymentConfig.livemode,
       })
     : undefined;
+let workBillingOnce: (() => Promise<void>) | undefined;
 const app = await buildApp({
   engine,
   payments,
   paymentConfig,
   billingRuntime,
+  onBillingRuntime: (runtime) => {
+    workBillingOnce = runtime.workOnce;
+  },
   ...(sandbox ? {} : { humanTermsPolicy }),
   publicUrl,
   apiToken: process.env.MR_API_TOKEN,
   workspaceId: process.env.MR_WORKSPACE_ID,
   logger: true,
 });
+let rechargeWorking = false;
+const rechargeInterval =
+  billingRuntime?.automaticChargesEnabled && workBillingOnce
+    ? setInterval(() => {
+        if (rechargeWorking) return;
+        rechargeWorking = true;
+        void workBillingOnce!()
+          .catch((error) => {
+            app.log.error({ err: error }, 'Background billing recharge tick failed');
+          })
+          .finally(() => {
+            rechargeWorking = false;
+          });
+      }, 15_000)
+    : undefined;
+rechargeInterval?.unref();
 const shutdown = async () => {
+  if (rechargeInterval) clearInterval(rechargeInterval);
   await app.close();
   await engine?.close();
   process.exit(0);

@@ -1,10 +1,12 @@
-# OpenGen portable CLI
+# OpenGen portable CLI (`@opengen/cli`)
 
-This is a locally built, private `opengen-cli` package. No npm namespace or published package is claimed. OpenGen code is Apache-2.0; bundled third-party notices are included. Node **22.12 or newer** is required. Node itself is not included.
+Standalone `@opengen/cli` package exposing the `opengen` command. OpenGen code is Apache-2.0; bundled third-party notices are included. Node **22.12 or newer** is required. Node itself is not included.
 
-Verify the archive's SHA-256 against the separately supplied `.tgz.sha256` file before local installation. Use an explicit private directory; no global install is needed:
+Install from npm into an isolated prefix, or verify the release archive's SHA-256 against the supplied `.tgz.sha256` file before offline installation:
 
 ```sh
+npm install --prefix /absolute/private/opengen-client @opengen/cli@{{VERSION}} --ignore-scripts --no-audit --no-fund
+# Offline from release bundle:
 npm install --prefix /absolute/private/opengen-client /absolute/path/opengen-cli-{{VERSION}}.tgz --ignore-scripts --no-audit --no-fund --offline
 /absolute/private/opengen-client/node_modules/.bin/opengen --help
 ```

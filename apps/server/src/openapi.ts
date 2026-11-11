@@ -1113,7 +1113,7 @@ export function openApiDocument(billingAvailable = false) {
     openapi: '3.1.0',
     info: {
       title: 'OpenGen API',
-      version: '0.1.0',
+      version: '0.1.1',
       description:
         'Self-hosted regional image/video generation router. Documented routes may not be executable; inspect quotes and notices. The explicit MCP call registry lists supported business operations. Private comparisons, browser sessions and OAuth transport/discovery are HTTP-only. Unknown provider acceptance must never trigger a blind paid retry.',
       license: { name: 'Apache-2.0', identifier: 'Apache-2.0' },

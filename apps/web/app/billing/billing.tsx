@@ -178,6 +178,7 @@ export function Billing({ workspaceId, recoveryScope }: BillingWorkspace) {
 function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
   const legal = useLegalPresentation();
   const [capabilities, setCapabilities] = useState<BillingCapabilities | null>();
+  const [policyRefreshKey, setPolicyRefreshKey] = useState(0);
   const [accessError, setAccessError] = useState('');
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [amount, setAmount] = useState('25');
@@ -727,13 +728,104 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
           window never adds credit by itself.
         </p>
       </section>
+      {capabilities?.read && recoveryScope && capabilities.ownerEnrollment?.upgradeToRecharge && (
+        <BillingAutoRechargeUpgradeCard
+          workspaceId={workspaceId}
+          recoveryScope={recoveryScope}
+          enrollment={capabilities.ownerEnrollment}
+          onUpgraded={async () => {
+            const next = await readBillingAccess({ workspaceId, recoveryScope });
+            if (mounted.current) {
+              setCapabilities(next);
+              setPolicyRefreshKey((current) => current + 1);
+              setNotice(
+                'Saved-card automatic recharge authority is now enabled for this workspace.',
+              );
+            }
+          }}
+        />
+      )}
       {capabilities?.read && recoveryScope && (
         <BillingPolicyPanel
+          key={policyRefreshKey}
           workspaceId={workspaceId}
           recoveryScope={recoveryScope}
           capabilities={capabilities}
         />
       )}
+    </section>
+  );
+}
+
+function BillingAutoRechargeUpgradeCard({
+  workspaceId,
+  recoveryScope,
+  enrollment,
+  onUpgraded,
+}: {
+  workspaceId: string;
+  recoveryScope: string;
+  enrollment: BillingOwnerEnrollment;
+  onUpgraded: () => Promise<void>;
+}) {
+  const [accepted, setAccepted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!enrollment.eligible) return null;
+
+  return (
+    <section className={styles.current} aria-labelledby="recharge-upgrade-title">
+      <div>
+        <span className={styles.eyebrow}>OPTIONAL SAVED-CARD RECHARGE</span>
+        <h2 id="recharge-upgrade-title">Enable automatic recharge authority</h2>
+        <p>
+          This workspace was originally enrolled for one-time manual top-ups only. Approve updated
+          workspace funding rails to save a card and configure opt-in automatic recharge limits.
+        </p>
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
+        <label className={styles.consentLabel}>
+          <input
+            type="checkbox"
+            checked={accepted}
+            disabled={submitting}
+            onChange={(event) => setAccepted(event.target.checked)}
+          />
+          <span>
+            I authorize saved-card setup and opt-in automatic recharge rails for {workspaceId} under
+            payment summary {enrollment.terms.version}.
+          </span>
+        </label>
+      </div>
+      <button
+        className={styles.primary}
+        type="button"
+        disabled={!accepted || submitting}
+        onClick={() => {
+          if (!accepted || submitting) return;
+          setSubmitting(true);
+          setError('');
+          void enrollBillingOwner({
+            workspaceId,
+            recoveryScope,
+            expectedAuthorityVersion: enrollment.expectedAuthorityVersion,
+            termsVersion: enrollment.terms.version,
+          })
+            .then(() => onUpgraded())
+            .catch((cause) => {
+              setError(message(cause));
+            })
+            .finally(() => {
+              setSubmitting(false);
+            });
+        }}
+      >
+        {submitting ? 'Updating authority…' : 'Enable auto-recharge authority →'}
+      </button>
     </section>
   );
 }
@@ -807,9 +899,9 @@ function BillingOwnerEnrollmentCard({
           {enrollment.eligible ? (
             <>
               <p className={styles.enrollmentLead}>
-                Establish your administrator account as the funding owner for this workspace. Manual
-                top-ups are one-time Stripe Checkout payments; automatic recurring charges remain
-                disabled.
+                {enrollment.allowsAutoRecharge
+                  ? 'Establish your administrator account as the funding owner for this workspace. Enable one-time Stripe Checkout top-ups and optional opt-in saved-card automatic recharge within your workspace limits.'
+                  : 'Establish your administrator account as the funding owner for this workspace. Manual top-ups are one-time Stripe Checkout payments; automatic recurring charges remain disabled.'}
               </p>
               <details className={styles.termsDisclosure}>
                 <summary>Payment and refund summary ({enrollment.terms.version})</summary>
@@ -823,16 +915,28 @@ function BillingOwnerEnrollmentCard({
                   onChange={(event) => setAccepted(event.target.checked)}
                 />
                 <span>
-                  I am an authorized workspace administrator and agree to enable manual prepaid USD
-                  top-ups under the <a href="/terms">Terms of Service</a> and{' '}
-                  <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                  {enrollment.allowsAutoRecharge ? (
+                    <>
+                      I am an authorized workspace administrator and agree to enable prepaid USD
+                      billing under the <a href="/terms">Terms of Service</a> and{' '}
+                      <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                    </>
+                  ) : (
+                    <>
+                      I am an authorized workspace administrator and agree to enable manual prepaid
+                      USD top-ups under the <a href="/terms">Terms of Service</a> and{' '}
+                      <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                    </>
+                  )}
                 </span>
               </label>
               <button className={styles.primary} type="submit" disabled={!accepted || submitting}>
                 {submitting ? 'Enabling prepaid billing…' : 'Enable prepaid billing →'}
               </button>
               <p className={styles.finePrint}>
-                One-time prepaid credit · No saved-card auto-recharge
+                {enrollment.allowsAutoRecharge
+                  ? 'Prepaid USD credit · Optional opt-in saved-card auto-recharge'
+                  : 'One-time prepaid credit · No saved-card auto-recharge'}
               </p>
             </>
           ) : (

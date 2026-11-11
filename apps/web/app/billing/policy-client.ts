@@ -14,6 +14,8 @@ export interface BillingOwnerEnrollment {
   eligible: boolean;
   expectedAuthorityVersion: number;
   terms: { version: string; text: string };
+  allowsAutoRecharge?: boolean;
+  upgradeToRecharge?: boolean;
   reason?: BillingOwnerEnrollmentReason;
 }
 export interface BillingCapabilities {
@@ -69,6 +71,8 @@ function parseOwnerEnrollment(value: unknown): BillingOwnerEnrollment | undefine
     raw.terms.version.length > 120 ||
     typeof raw.terms.text !== 'string' ||
     !raw.terms.text ||
+    (raw.allowsAutoRecharge !== undefined && typeof raw.allowsAutoRecharge !== 'boolean') ||
+    (raw.upgradeToRecharge !== undefined && typeof raw.upgradeToRecharge !== 'boolean') ||
     (raw.reason !== undefined &&
       !enrollmentReasons.includes(raw.reason as BillingOwnerEnrollmentReason))
   )
@@ -77,6 +81,8 @@ function parseOwnerEnrollment(value: unknown): BillingOwnerEnrollment | undefine
     eligible: raw.eligible,
     expectedAuthorityVersion: raw.expectedAuthorityVersion,
     terms: { version: raw.terms.version, text: raw.terms.text },
+    ...(raw.allowsAutoRecharge !== undefined ? { allowsAutoRecharge: raw.allowsAutoRecharge } : {}),
+    ...(raw.upgradeToRecharge !== undefined ? { upgradeToRecharge: raw.upgradeToRecharge } : {}),
     ...(raw.reason ? { reason: raw.reason } : {}),
   };
 }

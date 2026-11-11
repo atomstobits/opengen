@@ -1,11 +1,12 @@
 {
   "name": "@media-router/server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "tsx --env-file-if-exists=../../.env src/index.ts",
-    "worker": "tsx --env-file-if-exists=../../.env src/worker.ts"
+    "worker": "tsx --env-file-if-exists=../../.env src/worker.ts",
+    "email-relay": "tsx --env-file-if-exists=../../.env src/email-relay-entry.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
