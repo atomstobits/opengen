@@ -135,6 +135,7 @@ it.each([false, true])(
       }
       for (const forbidden of [
         'billing.access',
+        'billing.owner',
         'billing.delegations.update',
         'billing.setup',
         'billing.mandate.revoke',
@@ -166,6 +167,7 @@ it.each([false, true])(
 it('relays only fixed private billing paths and retains session, Origin and rate-limit data', async () => {
   const paths = [
     ['GET', '/v1/billing/access'],
+    ['POST', '/v1/billing/owner'],
     ['GET', '/v1/billing/policy'],
     ['PUT', '/v1/billing/policy'],
     ['PUT', '/v1/billing/delegations'],
@@ -185,6 +187,8 @@ it('relays only fixed private billing paths and retains session, Origin and rate
   for (const [method, path] of paths)
     expect(registeredBackendPath(path!, method!), path).toBe(true);
   expect(registeredBackendPath('/v1/billing/access', 'PUT')).toBe(false);
+  expect(registeredBackendPath('/v1/billing/owner', 'GET')).toBe(false);
+  expect(registeredBackendPath('/v1/billing/owner', 'PUT')).toBe(false);
   expect(registeredBackendPath('/v1/billing/delegations', 'POST')).toBe(false);
   expect(registeredBackendPath('/v1/billing/delegations/key/fixture', 'DELETE')).toBe(false);
   expect(registeredBackendPath('/v1/billing/anything-else', 'GET')).toBe(false);

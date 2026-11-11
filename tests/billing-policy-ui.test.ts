@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   draftFromPolicy,
+  enrollBillingOwner,
   finishSetupRecovery,
   exactUsdDisplay,
   exactUsdInput,
@@ -60,6 +61,75 @@ describe('private billing policy browser helpers', () => {
     await expect(
       readBillingAccess(authority, undefined, async () => new Response(null, { status: 404 })),
     ).resolves.toBeNull();
+    await expect(
+      readBillingAccess(authority, undefined, async () =>
+        Response.json({
+          ...authority,
+          capabilities: { read: false, manage: false, setup: false },
+          ownerEnrollment: {
+            eligible: true,
+            expectedAuthorityVersion: 0,
+            terms: { version: 'manual-terms-v1', text: 'Prepaid non-recurring summary.' },
+          },
+        }),
+      ),
+    ).resolves.toEqual({
+      read: false,
+      manage: false,
+      setup: false,
+      ownerEnrollment: {
+        eligible: true,
+        expectedAuthorityVersion: 0,
+        terms: { version: 'manual-terms-v1', text: 'Prepaid non-recurring summary.' },
+      },
+    });
+    for (const invalidEnrollment of [
+      { eligible: 'yes', expectedAuthorityVersion: 0, terms: { version: 'v1', text: 'text' } },
+      { eligible: true, expectedAuthorityVersion: -1, terms: { version: 'v1', text: 'text' } },
+      { eligible: true, expectedAuthorityVersion: 0, terms: { version: '', text: 'text' } },
+      {
+        eligible: false,
+        expectedAuthorityVersion: 0,
+        terms: { version: 'v1', text: 'text' },
+        reason: 'unexpected-reason',
+      },
+    ])
+      await expect(
+        readBillingAccess(authority, undefined, async () =>
+          Response.json({
+            ...authority,
+            capabilities: { read: false, manage: false, setup: false },
+            ownerEnrollment: invalidEnrollment,
+          }),
+        ),
+      ).rejects.toThrow(/could not be verified/);
+    await expect(
+      enrollBillingOwner({
+        ...authority,
+        expectedAuthorityVersion: 0,
+        termsVersion: 'manual-terms-v1',
+        request: async (url, init) => {
+          expect(url).toBe('/api/billing/owner');
+          expect(init?.method).toBe('POST');
+          expect(new Headers(init?.headers).get('x-opengen-workspace')).toBe('workspace-a');
+          expect(new Headers(init?.headers).get('x-opengen-recovery-scope')).toBe('member-a-v1');
+          expect(JSON.parse(String(init?.body))).toEqual({
+            expectedAuthorityVersion: 0,
+            termsVersion: 'manual-terms-v1',
+            acceptedTerms: true,
+          });
+          return Response.json({ workspaceId: 'workspace-a', authorityVersion: 1 });
+        },
+      }),
+    ).resolves.toEqual({ workspaceId: 'workspace-a', authorityVersion: 1 });
+    await expect(
+      enrollBillingOwner({
+        ...authority,
+        expectedAuthorityVersion: 0,
+        termsVersion: 'manual-terms-v1',
+        request: async () => Response.json({ workspaceId: 'workspace-b', authorityVersion: 1 }),
+      }),
+    ).rejects.toThrow(/workspace changed/);
   });
 
   it('keeps exact six-decimal thresholds and whole-cent funding values without floating point money', () => {

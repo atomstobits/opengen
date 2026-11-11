@@ -59,7 +59,7 @@ const billingRuntime =
       ? await hostedBillingSandbox(engine.pool, sandbox)
       : undefined;
 const payments =
-  engine && paymentConfig
+  engine && paymentConfig && !hostedLegalPublication
     ? new PaymentStore(engine.pool, {
         creditInTransaction: creditWorkspaceInTransaction,
         livemode: paymentConfig.livemode,

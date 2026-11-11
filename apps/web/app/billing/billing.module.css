@@ -199,6 +199,48 @@
   text-align: center;
   margin: 14px 0 0;
 }
+.enrollmentLead {
+  margin: 0 0 18px;
+  font-size: 16px;
+  line-height: 1.58;
+  color: var(--on-light);
+}
+.termsDisclosure {
+  border: 1px solid var(--line-on-light);
+  padding: 12px 14px;
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.termsDisclosure summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.termsDisclosure p {
+  margin: 10px 0 0;
+  color: var(--muted-on-light);
+}
+.consentLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.55;
+  cursor: pointer;
+}
+.consentLabel input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.enrollmentStatus {
+  border: 1px solid var(--line-on-light);
+  padding: 16px;
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.58;
+  color: var(--on-light);
+}
 .explanation {
   display: flex;
   flex-direction: column;

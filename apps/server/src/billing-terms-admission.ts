@@ -79,6 +79,27 @@ function assertSamePolicy(snapshot: HumanTermsPolicy, readPolicy: () => HumanTer
     throw denied();
 }
 
+/** Verifies an OIDC-verified human Terms receipt for the active published policy
+ * inside the caller's financial transaction. Neither writes a receipt nor gates
+ * accepted-money recovery. */
+export async function verifyHumanIdentityTermsReceiptInTransaction(
+  client: PoolClient,
+  identity: { issuer: string; subject: string },
+  readPolicy: () => HumanTermsPolicy = currentHumanTermsPolicy,
+): Promise<HumanTermsPolicy> {
+  if (!identity.issuer || !identity.subject) throw denied();
+  const policy = activeSnapshot(readPolicy);
+  const receipt = await client.query(
+    `SELECT 1 FROM mr_terms_receipts
+     WHERE issuer=$1 AND subject=$2 AND policy_version=$3 AND policy_digest=$4
+       AND notice_version=$5 AND action='continue' AND method='oidc-verified'`,
+    [identity.issuer, identity.subject, policy.version, policy.digest, HUMAN_TERMS_NOTICE_VERSION],
+  );
+  assertSamePolicy(policy, readPolicy);
+  if (!receipt.rowCount) throw denied();
+  return policy;
+}
+
 /** New LIVE funding only. The caller supplies the actual current billing:manage
  * proof and reauthorizes on this same financial transaction client. This neither
  * writes a receipt nor makes assent a condition of accepted-money recovery. */
@@ -96,15 +117,7 @@ export async function requireCurrentHumanTermsInTransaction(
     keySecretVersion: authority.principal.keySecretVersion,
     membershipEpoch: authority.principal.membershipEpoch,
   };
-  const policy = activeSnapshot(readPolicy);
-  const receipt = await client.query(
-    `SELECT 1 FROM mr_terms_receipts
-     WHERE issuer=$1 AND subject=$2 AND policy_version=$3 AND policy_digest=$4
-       AND notice_version=$5 AND action='continue' AND method='oidc-verified'`,
-    [identity.issuer, identity.subject, policy.version, policy.digest, HUMAN_TERMS_NOTICE_VERSION],
-  );
-  assertSamePolicy(policy, readPolicy);
-  if (!receipt.rowCount) throw denied();
+  const policy = await verifyHumanIdentityTermsReceiptInTransaction(client, identity, readPolicy);
 
   // The receipt read is awaited; retain the original verified identity and current
   // human owner rather than treating a historical receipt as funding authority.

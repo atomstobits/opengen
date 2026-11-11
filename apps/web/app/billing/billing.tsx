@@ -6,7 +6,12 @@ import { useLegalPresentation } from '../legal/presentation';
 import type { BrowserSession } from '../gateway-access';
 import { hasWorkspaceAuthority, privateWorkspaceHeaders } from '../dashboard/activity-view';
 import { BillingPolicyPanel } from './policy-panel';
-import { readBillingAccess, type BillingCapabilities } from './policy-client';
+import {
+  enrollBillingOwner,
+  readBillingAccess,
+  type BillingCapabilities,
+  type BillingOwnerEnrollment,
+} from './policy-client';
 import {
   billingRequest,
   createOrRecoverOrder,
@@ -363,7 +368,25 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
         {accessError}
       </p>
     );
-  if (capabilities?.read === false && recoveryScope)
+  if (capabilities?.read === false && recoveryScope) {
+    if (capabilities.ownerEnrollment)
+      return (
+        <BillingOwnerEnrollmentCard
+          workspaceId={workspaceId}
+          recoveryScope={recoveryScope}
+          enrollment={capabilities.ownerEnrollment}
+          legal={legal}
+          onEnrolled={async () => {
+            const next = await readBillingAccess({ workspaceId, recoveryScope });
+            if (mounted.current) {
+              setCapabilities(next);
+              setNotice(
+                'Prepaid billing is enabled for this workspace. Choose an amount below to add credit.',
+              );
+            }
+          }}
+        />
+      );
     return (
       <BillingPolicyPanel
         workspaceId={workspaceId}
@@ -371,6 +394,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
         capabilities={capabilities}
       />
     );
+  }
 
   return (
     <section className={styles.billing} aria-labelledby="billing-title" aria-busy={loading}>
@@ -710,6 +734,192 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
           capabilities={capabilities}
         />
       )}
+    </section>
+  );
+}
+
+function BillingOwnerEnrollmentCard({
+  workspaceId,
+  recoveryScope,
+  enrollment,
+  legal,
+  onEnrolled,
+}: {
+  workspaceId: string;
+  recoveryScope: string;
+  enrollment: BillingOwnerEnrollment;
+  legal: ReturnType<typeof useLegalPresentation>;
+  onEnrolled: () => Promise<void>;
+}) {
+  const [accepted, setAccepted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  return (
+    <section className={styles.billing} aria-labelledby="billing-enrollment-title">
+      <header className={styles.heading}>
+        <div>
+          <span className={styles.eyebrow}>YOUR WORKSPACE / BILLING</span>
+          <h1 id="billing-enrollment-title">
+            Enable prepaid
+            <br />
+            <em>workspace credit.</em>
+          </h1>
+          <p>Approve manual one-time USD top-ups for image and video generation.</p>
+        </div>
+        <div className={styles.workspace}>
+          <span>Paying workspace</span>
+          <strong>{workspaceId}</strong>
+        </div>
+      </header>
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+      <div className={styles.topUpGrid}>
+        <form
+          className={styles.topUp}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!enrollment.eligible || !accepted || submitting) return;
+            setSubmitting(true);
+            setError('');
+            void enrollBillingOwner({
+              workspaceId,
+              recoveryScope,
+              expectedAuthorityVersion: enrollment.expectedAuthorityVersion,
+              termsVersion: enrollment.terms.version,
+            })
+              .then(() => onEnrolled())
+              .catch((cause) => {
+                setError(message(cause));
+              })
+              .finally(() => {
+                setSubmitting(false);
+              });
+          }}
+        >
+          <div className={styles.cardTop}>
+            <span className={styles.eyebrow}>01 / ENABLE PREPAID BILLING</span>
+            <span className={styles.currency}>USD</span>
+          </div>
+          {enrollment.eligible ? (
+            <>
+              <p className={styles.enrollmentLead}>
+                Establish your administrator account as the funding owner for this workspace. Manual
+                top-ups are one-time Stripe Checkout payments; automatic recurring charges remain
+                disabled.
+              </p>
+              <details className={styles.termsDisclosure}>
+                <summary>Payment and refund summary ({enrollment.terms.version})</summary>
+                <p>{enrollment.terms.text}</p>
+              </details>
+              <label className={styles.consentLabel}>
+                <input
+                  type="checkbox"
+                  checked={accepted}
+                  disabled={submitting}
+                  onChange={(event) => setAccepted(event.target.checked)}
+                />
+                <span>
+                  I am an authorized workspace administrator and agree to enable manual prepaid USD
+                  top-ups under the <a href="/terms">Terms of Service</a> and{' '}
+                  <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                </span>
+              </label>
+              <button className={styles.primary} type="submit" disabled={!accepted || submitting}>
+                {submitting ? 'Enabling prepaid billing…' : 'Enable prepaid billing →'}
+              </button>
+              <p className={styles.finePrint}>
+                One-time prepaid credit · No saved-card auto-recharge
+              </p>
+            </>
+          ) : (
+            <>
+              <div className={styles.enrollmentStatus} role="status">
+                {enrollment.reason === 'admin-required' ? (
+                  <p>
+                    Only a workspace administrator can enable prepaid billing for this workspace.
+                    Your existing generation balance and BYOK provider connections remain available.
+                  </p>
+                ) : enrollment.reason === 'owner-already-active' ? (
+                  <p>
+                    Prepaid billing is already enabled by another administrator in this workspace.
+                    Ask that funding owner to add credit, or spend from your workspace’s available
+                    generation balance.
+                  </p>
+                ) : enrollment.reason === 'terms-required' ? (
+                  <p>
+                    Review and accept the current Terms of Service before enabling prepaid billing
+                    for this workspace.
+                  </p>
+                ) : enrollment.reason === 'terms-inactive' ? (
+                  <p>
+                    Prepaid billing enrollment will open once the published Terms of Service take
+                    effect.
+                  </p>
+                ) : (
+                  <p>
+                    New prepaid billing enrollment and top-ups are temporarily paused. Try again
+                    shortly.
+                  </p>
+                )}
+              </div>
+              {enrollment.reason === 'terms-required' && (
+                <a className={styles.primary} href="/auth/login">
+                  Review Terms and sign in ↗
+                </a>
+              )}
+            </>
+          )}
+          <p className={`${styles.finePrint} legal-review-links`}>
+            {legal.mode === 'published' ? (
+              <>
+                Governed by the <a href="/terms">Terms of Service</a> and{' '}
+                <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+              </>
+            ) : legal.mode === 'staged' ? (
+              <>
+                Review the <a href="/terms">Terms of Service</a> and{' '}
+                <a href="/refunds">Refund Policy</a>. Scheduled effective {legal.effectiveAt} — not
+                yet effective.
+              </>
+            ) : (
+              <>
+                Review the <a href="/terms">Terms draft</a> and{' '}
+                <a href="/refunds">Refund policy draft</a>. Not yet effective.
+              </>
+            )}
+          </p>
+        </form>
+        <aside className={styles.explanation}>
+          <span className={styles.eyebrow}>HOW PREPAID CREDIT WORKS</span>
+          <h2>
+            Manual top-ups,
+            <br />
+            clear boundaries.
+          </h2>
+          <p>
+            Enabling prepaid billing records your workspace’s human funding owner without charging a
+            card until you choose an amount.
+          </p>
+          <ol>
+            <li>
+              <span>1</span>Enable manual prepaid billing as workspace admin.
+            </li>
+            <li>
+              <span>2</span>Add $5.00–$1,000.00 USD via Stripe Checkout when needed.
+            </li>
+            <li>
+              <span>3</span>Spend from your workspace balance across web, REST, MCP, or CLI.
+            </li>
+          </ol>
+          <a href="/dashboard">
+            Use BYOK or view your workspace ledger <span aria-hidden="true">↗</span>
+          </a>
+        </aside>
+      </div>
     </section>
   );
 }
