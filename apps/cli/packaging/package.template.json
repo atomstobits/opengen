@@ -1,8 +1,15 @@
 {
-  "name": "opengen-cli",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Portable OpenGen CLI, packaged locally for review. Not published to npm.",
+  "name": "@opengen/cli",
+  "version": "0.1.1",
+  "description": "Portable OpenGen CLI for exact regional image and video model discovery, quoting, generation and job recovery.",
+  "homepage": "https://opengen.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atomstobits/opengen.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "license": "Apache-2.0",
   "engines": { "node": ">=22.12" },

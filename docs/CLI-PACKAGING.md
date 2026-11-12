@@ -1,6 +1,6 @@
 # Standalone CLI packaging
 
-Packaging audit: 2026-11-03. The standalone artifact is a **local, unpublished** package named `opengen-cli`, version `0.1.0`, with `private: true` and an `opengen` executable. It is separate from the source workspace package `@media-router/cli`. No registry publication, public package-name ownership or global installation is established by these scripts. npm refuses publication of a package marked private; this does not prevent local tarball installation. [npm package metadata](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/)
+Packaging audit updated 2026-11-11. The standalone artifact is packaged as `@opengen/cli`, version `0.1.1`, with `"publishConfig": { "access": "public" }` and an `opengen` executable (`opengen-cli-0.1.1.tgz`). It is separate from the source workspace package `@media-router/cli`. Local build/pack scripts remain deterministic and offline-safe; actual registry publication happens only as an explicit release step. [npm package metadata](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/)
 
 ## Contents and dependencies
 
@@ -8,7 +8,7 @@ Packaging audit: 2026-11-03. The standalone artifact is a **local, unpublished**
 
 | Component                          | Audited exact version | License    | Artifact handling                                                                                                                  |
 | ---------------------------------- | --------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Original OpenGen CLI/SDK/contracts | 0.1.0                 | Apache-2.0 | Include repository `LICENSE` and `NOTICE`; preserve source attribution.                                                            |
+| Original OpenGen CLI/SDK/contracts | 0.1.1                 | Apache-2.0 | Include repository `LICENSE` and `NOTICE`; preserve source attribution.                                                            |
 | Zod                                | 4.6.7                 | MIT        | Bundled runtime validation code; include its complete installed copyright/permission/warranty notice in `THIRD-PARTY-NOTICES.txt`. |
 | esbuild                            | 0.28.2                | MIT        | Build-time tool only. Pin and record its version; its JavaScript service/native executable are not runtime package contents.       |
 
@@ -36,11 +36,11 @@ node scripts/package-cli.mjs \
   --out-dir /absolute/private/output/new-cli-release
 ```
 
-For version 0.1.0 the release directory holds:
+For version 0.1.1 the release directory holds:
 
-- `opengen-cli-0.1.0.tgz`
-- `opengen-cli-0.1.0.tgz.sha256`
-- `opengen-cli-0.1.0.manifest.json`
+- `opengen-cli-0.1.1.tgz`
+- `opengen-cli-0.1.1.tgz.sha256`
+- `opengen-cli-0.1.1.manifest.json`
 - `package/`, retained for inspection, containing the exact packaged files.
 
 The packer creates a deterministic USTAR/gzip archive for identical inputs and toolchain, using Node builtins and a fixed file list. The build manifest records the actual Node, V8 and zlib versions; cross-toolchain byte equivalence is not claimed. It does not run `npm pack`, lifecycle hooks, publication or a global installation. Generated artifacts stay outside the source release. The integration owner qualifies reproducibility using the pinned builder, source inputs and the exact archive; this document is not evidence that an untested artifact passed those checks.
@@ -55,8 +55,8 @@ Obtain the archive and checksum from the same reviewed build, and compare the ch
 
 ```sh
 cd /absolute/private/output/new-cli-release
-shasum -a 256 -c opengen-cli-0.1.0.tgz.sha256
-tar -tzf opengen-cli-0.1.0.tgz
+shasum -a 256 -c opengen-cli-0.1.1.tgz.sha256
+tar -tzf opengen-cli-0.1.1.tgz
 ```
 
 The archive should contain the expected package files only, under `package/`, with regular files/directories, no traversal paths and no links, `.env`, profile, source checkout or `node_modules` tree. Inspect the package/release manifests and third-party notice before installation.
@@ -65,7 +65,7 @@ Choose an empty private project directory for this local install:
 
 ```sh
 npm install --prefix /absolute/private/project \
-  /absolute/private/output/new-cli-release/opengen-cli-0.1.0.tgz \
+  /absolute/private/output/new-cli-release/opengen-cli-0.1.1.tgz \
   --ignore-scripts --no-audit --no-fund
 /absolute/private/project/node_modules/.bin/opengen --help
 ```

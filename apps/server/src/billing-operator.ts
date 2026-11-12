@@ -13,6 +13,9 @@ const evidence = z
     evidenceUrl: z.url().max(2000),
   })
   .strict();
+const WORK_RATE_LIMIT_WINDOW_MS = 60_000;
+const WORK_RATE_LIMIT_MAX = 60;
+
 export async function registerBillingOperatorRoutes(
   app: FastifyInstance,
   options: {
@@ -23,6 +26,25 @@ export async function registerBillingOperatorRoutes(
     revalidateOperator?(client: PoolClient, principal: Principal): Promise<void>;
   },
 ) {
+  let workWindowStart = 0;
+  let workWindowCount = 0;
+  const checkWorkRateLimit = () => {
+    const now = Date.now();
+    if (now - workWindowStart >= WORK_RATE_LIMIT_WINDOW_MS) {
+      workWindowStart = now;
+      workWindowCount = 0;
+    }
+    workWindowCount += 1;
+    if (workWindowCount > WORK_RATE_LIMIT_MAX)
+      throw Object.assign(new Error('Operator billing tick rate limit exceeded.'), {
+        code: 'rate_limited',
+        statusCode: 429,
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((WORK_RATE_LIMIT_WINDOW_MS - (now - workWindowStart)) / 1000),
+        ),
+      });
+  };
   const operator = async (request: FastifyRequest) => {
     if (!request.headers.authorization)
       throw Object.assign(new Error('Use explicit installation operator bearer authority.'), {
@@ -108,5 +130,21 @@ export async function registerBillingOperatorRoutes(
     return reply
       .header('Cache-Control', 'private, no-store')
       .send({ workspaceId: input.workspaceId, attempt });
+  });
+  app.post('/v1/operator/billing/work', async (request, reply) => {
+    checkWorkRateLimit();
+    const p = await operator(request);
+    z.object({})
+      .strict()
+      .optional()
+      .parse(request.body ?? {});
+    if (!options.transport)
+      throw Object.assign(new Error('Payment reconciliation transport is unavailable.'), {
+        statusCode: 503,
+        code: 'billing_not_configured',
+      });
+    await revalidate(p)({} as PoolClient);
+    await options.recharge.workOnce(options.transport);
+    return reply.header('Cache-Control', 'private, no-store').send({ ok: true });
   });
 }

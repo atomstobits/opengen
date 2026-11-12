@@ -112,7 +112,7 @@ try {
   else {
     const result = await runCommand(args, { signal: controller.signal, onLoginUrl: (url) => console.error('Complete OpenGen sign-in in your browser: ' + url) });
     let output = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-    if (result === help) output = output.replaceAll('npm run cli --', 'opengen') + '\\nPortable local package: opengen bind --help; opengen --version. Not published to npm.\\n';
+    if (result === help) output = output.replaceAll('npm run cli --', 'opengen') + '\\nPortable package (@opengen/cli): opengen bind --help; opengen --version.\\n';
     console.log(output);
   }
 } catch (error) {

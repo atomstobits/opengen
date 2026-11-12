@@ -72,10 +72,11 @@ export async function packageCli({ sourceRoot, outputDirectory } = {}) {
     }
     chunks.push(Buffer.alloc(1024));
     const archive = gzipSync(Buffer.concat(chunks), { level: 9 });
-    const filename = `${manifest.name}-${manifest.version}.tgz`;
+    const archiveName = manifest.name.replace(/^@/, '').replace('/', '-');
+    const filename = `${archiveName}-${manifest.version}.tgz`;
     const tarballPath = join(destination, filename);
     const sha256Path = `${tarballPath}.sha256`;
-    const manifestPath = join(destination, `${manifest.name}-${manifest.version}.manifest.json`);
+    const manifestPath = join(destination, `${archiveName}-${manifest.version}.manifest.json`);
     const hash = sha256(archive);
     const releaseManifest = {
       schemaVersion: 1,

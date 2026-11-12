@@ -402,6 +402,62 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
         expect(operatorRuntime.automaticChargesEnabled).toBe(false);
         expect(account).toHaveBeenCalledTimes(4);
         expect(checkout).not.toHaveBeenCalled();
+
+        expect(() =>
+          readBillingManualConfiguration({
+            ...configured,
+            OPENGEN_BILLING_MANUAL_WORKSPACE: f.workspace,
+            OPENGEN_BILLING_PROCESSOR_ENVIRONMENT: environment.id,
+            OPENGEN_BILLING_RECHARGE: 'open',
+          }),
+        ).toThrow('publishable key');
+        expect(() =>
+          readBillingManualConfiguration({
+            ...configured,
+            OPENGEN_BILLING_MANUAL_WORKSPACE: f.workspace,
+            OPENGEN_BILLING_PROCESSOR_ENVIRONMENT: environment.id,
+            OPENGEN_BILLING_RECHARGE: 'open',
+            OPENGEN_BILLING_PUBLISHABLE_KEY: ['pk', 'test', 'syntheticfixture'].join('_'),
+          }),
+        ).toThrow();
+        const syntheticPublishable = ['pk', 'live', 'syntheticfixture'].join('_');
+        const syntheticPortal = ['bpc', 'syntheticfixture'].join('_');
+        const withRecharge = readBillingManualConfiguration({
+          ...configured,
+          OPENGEN_BILLING_MANUAL_WORKSPACE: f.workspace,
+          OPENGEN_BILLING_PROCESSOR_ENVIRONMENT: environment.id,
+          OPENGEN_BILLING_OPERATOR_BEARER: operatorBearer,
+          OPENGEN_BILLING_RECHARGE: 'open',
+          OPENGEN_BILLING_PUBLISHABLE_KEY: syntheticPublishable,
+          OPENGEN_BILLING_PORTAL_CONFIGURATION: syntheticPortal,
+        })!;
+        account.mockImplementationOnce(async () => {
+          await f.pool.query('SELECT 1');
+          return {
+            id: environment.accountId,
+            charges_enabled: true,
+          } as Stripe.Response<Stripe.Account>;
+        });
+        const rechargeRuntime = await hostedBillingManual(f.pool, withRecharge, stripe);
+        expect(rechargeRuntime).toMatchObject({
+          activation: 'manual',
+          liveRechargeApproved: true,
+          setupAvailable: true,
+          automaticChargesEnabled: true,
+          portalAvailable: true,
+          operatorBearer,
+        });
+        expect(rechargeRuntime.recovery?.publishableKey).toBe(syntheticPublishable);
+        expect(() => createBillingFixtureRuntime(f.pool, rechargeRuntime)).not.toThrow();
+        expect(() =>
+          createBillingFixtureRuntime(f.pool, {
+            ...rechargeRuntime,
+            recovery: {
+              transport: rechargeRuntime.rechargeTransport,
+              publishableKey: ['pk', 'test', 'syntheticfixture'].join('_'),
+            },
+          }),
+        ).toThrow('live publishable key');
       } finally {
         await f.close();
       }

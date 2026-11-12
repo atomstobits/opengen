@@ -1,6 +1,6 @@
 {
   "name": "opengen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "An open-source, region-aware image and video API router.",
   "license": "Apache-2.0",
@@ -16,6 +16,7 @@
     "dev": "npm run dev --workspace @media-router/web",
     "dev:api": "npm run dev --workspace @media-router/server",
     "worker": "npm run worker --workspace @media-router/server",
+    "email:relay": "npm run email-relay --workspace @media-router/server",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

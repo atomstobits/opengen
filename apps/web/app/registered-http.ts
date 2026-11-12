@@ -16,6 +16,7 @@ const protocolTargets = [
   { method: 'GET', path: '/v1/operator/billing' },
   { method: 'POST', path: '/v1/operator/billing/holds/resolve' },
   { method: 'POST', path: '/v1/operator/billing/recharges/resolve' },
+  { method: 'POST', path: '/v1/operator/billing/work' },
   { method: 'POST', path: '/v1/billing/orders' },
   { method: 'GET', path: '/v1/billing/orders/:id' },
   { method: 'POST', path: '/v1/billing/orders/:id/checkout' },

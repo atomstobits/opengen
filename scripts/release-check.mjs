@@ -37,7 +37,7 @@ const packages = [
 for (const file of packages) {
   const pkg = JSON.parse(readFileSync(new URL(file, root), 'utf8'));
   if (pkg.license !== 'Apache-2.0') failures.push(`${file}: declare Apache-2.0`);
-  if (pkg.version !== '0.1.0') failures.push(`${file}: release version differs from 0.1.0`);
+  if (pkg.version !== '0.1.1') failures.push(`${file}: release version differs from 0.1.1`);
 }
 const lock = JSON.parse(readFileSync(new URL('package-lock.json', root), 'utf8'));
 const unknown = [];

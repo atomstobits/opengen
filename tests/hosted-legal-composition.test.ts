@@ -1945,6 +1945,149 @@ describe.skipIf(!databaseUrl)(
         });
         expect(hijackAttempt.statusCode).toBe(409);
         expect(hijackAttempt.json().error.code).toBe('billing_owner_already_active');
+
+        // 6. Auto-recharge activation: existing manual owner upgrades while preserving approval_reference, new user enrolls with allowsEnabled: true, and operator /v1/operator/billing/work ticks cleanly!
+        const operatorBearer = 'synthetic-live-recharge-operator-bearer-token-2026';
+        const rechargeConfig = readBillingManualConfiguration({
+          NODE_ENV: 'production',
+          OPENGEN_BILLING_MANUAL: 'true',
+          OPENGEN_BILLING_SANDBOX: 'false',
+          STRIPE_LIVEMODE: 'true',
+          DATABASE_URL: 'postgresql://localhost/opengen_live_fixture',
+          OPENGEN_PUBLIC_URL: canonicalOrigin,
+          OPENGEN_BILLING_MANUAL_WORKSPACE: operatorPrincipal.workspaceId,
+          OPENGEN_BILLING_CHECKOUT: 'open',
+          OPENGEN_BILLING_RECHARGE: 'open',
+          OPENGEN_BILLING_PUBLISHABLE_KEY: 'pk_live_syntheticAutoRechargeKey123',
+          OPENGEN_BILLING_PORTAL_CONFIGURATION: 'bpc_syntheticPortalConfig123',
+          OPENGEN_BILLING_OPERATOR_BEARER: operatorBearer,
+          OPENGEN_BILLING_PROCESSOR_ENVIRONMENT: environment.id,
+          OPENGEN_BILLING_PROCESSOR_ACCOUNT: environment.accountId,
+          OPENGEN_BILLING_APPROVAL_REFERENCE: approvalReference,
+          OPENGEN_BILLING_TERMS_VERSION: 'hosted-manual-prepaid-v1-2026-11-11',
+          OPENGEN_BILLING_TERMS_TEXT: 'Prepaid non-recurring Stripe Checkout credit summary.',
+          STRIPE_SECRET_KEY: ['rk', 'live', 'syntheticfixture'].join('_'),
+          STRIPE_WEBHOOK_SECRET: ['whsec', 'syntheticfixture'].join('_'),
+        })!;
+        const rechargeRuntime = await hostedBillingManual(engine.pool, rechargeConfig, stripe, {
+          humanTermsPolicy,
+        });
+        const rechargeApp = await buildApp({
+          publicUrl: canonicalOrigin,
+          engine,
+          humanTermsPolicy,
+          billingRuntime: rechargeRuntime,
+          env: {
+            NODE_ENV: 'test',
+            OPENGEN_PUBLIC_URL: canonicalOrigin,
+            OIDC_ISSUER: issuer,
+            OIDC_CLIENT_ID: 'client-fixture',
+            OIDC_CLIENT_SECRET: 'synthetic-server-secret',
+            MR_SESSION_SECRET: 's'.repeat(32),
+          },
+        });
+        try {
+          const teamOwnerBefore = (
+            await engine.pool.query(
+              'SELECT approval_reference FROM mr_billing_owners WHERE workspace_id=$1',
+              [teamId],
+            )
+          ).rows[0];
+          const upgradeAccess = await rechargeApp.inject({
+            url: '/v1/billing/access',
+            headers: teamAdmin1.headers,
+          });
+          expect(upgradeAccess.statusCode).toBe(200);
+          expect(upgradeAccess.json()).toMatchObject({
+            workspaceId: teamId,
+            capabilities: { read: true, manage: true, setup: true },
+            ownerEnrollment: {
+              eligible: true,
+              expectedAuthorityVersion: 1,
+              allowsAutoRecharge: true,
+              upgradeToRecharge: true,
+            },
+          });
+
+          const upgraded = await rechargeApp.inject({
+            method: 'POST',
+            url: '/v1/billing/owner',
+            headers: { ...teamAdmin1.headers, origin: canonicalOrigin },
+            payload: {
+              expectedAuthorityVersion: 1,
+              termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+              acceptedTerms: true,
+            },
+          });
+          expect(upgraded.statusCode, upgraded.body).toBe(200);
+          expect(upgraded.json()).toEqual({
+            workspaceId: teamId,
+            authorityVersion: 2,
+          });
+          const upgradedRow = (
+            await engine.pool.query(
+              'SELECT rails, approval_reference FROM mr_billing_owners WHERE workspace_id=$1',
+              [teamId],
+            )
+          ).rows[0];
+          expect(upgradedRow.rails.allowsEnabled).toBe(true);
+          expect(upgradedRow.approval_reference).toBe(teamOwnerBefore.approval_reference);
+
+          const postUpgradeAccess = await rechargeApp.inject({
+            url: '/v1/billing/access',
+            headers: teamAdmin1.headers,
+          });
+          expect(postUpgradeAccess.json().ownerEnrollment).toBeUndefined();
+
+          const policyView = await rechargeApp.inject({
+            url: '/v1/billing/policy',
+            headers: teamAdmin1.headers,
+          });
+          expect(policyView.statusCode, policyView.body).toBe(200);
+          expect(policyView.json()).toMatchObject({
+            setupAvailable: true,
+            automaticRechargeAvailable: true,
+            portalAvailable: true,
+            recoveryAvailable: true,
+            ownerAuthorityVersion: 2,
+          });
+
+          // New external user enrolls directly with allowsEnabled: true
+          const freshUser = await signInAs('external-recharge-user-4', 'fresh@gmail.com');
+          const freshEnrolled = await rechargeApp.inject({
+            method: 'POST',
+            url: '/v1/billing/owner',
+            headers: { ...freshUser.headers, origin: canonicalOrigin },
+            payload: {
+              expectedAuthorityVersion: 0,
+              termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+              acceptedTerms: true,
+            },
+          });
+          expect(freshEnrolled.statusCode, freshEnrolled.body).toBe(200);
+          const freshRow = (
+            await engine.pool.query('SELECT rails FROM mr_billing_owners WHERE workspace_id=$1', [
+              freshUser.principal.workspaceId,
+            ])
+          ).rows[0];
+          expect(freshRow.rails.allowsEnabled).toBe(true);
+
+          // Operator billing work endpoint requires operator bearer
+          expect(
+            (await rechargeApp.inject({ method: 'POST', url: '/v1/operator/billing/work' }))
+              .statusCode,
+          ).toBe(403);
+          const tick = await rechargeApp.inject({
+            method: 'POST',
+            url: '/v1/operator/billing/work',
+            headers: { authorization: `Bearer ${operatorBearer}` },
+            payload: {},
+          });
+          expect(tick.statusCode, tick.body).toBe(200);
+          expect(tick.json()).toEqual({ ok: true });
+        } finally {
+          await rechargeApp.close();
+        }
       } finally {
         await engine.close();
         await isolated.close();

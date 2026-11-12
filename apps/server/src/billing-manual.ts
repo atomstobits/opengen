@@ -22,6 +22,9 @@ interface BillingManualConfiguration {
   webhookSecret: string;
   operatorBearer?: string;
   checkoutWritesEnabled: boolean;
+  rechargeEnabled: boolean;
+  publishableKey?: string;
+  portalConfigurationId?: string;
   approvalReference: string;
   terms: BillingTerms;
 }
@@ -49,6 +52,9 @@ export function readBillingManualConfiguration(
   const { DATABASE_URL, OPENGEN_PUBLIC_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } = env;
   const workspaceId = env.OPENGEN_BILLING_MANUAL_WORKSPACE;
   const checkout = env.OPENGEN_BILLING_CHECKOUT ?? 'paused';
+  const recharge = env.OPENGEN_BILLING_RECHARGE ?? 'paused';
+  const publishableKey = env.OPENGEN_BILLING_PUBLISHABLE_KEY || undefined;
+  const portalConfigurationId = env.OPENGEN_BILLING_PORTAL_CONFIGURATION || undefined;
   const approvalReference = env.OPENGEN_BILLING_APPROVAL_REFERENCE;
   const termsVersion = env.OPENGEN_BILLING_TERMS_VERSION;
   const termsText = env.OPENGEN_BILLING_TERMS_TEXT;
@@ -58,7 +64,9 @@ export function readBillingManualConfiguration(
     (operatorBearer.length < 32 ||
       operatorBearer.length > 512 ||
       /[\s\p{Cc}]/u.test(operatorBearer) ||
-      [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, env.MR_API_TOKEN].includes(operatorBearer))
+      [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, env.MR_API_TOKEN, publishableKey].includes(
+        operatorBearer,
+      ))
   )
     throw new Error('Use a bounded dedicated manual billing operator credential.');
   if (
@@ -71,6 +79,9 @@ export function readBillingManualConfiguration(
     !STRIPE_WEBHOOK_SECRET ||
     !/^whsec_[A-Za-z0-9]+$/.test(STRIPE_WEBHOOK_SECRET) ||
     !['paused', 'open'].includes(checkout) ||
+    !['paused', 'open'].includes(recharge) ||
+    (publishableKey !== undefined && !/^pk_live_[A-Za-z0-9]+$/.test(publishableKey)) ||
+    (portalConfigurationId !== undefined && !/^bpc_[A-Za-z0-9]+$/.test(portalConfigurationId)) ||
     !approvalReference ||
     approvalReference.length > 200 ||
     approvalReference.trim() !== approvalReference ||
@@ -84,6 +95,8 @@ export function readBillingManualConfiguration(
     termsText.includes('\0')
   )
     throw new Error('Complete the reviewed manual billing configuration before startup.');
+  if (recharge === 'open' && !publishableKey)
+    throw new Error('Live automatic recharge requires a live Stripe publishable key.');
 
   let database: URL;
   let origin: URL;
@@ -123,6 +136,9 @@ export function readBillingManualConfiguration(
     webhookSecret: STRIPE_WEBHOOK_SECRET,
     ...(operatorBearer ? { operatorBearer } : {}),
     checkoutWritesEnabled: checkout === 'open',
+    rechargeEnabled: recharge === 'open',
+    ...(publishableKey ? { publishableKey } : {}),
+    ...(portalConfigurationId ? { portalConfigurationId } : {}),
     approvalReference,
     terms: { version: termsVersion, text: termsText },
   };
@@ -139,6 +155,9 @@ export async function hostedBillingManual(
     enabled: true,
     processorEnvironment: config.environment,
     publicUrl: config.publicUrl,
+    ...(config.portalConfigurationId
+      ? { portalConfigurationId: config.portalConfigurationId }
+      : {}),
   });
   const limiter = new PaymentStore(pool, {
     livemode: true,
@@ -168,6 +187,9 @@ export async function hostedBillingManual(
       client.release();
     }
   });
+  const rechargeEnabled = config.rechargeEnabled === true;
+  if (rechargeEnabled && !config.publishableKey)
+    throw new Error('Live automatic recharge requires a live Stripe publishable key.');
   return {
     activation: 'manual',
     processorEnvironment: config.environment,
@@ -180,8 +202,12 @@ export async function hostedBillingManual(
     webhookSecret: config.webhookSecret,
     ...(config.operatorBearer ? { operatorBearer: config.operatorBearer } : {}),
     checkoutWritesEnabled: config.checkoutWritesEnabled,
-    setupAvailable: false,
-    automaticChargesEnabled: false,
-    portalAvailable: false,
+    ...(rechargeEnabled ? { liveRechargeApproved: true } : {}),
+    setupAvailable: rechargeEnabled,
+    automaticChargesEnabled: rechargeEnabled,
+    portalAvailable: rechargeEnabled && Boolean(config.portalConfigurationId),
+    ...(rechargeEnabled && config.publishableKey
+      ? { recovery: { transport, publishableKey: config.publishableKey } }
+      : {}),
   };
 }

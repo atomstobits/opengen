@@ -169,7 +169,7 @@ export async function registerMcp(app: FastifyInstance, context: Context) {
       }
     }
     const server = new McpServer(
-      { name: 'opengen', version: '0.1.0' },
+      { name: 'opengen', version: '0.1.1' },
       {
         instructions,
         capabilities: {

@@ -235,18 +235,19 @@ describe('portable private OpenGen CLI package', () => {
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
-  it('ships an explicit private package with only a bundled executable, licenses and evidence', async () => {
+  it('ships an explicit portable package with only a bundled executable, licenses and evidence', async () => {
     expect(await filesIn(artifact.packageDirectory)).toEqual(packageFiles);
     const manifest = JSON.parse(
       await readFile(join(artifact.packageDirectory, 'package.json'), 'utf8'),
     );
     expect(manifest).toMatchObject({
-      name: 'opengen-cli',
-      private: true,
+      name: '@opengen/cli',
+      publishConfig: { access: 'public' },
       license: 'Apache-2.0',
       type: 'module',
       bin: { opengen: 'bin/opengen.mjs' },
     });
+    expect(manifest.private).toBeUndefined();
     expect(manifest.engines.node).toMatch(/22/);
     for (const field of [
       'dependencies',
@@ -263,7 +264,7 @@ describe('portable private OpenGen CLI package', () => {
     );
     expect(build).toMatchObject({
       schemaVersion: 1,
-      name: 'opengen-cli',
+      name: '@opengen/cli',
       version: manifest.version,
       builder: { name: 'esbuild', version: '0.28.2' },
     });
@@ -411,13 +412,13 @@ describe('portable private OpenGen CLI package', () => {
       expect(entry.mode).toBe(entry.name === 'package/bin/opengen.mjs' ? 0o755 : 0o644);
     }
     const checksum = await readFile(artifact.sha256Path, 'utf8');
-    expect(checksum.trim().split(/\s+/)).toEqual([digest(archive), 'opengen-cli-0.1.0.tgz']);
+    expect(checksum.trim().split(/\s+/)).toEqual([digest(archive), 'opengen-cli-0.1.1.tgz']);
     const manifest = JSON.parse(await readFile(artifact.manifestPath, 'utf8'));
     expect(manifest).toMatchObject({
       schemaVersion: 1,
-      name: 'opengen-cli',
-      version: '0.1.0',
-      tarball: { file: 'opengen-cli-0.1.0.tgz', sha256: digest(archive), size: archive.length },
+      name: '@opengen/cli',
+      version: '0.1.1',
+      tarball: { file: 'opengen-cli-0.1.1.tgz', sha256: digest(archive), size: archive.length },
     });
     expect(manifest.buildManifestSha256).toBe(
       digest(await readFile(join(artifact.packageDirectory, 'BUILD-MANIFEST.json'))),
@@ -464,11 +465,12 @@ describe('portable private OpenGen CLI package', () => {
         timeout: 20000,
       },
     );
-    const installed = join(prefix, 'node_modules/opengen-cli');
+    const installed = join(prefix, 'node_modules/@opengen/cli');
     expect(await filesIn(installed)).toEqual(packageFiles);
     expect(
       (await readdir(join(prefix, 'node_modules'))).filter((name) => !name.startsWith('.')),
-    ).toEqual(['opengen-cli']);
+    ).toEqual(['@opengen']);
+    expect(await readdir(join(prefix, 'node_modules/@opengen'))).toEqual(['cli']);
     const bin =
       process.platform === 'win32'
         ? join(installed, 'bin/opengen.mjs')

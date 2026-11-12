@@ -117,6 +117,7 @@ export interface AppOptions {
   engine?: EngineLike;
   payments?: PaymentsOptions['store'];
   billingRuntime?: BillingFixtureRuntimeOptions;
+  onBillingRuntime?: (runtime: { workOnce: () => Promise<void> }) => void;
   paymentConfig?: Pick<PaymentsOptions, 'stripe' | 'webhookSecret' | 'livemode'>;
   humanTermsPolicy?: () => HumanTermsPolicy;
   apiToken?: string;
@@ -232,6 +233,7 @@ export async function buildApp(options: AppOptions = {}) {
     options.billingRuntime && governancePool
       ? createBillingFixtureRuntime(governancePool, options.billingRuntime)
       : undefined;
+  if (billingRuntime) options.onBillingRuntime?.({ workOnce: billingRuntime.workOnce });
   const billingAvailable = Boolean(billingRuntime);
 
   await registerGovernance(app, {
@@ -341,7 +343,7 @@ export async function buildApp(options: AppOptions = {}) {
   const parseInput = (input: unknown): GenerateInput => parseGenerationRequest(input);
   app.get('/openapi.json', async () => openApiDocument(billingAvailable));
   app.get('/v1/operations', async () => ({ data: describeOperations(billingAvailable) }));
-  app.get('/health', async () => ({ status: 'ok', database: !!options.engine, version: '0.1.0' }));
+  app.get('/health', async () => ({ status: 'ok', database: !!options.engine, version: '0.1.1' }));
   const discoveredModels = catalog.models.map((model) => ({
     ...model,
     generationProfiles: generationProfiles(model.id),
