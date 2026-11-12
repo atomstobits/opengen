@@ -183,7 +183,7 @@ export const agentClients: AgentClient[] = [
     summary: 'Use the portable OpenGen CLI; native MCP is not assumed.',
     approach: 'CLI through the agent’s shell',
     steps: [
-      'Install @opengen/cli into an isolated prefix on Node 22.12+ (npm install --prefix /absolute/private/opengen-client @opengen/cli --ignore-scripts --no-audit --no-fund) or use the reviewed offline release bundle; no source checkout is needed.',
+      'Install @opengen-dev/cli into an isolated prefix on Node 22.12+ (npm install --prefix /absolute/private/opengen-client @opengen-dev/cli --ignore-scripts --no-audit --no-fund) or use the reviewed offline release bundle; no source checkout is needed.',
       'Complete opengen login in an interactive terminal with the intended gateway configured, then run opengen doctor.',
       'Ask pi to use the documented CLI for catalog discovery. Keep credentials in the private profile, outside the project.',
     ],
@@ -221,7 +221,7 @@ export const agentClients: AgentClient[] = [
     summary: 'Use the portable CLI with browser login, or create one scoped workspace API key.',
     approach: 'OpenGen browser PKCE login / scoped API key',
     steps: [
-      'Install @opengen/cli into an isolated prefix on Node 22.12 or later (npm install --prefix /absolute/private/opengen-client @opengen/cli --ignore-scripts --no-audit --no-fund), or use the checksum-verified offline release bundle.',
+      'Install @opengen-dev/cli into an isolated prefix on Node 22.12 or later (npm install --prefix /absolute/private/opengen-client @opengen-dev/cli --ignore-scripts --no-audit --no-fund), or use the checksum-verified offline release bundle.',
       'Configure MEDIA_ROUTER_URL for your gateway, then run login and status below. Review the paying workspace and read/generate permissions in your browser.',
       'For a backend API integration, create a separate expiring read/generate key in Workspace → API keys. Save it once in your application’s secret manager and send it only in the Authorization header.',
     ],

@@ -72,7 +72,7 @@ export async function packageCli({ sourceRoot, outputDirectory } = {}) {
     }
     chunks.push(Buffer.alloc(1024));
     const archive = gzipSync(Buffer.concat(chunks), { level: 9 });
-    const archiveName = manifest.name.replace(/^@/, '').replace('/', '-');
+    const archiveName = 'opengen-cli';
     const filename = `${archiveName}-${manifest.version}.tgz`;
     const tarballPath = join(destination, filename);
     const sha256Path = `${tarballPath}.sha256`;

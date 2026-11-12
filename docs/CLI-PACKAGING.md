@@ -1,6 +1,6 @@
 # Standalone CLI packaging
 
-Packaging audit updated 2026-11-11. The standalone artifact is packaged as `@opengen/cli`, version `0.1.1`, with `"publishConfig": { "access": "public" }` and an `opengen` executable (`opengen-cli-0.1.1.tgz`). It is separate from the source workspace package `@media-router/cli`. Local build/pack scripts remain deterministic and offline-safe; actual registry publication happens only as an explicit release step. [npm package metadata](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/)
+Packaging audit updated 2026-11-11. The standalone artifact is packaged as `@opengen-dev/cli`, version `0.1.1`, with `"publishConfig": { "access": "public" }` and an `opengen` executable (`opengen-cli-0.1.1.tgz`). It is separate from the source workspace package `@media-router/cli`. Local build/pack scripts remain deterministic and offline-safe; actual registry publication happens only as an explicit release step. [npm package metadata](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/)
 
 ## Contents and dependencies
 
