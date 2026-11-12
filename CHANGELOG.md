@@ -4,7 +4,7 @@
 
 - **Saved-card automatic recharge & Customer Portal**: Opt-in saved-card setup, off-session automatic USD recharge within workspace ceilings, 3DS/SCA browser authentication recovery, Stripe Customer Portal management, and `POST /v1/operator/billing/work` scheduling behind explicit `OPENGEN_BILLING_RECHARGE=open` configuration.
 - **Durable Resend notification email relay**: Standalone idempotent HTTPS operational alert email relay (`npm run email:relay`) backed by PostgreSQL delivery leases (`mr_email_relay_deliveries` storing SHA-256 digests only) and Resend `Idempotency-Key` forwarding.
-- **Portable `@opengen/cli` publication**: Updated the closed zero-dependency Node 22.12+ CLI package template to `@opengen/cli` (`bin: opengen`) for public npm installation alongside checksum-verified offline release bundles.
+- **Portable `@opengen-dev/cli` publication**: Updated the closed zero-dependency Node 22.12+ CLI package template to `@opengen-dev/cli` (`bin: opengen`) for public npm installation alongside checksum-verified offline release bundles.
 
 ## 0.1.0 — 2026-11-10
 

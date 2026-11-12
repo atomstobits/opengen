@@ -1,5 +1,5 @@
 {
-  "name": "@opengen/cli",
+  "name": "@opengen-dev/cli",
   "version": "0.1.1",
   "description": "Portable OpenGen CLI for exact regional image and video model discovery, quoting, generation and job recovery.",
   "homepage": "https://opengen.dev",

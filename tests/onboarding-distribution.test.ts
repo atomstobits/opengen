@@ -81,7 +81,7 @@ describe('private checkout-free onboarding release', () => {
       ['--disallow-code-generation-from-strings', installed.executable, '--version'],
       { cwd: temporary, env: env() },
     );
-    expect(version.stdout.trim()).toBe(`@opengen/cli ${release.version}`);
+    expect(version.stdout.trim()).toBe(`@opengen-dev/cli ${release.version}`);
     const help = await run(process.execPath, [installed.executable, '--help'], {
       cwd: temporary,
       env: env(),
