@@ -25,8 +25,10 @@ import type {
 import { catalog } from './data';
 import { validateSeriesCatalog } from './series';
 import { generationExamples } from './examples';
+import { boundedTokenQuote } from './token-pricing';
 
 export { catalog } from './data';
+export { boundedTokenQuote } from './token-pricing';
 export {
   companies,
   modelSeries,
@@ -290,7 +292,8 @@ export function quote(
           args.promptExpansion !== undefined &&
           (route.upstreamModelId !== 'MiniMax-H3-Max' ||
             ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||
-        (route.upstreamModelId === 'minimax/h3-max-turbo/text-to-video' &&
+        ((route.upstreamModelId === 'minimax/h3-max/text-to-video' ||
+          route.upstreamModelId === 'minimax/h3-max-turbo/text-to-video') &&
           ![undefined, false, 'none', 'disabled'].includes(args.promptExpansion)),
       );
       const quantity =
@@ -307,7 +310,19 @@ export function quote(
         !args.size &&
         quantity !== null;
       const value = canPrice ? rate.usdMicros * quantity! : null;
-      const estimate = value !== null && Number.isSafeInteger(value) ? value : null;
+      const rateEstimate = value !== null && Number.isSafeInteger(value) ? value : null;
+      const tokenQuote =
+        rateEstimate === null &&
+        !rate &&
+        !inputIssues.length &&
+        !extraInputs &&
+        !modelExtras &&
+        !args.size &&
+        !args.firstFrame &&
+        !args.lastFrame
+          ? boundedTokenQuote(route, input)
+          : null;
+      const estimate = rateEstimate ?? tokenQuote?.estimatedCostMicros ?? null;
       const withinBudget =
         estimate === null || input.maxCostMicros === undefined || estimate <= input.maxCostMicros;
       const configured = executableIds.has(route.id) && route.adapter !== null;
@@ -337,7 +352,7 @@ export function quote(
         currency: 'USD' as const,
         executable,
         reason,
-        source: route.pricingSource,
+        source: tokenQuote?.source ?? route.pricingSource,
         issues: inputIssues,
         notices: [
           ...(directBilling
@@ -345,7 +360,9 @@ export function quote(
                 'Your provider account is billed directly. OpenGen does not debit managed credit. Unknown provider charges cannot be capped by the gateway.',
               ]
             : []),
-          'Published list-price estimate; not a guaranteed settled provider charge.',
+          ...(tokenQuote
+            ? tokenQuote.notices
+            : ['Published list-price estimate; not a guaranteed settled provider charge.']),
           ...(route.liveVerification
             ? [
                 `Live verification covered ${(route.liveVerification.operations ?? [route.liveVerification.operation]).join(', ')} at ${route.liveVerification.resolution} for ${route.liveVerification.duration}s.`,

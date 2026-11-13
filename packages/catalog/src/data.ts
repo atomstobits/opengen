@@ -729,7 +729,23 @@ route(
   ['480p', '768p', '1080p'],
   durations(5, 15),
   // Route IDs identify persisted provider attempts; regrouping the model must not rename them.
-  { id: 'fal-undisclosed/fal-h3-max', adapter: 'fal', providerModelName: 'H3 Max' },
+  {
+    id: 'fal-undisclosed/fal-h3-max',
+    adapter: 'fal',
+    providerModelName: 'H3 Max',
+    rates: ['480p', '768p', '1080p'].map((resolution, index) => ({
+      operation: 'text-to-video' as const,
+      resolution,
+      unit: 'output-second' as const,
+      usdMicros: [50_000, 80_000, 160_000][index]!,
+      note: 'Standard list estimate for text-only generation with prompt expansion disabled. The November 1–15, 2026 promotion is $0.035/$0.056/$0.112 per second at 480p/768p/1080p; standard rates resume November 16. Actual output may run about 0.7 seconds longer than requested. This estimate is not settled billing or a provider charge ceiling.',
+    })),
+    pricingSource: {
+      url: 'https://fal.ai/models/minimax/h3-max/text-to-video',
+      checkedAt: '2026-11-03',
+      note: 'Exact fal H3 Max text-to-video endpoint: standard output-second rates, excluding promotional discounts. Qualified only without media inputs and with prompt expansion disabled. No reference/edit pricing, regional access, actual duration or settled charge is established.',
+    },
+  },
 );
 route(
   'fal/h3-max-turbo',
@@ -821,7 +837,21 @@ route(
   ['text-to-video', 'image-to-video', 'reference-to-video'],
   ['480p', '720p', '1080p'],
   durations(1, 15),
-  { adapter: 'xai' },
+  {
+    adapter: 'xai',
+    rates: ['480p', '720p', '1080p'].map((resolution, index) => ({
+      operation: 'text-to-video' as const,
+      resolution,
+      unit: 'output-second' as const,
+      usdMicros: [80_000, 140_000, 250_000][index]!,
+      note: 'Text-only Grok Imagine Video 1.5 output list estimate. Input frames and reference images add $0.01 each and remain outside this output-only rate. Settled billing uses valid provider-reported usage ticks when present.',
+    })),
+    pricingSource: {
+      url: 'https://docs.x.ai/developers/pricing#imagine-api',
+      checkedAt: '2026-11-03',
+      note: 'Exact Video 1.5 text-to-video output-second tariff without input media. Image-to-video and reference-to-video incur additional per-image input charges and remain unpriced. The global media endpoint does not establish an inference/storage region.',
+    },
+  },
 );
 route(
   'xai/grok-imagine-video-1.5-lite',
@@ -831,7 +861,21 @@ route(
   ['text-to-video', 'image-to-video'],
   ['480p', '720p', '1080p'],
   durations(1, 15),
-  { adapter: 'xai' },
+  {
+    adapter: 'xai',
+    rates: ['480p', '720p', '1080p'].map((resolution, index) => ({
+      operation: 'text-to-video' as const,
+      resolution,
+      unit: 'output-second' as const,
+      usdMicros: [20_000, 30_000, 140_000][index]!,
+      note: 'Text-only Grok Imagine Video 1.5 Lite output list estimate (1080p is upscaled). Input frames add $0.01 each and remain outside this output-only rate. Settled billing uses valid provider-reported usage ticks when present.',
+    })),
+    pricingSource: {
+      url: 'https://docs.x.ai/developers/pricing#imagine-api',
+      checkedAt: '2026-11-03',
+      note: 'Exact Video 1.5 Lite text-to-video output-second tariff without input media. Image-to-video incurs an additional input-image charge and remains unpriced. The global media endpoint does not establish an inference/storage region.',
+    },
+  },
 );
 route(
   'xai/grok-imagine-video',
@@ -887,7 +931,7 @@ route(
     pricingSource: {
       url: 'https://docs.x.ai/developers/pricing#imagine-api',
       checkedAt: '2026-11-03',
-      note: 'Exact Image 2.0 low-quality 1K/2K text-to-image output tariff, one image without media input. The global media endpoint does not establish an inference/storage region. No edit, medium/auto-quality or video price is qualified here.',
+      note: 'Exact Image 2.0 low-quality 1K/2K text-to-image output tariff, one image without media input. The global media endpoint does not establish an inference/storage region. No edit or medium/auto-quality image price is qualified here.',
     },
   },
 );

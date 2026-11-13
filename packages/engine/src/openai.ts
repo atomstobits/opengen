@@ -16,6 +16,74 @@ import { captureProviderResult, type CaptureProviderOutputs } from './adapter-ou
 import type { DeliverySource } from './delivery.js';
 
 const models = new Set(['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare']);
+const NANO_PER_MICRO = 1_000n;
+
+function safeNonnegativeInt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/**
+ * Exact standard OpenAI Images token settlement ($5/1M text input, $1.25/1M cached text,
+ * $8/1M image input, $30/1M image output). Requires complete conserved token counts.
+ */
+export function observedOpenAICostMicros(body: Record<string, unknown>): number | null {
+  if (!body.usage || typeof body.usage !== 'object' || Array.isArray(body.usage)) return null;
+  const usage = providerObject(body.usage);
+  const inputTokens = safeNonnegativeInt(usage.input_tokens);
+  const outputTokens = safeNonnegativeInt(usage.output_tokens);
+  const totalTokens = safeNonnegativeInt(usage.total_tokens);
+  if (inputTokens === null || outputTokens === null || totalTokens === null) return null;
+  if (inputTokens + outputTokens !== totalTokens) return null;
+
+  if (
+    !usage.input_tokens_details ||
+    typeof usage.input_tokens_details !== 'object' ||
+    Array.isArray(usage.input_tokens_details)
+  )
+    return null;
+  const inputDetails = providerObject(usage.input_tokens_details);
+  const textTokens = safeNonnegativeInt(inputDetails.text_tokens);
+  const imageTokens = safeNonnegativeInt(inputDetails.image_tokens);
+  if (textTokens === null || imageTokens === null) return null;
+  if (textTokens + imageTokens !== inputTokens) return null;
+
+  const cachedTokens =
+    inputDetails.cached_tokens === undefined ? 0 : safeNonnegativeInt(inputDetails.cached_tokens);
+  if (cachedTokens === null || cachedTokens > inputTokens) return null;
+  // Without a modality-specific cached breakdown, cached tokens are only unambiguous when one input modality is zero.
+  if (cachedTokens > 0 && textTokens > 0 && imageTokens > 0) return null;
+
+  if (usage.output_tokens_details !== undefined) {
+    if (
+      typeof usage.output_tokens_details !== 'object' ||
+      Array.isArray(usage.output_tokens_details)
+    )
+      return null;
+    const outDetails = providerObject(usage.output_tokens_details);
+    const outText =
+      outDetails.text_tokens === undefined ? 0 : safeNonnegativeInt(outDetails.text_tokens);
+    const outImage =
+      outDetails.image_tokens === undefined
+        ? outputTokens
+        : safeNonnegativeInt(outDetails.image_tokens);
+    if (outText === null || outImage === null || outText !== 0 || outImage !== outputTokens)
+      return null;
+  }
+
+  const cachedTextTokens = imageTokens === 0 ? cachedTokens : 0;
+  const cachedImageTokens = textTokens === 0 ? cachedTokens : 0;
+  const uncachedTextTokens = textTokens - cachedTextTokens;
+  const uncachedImageTokens = imageTokens - cachedImageTokens;
+
+  const nanoUsd =
+    BigInt(uncachedTextTokens) * 5_000n +
+    BigInt(cachedTextTokens) * 1_250n +
+    BigInt(uncachedImageTokens) * 8_000n +
+    BigInt(cachedImageTokens) * 2_000n +
+    BigInt(outputTokens) * 30_000n;
+  const micros = (nanoUsd + NANO_PER_MICRO - 1n) / NANO_PER_MICRO;
+  return micros <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(micros) : null;
+}
 export interface StoredProviderOutput {
   jobId: string;
   bytes: Uint8Array;
@@ -195,11 +263,17 @@ export function createOpenAIAdapter(
           throw new SubmissionUnknown('Generated image did not match the requested file format.');
         sources.push({ kind: 'inline', bytes, mediaType: expected });
       }
+      const billedCostMicros = observedOpenAICostMicros(body);
       // Checkpoint all slots together before the first output PUT. Losing an inline-only
       // synchronous response before this callback persists it cannot be repaired by polling.
       if (options.captureOutputs)
         return {
-          immediateResult: await captureProviderResult(options.captureOutputs, context, sources),
+          immediateResult: await captureProviderResult(
+            options.captureOutputs,
+            context,
+            sources,
+            billedCostMicros,
+          ),
         };
       for (const source of sources) {
         if (source.kind !== 'inline') throw new Error('Expected inline OpenAI image.');
@@ -218,7 +292,7 @@ export function createOpenAIAdapter(
           );
         }
       }
-      return { immediateResult: { status: 'succeeded', billedCostMicros: null, outputs } };
+      return { immediateResult: { status: 'succeeded', billedCostMicros, outputs } };
     },
     async poll() {
       throw new Error(

@@ -13,17 +13,18 @@ export async function captureProviderResult(
   capture: CaptureProviderOutputs,
   context: AdapterContext & { upstreamId?: string },
   sources: DeliverySource[],
+  billedCostMicros: number | null = null,
 ): Promise<ProviderResult & { status: 'succeeded' }> {
   try {
     return {
       status: 'succeeded',
-      billedCostMicros: null,
+      billedCostMicros,
       outputs: await capture(context, sources),
     };
   } catch {
     return {
       status: 'succeeded',
-      billedCostMicros: null,
+      billedCostMicros,
       outputs: [],
       error: context.upstreamId
         ? 'The provider completed this generation but output delivery is unavailable. Recover the same job; do not submit another generation.'
