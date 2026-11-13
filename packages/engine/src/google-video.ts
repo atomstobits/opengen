@@ -15,6 +15,7 @@ import type { StoreProviderOutput } from './openai.js';
 import { detectedMediaType, readPublicAsset, outputLimitBytes } from './output.js';
 import { pollProviderJson, providerObject, submitProviderJson } from './provider-http.js';
 import { captureProviderResult, type CaptureProviderOutputs } from './adapter-output.js';
+import { observedGoogleVideoCostMicros } from './google-usage.js';
 
 const model = 'gemini-omni-1.1-flash';
 const tasks: Partial<Record<Operation, string>> = {
@@ -220,13 +221,14 @@ export function createGoogleVideoAdapter(
         140_000_000,
       );
       if (body.status === 'in_progress') return { status: 'running' };
+      const billedCostMicros = observedGoogleVideoCostMicros(body);
       if (body.status === 'failed' || body.status === 'cancelled')
         return {
           status: body.status,
           failureCategory: 'unknown',
           error:
             'Google ended the video interaction without delivered media. Billing requires reconciliation.',
-          billedCostMicros: null,
+          billedCostMicros,
         };
       if (body.status !== 'completed') throw new Error('Unrecognized Omni interaction status.');
       const videos = (Array.isArray(body.steps) ? body.steps : []).flatMap((value) => {
@@ -248,9 +250,12 @@ export function createGoogleVideoAdapter(
       if (bytes.length > outputLimitBytes || detectedMediaType(bytes) !== 'video/mp4')
         throw new Error('Omni output type or size is unsupported.');
       if (options.captureOutputs)
-        return captureProviderResult(options.captureOutputs, context, [
-          { kind: 'inline', bytes, mediaType: 'video/mp4' },
-        ]);
+        return captureProviderResult(
+          options.captureOutputs,
+          context,
+          [{ kind: 'inline', bytes, mediaType: 'video/mp4' }],
+          billedCostMicros,
+        );
       const asset = await options.storeOutput!({
         jobId: context.jobId,
         bytes,
@@ -258,7 +263,7 @@ export function createGoogleVideoAdapter(
       });
       return {
         status: 'succeeded',
-        billedCostMicros: null,
+        billedCostMicros,
         outputs: [{ ...asset, mediaType: 'video/mp4', fidelity: 'unverified' }],
       };
     },

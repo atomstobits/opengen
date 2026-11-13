@@ -7,6 +7,8 @@ const modelId = 'alibaba/wan-3.0';
 const routeId = 'alibaba/ap-southeast-1/wan-3.0';
 const playground = `/playground?model=${encodeURIComponent(modelId)}&route=${encodeURIComponent(routeId)}`;
 const imagePlayground = '/playground?model=openai%2Fgpt-image-2';
+const unknownPriceImagePlayground =
+  '/playground?model=openai%2Fgpt-image-2.5-sunburst&route=fal-undisclosed%2Fopenai%2Fgpt-image-2.5%2Fsunburst%2Ftext-to-image';
 const authorizedSession = {
   authenticated: true,
   workspaceId: 'fixture-workspace-a',
@@ -500,7 +502,7 @@ test('a private result survives a new draft and a paid retry requires a fresh qu
 
 test('unknown image pricing cannot enable managed or capped BYOK generation', async ({ page }) => {
   const stub = await gateway(page);
-  await page.goto(imagePlayground);
+  await page.goto(unknownPriceImagePlayground);
   await expect(page.getByText('Connected to', { exact: false })).toBeVisible();
   await page
     .getByRole('textbox', { name: 'Prompt', exact: true })
@@ -539,15 +541,36 @@ test('unknown image pricing cannot enable managed or capped BYOK generation', as
   expect(stub.submissions).toEqual([]);
 });
 
+test('bounded token image pricing enables managed generation on text-only OpenAI drafts', async ({
+  page,
+}) => {
+  const stub = await gateway(page);
+  await page.goto(imagePlayground);
+  await expect(page.getByText('Connected to', { exact: false })).toBeVisible();
+  await page
+    .getByRole('textbox', { name: 'Prompt', exact: true })
+    .fill('A bounded max-token studio still life.');
+  const generate = page.getByRole('button', { name: 'Generate', exact: true });
+  await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
+  await expect.poll(() => stub.quotes.length).toBe(1);
+  await expect(generate).toBeEnabled();
+  expect(stub.quotes[0]).toMatchObject({
+    modelId: 'openai/gpt-image-2',
+    operation: 'text-to-image',
+    billing: 'managed',
+    maxCostMicros: 2000000,
+  });
+  expect(stub.submissions).toEqual([]);
+});
+
 async function submitImageFixture(page: Page) {
   await page.goto(imagePlayground);
   await expect(page.getByText('Connected to', { exact: false })).toBeVisible();
   await page
     .getByRole('textbox', { name: 'Prompt', exact: true })
     .fill('A private studio still life.');
-  // GPT Image 2 has no qualified managed tariff. This synthetic gateway
-  // explicitly models a configured provider account, with its unknown external
-  // exposure accepted by removing the optional cap before quoting.
+  // Exercise uncapped BYOK submission on the synthetic gateway so output reuse
+  // fixtures remain independent of managed wallet reservation figures.
   await page.getByRole('combobox', { name: 'Pay with', exact: true }).selectOption('byok');
   await page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }).fill('');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();

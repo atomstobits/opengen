@@ -35,7 +35,7 @@ const openai = (model: string) =>
       : `https://developers.openai.com/api/docs/models/${model}`,
     [
       'Cached text and image inputs cost $1.25 and $2 per 1M tokens. Batch has separate rates.',
-      'Size, quality and actual token consumption determine the total.',
+      'Size, quality and actual token consumption determine the total. Text-to-image managed quotes reserve a conservative max-token bound and settle exact reported token usage on completion; image edits remain unpriced.',
     ],
     '2026-11-06',
   );
@@ -149,29 +149,19 @@ const published: Record<string, PublishedPricing> = {
     'Output video: $0.08 / second at 480p; $0.14 at 720p; $0.25 at 1080p.',
     xai,
     [
-      'Input images add $0.01 each. This output tariff is not a complete reference/edit quote.',
+      'Input images add $0.01 each. Only text-to-video without input media has a qualified output-second estimate; image-to-video and reference-to-video remain unpriced.',
       'The US regional endpoint does not serve image/video APIs; these prices describe the global media API.',
     ],
-    checkedAt,
-    outputRates('output-second', [
-      ['480p', 80_000],
-      ['720p', 140_000],
-      ['1080p', 250_000],
-    ]),
+    '2026-11-03',
   ),
   'xai-undisclosed|xai/grok-imagine-video-1.5-lite': tariff(
     'Output video: $0.02 / second at 480p; $0.03 at 720p; $0.14 at 1080p.',
     xai,
     [
-      'Input images add $0.01 each. Lite 1080p is upscaled, not a native-resolution guarantee.',
+      'Input images add $0.01 each. Only text-to-video without input media has a qualified output-second estimate; Lite 1080p is upscaled, not a native-resolution guarantee.',
       'The US regional endpoint does not serve image/video APIs; these prices describe the global media API.',
     ],
-    checkedAt,
-    outputRates('output-second', [
-      ['480p', 20_000],
-      ['720p', 30_000],
-      ['1080p', 140_000],
-    ]),
+    '2026-11-03',
   ),
   'xai-undisclosed|xai/grok-imagine-image-2.0': tariff(
     'Per output image: low 1K $0.04 / 2K $0.06; medium 1K $0.06 / 2K $0.08.',
@@ -188,15 +178,15 @@ const published: Record<string, PublishedPricing> = {
     google + '#gemini-omni-1.1-flash',
     [
       'Standard processing. At 720p, the source converts video output using 5,792 tokens / second; input and text/thinking costs are additional.',
-      'The approximate $0.10 / video second is an output component, not a complete generation price.',
+      'The approximate $0.10 / video second is an output component, not a complete generation price. Single-output text-to-video managed quotes reserve a conservative max-token bound; frame, reference, edit and continuation operations remain unpriced.',
     ],
   ),
   'google-undisclosed|google/nano-banana-2.1': tariff(
     'Per 1M tokens: $1.50 input; $7.50 text/thinking output; $30 image output.',
     google + '#gemini-nano-banana-2.1',
     [
-      'Standard image-output components: $0.0336 at 1K, $0.0504 at 2K, approximately $0.113 at 4K. Input and thinking add cost.',
-      'Batch and search grounding have separate pricing. This adapter uses standard Interactions without grounding.',
+      'Standard image-output components: $0.0336 at 1K, $0.0504 at 2K, approximately $0.113 at 4K. Input and thinking add cost; single-output text-to-image managed quotes reserve a conservative max-token bound.',
+      'Batch and search grounding have separate pricing. This adapter uses standard Interactions without grounding; reference/edit operations remain unpriced.',
     ],
   ),
   'openai-undisclosed|openai/gpt-image-2': openai('gpt-image-2'),
@@ -219,15 +209,11 @@ const published: Record<string, PublishedPricing> = {
     'Standard output video: $0.05 / second at 480p; $0.08 at 768p; $0.16 at 1080p.',
     'https://fal.ai/models/minimax/h3-max/text-to-video',
     [
-      'Standard list rates, without promotional discounts. The checked source separately describes a November 1–15, 2026 promotion and standard pricing from November 16; recheck the source for current/account terms.',
-      'Reference tokens beyond the included quota have additional charges; this summary is not an arbitrary-reference quote.',
+      'November 1–15, 2026 promotional rates are $0.035/$0.056/$0.112 per second at 480p/768p/1080p; standard rates resume November 16. Quotes conservatively use standard list rates without promotional discounts.',
+      'Reference tokens beyond the included quota have additional charges; only text-to-video without input media and with prompt expansion disabled has a qualified estimate.',
+      'Billing follows generated video seconds; output can run about 0.7 seconds longer than requested. Requested-duration estimates are not settled charges or guaranteed ceilings.',
     ],
-    checkedAt,
-    outputRates('output-second', [
-      ['480p', 50_000],
-      ['768p', 80_000],
-      ['1080p', 160_000],
-    ]),
+    '2026-11-03',
   ),
   'fal-undisclosed|fal/h3-max-turbo': tariff(
     'Standard output video: $0.025 / second at 480p; $0.04 at 768p; $0.08 at 1080p.',

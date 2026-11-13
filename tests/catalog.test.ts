@@ -215,14 +215,17 @@ describe('regional quote selection', () => {
   it('never selects an unknown-priced route as free', () => {
     const result = quote(
       {
-        modelId: 'openai/gpt-image-2',
-        operation: 'text-to-image',
-        input: { prompt: 'A red kite', resolution: '1K' },
+        modelId: 'bytedance/seedance-2.5',
+        operation: 'text-to-video',
+        input: { prompt: 'A red kite', resolution: '720p', duration: 5 },
       },
       { executableRouteIds: catalog.routes.map((route) => route.id) },
     );
-    expect(result.candidates[0]?.estimatedCostMicros).toBeNull();
-    expect(result.candidates[0]?.executable).toBe(false);
+    expect(result.candidates.every((candidate) => candidate.estimatedCostMicros === null)).toBe(
+      true,
+    );
+    expect(result.candidates.every((candidate) => candidate.executable === false)).toBe(true);
+    expect(result.selectedRouteId).toBeNull();
   });
   it('quotes the real Singapore image tariff without applying it to edit/input-image costs', () => {
     const image: GenerateInput = {

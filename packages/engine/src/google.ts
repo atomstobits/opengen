@@ -12,6 +12,7 @@ import type { GenerationArguments } from '@media-router/contracts';
 import type { StoreProviderImage } from './openai.js';
 import { pollProviderJson, providerObject, submitProviderJson } from './provider-http.js';
 import { captureProviderResult, type CaptureProviderOutputs } from './adapter-output.js';
+import { observedGoogleImageCostMicros } from './google-usage.js';
 
 const model = 'gemini-nano-banana-2.1';
 const ratios = new Set([
@@ -178,13 +179,14 @@ export function createGoogleImageAdapter(
         32_000_000,
       );
       if (body.status === 'in_progress') return { status: 'running' };
+      const billedCostMicros = observedGoogleImageCostMicros(body);
       if (body.status === 'failed' || body.status === 'cancelled')
         return {
           status: body.status,
           failureCategory: 'unknown',
           error:
             'Google ended this interaction without a delivered image. Billing requires reconciliation.',
-          billedCostMicros: null,
+          billedCostMicros,
         };
       if (body.status !== 'completed') throw new Error('Unrecognized Google interaction status.');
       const images = (Array.isArray(body.steps) ? body.steps : []).flatMap((value) => {
@@ -207,9 +209,12 @@ export function createGoogleImageAdapter(
       if (bytes.byteLength > outputLimitBytes || detectedMediaType(bytes) !== expectedType)
         throw new Error('Google output did not match the requested image format.');
       if (options.captureOutputs)
-        return captureProviderResult(options.captureOutputs, context, [
-          { kind: 'inline', bytes, mediaType: expectedType },
-        ]);
+        return captureProviderResult(
+          options.captureOutputs,
+          context,
+          [{ kind: 'inline', bytes, mediaType: expectedType }],
+          billedCostMicros,
+        );
       const asset = await options.storeOutput!({
         jobId: context.jobId,
         bytes,
@@ -219,7 +224,7 @@ export function createGoogleImageAdapter(
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid store URL.');
       return {
         status: 'succeeded',
-        billedCostMicros: null,
+        billedCostMicros,
         outputs: [{ ...asset, mediaType: expectedType, fidelity: 'unverified' }],
       };
     },

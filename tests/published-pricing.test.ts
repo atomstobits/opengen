@@ -19,9 +19,14 @@ describe('informational provider tariffs', () => {
     expect(native.rates).toHaveLength(2);
     expect(native.rates.every((rate) => rate.operation === 'text-to-video')).toBe(true);
     expect(native.pricingSource.checkedAt).toBe('2026-11-03');
-    expect(fal.rates).toEqual([]);
+    expect(fal.rates.map((rate) => [rate.resolution, rate.usdMicros])).toEqual([
+      ['480p', 50_000],
+      ['768p', 80_000],
+      ['1080p', 160_000],
+    ]);
+    expect(fal.rates.every((rate) => rate.operation === 'text-to-video')).toBe(true);
   });
-  it('keeps published token tariffs separate from executable request-price qualification', () => {
+  it('keeps published token tariffs separate from flat output rates while bounding text-only quotes', () => {
     const route = catalog.routes.find(
       (route) =>
         route.modelId === 'openai/gpt-image-2.5-flare' &&
@@ -32,7 +37,7 @@ describe('informational provider tariffs', () => {
     expect(route.publishedPricing?.source.url).toBe(
       'https://developers.openai.com/api/docs/models/gpt-image-2.5-flare',
     );
-    const result = quote(
+    const bounded = quote(
       {
         modelId: route.modelId,
         routeId: route.id,
@@ -41,9 +46,26 @@ describe('informational provider tariffs', () => {
       },
       { executableRouteIds: [route.id] },
     );
-    expect(result.candidates[0]).toMatchObject({ estimatedCostMicros: null, executable: false });
-    expect(result.selectedRouteId).toBeNull();
-    expect(result.candidates[0]?.reason).toContain('not qualified');
+    expect(bounded.selectedRouteId).toBe(route.id);
+    expect(bounded.candidates[0]?.estimatedCostMicros).toBeGreaterThan(100_000);
+    expect(bounded.candidates[0]?.notices.join(' ')).toContain('Bounded max-token reservation');
+
+    const edit = quote(
+      {
+        modelId: route.modelId,
+        routeId: route.id,
+        operation: 'image-edit',
+        input: {
+          prompt: 'Add a lighthouse.',
+          resolution: '1K',
+          references: [{ type: 'image', asset: { url: 'https://media.example.com/in.png' } }],
+        },
+      },
+      { executableRouteIds: [route.id] },
+    );
+    expect(edit.candidates[0]).toMatchObject({ estimatedCostMicros: null, executable: false });
+    expect(edit.selectedRouteId).toBeNull();
+    expect(edit.candidates[0]?.reason).toContain('not qualified');
   });
   it('does not copy a global reseller tariff onto an account-enabled regional offering', () => {
     const global = catalog.routes.find(

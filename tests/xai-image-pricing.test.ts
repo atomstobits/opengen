@@ -58,9 +58,19 @@ describe('xAI Image 2.0 single-output low-quality tariff', () => {
       expect(result.candidates[0]!.estimatedCostMicros).toBeNull();
     }
     expect(
+      catalog.routes.find((entry) => entry.modelId === 'xai/grok-imagine-video')!.rates,
+    ).toEqual([]);
+    expect(
       catalog.routes
-        .filter((entry) => entry.adapter === 'xai' && entry.modelId.includes('video'))
-        .every((entry) => entry.rates.length === 0),
+        .filter(
+          (entry) =>
+            entry.adapter === 'xai' && entry.modelId.startsWith('xai/grok-imagine-video-1.5'),
+        )
+        .every((entry) =>
+          entry.rates.every(
+            (rate) => rate.operation === 'text-to-video' && rate.unit === 'output-second',
+          ),
+        ),
     ).toBe(true);
     expect(route.rates.every((rate) => rate.operation === 'text-to-image')).toBe(true);
   });
