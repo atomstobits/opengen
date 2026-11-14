@@ -90,7 +90,7 @@ const endpoints = new Map<string, FalImageEndpointSpec>([
   ],
   [
     'bytedance/seedream/v5/lite/edit',
-    { kind: 'seedream', operation: 'image-edit', maxReferences: 14, ...liteSeedream },
+    { kind: 'seedream', operation: 'image-edit', maxReferences: 10, ...liteSeedream },
   ],
   [
     'fal-ai/bytedance/seedream/v4.5/text-to-image',
@@ -179,6 +179,7 @@ const xaiRatios = new Set([
 
 function qwenImageSize(
   args: GenerationArguments,
+  operation: 'text-to-image' | 'image-edit',
 ): { width: number; height: number } | 'omit' | null {
   if (args.size) {
     const { width, height } = args.size;
@@ -195,8 +196,14 @@ function qwenImageSize(
   }
   const tier = (args.resolution ?? '').toUpperCase();
   if (!['1K', '2K'].includes(tier)) return null;
-  if (args.aspectRatio === 'source' || args.aspectRatio === 'auto')
-    return tier === '1K' ? 'omit' : { width: 2048, height: 2048 };
+  if (args.aspectRatio === 'source' || (operation === 'image-edit' && !args.aspectRatio))
+    return tier === '1K' ? 'omit' : null;
+  if (args.aspectRatio === 'auto')
+    return tier === '1K'
+      ? 'omit'
+      : operation === 'image-edit'
+        ? null
+        : { width: 2048, height: 2048 };
   const edge = tier === '2K' ? 2048 : 1024;
   const map: Record<string, [number, number]> = {
     '1:1': [edge, edge],
@@ -330,7 +337,7 @@ export function falImageInput(
     };
   }
   if (endpoint.kind === 'qwen') {
-    const qwenSize = qwenImageSize(args);
+    const qwenSize = qwenImageSize(args, input.operation);
     if (!qwenSize) return { error: 'Unsupported Qwen Image 3 dimensions.' };
     return {
       body: {
@@ -377,7 +384,8 @@ export function falImageInput(
   if (args.quality) return { error: 'Seedream does not expose this quality control.' };
   if (
     args.background === 'transparent' &&
-    context.route.upstreamModelId === 'bytedance/seedream/v5/pro/edit' &&
+    (context.route.upstreamModelId === 'bytedance/seedream/v5/pro/edit' ||
+      context.route.upstreamModelId === 'bytedance/seedream/v5/flash/edit') &&
     (references.length !== 1 || args.outputFormat !== 'png')
   )
     return { error: 'Seedream transparent edit requires one input and explicitPNG output.' };

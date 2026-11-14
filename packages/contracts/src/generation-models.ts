@@ -210,11 +210,12 @@ video('bytedance/seedance-1.0-pro', {
   resolutions: ['480p', '720p', '1080p'],
   minimum: 2,
   maximum: 12,
-  referenceMaximum: { image: 4 },
+  referenceMaximum: {},
+  operations: ['text-to-video', 'image-to-video'],
   audio: 'unsupported',
   extra: ['watermark'],
   notices: [
-    'Seedance 1.0 Pro generates silent video without native audio. Strict first/last-frame mode and 1–4 image references are mutually exclusive on native BytePlus; fal v1/pro routes expose text-to-video and image-to-video.',
+    'Seedance 1.0 Pro generates silent video without native audio. Strict first/last-frame mode is supported on native BytePlus; fal v1/pro routes expose text-to-video and image-to-video.',
   ],
 });
 video('bytedance/seedance-1.0-pro-fast', {
@@ -524,12 +525,12 @@ image('bytedance/seedream-5.0-flash', {
     'https://fal.ai/models/bytedance/seedream/v5/flash/edit/api',
   ],
   resolutions: ['1K', '1.5K', '2K'],
-  maxReferences: 14,
+  maxReferences: 10,
   countMaximum: 6,
   extra: ['background', 'watermark'],
   promptMax: 4000,
   notices: [
-    'Fast Seedream 5.0 release; native BytePlus returns one image synchronously while fal v5/flash accepts up to 10 edit references.',
+    'Fast Seedream 5.0 release; native BytePlus returns one image synchronously while both native BytePlus and fal v5/flash accept up to 10 edit references.',
   ],
 });
 image('bytedance/seedream-5.0-lite', {
@@ -544,7 +545,7 @@ image('bytedance/seedream-5.0-lite', {
   extra: ['watermark'],
   promptMax: 4000,
   notices: [
-    'Seedream 5.0 Lite operates in the high-resolution 2K–4K pixel range (3,686,400–16,777,216 pixels); 1K is not supported.',
+    'Seedream 5.0 Lite operates in the high-resolution 2K–4K pixel range (3,686,400–16,777,216 pixels); 1K is not supported. Native BytePlus accepts up to 14 edit references while fal v5/lite accepts up to 10.',
   ],
 });
 image('bytedance/seedream-4.5', {

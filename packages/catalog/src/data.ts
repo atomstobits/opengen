@@ -197,7 +197,7 @@ const models: Model[] = [
     'seedance',
     'video',
     'https://docs.byteplus.com/en/docs/modelark/seedance-1-0-pro',
-    'Silent 480p–1080p video generation with first/last frame and multi-image reference modes.',
+    'Silent 480p–1080p video generation with text-to-video and first/last-frame conditioning.',
   ),
   model(
     'bytedance/seedance-1.0-pro-fast',
@@ -708,7 +708,7 @@ for (const [modelId, upstream, minimumDuration, maximumDuration, resolutions, op
     2,
     12,
     ['480p', '720p', '1080p'],
-    ['text-to-video', 'image-to-video', 'reference-to-video'],
+    ['text-to-video', 'image-to-video'],
   ],
   [
     'bytedance/seedance-1.0-pro-fast',

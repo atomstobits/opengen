@@ -119,8 +119,8 @@ export function createBytePlusVideoAdapter(
           (field) =>
             field !== 'audio' &&
             field !== 'draft' &&
-            (modelId !== 'seedance-1-0-pro-fast-251015' ||
-              (field !== 'lastFrame' && field !== 'references')),
+            field !== 'references' &&
+            (modelId !== 'seedance-1-0-pro-fast-251015' || field !== 'lastFrame'),
         ),
         'seed',
       ];
@@ -132,8 +132,7 @@ export function createBytePlusVideoAdapter(
     if (deployment.id !== 'byteplus-modelark-ap-southeast-1' || !models.has(route.upstreamModelId))
       return 'This adapter executes explicitly qualified Singapore Seedance routes only.';
     const isV1 = route.upstreamModelId.startsWith('seedance-1-0-');
-    const isV1Fast = route.upstreamModelId === 'seedance-1-0-pro-fast-251015';
-    const supportedOps = isV1Fast
+    const supportedOps = isV1
       ? ['text-to-video', 'image-to-video']
       : ['text-to-video', 'image-to-video', 'reference-to-video'];
     if (!supportedOps.includes(input.operation))

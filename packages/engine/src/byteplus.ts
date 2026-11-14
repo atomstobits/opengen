@@ -23,7 +23,7 @@ export interface SeedreamSizeConfig {
   maxPixels: number;
   maxReferences: number;
   jpegOnly?: boolean;
-  supportsBackground?: boolean;
+  backgroundModes?: readonly string[];
 }
 
 export const seedreamModelConfigs = new Map<string, SeedreamSizeConfig>([
@@ -33,8 +33,8 @@ export const seedreamModelConfigs = new Map<string, SeedreamSizeConfig>([
       tiers: ['1K', '1.5K', '2K'],
       minPixels: 921_600,
       maxPixels: 4_624_220,
-      maxReferences: 10,
-      supportsBackground: true,
+      maxReferences: 14,
+      backgroundModes: ['auto', 'opaque', 'transparent'],
     },
   ],
   [
@@ -43,8 +43,8 @@ export const seedreamModelConfigs = new Map<string, SeedreamSizeConfig>([
       tiers: ['1K', '1.5K', '2K'],
       minPixels: 921_600,
       maxPixels: 4_624_220,
-      maxReferences: 14,
-      supportsBackground: true,
+      maxReferences: 10,
+      backgroundModes: ['opaque', 'transparent'],
     },
   ],
   [
@@ -54,7 +54,7 @@ export const seedreamModelConfigs = new Map<string, SeedreamSizeConfig>([
       minPixels: 921_600,
       maxPixels: 4_624_220,
       maxReferences: 10,
-      supportsBackground: true,
+      backgroundModes: ['opaque', 'transparent'],
     },
   ],
   [
@@ -221,7 +221,7 @@ export function createBytePlusAdapter(
   ];
   function imageFields(modelId: string): (keyof GenerationArguments)[] {
     const config = seedreamModelConfigs.get(modelId);
-    return config?.supportsBackground ? [...baseFields, 'background'] : baseFields;
+    return config?.backgroundModes?.length ? [...baseFields, 'background'] : baseFields;
   }
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     if (isBytePlusVideoModel(context.route.upstreamModelId)) return video.preflight!(context);
@@ -252,10 +252,19 @@ export function createBytePlusAdapter(
       return 'Seedream supports PNG or JPEG output.';
     }
     if (args.background !== undefined) {
-      if (!['auto', 'opaque', 'transparent'].includes(args.background))
+      if (!config.backgroundModes?.includes(args.background))
         return 'Unsupported Seedream background mode.';
       if (args.background === 'transparent' && args.outputFormat === 'jpeg')
         return 'Transparent output requires PNG.';
+      if (
+        args.background === 'transparent' &&
+        (context.route.upstreamModelId === 'dola-seedream-5-0-pro-260628' ||
+          context.route.upstreamModelId === 'dola-seedream-5-0-flash-260915') &&
+        (context.input.operation !== 'image-edit' ||
+          refs.length !== 1 ||
+          args.outputFormat !== 'png')
+      )
+        return 'Seedream 5.0 transparent output requires one image edit reference and explicit PNG output.';
     }
     if (!seedreamImageSize(args, config)) return 'Unsupported exact Seedream dimensions.';
     return null;

@@ -623,7 +623,7 @@ export function createFalAdapter(
               ? {
                   ...(args.prompt === undefined ? {} : { prompt: args.prompt }),
                   resolution: args.resolution?.toLowerCase(),
-                  ...(args.duration === 'auto' ? {} : { duration: args.duration }),
+                  duration: args.duration === 'auto' ? null : args.duration,
                   aspect_ratio:
                     args.aspectRatio === 'source' || args.aspectRatio === 'auto'
                       ? 'adaptive'
@@ -795,9 +795,16 @@ export function createFalAdapter(
         assets.some((asset) => typeof asset.url !== 'string' || !isPublicHttpsAssetUrl(asset.url))
       )
         throw new Error('Fal has not returned the requested output assets.');
-      const mediaType = image
+      const defaultMediaType = image
         ? `image/${falImageDefaultFormat(context.route.upstreamModelId, context.input.input.outputFormat)}`
         : 'video/mp4';
+      const assetMediaType = (asset: Record<string, unknown>) =>
+        image &&
+        !context.input.input.outputFormat &&
+        typeof asset.content_type === 'string' &&
+        ['image/png', 'image/jpeg', 'image/webp'].includes(asset.content_type)
+          ? asset.content_type
+          : defaultMediaType;
       if (options.captureOutputs)
         return captureProviderResult(
           options.captureOutputs,
@@ -805,7 +812,7 @@ export function createFalAdapter(
           assets.map((asset) => ({
             kind: 'url' as const,
             url: String(asset.url),
-            mediaType,
+            mediaType: assetMediaType(asset),
             refreshable: true,
           })),
         );
@@ -814,7 +821,7 @@ export function createFalAdapter(
         billedCostMicros: null,
         outputs: assets.map((asset) => ({
           url: String(asset.url),
-          mediaType,
+          mediaType: assetMediaType(asset),
           fidelity: 'unverified' as const,
         })),
       };

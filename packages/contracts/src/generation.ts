@@ -226,7 +226,11 @@ function operationDefinition(
             ? ['firstFrame', 'lastFrame', 'sourceVideo']
             : ['firstFrame', 'lastFrame', 'mask'],
   );
-  if (modelId === 'xai/grok-imagine-video' && operation === 'video-edit') forbidden.add('duration');
+  if (
+    (modelId === 'xai/grok-imagine-video' || modelId === 'google/gemini-omni-1.1-flash') &&
+    operation === 'video-edit'
+  )
+    forbidden.add('duration');
   if (modelId === 'xai/grok-imagine-video' && operation === 'video-extend')
     forbidden.add('resolution');
   const commonArguments = model.commonArguments.filter((field) => !forbidden.has(field));
@@ -250,7 +254,8 @@ function operationDefinition(
     defaults: {
       ...(forbidden.has('resolution') ? {} : { resolution: model.defaults.resolution }),
       ...(video && !forbidden.has('duration') ? { duration: 5 } : {}),
-      ...(operation === 'image-edit'
+      ...(operation === 'image-edit' ||
+      (modelId === 'google/gemini-omni-1.1-flash' && operation === 'video-edit')
         ? {}
         : {
             aspectRatio: sourceRatioQualified ? 'source' : video ? '16:9' : '1:1',
@@ -585,7 +590,8 @@ function inputIssues(
       );
   }
   if (
-    request.modelId === 'bytedance/seedream-5.0-pro' &&
+    (request.modelId === 'bytedance/seedream-5.0-pro' ||
+      request.modelId === 'bytedance/seedream-5.0-flash') &&
     args.background === 'transparent' &&
     (request.operation !== 'image-edit' || refs.length !== 1 || args.outputFormat !== 'png')
   )

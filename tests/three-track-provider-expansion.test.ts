@@ -161,7 +161,7 @@ describe('Track 2: BytePlus ModelArk Seedream & Seedance expansion + token billi
     ['bytedance/seedance-2.0', '720p', false, 100_000, 700_000],
     ['bytedance/seedance-2.0-fast', '720p', true, 100_000, 560_000],
     ['bytedance/seedance-2.0-mini', '720p', false, 100_000, 350_000],
-    ['bytedance/seedance-1.0-pro', '720p', undefined, 108_000, 270_000],
+    ['bytedance/seedance-1.0-pro', '1080p', undefined, 246_840, 617_100],
     ['bytedance/seedance-1.0-pro-fast', '720p', undefined, 108_000, 108_000],
   ] as const)(
     'quotes bounded non-video tokens for %s (%s, audio=%s) and settles exact completion_tokens (%i -> %i micro-USD)',
@@ -242,9 +242,22 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
     }
   });
 
-  it('rejects silent duration override on fal Gemini Omni video-edit', async () => {
+  it('forbids duration on Gemini Omni video-edit and accepts normalized source-video edits on fal', async () => {
+    expect(() =>
+      catalogContext('fal-undisclosed/google/gemini-omni-flash/v1.1/edit', {
+        modelId: 'google/gemini-omni-1.1-flash',
+        routeId: 'fal-undisclosed/google/gemini-omni-flash/v1.1/edit',
+        operation: 'video-edit',
+        input: {
+          prompt: 'Add warm golden sunset lighting.',
+          sourceVideo: { url: 'https://assets.example.com/source.mp4' },
+          resolution: '720p',
+          duration: 5,
+        },
+      }),
+    ).toThrow();
     const adapter = createFalAdapter({ env: { FAL_KEY: 'fal-fixture-key' } });
-    const ctx = catalogContext('fal-undisclosed/google/gemini-omni-flash/v1.1/edit', {
+    const validCtx = catalogContext('fal-undisclosed/google/gemini-omni-flash/v1.1/edit', {
       modelId: 'google/gemini-omni-1.1-flash',
       routeId: 'fal-undisclosed/google/gemini-omni-flash/v1.1/edit',
       operation: 'video-edit',
@@ -252,10 +265,31 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
         prompt: 'Add warm golden sunset lighting.',
         sourceVideo: { url: 'https://assets.example.com/source.mp4' },
         resolution: '720p',
-        duration: 5,
       },
     });
-    await expect(adapter.submit(ctx)).rejects.toThrow(SubmissionRejected);
+    expect(adapter.preflight!(validCtx)).toBeNull();
+    await expect(
+      adapter.submit({
+        ...validCtx,
+        input: { ...validCtx.input, input: { ...validCtx.input.input, duration: 5 } },
+      }),
+    ).rejects.toThrow(SubmissionRejected);
+  });
+
+  it('sends null smart duration on fal Wan and rejects 2K source-ratio Qwen edits without explicit size', () => {
+    const adapter = createFalAdapter({ env: { FAL_KEY: 'fal-fixture-key' } });
+    const qwen2kSource = catalogContext('fal-undisclosed/alibaba/qwen-image-3/edit', {
+      modelId: 'fal/qwen-image-3',
+      routeId: 'fal-undisclosed/alibaba/qwen-image-3/edit',
+      operation: 'image-edit',
+      input: {
+        prompt: 'Adjust lighting.',
+        references: [{ type: 'image', asset: { url: 'https://assets.example.com/ref.png' } }],
+        resolution: '2K',
+        aspectRatio: 'source',
+      },
+    });
+    expect(adapter.preflight!(qwen2kSource)).toMatch(/Unsupported Qwen Image 3 dimensions/);
   });
 
   it.each([
@@ -352,7 +386,7 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
         input: {
           prompt: 'Character walks across a sunlit plaza.',
           resolution: '720p',
-          duration: 5,
+          duration: 'auto' as const,
           references: [
             { type: 'image' as const, asset: { url: 'https://assets.example.com/char.png' } },
           ],
@@ -363,7 +397,7 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
       expectedBody: {
         reference_image_urls: ['https://assets.example.com/char.png'],
         resolution: '720p',
-        duration: 5,
+        duration: null,
       },
       isImage: false,
     },
@@ -491,6 +525,7 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
       expect(await adapter.poll({ ...ctx, upstreamId: 'req-123' })).toMatchObject({
         status: 'succeeded',
         billedCostMicros: null,
+        outputs: [{ mediaType: isImage ? 'image/png' : 'video/mp4' }],
       });
       expect(calls[0]?.url).toBe(expectedPostUrl);
       expect(calls[0]?.body).toMatchObject(expectedBody);

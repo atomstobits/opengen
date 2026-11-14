@@ -280,6 +280,7 @@ function byteplusVideoBoundedQuote(route: Route, input: GenerateInput): BoundedT
   if (typeof args.duration !== 'number' || !Number.isInteger(args.duration)) return null;
 
   const is1x = route.upstreamModelId.startsWith('seedance-1-0-pro');
+  if (is1x && input.operation === 'reference-to-video') return null;
   const maxDuration = route.upstreamModelId.includes('2-5-') ? 30 : is1x ? 12 : 15;
   const minDuration = is1x ? 2 : 4;
   if (args.duration < minDuration || args.duration > maxDuration) return null;
@@ -293,7 +294,10 @@ function byteplusVideoBoundedQuote(route: Route, input: GenerateInput): BoundedT
   const nanoPerToken = byteplusNonVideoNanoPerToken(route.upstreamModelId, normalizedRes);
   if (!maxPixels || nanoPerToken === null) return null;
 
-  const maxTokens = Math.ceil((maxPixels * 24 * args.duration) / 1024);
+  // Seedance VAE latent frame counts follow 25 + 4n (e.g. 5s @ 24fps = 121 frames, not 120);
+  // include one 4-frame latent block ceiling so completion_tokens never exceeds reservation.
+  const maxFrames = 24 * args.duration + 4;
+  const maxTokens = Math.ceil((maxPixels * maxFrames) / 1024);
   const nanoUsd = BigInt(maxTokens) * nanoPerToken;
   const estimatedCostMicros = nanoToMicrosCeil(nanoUsd);
   if (estimatedCostMicros === null) return null;
