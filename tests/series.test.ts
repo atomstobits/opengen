@@ -29,7 +29,11 @@ describe('public company and model-series identity', () => {
       'bytedance/seedance-2.0-fast',
       'bytedance/seedance-2.0-mini',
     ]);
-    expect(getCompanyModels('bytedance')).toHaveLength(5);
+    expect(getSeries('bytedance/seedance-1.0')?.modelIds).toEqual([
+      'bytedance/seedance-1.0-pro',
+      'bytedance/seedance-1.0-pro-fast',
+    ]);
+    expect(getCompanyModels('bytedance')).toHaveLength(12);
   });
 
   it('combines the two H3 Max provider labels and preserves Turbo/Pika identities', () => {
@@ -42,10 +46,13 @@ describe('public company and model-series identity', () => {
     expect(h3.modelIds).toContain('pika/h3-flex');
     expect(catalog.models.find((model) => model.id === 'minimax/h3-max')?.creator).toBe('MiniMax');
     expect(
-      catalog.routes
-        .filter((route) => route.modelId === 'minimax/h3-max')
-        .map((route) => route.deploymentId)
-        .sort(),
+      Array.from(
+        new Set(
+          catalog.routes
+            .filter((route) => route.modelId === 'minimax/h3-max')
+            .map((route) => route.deploymentId),
+        ),
+      ).sort(),
     ).toEqual(['fal-undisclosed', 'minimax-undisclosed']);
     expect(catalog.models.find((model) => model.id === 'pika/h3-flex')?.creator).toBe('Pika');
     for (const id of h3.modelIds)
@@ -64,7 +71,7 @@ describe('public company and model-series identity', () => {
       'qwen/image-2.1',
       'qwen/image-3.0-pro',
     ]);
-    expect(getCompanyModels('alibaba')).toHaveLength(6);
+    expect(getCompanyModels('alibaba')).toHaveLength(7);
     expect(seriesHref('alibaba/qwen-image-3.0-pro')).toBe('/qwen/image-3.0-pro');
   });
 

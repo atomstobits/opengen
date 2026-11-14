@@ -30,7 +30,16 @@ function size(resolution: string, ratio = '1:1'): string | null {
   return pair ? `${pair[0]}*${pair[1]}` : null;
 }
 
-/** Singapore is explicitly demonstrated by the model docs; other regional model matrices remain unqualified. */
+const alibabaRegions = new Set([
+  'cn-beijing',
+  'ap-southeast-1',
+  'ap-northeast-1',
+  'eu-central-1',
+  'us-east-1',
+  'cn-hongkong',
+]);
+
+/** All six Alibaba Cloud Model Studio regions document Qwen Image 2.1 Turbo/Pro and 3.0 Pro via regional workspace MaAS endpoints. */
 export function createQwenImageAdapter(
   options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch } = {},
 ): ProviderAdapter {
@@ -71,10 +80,12 @@ export function createQwenImageAdapter(
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     const { deployment, route, input } = context;
     if (
-      deployment.id !== 'alibaba-model-studio-ap-southeast-1' ||
+      deployment.providerId !== 'alibaba' ||
+      !alibabaRegions.has(deployment.endpointRegion) ||
+      deployment.id !== `alibaba-model-studio-${deployment.endpointRegion}` ||
       !models.has(route.upstreamModelId)
     )
-      return 'This Qwen adapter executes qualified Singapore model routes only.';
+      return 'This Qwen adapter executes qualified Alibaba Model Studio regional routes only.';
     if (!['text-to-image', 'image-edit'].includes(input.operation))
       return 'Qwen image routes support text-to-image and image edits only.';
     const args = input.input;
@@ -99,10 +110,10 @@ export function createQwenImageAdapter(
     const credentials = alibabaCredentials(context.deployment, env);
     if (!credentials)
       throw new SubmissionRejected(
-        'Configure matching Alibaba Singapore credentials and workspace.',
+        `Configure matching Alibaba ${context.deployment.endpointRegion} credentials and workspace.`,
       );
     return {
-      base: `https://${credentials.workspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1`,
+      base: `https://${credentials.workspaceId}.${context.deployment.endpointRegion}.maas.aliyuncs.com/api/v1`,
       headers: { Authorization: `Bearer ${credentials.apiKey}` },
     };
   }
@@ -113,7 +124,9 @@ export function createQwenImageAdapter(
     preflight,
     isConfigured: (route, deployment) =>
       route.adapter === 'alibaba' &&
-      deployment.id === 'alibaba-model-studio-ap-southeast-1' &&
+      deployment.providerId === 'alibaba' &&
+      alibabaRegions.has(deployment.endpointRegion) &&
+      deployment.id === `alibaba-model-studio-${deployment.endpointRegion}` &&
       models.has(route.upstreamModelId) &&
       alibabaCredentials(deployment, env) !== null,
     async submit(context) {

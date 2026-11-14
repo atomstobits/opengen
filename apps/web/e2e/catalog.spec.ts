@@ -16,7 +16,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await expect(
     page.getByRole('heading', { level: 1, name: 'Find your next model.' }),
   ).toBeVisible();
-  await expect(cards(page)).toHaveCount(27);
+  await expect(cards(page)).toHaveCount(35);
   await expect(page.locator('.hero')).toHaveCount(0);
   await expect(page.locator('.playground-view')).toHaveCount(0);
   await mkdir(evidenceDir, { recursive: true });
@@ -29,7 +29,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await card(page, 'alibaba/wan-3.0').getByRole('link', { name: 'Wan 3.0', exact: true }).click();
   await expect(page).toHaveURL(/\/alibaba\/wan-3\.0$/);
   const standard = page.locator('[data-testid="series-variant"][data-model-id="alibaba/wan-3.0"]');
-  await expect(standard.locator('.route-table tbody tr')).toHaveCount(6);
+  await expect(standard.locator('.route-table tbody tr')).toHaveCount(9);
   for (const region of [
     'Beijing, China',
     'Singapore',
@@ -107,7 +107,7 @@ test('the separate playground quotes comparison-only routes and preserves a sele
     .fill('A quiet coastal road at sunrise, filmed in a slow tracking shot.');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   const pricing = page.getByRole('region', { name: 'Wan 3.0 pricing' });
-  await expect(pricing.getByText('Quote details · 6 routes')).toBeVisible();
+  await expect(pricing.getByText('Quote details · 9 routes')).toBeVisible();
   await expect(pricing).toContainText(
     'No qualified adapter and regional credentials are configured.',
   );
@@ -220,7 +220,7 @@ test.describe('phone model discovery', () => {
     await page.locator('.hero').screenshot({ path: path.join(evidenceDir, 'hero-mobile.png') });
     await page.locator('.hero').getByRole('link', { name: 'Explore models', exact: true }).click();
     await expect(page).toHaveURL(/\/models$/);
-    await expect(cards(page)).toHaveCount(27);
+    await expect(cards(page)).toHaveCount(35);
     const overflow = await page.evaluate(() => ({
       width: document.documentElement.scrollWidth,
       viewport: innerWidth,

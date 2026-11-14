@@ -105,7 +105,8 @@ describe('canonical image-to-video walkthrough', () => {
     ['openai', 'gpt-image-2', undefined, false],
     ['xai', 'grok-imagine-video', 'xai/grok-imagine-video', false],
     ['xai', 'grok-imagine-video', 'xai/grok-imagine-video-1.5', true],
-    ['minimax', 'h3', 'fal/h3-max-turbo', false],
+    ['minimax', 'h3', 'fal/h3-max-turbo', true],
+    ['qwen', 'image-2.1', undefined, false],
   ])(
     'links from a series only when the selected variant supports a first frame',
     async (company, series, variant, expected) => {

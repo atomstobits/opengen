@@ -126,21 +126,6 @@ for (const provider of providers.filter((item) => item.id !== 'alibaba')) {
     ),
   });
 }
-deployments.push({
-  id: 'alibaba-model-studio-region-unqualified',
-  providerId: 'alibaba',
-  name: 'Model Studio · Region not qualified',
-  endpointRegion: 'undisclosed',
-  scope: 'undisclosed',
-  processingRegions: null,
-  storageRegions: null,
-  endpointTemplate: null,
-  credentialEnv: null,
-  source: source(
-    'https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference',
-    'This image offering is documented; its regional availability matrix remains to be qualified.',
-  ),
-});
 
 function model(
   id: string,
@@ -204,6 +189,24 @@ const models: Model[] = [
     'video',
     'https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0',
     'Mini variant; not an alias of the standard or Fast release.',
+  ),
+  model(
+    'bytedance/seedance-1.0-pro',
+    'Seedance 1.0 Pro',
+    'ByteDance',
+    'seedance',
+    'video',
+    'https://docs.byteplus.com/en/docs/modelark/seedance-1-0-pro',
+    'Silent 480p–1080p video generation with first/last frame and multi-image reference modes.',
+  ),
+  model(
+    'bytedance/seedance-1.0-pro-fast',
+    'Seedance 1.0 Pro Fast',
+    'ByteDance',
+    'seedance',
+    'video',
+    'https://docs.byteplus.com/en/docs/modelark/seedance-1-0-pro-fast',
+    'Lower-cost fast sibling in the Seedance 1.0 silent video series.',
   ),
   model(
     'kling/kling-4.0',
@@ -382,6 +385,15 @@ const models: Model[] = [
     { aliases: ['Grok Image 2.0'] },
   ),
   model(
+    'bytedance/seedream-5.5',
+    'Seedream 5.5',
+    'ByteDance',
+    'seedream',
+    'image',
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-5',
+    'Latest Seedream 5.5 image generation and multi-reference editing release.',
+  ),
+  model(
     'bytedance/seedream-5.0-pro',
     'Seedream 5.0 Pro',
     'ByteDance',
@@ -389,6 +401,42 @@ const models: Model[] = [
     'image',
     'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro',
     'Generation, multi-reference editing, interactive edits and layer decomposition.',
+  ),
+  model(
+    'bytedance/seedream-5.0-flash',
+    'Seedream 5.0 Flash',
+    'ByteDance',
+    'seedream',
+    'image',
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-flash',
+    'Fast Seedream 5.0 image generation and editing.',
+  ),
+  model(
+    'bytedance/seedream-5.0-lite',
+    'Seedream 5.0 Lite',
+    'ByteDance',
+    'seedream',
+    'image',
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-lite',
+    'High-resolution 2K–4K Seedream 5.0 Lite image generation and editing.',
+  ),
+  model(
+    'bytedance/seedream-4.5',
+    'Seedream 4.5',
+    'ByteDance',
+    'seedream',
+    'image',
+    'https://docs.byteplus.com/en/docs/modelark/seedream-4-5',
+    'Seedream 4.5 2K and 4K image generation and editing.',
+  ),
+  model(
+    'bytedance/seedream-4.0',
+    'Seedream 4.0',
+    'ByteDance',
+    'seedream',
+    'image',
+    'https://docs.byteplus.com/en/docs/modelark/seedream-4-0',
+    'Seedream 4.0 1K–4K image generation and editing.',
   ),
   model(
     'qwen/image-2.1',
@@ -435,6 +483,15 @@ const models: Model[] = [
     'image',
     'https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference',
     'Hosted image generation and editing; no public-weight grant is assumed.',
+  ),
+  model(
+    'fal/qwen-image-3',
+    'Qwen Image 3 · fal',
+    'fal',
+    'qwen-image-3',
+    'image',
+    'https://fal.ai/models/alibaba/qwen-image-3/text-to-image',
+    'fal-hosted Qwen Image 3 offering; kept distinct from Qwen Image 3.0 Pro until checkpoint identity is confirmed.',
   ),
 ];
 
@@ -612,31 +669,120 @@ route(
 );
 
 // Singapore ModelArk endpoints are independently qualified, separate from unqualified regional listings.
-for (const [modelId, upstream, maximumDuration, resolutions] of [
-  ['bytedance/seedance-2.5', 'dreamina-seedance-2-5-260628', 30, ['480p', '720p', '1080p']],
-  ['bytedance/seedance-2.0', 'dreamina-seedance-2-0-260128', 15, ['480p', '720p', '1080p', '4K']],
-  ['bytedance/seedance-2.0-fast', 'dreamina-seedance-2-0-fast-260128', 15, ['480p', '720p']],
-  ['bytedance/seedance-2.0-mini', 'dreamina-seedance-2-0-mini-260615', 15, ['480p', '720p']],
+for (const [modelId, upstream, minimumDuration, maximumDuration, resolutions, operations] of [
+  [
+    'bytedance/seedance-2.5',
+    'dreamina-seedance-2-5-260628',
+    4,
+    30,
+    ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.0',
+    'dreamina-seedance-2-0-260128',
+    4,
+    15,
+    ['480p', '720p', '1080p', '4K'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.0-fast',
+    'dreamina-seedance-2-0-fast-260128',
+    4,
+    15,
+    ['480p', '720p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.0-mini',
+    'dreamina-seedance-2-0-mini-260615',
+    4,
+    15,
+    ['480p', '720p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-1.0-pro',
+    'seedance-1-0-pro-250528',
+    2,
+    12,
+    ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-1.0-pro-fast',
+    'seedance-1-0-pro-fast-251015',
+    2,
+    12,
+    ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video'],
+  ],
 ] as const) {
   route(
     modelId,
     'byteplus-modelark-ap-southeast-1',
     upstream,
     'https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api',
-    ['text-to-video', 'image-to-video', 'reference-to-video'],
+    [...operations],
     [...resolutions],
-    durations(4, maximumDuration),
+    durations(minimumDuration, maximumDuration),
     { adapter: 'byteplus' },
   );
 }
 
 // Exact fal endpoints are distinct routes; standard, fast, first-frame and reference input are never substituted.
-for (const [modelId, prefix, maximumDuration, resolutions] of [
-  ['bytedance/seedance-2.5', 'bytedance/seedance-2.5', 30, ['480p', '720p', '1080p']],
-  ['bytedance/seedance-2.0', 'bytedance/seedance-2.0', 15, ['480p', '720p', '1080p', '4K']],
-  ['bytedance/seedance-2.0-fast', 'bytedance/seedance-2.0/fast', 15, ['480p', '720p']],
+for (const [modelId, prefix, minimumDuration, maximumDuration, resolutions, operations] of [
+  [
+    'bytedance/seedance-2.5',
+    'bytedance/seedance-2.5',
+    4,
+    30,
+    ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.0',
+    'bytedance/seedance-2.0',
+    4,
+    15,
+    ['480p', '720p', '1080p', '4K'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.0-fast',
+    'bytedance/seedance-2.0/fast',
+    4,
+    15,
+    ['480p', '720p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.0-mini',
+    'bytedance/seedance-2.0/mini',
+    4,
+    15,
+    ['480p', '720p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-1.0-pro',
+    'fal-ai/bytedance/seedance/v1/pro',
+    2,
+    12,
+    ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video'],
+  ],
+  [
+    'bytedance/seedance-1.0-pro-fast',
+    'fal-ai/bytedance/seedance/v1/pro/fast',
+    2,
+    12,
+    ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video'],
+  ],
 ] as const) {
-  for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+  for (const operation of operations) {
     const upstream = `${prefix}/${operation}`;
     routes.push({
       id: `fal-undisclosed/${upstream}`,
@@ -645,7 +791,7 @@ for (const [modelId, prefix, maximumDuration, resolutions] of [
       upstreamModelId: upstream,
       operations: [operation],
       resolutions: [...resolutions],
-      durations: durations(4, maximumDuration),
+      durations: durations(minimumDuration, maximumDuration),
       fidelity: 'unknown',
       adapter: 'fal',
       status: 'documented',
@@ -657,6 +803,48 @@ for (const [modelId, prefix, maximumDuration, resolutions] of [
       source: source(
         `https://fal.ai/models/${upstream}/api`,
         'Explicit endpoint schema checked; not live-verified. Canonical reference roles and media types are validated per operation; unsupported options are rejected before submission.',
+      ),
+    });
+  }
+}
+
+for (const [modelId, prefix, prices] of [
+  ['alibaba/wan-3.0', 'alibaba/wan-3.0', [50_000, 100_000, 200_000]],
+  ['alibaba/wan-3.0-prime', 'alibaba/wan-3.0-prime', [68_000, 140_000, 280_000]],
+] as const) {
+  for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+    const upstream = `${prefix}/${operation}`;
+    const priced = operation !== 'reference-to-video';
+    routes.push({
+      id: `fal-undisclosed/${upstream}`,
+      modelId,
+      deploymentId: 'fal-undisclosed',
+      upstreamModelId: upstream,
+      operations: [operation],
+      resolutions: ['480p', '720p', '1080p'],
+      durations: durations(2, 30),
+      fidelity: 'unknown',
+      adapter: 'fal',
+      status: 'documented',
+      rates: priced
+        ? ['480p', '720p', '1080p'].map((resolution, index) => ({
+            operation,
+            resolution,
+            unit: 'output-second' as const,
+            usdMicros: prices[index]!,
+            note: 'Published fal output-second list estimate. Provider marks Wan 3.0 pricing subject to change; settled charges are reconciled separately.',
+          }))
+        : [],
+      pricingSource: {
+        url: `https://fal.ai/models/${upstream}`,
+        checkedAt: '2026-11-13',
+        note: priced
+          ? 'Exact fal Wan 3.0 output-second list estimate without video-reference inputs.'
+          : 'Reference-to-video video-input duration billing is not quoted by a flat output-second formula.',
+      },
+      source: source(
+        `https://fal.ai/models/${upstream}/api`,
+        'Explicit fal Wan 3.0 queue endpoint schema checked; not live-verified.',
       ),
     });
   }
@@ -771,6 +959,73 @@ route(
     },
   },
 );
+for (const [modelId, prefix, providerModelName] of [
+  ['minimax/h3-max', 'minimax/h3-max', 'H3 Max'],
+  ['fal/h3-max-turbo', 'minimax/h3-max-turbo', undefined],
+] as const) {
+  for (const operation of ['image-to-video', 'reference-to-video'] as const) {
+    const upstream = `${prefix}/${operation}`;
+    routes.push({
+      id: `fal-undisclosed/${upstream}`,
+      modelId,
+      deploymentId: 'fal-undisclosed',
+      upstreamModelId: upstream,
+      operations: [operation],
+      resolutions: ['480p', '768p', '1080p'],
+      durations: durations(5, 15),
+      fidelity: 'unknown',
+      adapter: 'fal',
+      status: 'documented',
+      ...(providerModelName ? { providerModelName } : {}),
+      rates: [],
+      pricingSource: {
+        url: `https://fal.ai/models/${upstream}`,
+        checkedAt: '2026-11-13',
+        note: 'Includes 4,096 shared reference tokens per request; excess reference tokens carry separate per-thousand-token charges and remain unpriced for managed quotes.',
+      },
+      source: source(
+        `https://fal.ai/models/${upstream}/api`,
+        'Explicit fal H3 queue endpoint schema checked; not live-verified.',
+      ),
+    });
+  }
+}
+for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+  const upstream = `minimax/h3/${operation}`;
+  const priced = operation !== 'reference-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'minimax/h3',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['480p', '768p', '2K', '4K'],
+    durations: durations(4, 15),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['480p', '768p', '2K', '4K'].map((resolution, index) => ({
+          operation,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: [50_000, 60_000, 130_000, 160_000][index]!,
+          note: 'Published fal MiniMax H3 output-second list estimate with prompt expansion disabled.',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-13',
+      note: priced
+        ? 'Exact fal MiniMax H3 output-second list estimate with prompt expansion disabled.'
+        : 'Reference-to-video adds per-image charges beyond five reference images and remains unpriced.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal MiniMax H3 open-weights queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 route(
   'pika/h3-flex',
   'pika-undisclosed',
@@ -829,6 +1084,47 @@ route(
   durations(3, 10),
   { adapter: 'google' },
 );
+for (const [operation, suffix] of [
+  ['text-to-video', 'text-to-video'],
+  ['image-to-video', 'image-to-video'],
+  ['reference-to-video', 'reference-to-video'],
+  ['video-edit', 'edit'],
+] as const) {
+  const upstream = `google/gemini-omni-flash/v1.1/${suffix}`;
+  const priced = operation === 'text-to-video' || operation === 'image-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'google/gemini-omni-1.1-flash',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['360p', '720p', '1080p', '4K'],
+    durations: durations(3, 10),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['360p', '720p', '1080p', '4K'].map((resolution, index) => ({
+          operation,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: [30_000, 100_000, 150_000, 300_000][index]!,
+          note: 'Published fal Gemini Omni Flash v1.1 output-second list estimate.',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-13',
+      note: priced
+        ? 'Exact fal Gemini Omni Flash v1.1 output-second list estimate without reference or source-video inputs.'
+        : 'Reference and source-derived edit duration billing remains unpriced for managed quotes.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Gemini Omni Flash v1.1 queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 route(
   'xai/grok-imagine-video-1.5',
   'xai-undisclosed',
@@ -853,6 +1149,44 @@ route(
     },
   },
 );
+for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+  const upstream = `xai/grok-imagine-video/v1.5/${operation}`;
+  const priced = operation === 'text-to-video';
+  const resolutions =
+    operation === 'reference-to-video' ? ['480p', '720p'] : ['480p', '720p', '1080p'];
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'xai/grok-imagine-video-1.5',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions,
+    durations: durations(1, operation === 'reference-to-video' ? 10 : 15),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['480p', '720p', '1080p'].map((resolution, index) => ({
+          operation: 'text-to-video' as const,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: [80_000, 140_000, 250_000][index]!,
+          note: 'Published fal Grok Imagine Video 1.5 text-to-video output-second list estimate.',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-13',
+      note: priced
+        ? 'Exact fal Grok Imagine Video 1.5 text-to-video output-second tariff without input media.'
+        : 'Input frames and reference images add $0.01 each and remain outside flat output-second quoting.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Grok Imagine Video 1.5 queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 route(
   'xai/grok-imagine-video-1.5-lite',
   'xai-undisclosed',
@@ -877,6 +1211,42 @@ route(
     },
   },
 );
+for (const operation of ['text-to-video', 'image-to-video'] as const) {
+  const upstream = `xai/grok-imagine-video/v1.5/lite/${operation}`;
+  const priced = operation === 'text-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'xai/grok-imagine-video-1.5-lite',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['480p', '720p', '1080p'],
+    durations: durations(1, 15),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['480p', '720p', '1080p'].map((resolution, index) => ({
+          operation: 'text-to-video' as const,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: [20_000, 30_000, 140_000][index]!,
+          note: 'Published fal Grok Imagine Video 1.5 Lite text-to-video output-second list estimate.',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-13',
+      note: priced
+        ? 'Exact fal Grok Imagine Video 1.5 Lite text-to-video output-second tariff without input media.'
+        : 'Image-to-video adds $0.01 per input image and remains unpriced.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Grok Imagine Video 1.5 Lite queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 route(
   'xai/grok-imagine-video',
   'xai-undisclosed',
@@ -886,6 +1256,34 @@ route(
   ['480p', '720p'],
   durations(1, 15),
 );
+for (const [operation, suffix, minDuration, maxDuration] of [
+  ['video-edit', 'edit-video', 1, 15],
+  ['video-extend', 'extend-video', 2, 10],
+] as const) {
+  const upstream = `xai/grok-imagine-video/${suffix}`;
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'xai/grok-imagine-video',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['480p', '720p'],
+    durations: durations(minDuration, maxDuration),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-13',
+      note: 'Source-video duration incurs $0.01 per input second in addition to output-second rates; remains unpriced for managed quotes.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Grok Imagine Video edit/extend queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 
 const imageOps: Operation[] = ['text-to-image', 'image-edit'];
 for (const suffix of ['2.5-sunburst', '2.5-flare', '2']) {
@@ -943,27 +1341,79 @@ route(
   imageOps,
   ['1K', '1.5K', '2K'],
 );
-route(
-  'bytedance/seedream-5.0-pro',
-  'byteplus-modelark-ap-southeast-1',
-  'dola-seedream-5-0-pro-260628',
-  'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro',
-  imageOps,
-  ['1K', '1.5K', '2K'],
-  [],
-  {
-    adapter: 'byteplus',
-    pricingSource: source(
-      'https://console.byteplus.com/ark/region%3Aap-southeast-1/docs/model-pricing',
-      'Single-image text-to-image list tariff: up to 2.61MP $0.045; higher-resolution 2K tier $0.09. Multi-image inputs and layer decomposition require separate pricing.',
-    ),
-    rates: [
-      { operation: 'text-to-image', resolution: '1K', unit: 'image', usdMicros: 45_000 },
-      { operation: 'text-to-image', resolution: '1.5K', unit: 'image', usdMicros: 45_000 },
-      { operation: 'text-to-image', resolution: '2K', unit: 'image', usdMicros: 90_000 },
-    ],
-  },
-);
+for (const [modelId, upstream, docUrl, resolutions, prices, pricingNote] of [
+  [
+    'bytedance/seedream-5.5',
+    'dola-seedream-5-5-261028',
+    'https://docs.byteplus.com/en/docs/modelark/image-generation-api',
+    ['1K', '1.5K', '2K'],
+    [20_000, 20_000, 35_000],
+    'Single-image text-to-image list tariff: up to 2.60MP $0.02; 2K tier $0.035. Image editing adds $0.008 per input image and remains outside flat output-only quoting.',
+  ],
+  [
+    'bytedance/seedream-5.0-pro',
+    'dola-seedream-5-0-pro-260628',
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro',
+    ['1K', '1.5K', '2K'],
+    [45_000, 45_000, 90_000],
+    'Single-image text-to-image list tariff: up to 2.61MP $0.045; higher-resolution 2K tier $0.09. Multi-image inputs and layer decomposition require separate pricing.',
+  ],
+  [
+    'bytedance/seedream-5.0-flash',
+    'dola-seedream-5-0-flash-260915',
+    'https://docs.byteplus.com/en/docs/modelark/image-generation-api',
+    ['1K', '1.5K', '2K'],
+    [18_000, 18_000, 18_000],
+    'Single-image text-to-image list tariff: flat $0.018 across 1K, 1.5K and 2K.',
+  ],
+  [
+    'bytedance/seedream-5.0-lite',
+    'seedream-5-0-lite-260128',
+    'https://docs.byteplus.com/en/docs/modelark/image-generation-api',
+    ['2K', '3K', '4K'],
+    [35_000, 35_000, 35_000],
+    'Single-image text-to-image list tariff: flat $0.035 across 2K, 3K and 4K.',
+  ],
+  [
+    'bytedance/seedream-4.5',
+    'seedream-4-5-251128',
+    'https://docs.byteplus.com/en/docs/modelark/image-generation-api',
+    ['2K', '4K'],
+    [40_000, 40_000],
+    'Single-image text-to-image list tariff: flat $0.04 across 2K and 4K.',
+  ],
+  [
+    'bytedance/seedream-4.0',
+    'seedream-4-0-250828',
+    'https://docs.byteplus.com/en/docs/modelark/image-generation-api',
+    ['1K', '2K', '4K'],
+    [30_000, 30_000, 30_000],
+    'Single-image text-to-image list tariff: flat $0.03 across 1K, 2K and 4K.',
+  ],
+] as const) {
+  route(
+    modelId,
+    'byteplus-modelark-ap-southeast-1',
+    upstream,
+    docUrl,
+    imageOps,
+    [...resolutions],
+    [],
+    {
+      adapter: 'byteplus',
+      pricingSource: source(
+        'https://console.byteplus.com/ark/region%3Aap-southeast-1/docs/model-pricing',
+        pricingNote,
+      ),
+      rates: resolutions.map((resolution, index) => ({
+        operation: 'text-to-image' as const,
+        resolution,
+        unit: 'image' as const,
+        usdMicros: prices[index]!,
+      })),
+    },
+  );
+}
 route(
   'bytedance/seedream-5.0-pro',
   'replicate-undisclosed',
@@ -975,19 +1425,64 @@ route(
   { adapter: 'replicate' },
 );
 // Verified fal reseller endpoints preserve the upstream exact model identity.
-for (const [modelId, prefix, resolutions] of [
-  ['bytedance/seedream-5.0-pro', 'bytedance/seedream/v5/pro', ['1K', '1.5K', '2K']],
-  ['openai/gpt-image-2.5-flare', 'openai/gpt-image-2.5/flare', ['1K', '2K', '4K']],
-  ['openai/gpt-image-2.5-sunburst', 'openai/gpt-image-2.5/sunburst', ['1K', '2K', '4K']],
-  ['google/nano-banana-2.1', 'google/nano-banana-2.1', ['1K', '2K', '4K']],
+for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
+  ['bytedance/seedream-5.0-pro', 'bytedance/seedream/v5/pro', ['1K', '1.5K', '2K'], null, null],
+  [
+    'bytedance/seedream-5.5',
+    'bytedance/seedream/v5.5',
+    ['1K', '1.5K', '2K'],
+    [30_000, 30_000, 40_500],
+    'Exact fal Seedream v5.5 text-to-image list tariff ($0.03 up to 2.61MP, $0.0405 at 2K). Image editing adds $0.012 per input image per output and remains unpriced.',
+  ],
+  ['bytedance/seedream-5.0-flash', 'bytedance/seedream/v5/flash', ['1K', '1.5K', '2K'], null, null],
+  [
+    'bytedance/seedream-5.0-lite',
+    'bytedance/seedream/v5/lite',
+    ['2K', '3K', '4K'],
+    [35_000, 35_000, 35_000],
+    'Exact fal Seedream v5 Lite text-to-image list tariff ($0.035 per image).',
+  ],
+  [
+    'bytedance/seedream-4.5',
+    'fal-ai/bytedance/seedream/v4.5',
+    ['2K', '4K'],
+    [40_000, 40_000],
+    'Exact fal Seedream v4.5 text-to-image list tariff ($0.04 per image).',
+  ],
+  ['bytedance/seedream-4.0', 'fal-ai/bytedance/seedream/v4', ['1K', '2K', '4K'], null, null],
+  ['openai/gpt-image-2.5-flare', 'openai/gpt-image-2.5/flare', ['1K', '2K', '4K'], null, null],
+  [
+    'openai/gpt-image-2.5-sunburst',
+    'openai/gpt-image-2.5/sunburst',
+    ['1K', '2K', '4K'],
+    null,
+    null,
+  ],
+  ['openai/gpt-image-2', 'openai/gpt-image-2', ['1K', '2K', '4K'], null, null],
+  ['google/nano-banana-2.1', 'google/nano-banana-2.1', ['1K', '2K', '4K'], null, null],
+  [
+    'xai/grok-imagine-image-2.0',
+    'xai/grok-imagine-image/v2.0',
+    ['1K', '1.5K', '2K'],
+    [40_000, 50_000, 60_000],
+    'Exact fal Grok Imagine Image 2.0 single-output low-quality text-to-image tariff. Medium/auto quality and image edits carry additional charges and remain unpriced.',
+  ],
+  [
+    'fal/qwen-image-3',
+    'alibaba/qwen-image-3',
+    ['1K', '2K'],
+    [40_000, 75_000],
+    'Exact fal Qwen Image 3 text-to-image list tariff ($0.04 at 1K, $0.075 at 2K).',
+  ],
 ] as const) {
   for (const operation of ['text-to-image', 'image-edit'] as const) {
     const upstream =
       operation === 'image-edit'
         ? `${prefix}/edit`
-        : prefix.startsWith('google/')
+        : prefix === 'google/nano-banana-2.1' || prefix === 'openai/gpt-image-2'
           ? prefix
           : `${prefix}/text-to-image`;
+    const priced = operation === 'text-to-image' && t2iPrices !== null;
     routes.push({
       id: `fal-undisclosed/${upstream}`,
       modelId,
@@ -999,11 +1494,21 @@ for (const [modelId, prefix, resolutions] of [
       fidelity: 'unknown',
       adapter: 'fal',
       status: 'documented',
-      rates: [],
-      pricingSource: unknownPrice(`https://fal.ai/models/${upstream}`),
+      rates: priced
+        ? resolutions.map((resolution, index) => ({
+            operation: 'text-to-image' as const,
+            resolution,
+            unit: 'image' as const,
+            usdMicros: t2iPrices[index]!,
+          }))
+        : [],
+      pricingSource:
+        priced && priceNote
+          ? { url: `https://fal.ai/models/${upstream}`, checkedAt: '2026-11-13', note: priceNote }
+          : unknownPrice(`https://fal.ai/models/${upstream}`),
       source: source(
         `https://fal.ai/models/${upstream}/api`,
-        'Exact reseller endpoint and schema checked. Single-image output; references preserve order. Prices and actual account access remain unqualified.',
+        'Exact reseller endpoint and schema checked. Single-image output; references preserve order. Actual account access and settled charges remain reconciled separately.',
       ),
     });
   }
@@ -1011,63 +1516,42 @@ for (const [modelId, prefix, resolutions] of [
 
 const qwen =
   'https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference';
-// Base checkpoint remains discoverable without fabricating an Alibaba API route for a repository ID.
-route(
-  'qwen/image-2.1-turbo',
-  'alibaba-model-studio-region-unqualified',
-  'qwen-image-2.1-turbo',
-  'https://www.alibabacloud.com/help/en/model-studio/text-to-image',
-  imageOps,
-  ['1K', '2K'],
-);
-route(
-  'alibaba/qwen-image-2.1-pro',
-  'alibaba-model-studio-region-unqualified',
-  'qwen-image-2.1-pro',
-  'https://www.alibabacloud.com/help/en/model-studio/text-to-image',
-  imageOps,
-  ['1K', '2K'],
-);
-route(
-  'alibaba/qwen-image-3.0-pro',
-  'alibaba-model-studio-region-unqualified',
-  'qwen-image-3.0-pro',
-  qwen,
-  imageOps,
-  ['1K', '2K'],
-);
-
-// Singapore Qwen generation/editing is explicitly demonstrated in the model-specific reference.
-// The six generic endpoint regions are not blindly cross-producted with every model.
-for (const [modelId, upstream, prices] of [
-  ['qwen/image-2.1-turbo', 'qwen-image-2.1-turbo', [16_000, 16_000]],
-  ['alibaba/qwen-image-2.1-pro', 'qwen-image-2.1-pro', [40_000, 40_000]],
-  ['alibaba/qwen-image-3.0-pro', 'qwen-image-3.0-pro', [40_000, 75_000]],
-] as const) {
-  route(
-    modelId,
-    'alibaba-model-studio-ap-southeast-1',
-    upstream,
-    qwen,
-    ['text-to-image', 'image-edit'],
-    ['1K', '2K'],
-    [],
-    {
-      adapter: 'alibaba',
-      rates: ['1K', '2K'].map((resolution, index) => ({
-        resolution,
-        operation: 'text-to-image',
-        unit: 'image',
-        usdMicros: prices[index]!,
-        note: 'Singapore International standard output price for text-only generation. Image inputs, edits, exact sizes and thinking modes remain unqualified.',
-      })),
-      pricingSource: {
-        url: 'https://www.alibabacloud.com/help/en/model-studio/model-pricing',
-        checkedAt: '2026-11-06',
-        note: 'Standard Singapore International list prices, excluding account promotions and free quota. Qwen Image 3.0 Pro image inputs cost an additional USD 0.003 each; output-only rates do not price image edits. Actual upstream charges remain unknown until reconciled.',
+// All six Alibaba Cloud Model Studio regions explicitly document Qwen Image 2.1 Turbo/Pro and 3.0 Pro with workspace MaAS endpoints.
+for (const region of regionalDefinitions) {
+  const singapore = region.code === 'ap-southeast-1';
+  for (const [modelId, upstream, sgPrices, globalPrices] of [
+    ['qwen/image-2.1-turbo', 'qwen-image-2.1-turbo', [16_000, 16_000], [14_133, 14_133]],
+    ['alibaba/qwen-image-2.1-pro', 'qwen-image-2.1-pro', [40_000, 40_000], [35_333, 35_333]],
+    ['alibaba/qwen-image-3.0-pro', 'qwen-image-3.0-pro', [40_000, 75_000], [34_380, 68_761]],
+  ] as const) {
+    const prices = singapore ? sgPrices : globalPrices;
+    route(
+      modelId,
+      `alibaba-model-studio-${region.code}`,
+      upstream,
+      qwen,
+      ['text-to-image', 'image-edit'],
+      ['1K', '2K'],
+      [],
+      {
+        adapter: 'alibaba',
+        rates: ['1K', '2K'].map((resolution, index) => ({
+          resolution,
+          operation: 'text-to-image',
+          unit: 'image',
+          usdMicros: prices[index]!,
+          note: `${region.name} Model Studio standard output price for text-only generation. Image inputs, edits, exact sizes and thinking modes remain unqualified.`,
+        })),
+        pricingSource: {
+          url: 'https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio',
+          checkedAt: '2026-11-13',
+          note: singapore
+            ? 'Standard Singapore International list prices, excluding account promotions and free quota. Qwen Image 3.0 Pro image inputs cost an additional USD 0.003 each; output-only rates do not price image edits. Actual upstream charges remain unknown until reconciled.'
+            : `Standard ${region.name} Model Studio list prices, excluding account promotions and free quota. Qwen Image 3.0 Pro image inputs cost an additional USD 0.00275 each; output-only rates do not price image edits. Actual upstream charges remain unknown until reconciled.`,
+        },
       },
-    },
-  );
+    );
+  }
 }
 
 for (const route of routes) {

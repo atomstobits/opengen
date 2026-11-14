@@ -3,7 +3,7 @@ import type { ComparisonJob, ComparisonRun, ComparisonSummary } from '@media-rou
 
 const ids = [
   'xai-undisclosed/xai-grok-imagine-image-2.0',
-  'byteplus-modelark-ap-southeast-1/bytedance-seedream-5.0-pro',
+  'byteplus-modelark-ap-southeast-1/bytedance-seedream-5.5',
 ] as const;
 const privatePrompt = 'A miniature stone sculpture in the sun.';
 const runId = 'e1bf67ee-603e-423f-8b37-e5dbb70df276';
@@ -16,11 +16,11 @@ function comparisonQuote(id = runId, prompt = privatePrompt, lifetimeMs = 600_00
     index: number,
   ): ComparisonRun['children'][number] => ({
     input: {
-      modelId: index === 0 ? 'xai/grok-imagine-image-2.0' : 'bytedance/seedream-5.0-pro',
+      modelId: index === 0 ? 'xai/grok-imagine-image-2.0' : 'bytedance/seedream-5.5',
       operation: 'text-to-image',
       routeId,
       billing: 'managed',
-      input: { prompt, count: 1, resolution: '1K' },
+      input: { prompt, count: 1, resolution: index === 0 ? '1K' : '2K' },
     },
     estimatedMicros: index === 0 ? 40_000 : 45_000,
     ceilingMicros: index === 0 ? 40_000 : 45_000,
@@ -145,7 +145,7 @@ for (const width of [1440, 390]) {
       return route.fulfill({ json: firstJob });
     });
     await page.getByText('Recent comparisons', { exact: true }).click();
-    await page.getByRole('button', { name: /Grok Imagine Image 2.0.*Seedream 5.0 Pro/ }).click();
+    await page.getByRole('button', { name: /Grok Imagine Image 2.0.*Seedream 5\.5/ }).click();
     await page.getByRole('button', { name: 'Open in Playground' }).first().click();
     await expect(page).toHaveURL(
       (url) =>

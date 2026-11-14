@@ -6,7 +6,12 @@ import type {
   GenerationDefinition,
   GenerationIssue,
 } from './generation-types';
-import { modelDefinitions, nativeH3MaxDefinition, type ModelDefinition } from './generation-models';
+import {
+  modelDefinitions,
+  nativeH3Definition,
+  nativeH3MaxDefinition,
+  type ModelDefinition,
+} from './generation-models';
 import { canonicalModelId } from './model-identity';
 export * from './generation-assets';
 export type * from './generation-types';
@@ -221,6 +226,9 @@ function operationDefinition(
             ? ['firstFrame', 'lastFrame', 'sourceVideo']
             : ['firstFrame', 'lastFrame', 'mask'],
   );
+  if (modelId === 'xai/grok-imagine-video' && operation === 'video-edit') forbidden.add('duration');
+  if (modelId === 'xai/grok-imagine-video' && operation === 'video-extend')
+    forbidden.add('resolution');
   const commonArguments = model.commonArguments.filter((field) => !forbidden.has(field));
   const modelSpecificArguments = model.modelSpecificArguments.filter((field) =>
     field === 'keyframes'
@@ -240,8 +248,8 @@ function operationDefinition(
     modelSpecificArguments,
     promptRequired: ['text-to-image', 'text-to-video', 'image-edit'].includes(operation),
     defaults: {
-      resolution: model.defaults.resolution,
-      ...(video ? { duration: 5 } : {}),
+      ...(forbidden.has('resolution') ? {} : { resolution: model.defaults.resolution }),
+      ...(video && !forbidden.has('duration') ? { duration: 5 } : {}),
       ...(operation === 'image-edit'
         ? {}
         : {
@@ -817,11 +825,15 @@ export function getGenerationSchema(
 
 export function validateRouteInput(request: GenerationRequest, route: Route): GenerationIssue[] {
   request = { ...request, modelId: canonicalModelId(request.modelId) };
-  const nativeMax =
-    request.modelId === 'minimax/h3-max' && route.adapter === 'minimax'
+  const nativeOverride =
+    route.adapter === 'minimax' && request.modelId === 'minimax/h3-max'
       ? operationDefinition(request.modelId, request.operation, nativeH3MaxDefinition)
-      : undefined;
-  const issues = nativeMax ? inputIssues(request, nativeMax) : validateGenerationInput(request);
+      : route.adapter === 'minimax' && request.modelId === 'minimax/h3'
+        ? operationDefinition(request.modelId, request.operation, nativeH3Definition)
+        : undefined;
+  const issues = nativeOverride
+    ? inputIssues(request, nativeOverride)
+    : validateGenerationInput(request);
   if (canonicalModelId(route.modelId) !== request.modelId)
     issues.push({
       code: 'route_model_mismatch',
@@ -844,6 +856,7 @@ export function validateRouteInput(request: GenerationRequest, route: Route): Ge
       limit: route.resolutions.join(','),
     });
   const falMax = request.modelId === 'minimax/h3-max' && route.adapter === 'fal';
+  const falH3 = request.modelId === 'minimax/h3' && route.adapter === 'fal';
   if (typeof args.duration === 'number' && !falMax && !route.durations.includes(args.duration))
     issues.push({
       code: 'unsupported_duration',
@@ -851,7 +864,7 @@ export function validateRouteInput(request: GenerationRequest, route: Route): Ge
       message: 'The route does not support the requested duration.',
       received: args.duration,
     });
-  if (falMax && (args.references?.length ?? 0) > 12)
+  if ((falMax || falH3) && (args.references?.length ?? 0) > 12)
     issues.push({
       code: 'too_many_references',
       field: 'input.references',

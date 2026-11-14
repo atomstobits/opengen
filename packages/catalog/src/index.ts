@@ -286,14 +286,17 @@ export function quote(
         args.shots?.length ||
         args.codec ||
         args.bitrateMode ||
-        (route.upstreamModelId === 'grok-imagine-image-2.0' &&
+        ((route.upstreamModelId === 'grok-imagine-image-2.0' ||
+          route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image') &&
           (count !== 1 || ![undefined, 'low'].includes(args.quality))) ||
         (route.adapter === 'minimax' &&
           args.promptExpansion !== undefined &&
           (route.upstreamModelId !== 'MiniMax-H3-Max' ||
             ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||
         ((route.upstreamModelId === 'minimax/h3-max/text-to-video' ||
-          route.upstreamModelId === 'minimax/h3-max-turbo/text-to-video') &&
+          route.upstreamModelId === 'minimax/h3-max-turbo/text-to-video' ||
+          route.upstreamModelId === 'minimax/h3/text-to-video' ||
+          route.upstreamModelId === 'minimax/h3/image-to-video') &&
           ![undefined, false, 'none', 'disabled'].includes(args.promptExpansion)),
       );
       const quantity =
@@ -315,11 +318,13 @@ export function quote(
         rateEstimate === null &&
         !rate &&
         !inputIssues.length &&
-        !extraInputs &&
         !modelExtras &&
         !args.size &&
-        !args.firstFrame &&
-        !args.lastFrame
+        !args.sourceVideo &&
+        !args.mask &&
+        !args.elements?.length &&
+        !args.keyframes?.length &&
+        !input.previousJobId
           ? boundedTokenQuote(route, input)
           : null;
       const estimate = rateEstimate ?? tokenQuote?.estimatedCostMicros ?? null;

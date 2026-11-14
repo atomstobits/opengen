@@ -66,6 +66,40 @@ const omniVideoTokensPerSecond: Record<'360p' | '720p' | '1080p' | '4K', number>
 };
 const OMNI_THOUGHT_TOKEN_CEILING = 8_192;
 
+const byteplusSeedanceMaxPixels2x: Record<'480p' | '720p' | '1080p' | '4k', number> = {
+  '480p': 428_544,
+  '720p': 942_080,
+  '1080p': 2_088_960,
+  '4k': 8_355_840,
+};
+const byteplusSeedanceMaxPixels1x: Record<'480p' | '720p' | '1080p', number> = {
+  '480p': 428_544,
+  '720p': 962_560,
+  '1080p': 2_088_960,
+};
+
+function byteplusNonVideoNanoPerToken(
+  upstreamModelId: string,
+  resolution: '480p' | '720p' | '1080p' | '4k',
+): bigint | null {
+  switch (upstreamModelId) {
+    case 'dreamina-seedance-2-5-260628':
+      return resolution === '4k' ? null : resolution === '1080p' ? 11_700n : 10_700n;
+    case 'dreamina-seedance-2-0-260128':
+      return resolution === '4k' ? 4_000n : resolution === '1080p' ? 7_700n : 7_000n;
+    case 'dreamina-seedance-2-0-fast-260128':
+      return resolution === '480p' || resolution === '720p' ? 5_600n : null;
+    case 'dreamina-seedance-2-0-mini-260615':
+      return resolution === '480p' || resolution === '720p' ? 3_500n : null;
+    case 'seedance-1-0-pro-250528':
+      return resolution === '4k' ? null : 2_500n;
+    case 'seedance-1-0-pro-fast-251015':
+      return resolution === '4k' ? null : 1_000n;
+    default:
+      return null;
+  }
+}
+
 function nanoToMicrosCeil(nanoUsd: bigint): number | null {
   if (nanoUsd < 0n) return null;
   const micros = (nanoUsd + NANO_PER_MICRO - 1n) / NANO_PER_MICRO;
@@ -230,8 +264,56 @@ function googleOmniBoundedQuote(route: Route, input: GenerateInput): BoundedToke
   };
 }
 
+function byteplusVideoBoundedQuote(route: Route, input: GenerateInput): BoundedTokenQuote | null {
+  if (
+    route.adapter !== 'byteplus' ||
+    route.deploymentId !== 'byteplus-modelark-ap-southeast-1' ||
+    !['text-to-video', 'image-to-video', 'reference-to-video'].includes(input.operation)
+  )
+    return null;
+
+  const args = input.input;
+  if ((args.count ?? 1) !== 1 || args.draft) return null;
+  if (args.outputFormat && args.outputFormat !== 'mp4') return null;
+  if (args.sourceVideo) return null;
+  if (args.references?.some((ref) => ref.type === 'video' || ref.type === 'document')) return null;
+  if (typeof args.duration !== 'number' || !Number.isInteger(args.duration)) return null;
+
+  const is1x = route.upstreamModelId.startsWith('seedance-1-0-pro');
+  const maxDuration = route.upstreamModelId.includes('2-5-') ? 30 : is1x ? 12 : 15;
+  const minDuration = is1x ? 2 : 4;
+  if (args.duration < minDuration || args.duration > maxDuration) return null;
+
+  const normalizedRes = (args.resolution ?? '').toLowerCase() as '480p' | '720p' | '1080p' | '4k';
+  const maxPixels = is1x
+    ? normalizedRes === '4k'
+      ? undefined
+      : byteplusSeedanceMaxPixels1x[normalizedRes]
+    : byteplusSeedanceMaxPixels2x[normalizedRes];
+  const nanoPerToken = byteplusNonVideoNanoPerToken(route.upstreamModelId, normalizedRes);
+  if (!maxPixels || nanoPerToken === null) return null;
+
+  const maxTokens = Math.ceil((maxPixels * 24 * args.duration) / 1024);
+  const nanoUsd = BigInt(maxTokens) * nanoPerToken;
+  const estimatedCostMicros = nanoToMicrosCeil(nanoUsd);
+  if (estimatedCostMicros === null) return null;
+
+  const perMillionUsd = (Number(nanoPerToken) / 1_000).toFixed(2);
+  return {
+    estimatedCostMicros,
+    source: {
+      url: 'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+      checkedAt: '2026-11-06',
+      note: `Conservative bounded max-token reservation for non-video-input ModelArk Seedance generation ($${perMillionUsd}/1M tokens at ${normalizedRes}). Video-reference tasks incur variable input-video token charges and remain unpriced.`,
+    },
+    notices: [
+      `Bounded max-token reservation (${maxTokens} ${normalizedRes} 24fps video-token ceiling for ${args.duration}s at $${perMillionUsd}/1M ModelArk tokens); settled against reported completion_tokens on completion and unused reservation is released.`,
+    ],
+  };
+}
+
 /**
- * Deterministic conservative token ceilings for first-party token-priced text-only routes.
+ * Deterministic conservative token ceilings for first-party token-priced routes.
  * Flat per-output `route.rates` remain empty on token-billed routes so public tables never
  * misrepresent variable token billing as a fixed per-image or per-second list fee.
  */
@@ -239,6 +321,7 @@ export function boundedTokenQuote(route: Route, input: GenerateInput): BoundedTo
   return (
     openAIBoundedQuote(route, input) ??
     googleNanoBananaBoundedQuote(route, input) ??
-    googleOmniBoundedQuote(route, input)
+    googleOmniBoundedQuote(route, input) ??
+    byteplusVideoBoundedQuote(route, input)
   );
 }

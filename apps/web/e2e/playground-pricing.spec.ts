@@ -172,11 +172,13 @@ for (const viewport of [
     await expect(page.getByRole('combobox', { name: 'Operation' })).toHaveValue('image-edit');
     const pricing = page.getByRole('region', { name: 'GPT Image 2 pricing' });
     const quoteButton = page.getByRole('button', { name: 'Get a quote', exact: true });
+    await pricing.locator('summary', { hasText: 'View 2 regional route prices' }).click();
     await expect(pricing).toContainText('USD per 1M tokens');
-    await expect(pricing.getByRole('link', { name: 'Price source ↗' })).toHaveAttribute(
-      'href',
-      /image-generation-models/,
-    );
+    await expect(
+      pricing
+        .locator('li', { hasText: 'OpenAI · Not disclosed' })
+        .getByRole('link', { name: 'Price source ↗' }),
+    ).toHaveAttribute('href', /image-generation-models/);
     const example = page
       .locator('details')
       .filter({ hasText: 'Change the season in a billboard scene' });
