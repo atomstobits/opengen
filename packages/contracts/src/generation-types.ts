@@ -37,6 +37,7 @@ export interface GenerationArguments {
   outputFormat?: 'png' | 'jpeg' | 'webp' | 'mp4';
   outputCompression?: number;
   background?: 'auto' | 'opaque' | 'transparent';
+  complexity?: 'low' | 'medium' | 'high';
   seed?: number;
   audio?: boolean;
   draft?: boolean;

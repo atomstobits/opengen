@@ -17,7 +17,7 @@ import { pollProviderJson, providerObject, submitProviderJson } from './provider
 import { captureProviderResult, type CaptureProviderOutputs } from './adapter-output.js';
 import { observedGoogleVideoCostMicros } from './google-usage.js';
 
-const model = 'gemini-omni-1.1-flash';
+const models = new Set(['gemini-omni-1.1-flash', 'gemini-omni-1.2-flash']);
 const tasks: Partial<Record<Operation, string>> = {
   'text-to-video': 'text_to_video',
   'image-to-video': 'image_to_video',
@@ -53,17 +53,30 @@ export function createGoogleVideoAdapter(
   ];
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     const { route, deployment, input } = context;
-    if (deployment.id !== 'google-undisclosed' || route.upstreamModelId !== model)
+    if (deployment.id !== 'google-undisclosed' || !models.has(route.upstreamModelId))
       return 'Unsupported Google Omni model or deployment.';
     if (!tasks[input.operation]) return 'Unsupported Omni operation.';
-    const issue = adapterInputIssue(context, fields) ?? referenceTypeIssue(input);
+    const is12 = route.upstreamModelId === 'gemini-omni-1.2-flash';
+    const issue =
+      adapterInputIssue(context, fields) ??
+      referenceTypeIssue(input, is12 ? ['image', 'video'] : ['image']);
     if (issue) return issue;
     const args = input.input;
     if (!['360p', '720p', '1080p', '4k'].includes((args.resolution ?? '').toLowerCase()))
       return 'Unsupported Omni output resolution.';
-    const duration = numericDuration(input);
-    if (!Number.isInteger(duration) || duration < 3 || duration > 10)
-      return 'Omni duration must be 3–10 seconds.';
+    const first = frameUrl(input, 'first');
+    const last = frameUrl(input, 'last');
+    const maxDuration =
+      is12 && input.operation !== 'video-extend' && !(input.operation === 'image-to-video' && last)
+        ? 15
+        : 10;
+    const durationOptionalEdit =
+      is12 && input.operation === 'video-edit' && args.duration === undefined;
+    if (!durationOptionalEdit) {
+      const duration = numericDuration(input);
+      if (!Number.isInteger(duration) || duration < 3 || duration > maxDuration)
+        return `Omni duration must be 3–${maxDuration} seconds.`;
+    }
     if (input.operation === 'video-extend') {
       if (args.aspectRatio && args.aspectRatio !== 'source')
         return 'Omni extension preserves its source ratio; use source or omit aspectRatio.';
@@ -75,9 +88,11 @@ export function createGoogleVideoAdapter(
       return 'This Omni adapter produces MP4 output only.';
     if (args.audio === false)
       return 'Omni generates native audio and has no qualified audio-off switch.';
-    const references = referenceUrls(input);
-    const first = frameUrl(input, 'first');
-    const last = frameUrl(input, 'last');
+    const imageRefs = referenceUrls(input, 'image');
+    const videoRefs = referenceUrls(input, 'video');
+    const allRefs = [...imageRefs, ...videoRefs];
+    if (is12 && (imageRefs.length > 10 || videoRefs.length > 3))
+      return 'Omni 1.2 supports at most 10 image references and 3 video references.';
     const source = sourceVideoUrl(input);
     const continuing = Boolean(context.previousUpstreamId || input.previousJobId);
     if (continuing && !['video-edit', 'video-extend'].includes(input.operation))
@@ -88,12 +103,12 @@ export function createGoogleVideoAdapter(
       return 'First/last frames belong to the image-to-video operation.';
     if (!['video-edit', 'video-extend'].includes(input.operation) && source)
       return 'A source video belongs to video edit or extension.';
-    if (input.operation === 'text-to-video' && references.length)
+    if (input.operation === 'text-to-video' && allRefs.length)
       return 'Text-to-video does not accept reference assets.';
     if (input.operation === 'image-to-video' && !first)
       return 'Omni image-to-video requires firstFrame and accepts optional lastFrame.';
-    if (input.operation === 'reference-to-video' && !references.length)
-      return 'Omni reference generation requires at least one image reference.';
+    if (input.operation === 'reference-to-video' && !allRefs.length)
+      return 'Omni reference generation requires at least one reference.';
     if (['video-edit', 'video-extend'].includes(input.operation) && !source && !continuing)
       return 'Omni video edit/extend requires sourceVideo or a verified previous job.';
     return null;
@@ -118,7 +133,7 @@ export function createGoogleVideoAdapter(
     isConfigured: (route, deployment) =>
       route.adapter === 'google' &&
       deployment.id === 'google-undisclosed' &&
-      route.upstreamModelId === model &&
+      models.has(route.upstreamModelId) &&
       Boolean(
         (env.GEMINI_API_KEY || env.GOOGLE_API_KEY) &&
         (options.captureOutputs || options.storeOutput),
@@ -136,6 +151,7 @@ export function createGoogleVideoAdapter(
       const references: string[] = [];
       let inputBytes = 0;
       let imageIndex = 0;
+      let videoIndex = 0;
       async function addMedia(url: string, type: 'image' | 'video'): Promise<number> {
         let asset: Awaited<ReturnType<typeof readPublicAsset>>;
         try {
@@ -159,19 +175,21 @@ export function createGoogleVideoAdapter(
             'The reference asset type does not match its explicit Omni media role.',
           );
         content.push({ type, mime_type: asset.mediaType, data: asset.bytes.toString('base64') });
-        return type === 'image' ? ++imageIndex : 1;
+        return type === 'image' ? ++imageIndex : ++videoIndex;
       }
       const first = frameUrl(input, 'first');
       const last = frameUrl(input, 'last');
       if (first) sources.push(`<FIRST_FRAME>@Image${await addMedia(first, 'image')}`);
       if (last) sources.push(`<LAST_FRAME>@Image${await addMedia(last, 'image')}`);
-      const images = referenceUrls(input);
+      const images = referenceUrls(input, 'image');
       for (let index = 0; index < images.length; index++)
         references.push(`<IMAGE_REF_${index}>@Image${await addMedia(images[index]!, 'image')}`);
+      const videos = referenceUrls(input, 'video');
+      for (let index = 0; index < videos.length; index++)
+        references.push(`<VIDEO_REF_${index}>@Video${await addMedia(videos[index]!, 'video')}`);
       const source = sourceVideoUrl(input);
       if (source) {
-        await addMedia(source, 'video');
-        sources.push('<VIDEO_0>@Video1');
+        sources.push(`<VIDEO_0>@Video${await addMedia(source, 'video')}`);
       }
       // Google’s documented declarations bind each named role to its physical media position.
       // Ordinary references cannot accidentally become the first or last frame.
@@ -189,7 +207,7 @@ export function createGoogleVideoAdapter(
         'https://generativelanguage.googleapis.com/v1beta/interactions',
         auth(),
         {
-          model,
+          model: context.route.upstreamModelId,
           input: content,
           background: true,
           store: true,
@@ -197,9 +215,10 @@ export function createGoogleVideoAdapter(
           response_format: {
             type: 'video',
             delivery: 'inline',
-            duration: `${input.input.duration}s`,
+            ...(input.input.duration !== undefined ? { duration: `${input.input.duration}s` } : {}),
             resolution: (input.input.resolution ?? '').toLowerCase(),
-            ...(input.operation !== 'video-extend'
+            ...(input.operation !== 'video-extend' &&
+            !(input.operation === 'video-edit' && input.input.aspectRatio === undefined)
               ? { aspect_ratio: input.input.aspectRatio ?? '16:9' }
               : {}),
           },
@@ -221,7 +240,7 @@ export function createGoogleVideoAdapter(
         140_000_000,
       );
       if (body.status === 'in_progress') return { status: 'running' };
-      const billedCostMicros = observedGoogleVideoCostMicros(body);
+      const billedCostMicros = observedGoogleVideoCostMicros(body, context.route.upstreamModelId);
       if (body.status === 'failed' || body.status === 'cancelled')
         return {
           status: body.status,

@@ -56,6 +56,13 @@ export function getPlaygroundFields(modelId: string, operation: Operation, route
       );
     if (name === 'aspectRatio') field.choices = caps.aspectRatios;
     if (name === 'quality' && caps.quality) field.choices = caps.quality;
+    if (name === 'complexity' && modelId === 'fal/flux-3-max-video')
+      field.choices = ['low', 'high'];
+    if (name === 'thinkingLevel') {
+      if (modelId === 'google/nano-banana-pro') field.choices = ['high'];
+      else if (modelId === 'google/nano-banana-2' || modelId === 'google/nano-banana-2-lite')
+        field.choices = ['minimal', 'high'];
+    }
     if (name === 'count') field.maximum = caps.countMaximum;
     if (name === 'prompt' && definition.promptMaximum !== null)
       field.schema = { ...schema, maxLength: definition.promptMaximum };

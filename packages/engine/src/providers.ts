@@ -9,6 +9,11 @@ import {
 } from './openai.js';
 import { createXaiAdapter } from './xai.js';
 import { createMiniMaxAdapter } from './minimax.js';
+import {
+  createMiniMaxImageAdapter,
+  isMiniMaxImageModel,
+  observedMiniMaxImageCostMicros,
+} from './minimax-image.js';
 import { createGoogleImageAdapter } from './google.js';
 import { createQwenImageAdapter, isQwenImageModel } from './qwen.js';
 import { createReplicateAdapter } from './replicate.js';
@@ -21,6 +26,8 @@ export {
   createOpenAIAdapter,
   createXaiAdapter,
   createMiniMaxAdapter,
+  createMiniMaxImageAdapter,
+  observedMiniMaxImageCostMicros,
   createGoogleImageAdapter,
   createQwenImageAdapter,
   createReplicateAdapter,
@@ -66,7 +73,10 @@ export function createGoogleMediaAdapter(
   const image = createGoogleImageAdapter(options);
   const video = createGoogleVideoAdapter(options);
   const forRoute = (route: Parameters<ProviderAdapter['isConfigured']>[0]) =>
-    route.upstreamModelId === 'gemini-omni-1.1-flash' ? video : image;
+    route.upstreamModelId === 'gemini-omni-1.1-flash' ||
+    route.upstreamModelId === 'gemini-omni-1.2-flash'
+      ? video
+      : image;
   return {
     id: 'google',
     supportedOperations: [
@@ -77,6 +87,34 @@ export function createGoogleMediaAdapter(
       'reference-to-video',
       'video-edit',
       'video-extend',
+    ],
+    isConfigured: (route, deployment) => forRoute(route).isConfigured(route, deployment),
+    inputFields: (context) => forRoute(context.route).inputFields?.(context) ?? [],
+    preflight: (context) => forRoute(context.route).preflight!(context),
+    submit: (context) => forRoute(context.route).submit(context),
+    poll: (context) => forRoute(context.route).poll(context),
+  };
+}
+
+export function createMiniMaxMediaAdapter(
+  options: {
+    env?: NodeJS.ProcessEnv;
+    fetch?: typeof fetch;
+    captureOutputs?: CaptureProviderOutputs;
+  } = {},
+): ProviderAdapter {
+  const video = createMiniMaxAdapter(options);
+  const image = createMiniMaxImageAdapter(options);
+  const forRoute = (route: Parameters<ProviderAdapter['isConfigured']>[0]) =>
+    isMiniMaxImageModel(route.upstreamModelId) ? image : video;
+  return {
+    id: 'minimax',
+    supportedOperations: [
+      'text-to-video',
+      'image-to-video',
+      'reference-to-video',
+      'text-to-image',
+      'image-edit',
     ],
     isConfigured: (route, deployment) => forRoute(route).isConfigured(route, deployment),
     inputFields: (context) => forRoute(context.route).inputFields?.(context) ?? [],
@@ -100,7 +138,7 @@ export function createDefaultAdapters(
     createFalAdapter(options),
     createOpenAIAdapter(options),
     createXaiAdapter(options),
-    createMiniMaxAdapter(options),
+    createMiniMaxMediaAdapter(options),
     createGoogleMediaAdapter(options),
     createReplicateAdapter(options),
     createRunwayAdapter(options),

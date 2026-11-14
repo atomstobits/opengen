@@ -45,8 +45,8 @@ describe('source-backed catalog', () => {
         }),
       ]),
     );
-    expect(catalog.models).toHaveLength(35);
-    expect(catalog.routes).toHaveLength(132);
+    expect(catalog.models).toHaveLength(49);
+    expect(catalog.routes).toHaveLength(182);
   });
   it('resolves Omni Flash as a search alias without creating duplicate live releases', () => {
     expect(searchCatalog('Gemini Omni Flash').map((model) => model.id)).toEqual([

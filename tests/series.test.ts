@@ -19,7 +19,7 @@ describe('public company and model-series identity', () => {
     const memberships = modelSeries.flatMap((series) => series.modelIds);
     expect(memberships).toHaveLength(catalog.models.length);
     expect(new Set(memberships)).toEqual(new Set(catalog.models.map((model) => model.id)));
-    expect(companies).toHaveLength(8);
+    expect(companies).toHaveLength(9);
   });
 
   it('groups complete versions without merging different Seedance releases', () => {
@@ -57,7 +57,11 @@ describe('public company and model-series identity', () => {
     expect(catalog.models.find((model) => model.id === 'pika/h3-flex')?.creator).toBe('Pika');
     for (const id of h3.modelIds)
       expect(catalog.routes.some((route) => route.modelId === id)).toBe(true);
-    expect(getCompanyModels('minimax').map((model) => model.id)).toEqual(h3.modelIds);
+    const h3Image = getSeries('minimax/h3-image')!;
+    expect(getCompanyModels('minimax').map((model) => model.id)).toEqual([
+      ...h3.modelIds,
+      ...h3Image.modelIds,
+    ]);
   });
 
   it('includes Qwen brand models on Alibaba while retaining canonical Qwen pages', () => {
@@ -68,10 +72,11 @@ describe('public company and model-series identity', () => {
     ]);
     expect(getCompanySeries('alibaba').map((series) => series.id)).toEqual([
       'alibaba/wan-3.0',
+      'alibaba/happy-horse-1.1',
       'qwen/image-2.1',
       'qwen/image-3.0-pro',
     ]);
-    expect(getCompanyModels('alibaba')).toHaveLength(7);
+    expect(getCompanyModels('alibaba')).toHaveLength(8);
     expect(seriesHref('alibaba/qwen-image-3.0-pro')).toBe('/qwen/image-3.0-pro');
   });
 

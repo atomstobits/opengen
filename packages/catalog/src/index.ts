@@ -290,6 +290,7 @@ export function quote(
           route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image') &&
           (count !== 1 || ![undefined, 'low'].includes(args.quality))) ||
         (route.adapter === 'minimax' &&
+          !route.upstreamModelId.startsWith('MiniMax-H3-Image') &&
           args.promptExpansion !== undefined &&
           (route.upstreamModelId !== 'MiniMax-H3-Max' ||
             ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||

@@ -16,7 +16,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await expect(
     page.getByRole('heading', { level: 1, name: 'Find your next model.' }),
   ).toBeVisible();
-  await expect(cards(page)).toHaveCount(35);
+  await expect(cards(page)).toHaveCount(catalog.models.length);
   await expect(page.locator('.hero')).toHaveCount(0);
   await expect(page.locator('.playground-view')).toHaveCount(0);
   await mkdir(evidenceDir, { recursive: true });
@@ -66,12 +66,17 @@ test('catalog search and image filtering preserve the exact variant when opening
   await page.getByRole('button', { name: 'Image', exact: true }).click();
   await expect(cards(page).filter({ hasText: 'Seedance' })).toHaveCount(0);
   await page.getByLabel('Search models, providers or regions').fill('Sunburst');
-  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toHaveCount(2);
   const sunburst = card(page, 'openai/gpt-image-2.5-sunburst');
   await expect(sunburst.getByRole('heading', { level: 2 })).toHaveText('GPT Image 2.5 Sunburst');
   await expect(
     sunburst.getByRole('link', { name: 'Compare providers', exact: true }),
   ).toHaveAttribute('href', '/openai/gpt-image-2.5');
+  const sunburst26 = card(page, 'openai/gpt-image-2.6-sunburst');
+  await expect(sunburst26.getByRole('heading', { level: 2 })).toHaveText('GPT Image 2.6 Sunburst');
+  await expect(
+    sunburst26.getByRole('link', { name: 'Compare providers', exact: true }),
+  ).toHaveAttribute('href', '/openai/gpt-image-2.6');
 });
 
 test('the separate playground quotes comparison-only routes and preserves a selected regional pin', async ({
@@ -220,7 +225,7 @@ test.describe('phone model discovery', () => {
     await page.locator('.hero').screenshot({ path: path.join(evidenceDir, 'hero-mobile.png') });
     await page.locator('.hero').getByRole('link', { name: 'Explore models', exact: true }).click();
     await expect(page).toHaveURL(/\/models$/);
-    await expect(cards(page)).toHaveCount(35);
+    await expect(cards(page)).toHaveCount(catalog.models.length);
     const overflow = await page.evaluate(() => ({
       width: document.documentElement.scrollWidth,
       viewport: innerWidth,

@@ -9,7 +9,13 @@ export interface BoundedTokenQuote {
 const NANO_PER_MICRO = 1_000n;
 const PROTOCOL_FRAMING_TOKENS = 64;
 
-const openAIModels = new Set(['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare']);
+const openAIModels = new Set([
+  'gpt-image-2',
+  'gpt-image-2.5-sunburst',
+  'gpt-image-2.5-flare',
+  'gpt-image-2.6-sunburst',
+  'gpt-image-2.6-flare',
+]);
 const openAI1K2KRatios = new Set(['1:1', '16:9', '9:16', '4:3', '3:4']);
 const openAI4KRatios = new Set(['16:9', '9:16']);
 
@@ -23,6 +29,15 @@ const gptImage2OutputCeiling: Record<string, Record<'1K' | '2K' | '4K', number>>
 const gptImage25OutputCeiling: Record<string, Record<'1K' | '2K' | '4K', number>> = {
   low: { '1K': 1_500, '2K': 3_500, '4K': 8_000 },
   medium: { '1K': 3_500, '2K': 7_500, '4K': 16_000 },
+  high: { '1K': 8_000, '2K': 16_000, '4K': 32_000 },
+  xhigh: { '1K': 12_000, '2K': 24_000, '4K': 48_000 },
+  max: { '1K': 16_000, '2K': 32_000, '4K': 64_000 },
+  auto: { '1K': 16_000, '2K': 32_000, '4K': 64_000 },
+};
+
+const gptImage26OutputCeiling: Record<string, Record<'1K' | '2K' | '4K', number>> = {
+  low: { '1K': 3_500, '2K': 7_500, '4K': 16_000 },
+  medium: { '1K': 6_000, '2K': 12_000, '4K': 24_000 },
   high: { '1K': 8_000, '2K': 16_000, '4K': 32_000 },
   xhigh: { '1K': 12_000, '2K': 24_000, '4K': 48_000 },
   max: { '1K': 16_000, '2K': 32_000, '4K': 64_000 },
@@ -46,10 +61,58 @@ const googleImageRatios = new Set([
   '21:9',
 ]);
 
-const nanoBananaImageTokens: Record<'1K' | '2K' | '4K', number> = {
-  '1K': 1_120,
-  '2K': 1_680,
-  '4K': 3_840,
+interface GoogleImagePricingSpec {
+  inputNano: bigint;
+  thoughtNano: bigint;
+  imageNano: bigint;
+  imageTokens: Partial<Record<'0.5K' | '1K' | '2K' | '4K', number>>;
+  allowedThinking: readonly ('minimal' | 'medium' | 'high')[];
+  defaultThinking: 'minimal' | 'medium' | 'high';
+  pricingAnchor: string;
+  rateLabel: string;
+}
+
+const googleImagePricingSpecs: Record<string, GoogleImagePricingSpec> = {
+  'gemini-nano-banana-2.1': {
+    inputNano: 1_500n,
+    thoughtNano: 7_500n,
+    imageNano: 30_000n,
+    imageTokens: { '1K': 1_120, '2K': 1_680, '4K': 3_840 },
+    allowedThinking: ['minimal', 'medium', 'high'],
+    defaultThinking: 'medium',
+    pricingAnchor: 'gemini-nano-banana-2.1',
+    rateLabel: '$1.50/1M input, $7.50/1M thinking/text output, $30/1M image output',
+  },
+  'gemini-3-pro-image': {
+    inputNano: 2_000n,
+    thoughtNano: 12_000n,
+    imageNano: 120_000n,
+    imageTokens: { '1K': 1_120, '2K': 1_120, '4K': 2_000 },
+    allowedThinking: ['high'],
+    defaultThinking: 'high',
+    pricingAnchor: 'gemini-3-pro-image',
+    rateLabel: '$2.00/1M input, $12.00/1M thinking/text output, $120/1M image output',
+  },
+  'gemini-3.1-flash-image': {
+    inputNano: 500n,
+    thoughtNano: 3_000n,
+    imageNano: 60_000n,
+    imageTokens: { '0.5K': 747, '1K': 1_120, '2K': 1_680, '4K': 2_520 },
+    allowedThinking: ['minimal', 'high'],
+    defaultThinking: 'high',
+    pricingAnchor: 'gemini-3.1-flash-image',
+    rateLabel: '$0.50/1M input, $3.00/1M thinking/text output, $60/1M image output',
+  },
+  'gemini-3.1-flash-lite-image': {
+    inputNano: 250n,
+    thoughtNano: 1_500n,
+    imageNano: 30_000n,
+    imageTokens: { '1K': 1_120 },
+    allowedThinking: ['minimal', 'high'],
+    defaultThinking: 'high',
+    pricingAnchor: 'gemini-3.1-flash-lite-image',
+    rateLabel: '$0.25/1M input, $1.50/1M thinking/text output, $30/1M image output',
+  },
 };
 
 const nanoBananaThoughtCeiling: Record<'minimal' | 'medium' | 'high', number> = {
@@ -65,6 +128,20 @@ const omniVideoTokensPerSecond: Record<'360p' | '720p' | '1080p' | '4K', number>
   '4K': 24_000,
 };
 const OMNI_THOUGHT_TOKEN_CEILING = 8_192;
+
+const falOmni12PerSecondNanoUsd: Record<'360p' | '720p' | '1080p' | '4K', bigint> = {
+  '360p': 27_300_000n,
+  '720p': 81_900_000n,
+  '1080p': 122_900_000n,
+  '4K': 245_700_000n,
+};
+
+const minimaxImageOutputCeiling: Record<'1K' | '2K' | '4K', number> = {
+  '1K': 2_048,
+  '2K': 5_000,
+  '4K': 20_000,
+};
+const MINIMAX_PROMPT_ENHANCE_CEILING = 16_384;
 
 const byteplusSeedanceMaxPixels2x: Record<'480p' | '720p' | '1080p' | '4k', number> = {
   '480p': 428_544,
@@ -140,10 +217,18 @@ function openAIBoundedQuote(route: Route, input: GenerateInput): BoundedTokenQuo
   )
     return null;
   if (args.background === 'transparent' && args.outputFormat === 'jpeg') return null;
+  if (args.complexity !== undefined) {
+    if (!route.upstreamModelId.startsWith('gpt-image-2.6-')) return null;
+    if (!['low', 'medium', 'high'].includes(args.complexity)) return null;
+  }
 
   const quality = args.quality ?? 'medium';
   const ceilings =
-    route.upstreamModelId === 'gpt-image-2' ? gptImage2OutputCeiling : gptImage25OutputCeiling;
+    route.upstreamModelId === 'gpt-image-2'
+      ? gptImage2OutputCeiling
+      : route.upstreamModelId.startsWith('gpt-image-2.6-')
+        ? gptImage26OutputCeiling
+        : gptImage25OutputCeiling;
   const perImageOutputTokens = ceilings[quality]?.[tier];
   if (!perImageOutputTokens) return null;
 
@@ -163,7 +248,7 @@ function openAIBoundedQuote(route: Route, input: GenerateInput): BoundedTokenQuo
     estimatedCostMicros,
     source: {
       url,
-      checkedAt: '2026-11-06',
+      checkedAt: route.upstreamModelId.startsWith('gpt-image-2.6-') ? '2026-11-14' : '2026-11-06',
       note: 'Conservative bounded max-token reservation for text-only standard generation ($5/1M text input, $30/1M image output). Image edits and custom pixel dimensions remain unpriced.',
     },
     notices: [
@@ -176,10 +261,11 @@ function googleNanoBananaBoundedQuote(
   route: Route,
   input: GenerateInput,
 ): BoundedTokenQuote | null {
+  const spec = googleImagePricingSpecs[route.upstreamModelId];
   if (
     route.adapter !== 'google' ||
     route.deploymentId !== 'google-undisclosed' ||
-    route.upstreamModelId !== 'gemini-nano-banana-2.1' ||
+    !spec ||
     input.operation !== 'text-to-image'
   )
     return null;
@@ -190,26 +276,29 @@ function googleNanoBananaBoundedQuote(
   if (args.outputFormat && !['png', 'jpeg'].includes(args.outputFormat)) return null;
   if (args.aspectRatio && !googleImageRatios.has(args.aspectRatio)) return null;
 
-  const tier = (args.resolution ?? '').toUpperCase();
-  if (tier !== '1K' && tier !== '2K' && tier !== '4K') return null;
-  const thinking = (args.thinkingLevel ?? 'medium') as 'minimal' | 'medium' | 'high';
+  const tier = (args.resolution ?? '').toUpperCase() as '0.5K' | '1K' | '2K' | '4K';
+  const imageTokens = spec.imageTokens[tier];
+  if (!imageTokens) return null;
+
+  const thinking = (args.thinkingLevel ?? spec.defaultThinking) as 'minimal' | 'medium' | 'high';
+  if (!spec.allowedThinking.includes(thinking)) return null;
   const thoughtTokens = nanoBananaThoughtCeiling[thinking];
-  const imageTokens = nanoBananaImageTokens[tier];
-  if (!thoughtTokens || !imageTokens) return null;
+  if (!thoughtTokens) return null;
 
   const inputTokens = maxTextTokens(args.prompt, args.systemPrompt);
-  // Standard rates per 1M tokens: $1.50 input (1,500 nano-USD/tok), $7.50 text/thinking (7,500 nano-USD/tok), $30 image output (30,000 nano-USD/tok).
   const nanoUsd =
-    BigInt(inputTokens) * 1_500n + BigInt(thoughtTokens) * 7_500n + BigInt(imageTokens) * 30_000n;
+    BigInt(inputTokens) * spec.inputNano +
+    BigInt(thoughtTokens) * spec.thoughtNano +
+    BigInt(imageTokens) * spec.imageNano;
   const estimatedCostMicros = nanoToMicrosCeil(nanoUsd);
   if (estimatedCostMicros === null) return null;
 
   return {
     estimatedCostMicros,
     source: {
-      url: 'https://aistudio.google.com/docs/pricing#gemini-nano-banana-2.1',
-      checkedAt: '2026-11-02',
-      note: 'Conservative bounded max-token reservation for single-output text-to-image without grounding ($1.50/1M input, $7.50/1M thinking/text output, $30/1M image output). Reference/edit operations remain unpriced.',
+      url: `https://aistudio.google.com/docs/pricing#${spec.pricingAnchor}`,
+      checkedAt: route.upstreamModelId === 'gemini-nano-banana-2.1' ? '2026-11-02' : '2026-11-14',
+      note: `Conservative bounded max-token reservation for single-output text-to-image without grounding (${spec.rateLabel}). Reference/edit operations remain unpriced.`,
     },
     notices: [
       `Bounded max-token reservation (${inputTokens} input-byte ceiling + ${thoughtTokens} ${thinking}-thinking ceiling + ${imageTokens} ${tier} image-output tokens at standard Gemini Developer API rates); settled against reported modality token usage when unambiguous.`,
@@ -218,10 +307,12 @@ function googleNanoBananaBoundedQuote(
 }
 
 function googleOmniBoundedQuote(route: Route, input: GenerateInput): BoundedTokenQuote | null {
+  const is12 = route.upstreamModelId === 'gemini-omni-1.2-flash';
+  const is11 = route.upstreamModelId === 'gemini-omni-1.1-flash';
   if (
     route.adapter !== 'google' ||
     route.deploymentId !== 'google-undisclosed' ||
-    route.upstreamModelId !== 'gemini-omni-1.1-flash' ||
+    (!is11 && !is12) ||
     input.operation !== 'text-to-video'
   )
     return null;
@@ -232,7 +323,8 @@ function googleOmniBoundedQuote(route: Route, input: GenerateInput): BoundedToke
   if (args.outputFormat && args.outputFormat !== 'mp4') return null;
   if (args.aspectRatio && !['16:9', '9:16'].includes(args.aspectRatio)) return null;
   if (typeof args.duration !== 'number' || !Number.isInteger(args.duration)) return null;
-  if (args.duration < 3 || args.duration > 10) return null;
+  const maxDuration = is12 ? 15 : 10;
+  if (args.duration < 3 || args.duration > maxDuration) return null;
 
   const normalizedRes =
     (args.resolution ?? '').toUpperCase() === '4K'
@@ -243,23 +335,124 @@ function googleOmniBoundedQuote(route: Route, input: GenerateInput): BoundedToke
 
   const inputTokens = maxTextTokens(args.prompt);
   const videoTokens = args.duration * perSecondTokens;
-  // Standard rates per 1M tokens: $1.50 input (1,500 nano-USD/tok), $9.00 text/thinking (9,000 nano-USD/tok), $17.50 video output (17,500 nano-USD/tok).
+  const videoOutputNano = is12 ? 12_000n : 17_500n;
+  const videoRateLabel = is12 ? '$12/1M' : '$17.50/1M';
   const nanoUsd =
     BigInt(inputTokens) * 1_500n +
     BigInt(OMNI_THOUGHT_TOKEN_CEILING) * 9_000n +
-    BigInt(videoTokens) * 17_500n;
+    BigInt(videoTokens) * videoOutputNano;
   const estimatedCostMicros = nanoToMicrosCeil(nanoUsd);
   if (estimatedCostMicros === null) return null;
 
   return {
     estimatedCostMicros,
     source: {
-      url: 'https://aistudio.google.com/docs/pricing#gemini-omni-1.1-flash',
-      checkedAt: '2026-11-02',
-      note: 'Conservative bounded max-token reservation for single-output text-to-video ($1.50/1M input, $9/1M thinking/text output, $17.50/1M video output). Frame, reference, edit and continuation operations remain unpriced.',
+      url: `https://aistudio.google.com/docs/pricing#${route.upstreamModelId}`,
+      checkedAt: is12 ? '2026-11-14' : '2026-11-02',
+      note: `Conservative bounded max-token reservation for single-output text-to-video ($1.50/1M input, $9/1M thinking/text output, ${videoRateLabel} video output). Frame, reference, edit and continuation operations remain unpriced.`,
     },
     notices: [
       `Bounded max-token reservation (${inputTokens} input-byte ceiling + ${OMNI_THOUGHT_TOKEN_CEILING} thinking/text ceiling + ${videoTokens} ${normalizedRes} video-output token ceiling for ${args.duration}s at standard Gemini Developer API rates); settled against reported modality token usage when unambiguous.`,
+    ],
+  };
+}
+
+function falGoogleOmni12BoundedQuote(route: Route, input: GenerateInput): BoundedTokenQuote | null {
+  if (
+    route.adapter !== 'fal' ||
+    route.deploymentId !== 'fal-undisclosed' ||
+    route.upstreamModelId !== 'google/gemini-omni-flash/v1.2/text-to-video' ||
+    input.operation !== 'text-to-video'
+  )
+    return null;
+
+  const args = input.input;
+  if ((args.count ?? 1) !== 1) return null;
+  if (args.audio === false) return null;
+  if (args.aspectRatio && !['16:9', '9:16'].includes(args.aspectRatio)) return null;
+  if (typeof args.duration !== 'number' || !Number.isInteger(args.duration)) return null;
+  if (args.duration < 3 || args.duration > 15) return null;
+
+  const normalizedRes =
+    (args.resolution ?? '').toUpperCase() === '4K'
+      ? '4K'
+      : ((args.resolution ?? '').toLowerCase() as '360p' | '720p' | '1080p');
+  const perSecondNano = falOmni12PerSecondNanoUsd[normalizedRes];
+  if (!perSecondNano) return null;
+
+  const inputTokens = maxTextTokens(args.prompt);
+  const nanoUsd = BigInt(inputTokens) * 1_500n + BigInt(args.duration) * perSecondNano;
+  const estimatedCostMicros = nanoToMicrosCeil(nanoUsd);
+  if (estimatedCostMicros === null) return null;
+
+  return {
+    estimatedCostMicros,
+    source: {
+      url: 'https://fal.ai/models/google/gemini-omni-flash/v1.2/text-to-video',
+      checkedAt: '2026-11-14',
+      note: 'Conservative bounded reservation combining fal Gemini Omni Flash v1.2 output-second list rates ($0.0273/$0.0819/$0.1229/$0.2457 per second at 360p/720p/1080p/4K) with $1.50/1M input-token ceiling.',
+    },
+    notices: [
+      `Bounded reservation (${inputTokens} input-byte ceiling at $1.50/1M tokens + ${args.duration}s ${normalizedRes} output video at fal list rates).`,
+    ],
+  };
+}
+
+function minimaxImageBoundedQuote(route: Route, input: GenerateInput): BoundedTokenQuote | null {
+  const isStandard = route.upstreamModelId === 'MiniMax-H3-Image';
+  const isHighspeed = route.upstreamModelId === 'MiniMax-H3-Image-Highspeed';
+  if (
+    route.adapter !== 'minimax' ||
+    route.deploymentId !== 'minimax-undisclosed' ||
+    (!isStandard && !isHighspeed) ||
+    input.operation !== 'text-to-image'
+  )
+    return null;
+
+  const args = input.input;
+  if (args.size) return null;
+  const tier = (args.resolution ?? '').toUpperCase() as '1K' | '2K' | '4K';
+  const perImageOutputTokens = minimaxImageOutputCeiling[tier];
+  if (!perImageOutputTokens) return null;
+
+  const count = args.count ?? 1;
+  if (!Number.isInteger(count) || count < 1 || count > 10) return null;
+  if (args.outputFormat && !['png', 'jpeg', 'webp'].includes(args.outputFormat)) return null;
+  if (
+    args.outputCompression !== undefined &&
+    (args.outputFormat === undefined || args.outputFormat === 'png')
+  )
+    return null;
+
+  const expansionDisabled =
+    args.promptExpansion === false ||
+    args.promptExpansion === 'none' ||
+    args.promptExpansion === 'disabled';
+  if (
+    expansionDisabled &&
+    (!args.aspectRatio || args.aspectRatio === 'auto' || args.aspectRatio === 'source')
+  )
+    return null;
+  if (args.aspectRatio === 'source') return null;
+
+  const textTokens =
+    maxTextTokens(args.prompt) + (expansionDisabled ? 0 : MINIMAX_PROMPT_ENHANCE_CEILING);
+  const outputTokens = count * perImageOutputTokens;
+  const imageOutNano = isHighspeed ? 7_600n : 3_800n;
+  const outRateLabel = isHighspeed ? '$7.60/1M' : '$3.80/1M';
+  const nanoUsd = BigInt(textTokens) * 2_300n + BigInt(outputTokens) * imageOutNano;
+  const estimatedCostMicros = nanoToMicrosCeil(nanoUsd);
+  if (estimatedCostMicros === null) return null;
+
+  return {
+    estimatedCostMicros,
+    source: {
+      url: 'https://platform.minimax.io/docs/pricing/overview#image',
+      checkedAt: '2026-11-14',
+      note: `Conservative bounded max-token reservation for text-to-image ($2.30/1M text input including prompt enhancement, ${outRateLabel} image output; excluding temporary 4K promotional discounts). Image edits and custom pixel dimensions remain unpriced.`,
+    },
+    notices: [
+      `Bounded max-token reservation (${textTokens} text/enhancement token ceiling + ${outputTokens} ${tier} image-output token ceiling at standard MiniMax token rates); settled against reported usage on completion and unused reservation is released.`,
     ],
   };
 }
@@ -326,6 +519,8 @@ export function boundedTokenQuote(route: Route, input: GenerateInput): BoundedTo
     openAIBoundedQuote(route, input) ??
     googleNanoBananaBoundedQuote(route, input) ??
     googleOmniBoundedQuote(route, input) ??
+    falGoogleOmni12BoundedQuote(route, input) ??
+    minimaxImageBoundedQuote(route, input) ??
     byteplusVideoBoundedQuote(route, input)
   );
 }

@@ -48,18 +48,21 @@ export function createRunwayAdapter(
     ...(operation === 'image-to-video' ? ['firstFrame' as const] : []),
   ];
   function preflight({ input, route, deployment }: Omit<AdapterContext, 'jobId'>): string | null {
-    if (deployment.providerId !== 'runway' || route.upstreamModelId !== 'kling_4')
-      return 'This Runway adapter supports Kling 4.0 only.';
+    const isFlash = route.upstreamModelId === 'kling_4_flash';
+    if (deployment.providerId !== 'runway' || (route.upstreamModelId !== 'kling_4' && !isFlash))
+      return 'This Runway adapter supports Kling 4.0 and Kling 4.0 Flash only.';
     if (!['text-to-video', 'image-to-video'].includes(input.operation))
       return 'Runway video editing requires source-derived duration and input billing; this adapter does not execute it.';
-    if (!ratios[(input.input.resolution ?? '').toLowerCase()])
-      return 'Kling 4.0 supports 720p and 1080p.';
+    const res = (input.input.resolution ?? '').toLowerCase();
+    if (isFlash ? res !== '720p' : !ratios[res])
+      return isFlash ? 'Kling 4.0 Flash supports 720p only.' : 'Kling 4.0 supports 720p and 1080p.';
+    const maxDuration = isFlash ? 20 : 30;
     if (
       !Number.isInteger(input.input.duration) ||
       numericDuration(input) < 3 ||
-      numericDuration(input) > 30
+      numericDuration(input) > maxDuration
     )
-      return 'Kling 4.0 requires an integer duration from 3 through 30 seconds.';
+      return `Kling requires an integer duration from 3 through ${maxDuration} seconds.`;
     const args = input.input;
     const unsupported = adapterInputIssue({ input, route, deployment }, fields(input.operation));
     if (unsupported) return unsupported;
@@ -96,7 +99,7 @@ export function createRunwayAdapter(
     inputFields: (context) => fields(context.input.operation),
     isConfigured: (route, deployment) =>
       route.adapter === 'runway' &&
-      route.upstreamModelId === 'kling_4' &&
+      (route.upstreamModelId === 'kling_4' || route.upstreamModelId === 'kling_4_flash') &&
       deployment.providerId === 'runway' &&
       Boolean(env.RUNWAYML_API_SECRET),
     async submit(context) {
@@ -110,7 +113,7 @@ export function createRunwayAdapter(
         `https://api.dev.runwayml.com/v1/${image ? 'image_to_video' : 'text_to_video'}`,
         auth(),
         {
-          model: 'kling_4',
+          model: context.route.upstreamModelId,
           promptText: input.input.prompt,
           duration: input.input.duration,
           ratio: image

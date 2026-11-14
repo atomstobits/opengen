@@ -34,6 +34,7 @@ const providers: Provider[] = [
   { id: 'google', name: 'Google', website: 'https://ai.google.dev/' },
   { id: 'openai', name: 'OpenAI', website: 'https://developers.openai.com/' },
   { id: 'xai', name: 'xAI', website: 'https://docs.x.ai/' },
+  { id: 'bfl', name: 'Black Forest Labs', website: 'https://docs.bfl.ai/' },
 ];
 
 // Explicit author/service relationships, including BytePlus and the Qwen parent brand.
@@ -48,6 +49,7 @@ const modelAuthors = {
   Google: ['google'],
   xAI: ['xai'],
   OpenAI: ['openai'],
+  'Black Forest Labs': ['bfl'],
 } as const;
 
 const wanGuide = 'https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference';
@@ -102,6 +104,7 @@ const providerEndpoints: Record<string, { endpoint: string; credential: string }
   minimax: { endpoint: 'https://api.minimax.io/v2', credential: 'MINIMAX_API_KEY' },
   openai: { endpoint: 'https://api.openai.com/v1', credential: 'OPENAI_API_KEY' },
   xai: { endpoint: 'https://api.x.ai/v1', credential: 'XAI_API_KEY' },
+  bfl: { endpoint: 'https://api.bfl.ai/v1', credential: 'BFL_API_KEY' },
   google: {
     endpoint: 'https://generativelanguage.googleapis.com/v1beta',
     credential: 'GEMINI_API_KEY',
@@ -218,6 +221,24 @@ const models: Model[] = [
     'Video generation and editing with separately qualified serving routes.',
   ),
   model(
+    'kling/kling-4.0-flash',
+    'Kling 4.0 Flash',
+    'Kling AI',
+    'kling',
+    'video',
+    'https://fal.ai/models/kling/v4/flash/text-to-video',
+    '720p fast sibling in the Kling 4.0 family with native synchronized audio.',
+  ),
+  model(
+    'alibaba/happy-horse-1.1',
+    'HappyHorse 1.1',
+    'Alibaba',
+    'happy-horse',
+    'video',
+    'https://fal.ai/models/alibaba/happy-horse/v1.1/text-to-video',
+    '720p and 1080p video generation with native synchronized audio and multi-image references.',
+  ),
+  model(
     'alibaba/wan-3.0',
     'Wan 3.0',
     'Alibaba',
@@ -300,6 +321,16 @@ const models: Model[] = [
     },
   ),
   model(
+    'google/gemini-omni-1.2-flash',
+    'Gemini Omni 1.2 Flash',
+    'Google',
+    'gemini-omni',
+    'video',
+    'https://aistudio.google.com/docs/models/gemini-omni-flash',
+    'Expanded 3–15s conversational video generation, editing and stateful extension.',
+    { aliases: ['gemini-omni-1.2-flash'] },
+  ),
+  model(
     'google/gemini-omni-1.1-flash',
     'Gemini Omni 1.1 Flash',
     'Google',
@@ -308,6 +339,24 @@ const models: Model[] = [
     'https://aistudio.google.com/docs/models/gemini-omni-flash',
     'Conversational video generation and editing; continuation state must remain on the originating route.',
     { aliases: ['Gemini Omni Flash', 'gemini-omni-1.1-flash'] },
+  ),
+  model(
+    'bfl/flux-3-video',
+    'FLUX 3 Video',
+    'Black Forest Labs',
+    'flux-3',
+    'video',
+    'https://docs.bfl.ai/flux_3/flux3_video',
+    '720p–2160p video generation, editing and extension with switchable generated audio.',
+  ),
+  model(
+    'fal/flux-3-max-video',
+    'FLUX 3 Max Video · fal',
+    'fal',
+    'flux-3',
+    'video',
+    'https://fal.ai/models/blackforestlabs/flux-3-max/text-to-video',
+    'Post-trained fal Research FLUX 3 Video derivative with configurable reasoning level.',
   ),
   model(
     'xai/grok-imagine-video-1.5',
@@ -335,6 +384,24 @@ const models: Model[] = [
     'video',
     'https://docs.x.ai/developers/model-capabilities/video/overview',
     'Existing model retained for video editing and extension.',
+  ),
+  model(
+    'openai/gpt-image-2.6-sunburst',
+    'GPT Image 2.6 Sunburst',
+    'OpenAI',
+    'gpt-image',
+    'image',
+    'https://developers.openai.com/api/docs/models/gpt-image-2.6-sunburst',
+    'Highest-detail GPT Image 2.6 flagship with configurable pre-render reasoning complexity.',
+  ),
+  model(
+    'openai/gpt-image-2.6-flare',
+    'GPT Image 2.6 Flare',
+    'OpenAI',
+    'gpt-image',
+    'image',
+    'https://developers.openai.com/api/docs/models/gpt-image-2.6-flare',
+    'Lower-latency GPT Image 2.6 sibling, distinct from Sunburst.',
   ),
   model(
     'openai/gpt-image-2.5-sunburst',
@@ -373,6 +440,79 @@ const models: Model[] = [
     'https://ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1',
     'Native Gemini image generation and editing.',
     { aliases: ['gemini-nano-banana-2.1'] },
+  ),
+  model(
+    'google/nano-banana-pro',
+    'Nano Banana Pro',
+    'Google',
+    'nano-banana',
+    'image',
+    'https://aistudio.google.com/docs/image-generation',
+    'Gemini 3 Pro Image high-reasoning tier across 1K, 2K and 4K.',
+    { aliases: ['gemini-3-pro-image'] },
+  ),
+  model(
+    'google/nano-banana-2',
+    'Nano Banana 2',
+    'Google',
+    'nano-banana',
+    'image',
+    'https://aistudio.google.com/docs/image-generation',
+    'Gemini 3.1 Flash Image generation and editing across 0.5K–4K.',
+    { aliases: ['gemini-3.1-flash-image'] },
+  ),
+  model(
+    'google/nano-banana-2-lite',
+    'Nano Banana 2 Lite',
+    'Google',
+    'nano-banana',
+    'image',
+    'https://aistudio.google.com/docs/image-generation',
+    'Low-latency Gemini 3.1 Flash Lite Image 1K specialist.',
+    { aliases: ['gemini-3.1-flash-lite-image'] },
+  ),
+  model(
+    'minimax/h3-image',
+    'MiniMax H3 Image',
+    'MiniMax',
+    'minimax-h3-image',
+    'image',
+    'https://platform.minimax.io/docs/api-reference/image-generation-h3-generations',
+    'Unified 1K–4K image generation and up to 16-reference editing.',
+    { aliases: ['MiniMax-H3-Image'] },
+  ),
+  model(
+    'minimax/h3-image-highspeed',
+    'MiniMax H3 Image Highspeed',
+    'MiniMax',
+    'minimax-h3-image',
+    'image',
+    'https://platform.minimax.io/docs/api-reference/image-generation-h3-generations',
+    'High-throughput MiniMax H3 Image sibling with distinct token rates.',
+    { aliases: ['MiniMax-H3-Image-Highspeed'] },
+  ),
+  model(
+    'bfl/flux-3-image',
+    'FLUX 3 Image',
+    'Black Forest Labs',
+    'flux-3',
+    'image',
+    'https://docs.bfl.ai/flux_3/flux3_image_generate',
+    'Flagship FLUX 3 image generation and multi-reference editing across 768sq–4K.',
+  ),
+  model(
+    'bfl/flux-3-klein',
+    'FLUX 3 Klein',
+    'Black Forest Labs',
+    'flux-3',
+    'image',
+    'https://docs.bfl.ai/flux_3/flux3_image_klein',
+    'Compact 5.6B open-weights FLUX 3 image generation and editing sibling.',
+    {
+      openness: 'open-weights',
+      license:
+        'FLUX Kommunity License — commercial self-hosting permitted below $5M annual revenue',
+    },
   ),
   model(
     'xai/grok-imagine-image-2.0',
@@ -667,6 +807,143 @@ route(
     ),
   },
 );
+for (const [operation, suffix] of [
+  ['text-to-video', 'text-to-video'],
+  ['image-to-video', 'image-to-video'],
+  ['reference-to-video', 'reference-to-video'],
+  ['video-edit', 'video-to-video/edit'],
+] as const) {
+  const upstream = `kling/v4/${suffix}`;
+  const priced = operation === 'text-to-video' || operation === 'image-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'kling/kling-4.0',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['720p', '1080p'],
+    durations: durations(3, 30),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['720p', '1080p'].map((resolution, index) => ({
+          operation,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: [157_000, 235_000][index]!,
+          note: 'Published fal Kling v4 output-second list estimate without video input.',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-14',
+      note: priced
+        ? 'Exact fal Kling v4 output-second list estimate without video input ($0.157/s at 720p, $0.235/s at 1080p).'
+        : 'Video-reference and source-video edit operations bill across active input and output seconds and remain unpriced.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Kling v4 queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
+route(
+  'kling/kling-4.0-flash',
+  'runway-undisclosed',
+  'kling_4_flash',
+  'https://docs.dev.runwayml.com/guides/models/',
+  ['text-to-video', 'image-to-video', 'video-edit'],
+  ['720p'],
+  durations(3, 20),
+  {
+    adapter: 'runway',
+    pricingSource: {
+      url: 'https://docs.dev.runwayml.com/guides/pricing/',
+      checkedAt: '2026-11-14',
+      note: 'Runway charges 9.4 credits ($0.094)/s without input video, rounded up to whole credits with a 29-credit ($0.29) minimum; linear per-second quoting is omitted.',
+    },
+  },
+);
+for (const [operation, suffix] of [
+  ['text-to-video', 'text-to-video'],
+  ['image-to-video', 'image-to-video'],
+  ['reference-to-video', 'reference-to-video'],
+  ['video-edit', 'video-to-video'],
+] as const) {
+  const upstream = `kling/v4/flash/${suffix}`;
+  const priced = operation === 'text-to-video' || operation === 'image-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'kling/kling-4.0-flash',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['720p'],
+    durations: durations(3, 20),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? [
+          {
+            operation,
+            resolution: '720p',
+            unit: 'output-second' as const,
+            usdMicros: 94_000,
+            note: 'Published fal Kling v4 Flash output-second list estimate without video input.',
+          },
+        ]
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-14',
+      note: priced
+        ? 'Exact fal Kling v4 Flash 720p output-second list estimate ($0.094/s) without video input.'
+        : 'Video-reference and video-to-video operations carry input-duration billing and remain unpriced.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Kling v4 Flash queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
+for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+  const upstream = `alibaba/happy-horse/v1.1/${operation}`;
+  const priced = operation !== 'reference-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'alibaba/happy-horse-1.1',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['720p', '1080p'],
+    durations: durations(3, 15),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['720p', '1080p'].map((resolution) => ({
+          operation,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: 140_000,
+          note: 'Published fal HappyHorse 1.1 output-second list estimate ($0.14/s).',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-14',
+      note: priced
+        ? 'Exact fal HappyHorse 1.1 output-second list estimate ($0.14/s across 720p and 1080p).'
+        : 'Reference-to-video remains unpriced for managed quotes.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal HappyHorse 1.1 queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 
 // Singapore ModelArk endpoints are independently qualified, separate from unqualified regional listings.
 for (const [modelId, upstream, minimumDuration, maximumDuration, resolutions, operations] of [
@@ -1074,6 +1351,158 @@ routes.push({
     '1–9 reference images, single video output, rewriting disabled. Native 480p/768p; higher tiers use upscaling. No audio stems.',
   ),
 });
+routes.push({
+  id: 'pika-undisclosed/pika-h3-flex-image-to-video',
+  modelId: 'pika/h3-flex',
+  deploymentId: 'pika-undisclosed',
+  upstreamModelId: 'pika/pika-h3-flex/image-to-video',
+  operations: ['image-to-video'],
+  resolutions: ['480p', '768p', '1080p', '2K', '4K'],
+  durations: durations(5, 15),
+  fidelity: 'unknown',
+  adapter: 'pika',
+  status: 'documented',
+  rates: ['480p', '768p', '1080p', '2K', '4K'].map((resolution, index) => ({
+    operation: 'image-to-video' as const,
+    resolution,
+    unit: 'output-second' as const,
+    usdMicros: [10_000, 20_000, 35_000, 40_000, 80_000][index]!,
+  })),
+  source: source(
+    'https://dev.pika.art/models/pika/pika-h3-flex/image-to-video/api',
+    'Explicit Pika H3 Flex image-to-video schema checked; not live-verified.',
+  ),
+  pricingSource: {
+    url: 'https://dev.pika.art/models/pika/pika-h3-flex/image-to-video/pricing',
+    checkedAt: '2026-11-14',
+    note: 'Single video output with rewriting disabled and no audio stems; above 768p uses upscaling.',
+  },
+});
+route(
+  'google/gemini-omni-1.2-flash',
+  'google-undisclosed',
+  'gemini-omni-1.2-flash',
+  'https://aistudio.google.com/docs/models/gemini-omni-flash',
+  videoOps,
+  ['360p', '720p', '1080p', '4K'],
+  durations(3, 15),
+  { adapter: 'google' },
+);
+for (const [operation, suffix, allowedDurations] of [
+  ['text-to-video', 'text-to-video', durations(3, 15)],
+  ['image-to-video', 'image-to-video', durations(3, 15)],
+  ['reference-to-video', 'reference-to-video', durations(3, 15)],
+  ['video-edit', 'edit', [] as number[]],
+  ['video-extend', 'extend', durations(3, 10)],
+] as const) {
+  const upstream = `google/gemini-omni-flash/v1.2/${suffix}`;
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'google/gemini-omni-1.2-flash',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['360p', '720p', '1080p', '4K'],
+    durations: [...allowedDurations],
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-14',
+      note:
+        operation === 'text-to-video'
+          ? 'Output-second rates ($0.0273/$0.0819/$0.1229/$0.2457 per second across 360p/720p/1080p/4K) plus $1.50/1M input tokens; quoted via bounded token reservation.'
+          : 'Media input token charges and source-derived duration billing remain unpriced for managed quotes.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal Gemini Omni Flash v1.2 queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
+route(
+  'google/gemini-omni-1.2-flash',
+  'runway-undisclosed',
+  'gemini_omni_flash_1.2',
+  'https://docs.dev.runwayml.com/guides/models/',
+  videoOps,
+  ['360p', '720p', '1080p', '4K'],
+  durations(3, 15),
+);
+for (const [operation, suffix, allowedResolutions, allowedDurations] of [
+  ['text-to-video', 'text-to-video', ['720p', '1080p', '1440p', '2160p'], durations(5, 20)],
+  ['image-to-video', 'image-to-video', ['720p', '1080p', '1440p', '2160p'], durations(5, 20)],
+  ['video-edit', 'edit-video', [] as string[], [] as number[]],
+  ['video-extend', 'extend-video', ['720p', '1080p', '1440p', '2160p'], durations(5, 20)],
+] as const) {
+  const upstream = `blackforestlabs/flux-3/${suffix}`;
+  const priced = operation === 'text-to-video' || operation === 'image-to-video';
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'bfl/flux-3-video',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: [...allowedResolutions],
+    durations: [...allowedDurations],
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: priced
+      ? ['720p', '1080p', '1440p', '2160p'].map((resolution, index) => ({
+          operation,
+          resolution,
+          unit: 'output-second' as const,
+          usdMicros: [170_000, 290_000, 320_000, 470_000][index]!,
+          note: 'Published fal FLUX 3 Video regular output-second list estimate.',
+        }))
+      : [],
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-14',
+      note: priced
+        ? 'Regular fal FLUX 3 Video output-second list estimate ($0.17/$0.29/$0.32/$0.47 per second across 720p/1080p/1440p/2160p) for fixed integer durations.'
+        : 'Source-derived video-edit and video-extend billing remains unpriced for managed quotes.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal FLUX 3 Video queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
+for (const operation of ['text-to-video', 'image-to-video'] as const) {
+  const upstream = `blackforestlabs/flux-3-max/${operation}`;
+  routes.push({
+    id: `fal-undisclosed/${upstream}`,
+    modelId: 'fal/flux-3-max-video',
+    deploymentId: 'fal-undisclosed',
+    upstreamModelId: upstream,
+    operations: [operation],
+    resolutions: ['720p', '1080p', '2K', '4K'],
+    durations: durations(5, 20),
+    fidelity: 'unknown',
+    adapter: 'fal',
+    status: 'documented',
+    rates: ['720p', '1080p'].map((resolution, index) => ({
+      operation,
+      resolution,
+      unit: 'output-second' as const,
+      usdMicros: [170_000, 290_000][index]!,
+      note: 'Regular fal FLUX 3 Max Video list rate ($0.17/s at 720p, $0.29/s at 1080p; excluding temporary November 8–22 promotional discounts).',
+    })),
+    pricingSource: {
+      url: `https://fal.ai/models/${upstream}`,
+      checkedAt: '2026-11-14',
+      note: 'Regular fal FLUX 3 Max Video output-second list rates at 720p and 1080p, excluding temporary promotional discounts; 2K and 4K remain unpriced.',
+    },
+    source: source(
+      `https://fal.ai/models/${upstream}/api`,
+      'Explicit fal FLUX 3 Max Video queue endpoint schema checked; not live-verified.',
+    ),
+  });
+}
 route(
   'google/gemini-omni-1.1-flash',
   'google-undisclosed',
@@ -1286,7 +1715,7 @@ for (const [operation, suffix, minDuration, maxDuration] of [
 }
 
 const imageOps: Operation[] = ['text-to-image', 'image-edit'];
-for (const suffix of ['2.5-sunburst', '2.5-flare', '2']) {
+for (const suffix of ['2.6-sunburst', '2.6-flare', '2.5-sunburst', '2.5-flare', '2']) {
   const id = `gpt-image-${suffix}`;
   route(
     `openai/${id}`,
@@ -1309,6 +1738,51 @@ route(
   [],
   { adapter: 'google' },
 );
+route(
+  'google/nano-banana-pro',
+  'google-undisclosed',
+  'gemini-3-pro-image',
+  'https://aistudio.google.com/docs/image-generation',
+  imageOps,
+  ['1K', '2K', '4K'],
+  [],
+  { adapter: 'google' },
+);
+route(
+  'google/nano-banana-2',
+  'google-undisclosed',
+  'gemini-3.1-flash-image',
+  'https://aistudio.google.com/docs/image-generation',
+  imageOps,
+  ['0.5K', '1K', '2K', '4K'],
+  [],
+  { adapter: 'google' },
+);
+route(
+  'google/nano-banana-2-lite',
+  'google-undisclosed',
+  'gemini-3.1-flash-lite-image',
+  'https://aistudio.google.com/docs/image-generation',
+  imageOps,
+  ['1K'],
+  [],
+  { adapter: 'google' },
+);
+for (const [modelId, upstream] of [
+  ['minimax/h3-image', 'MiniMax-H3-Image'],
+  ['minimax/h3-image-highspeed', 'MiniMax-H3-Image-Highspeed'],
+] as const) {
+  route(
+    modelId,
+    'minimax-undisclosed',
+    upstream,
+    'https://platform.minimax.io/docs/api-reference/image-generation-h3-generations',
+    imageOps,
+    ['1K', '2K', '4K'],
+    [],
+    { adapter: 'minimax' },
+  );
+}
 route(
   'xai/grok-imagine-image-2.0',
   'xai-undisclosed',
@@ -1450,6 +1924,14 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
     'Exact fal Seedream v4.5 text-to-image list tariff ($0.04 per image).',
   ],
   ['bytedance/seedream-4.0', 'fal-ai/bytedance/seedream/v4', ['1K', '2K', '4K'], null, null],
+  ['openai/gpt-image-2.6-flare', 'openai/gpt-image-2.6/flare', ['1K', '2K', '4K'], null, null],
+  [
+    'openai/gpt-image-2.6-sunburst',
+    'openai/gpt-image-2.6/sunburst',
+    ['1K', '2K', '4K'],
+    null,
+    null,
+  ],
   ['openai/gpt-image-2.5-flare', 'openai/gpt-image-2.5/flare', ['1K', '2K', '4K'], null, null],
   [
     'openai/gpt-image-2.5-sunburst',
@@ -1460,6 +1942,8 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
   ],
   ['openai/gpt-image-2', 'openai/gpt-image-2', ['1K', '2K', '4K'], null, null],
   ['google/nano-banana-2.1', 'google/nano-banana-2.1', ['1K', '2K', '4K'], null, null],
+  ['minimax/h3-image', 'minimax/h3-image', ['1K', '2K', '4K'], null, null],
+  ['minimax/h3-image-highspeed', 'minimax/h3-image/highspeed', ['1K', '2K', '4K'], null, null],
   [
     'xai/grok-imagine-image-2.0',
     'xai/grok-imagine-image/v2.0',
@@ -1509,6 +1993,100 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
       source: source(
         `https://fal.ai/models/${upstream}/api`,
         'Exact reseller endpoint and schema checked. Single-image output; references preserve order. Actual account access and settled charges remain reconciled separately.',
+      ),
+    });
+  }
+}
+for (const [modelId, prefix, resolutions, oneKPrice] of [
+  ['google/nano-banana-pro', 'fal-ai/nano-banana-pro', ['1K', '2K', '4K'], 150_000],
+  ['google/nano-banana-2', 'fal-ai/nano-banana-2', ['0.5K', '1K', '2K', '4K'], 80_000],
+] as const) {
+  for (const operation of ['text-to-image', 'image-edit'] as const) {
+    const upstream = operation === 'image-edit' ? `${prefix}/edit` : prefix;
+    const priced = operation === 'text-to-image';
+    routes.push({
+      id: `fal-undisclosed/${upstream}`,
+      modelId,
+      deploymentId: 'fal-undisclosed',
+      upstreamModelId: upstream,
+      operations: [operation],
+      resolutions: [...resolutions],
+      durations: [],
+      fidelity: 'unknown',
+      adapter: 'fal',
+      status: 'documented',
+      rates: priced
+        ? [
+            {
+              operation: 'text-to-image' as const,
+              resolution: '1K',
+              unit: 'image' as const,
+              usdMicros: oneKPrice,
+              note: 'Published fal 1K base output-image list estimate without search grounding.',
+            },
+          ]
+        : [],
+      pricingSource: priced
+        ? {
+            url: `https://fal.ai/models/${upstream}`,
+            checkedAt: '2026-11-14',
+            note: `Exact fal 1K text-to-image list tariff ($${(oneKPrice / 1_000_000).toFixed(2)} per image without search grounding); other resolution tiers and edits remain unpriced.`,
+          }
+        : unknownPrice(`https://fal.ai/models/${upstream}`),
+      source: source(
+        `https://fal.ai/models/${upstream}/api`,
+        'Explicit fal Nano Banana queue endpoint schema checked; not live-verified.',
+      ),
+    });
+  }
+}
+routes.push({
+  id: 'fal-undisclosed/google/nano-banana-2-lite',
+  modelId: 'google/nano-banana-2-lite',
+  deploymentId: 'fal-undisclosed',
+  upstreamModelId: 'google/nano-banana-2-lite',
+  operations: ['text-to-image'],
+  resolutions: ['1K'],
+  durations: [],
+  fidelity: 'unknown',
+  adapter: 'fal',
+  status: 'documented',
+  rates: [],
+  pricingSource: unknownPrice('https://fal.ai/models/google/nano-banana-2-lite'),
+  source: source(
+    'https://fal.ai/models/google/nano-banana-2-lite/api',
+    'Explicit fal Nano Banana 2 Lite text-to-image queue endpoint schema checked; not live-verified.',
+  ),
+});
+for (const [modelId, prefix, resolutions] of [
+  ['bfl/flux-3-image', 'blackforestlabs/flux-3', ['768sq', '1K', '1.5K', '2K', '4K']],
+  ['bfl/flux-3-klein', 'blackforestlabs/flux-3/klein', ['1K', '2K', '4K']],
+] as const) {
+  for (const [operation, suffix] of [
+    ['text-to-image', 'text-to-image'],
+    ['image-edit', 'edit-image'],
+  ] as const) {
+    const upstream = `${prefix}/${suffix}`;
+    routes.push({
+      id: `fal-undisclosed/${upstream}`,
+      modelId,
+      deploymentId: 'fal-undisclosed',
+      upstreamModelId: upstream,
+      operations: [operation],
+      resolutions: [...resolutions],
+      durations: [],
+      fidelity: 'unknown',
+      adapter: 'fal',
+      status: 'documented',
+      rates: [],
+      pricingSource: {
+        url: `https://fal.ai/models/${upstream}`,
+        checkedAt: '2026-11-14',
+        note: 'Megapixel-billed output depends on exact output dimensions; flat per-tier fees are not assumed.',
+      },
+      source: source(
+        `https://fal.ai/models/${upstream}/api`,
+        'Explicit fal FLUX 3 queue endpoint schema checked; not live-verified.',
       ),
     });
   }
