@@ -238,6 +238,7 @@ defs['bytedance/seedance-1.0-pro-fast']!.capabilities.frames.last = false;
 video('kling/kling-4.0', {
   sources: [
     'https://dev.runwayml.com/learn/kling-4-0-api',
+    'https://fal.ai/models/kling/v4/text-to-video/api',
     'https://runware.ai/docs/models/klingai-video-4-0',
   ],
   resolutions: ['720p', '1080p'],
@@ -248,12 +249,52 @@ video('kling/kling-4.0', {
   keyframes: 10,
   mix: true,
   audio: 'always-on',
+  operations: [...videoOps, 'video-edit'],
   extra: ['keyframes', 'elements', 'shots'],
   promptMax: 26000,
   notices: [
     'Native detailed payload remains unresolved; qualified wrappers are independent contracts. Keyframes and reference images can share one combined image budget. Timed placement is not inferred from ordered middle frames. Native 4K availability is not assumed from consumer marketing.',
   ],
 });
+video('kling/kling-4.0-flash', {
+  sources: [
+    'https://fal.ai/models/kling/v4/flash/text-to-video/api',
+    'https://docs.dev.runwayml.com/guides/pricing/',
+  ],
+  resolutions: ['720p'],
+  defaultResolution: '720p',
+  minimum: 3,
+  maximum: 20,
+  referenceMaximum: { image: 10, video: 5 },
+  totalMaximum: 15,
+  mix: true,
+  audio: 'always-on',
+  operations: [...videoOps, 'video-edit'],
+  extra: ['elements'],
+  promptMax: 26000,
+  aspectRatios: ['auto', 'source', '21:9', '16:9', '1:1', '9:16'],
+  notices: [
+    'Kling 4.0 Flash is a distinct 720p 3–20s sibling variant with native audio; end-frame and middle-keyframe controls are not exposed.',
+  ],
+});
+defs['kling/kling-4.0-flash']!.capabilities.frames.last = false;
+video('alibaba/happy-horse-1.1', {
+  sources: [
+    'https://fal.ai/models/alibaba/happy-horse/v1.1/text-to-video/api',
+    'https://fal.ai/models/alibaba/happy-horse/v1.1/reference-to-video/api',
+  ],
+  resolutions: ['720p', '1080p'],
+  defaultResolution: '1080p',
+  minimum: 3,
+  maximum: 15,
+  referenceMaximum: { image: 9 },
+  audio: 'always-on',
+  aspectRatios: ['source', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21', '5:4', '4:5'],
+  notices: [
+    'HappyHorse 1.1 generates 720p/1080p video with native synchronized audio and up to nine reference images; end-frame interpolation is not exposed.',
+  ],
+});
+defs['alibaba/happy-horse-1.1']!.capabilities.frames.last = false;
 for (const id of ['alibaba/wan-3.0', 'alibaba/wan-3.0-prime'])
   video(id, {
     sources: [
@@ -393,6 +434,65 @@ defs['google/gemini-omni-1.1-flash']!.capabilities.references.types = ['image', 
 defs['google/gemini-omni-1.1-flash']!.commonArguments = videoCommon.filter(
   (field) => !['negativePrompt', 'seed'].includes(field),
 );
+video('google/gemini-omni-1.2-flash', {
+  sources: [
+    'https://aistudio.google.com/docs/models/gemini-omni-flash',
+    'https://aistudio.google.com/api-reference/interactions-api',
+    'https://fal.ai/models/google/gemini-omni-flash/v1.2/text-to-video/api',
+  ],
+  resolutions: ['360p', '720p', '1080p', '4K'],
+  minimum: 3,
+  maximum: 15,
+  referenceMaximum: { image: 10, video: 3 },
+  mix: true,
+  operations: [...videoOps, 'video-edit', 'video-extend'],
+  audio: 'always-on',
+  verification: 'model-guided-partial',
+  aspectRatios: ['16:9', '9:16', 'source'],
+  notices: [
+    'Gemini Omni 1.2 Flash expands generation duration up to 15 seconds while capping video extension and end-frame interpolation at 10 seconds per call. Stateful previousJobId continuation remains pinned to the originating deployment and model version.',
+  ],
+});
+defs['google/gemini-omni-1.2-flash']!.commonArguments = videoCommon.filter(
+  (field) => !['negativePrompt', 'seed'].includes(field),
+);
+video('bfl/flux-3-video', {
+  sources: [
+    'https://docs.bfl.ai/flux_3/flux3_video',
+    'https://fal.ai/models/blackforestlabs/flux-3/text-to-video/api',
+  ],
+  resolutions: ['720p', '1080p', '1440p', '2160p'],
+  defaultResolution: '720p',
+  minimum: 5,
+  maximum: 20,
+  auto: true,
+  referenceMaximum: {},
+  operations: ['text-to-video', 'image-to-video', 'video-edit', 'video-extend'],
+  audio: 'switchable',
+  aspectRatios: ['auto', 'source', '21:9', '2:1', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  notices: [
+    'FLUX 3 Video supports 5–20s (or auto) 720p–2160p generation with switchable audio; video editing preserves source clip duration and dimensions.',
+  ],
+});
+defs['bfl/flux-3-video']!.capabilities.frames.last = false;
+video('fal/flux-3-max-video', {
+  sources: [
+    'https://fal.ai/models/blackforestlabs/flux-3-max/text-to-video/api',
+    'https://fal.ai/models/blackforestlabs/flux-3-max/image-to-video/api',
+  ],
+  resolutions: ['720p', '1080p', '2K', '4K'],
+  defaultResolution: '720p',
+  minimum: 5,
+  maximum: 20,
+  referenceMaximum: {},
+  operations: ['text-to-video', 'image-to-video'],
+  audio: 'switchable',
+  extra: ['complexity'],
+  aspectRatios: ['auto', 'source', '21:9', '2:1', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  notices: [
+    'FLUX 3 Max Video is a post-trained fal Research derivative distinct from base FLUX 3 Video, exposing low/high reasoning complexity and optional end-frame conditioning.',
+  ],
+});
 video('xai/grok-imagine-video-1.5', {
   sources: [
     'https://docs.x.ai/developers/model-capabilities/video/generation',
@@ -441,6 +541,23 @@ video('xai/grok-imagine-video', {
   ],
 });
 const openai = 'https://developers.openai.com/api/reference/resources/images/methods/generate';
+for (const id of ['openai/gpt-image-2.6-sunburst', 'openai/gpt-image-2.6-flare'])
+  image(id, {
+    sources: [
+      openai,
+      'https://developers.openai.com/api/reference/resources/images/methods/edit',
+      `https://developers.openai.com/api/docs/models/${id.slice('openai/'.length)}`,
+    ],
+    maxReferences: 16,
+    countMaximum: 10,
+    mask: true,
+    quality: ['auto', 'low', 'medium', 'high', 'xhigh', 'max'],
+    extra: ['background', 'complexity'],
+    promptMax: 32000,
+    notices: [
+      'GPT Image 2.6 Sunburst and Flare remain distinct variants with dedicated 2.6 output-token multipliers at low/medium quality and explicit complexity reasoning controls. Raster PNG/JPEG/WebP outputs are qualified.',
+    ],
+  });
 for (const id of ['openai/gpt-image-2.5-sunburst', 'openai/gpt-image-2.5-flare'])
   image(id, {
     sources: [openai, 'https://developers.openai.com/api/reference/resources/images/methods/edit'],
@@ -477,6 +594,101 @@ image('google/nano-banana-2.1', {
   extra: ['thinkingLevel', 'systemPrompt', 'grounding'],
   notices: [
     'Video/PDF context is model/route-specific. Native model thinking/grounding is not a generic provider URL option. A transparent prompt is not a native background-setting guarantee.',
+  ],
+});
+image('google/nano-banana-pro', {
+  sources: [
+    'https://aistudio.google.com/docs/image-generation',
+    'https://fal.ai/models/fal-ai/nano-banana-pro/edit/api',
+  ],
+  resolutions: ['1K', '2K', '4K'],
+  maxReferences: 14,
+  types: ['image', 'document'],
+  countMaximum: 4,
+  extra: ['thinkingLevel', 'systemPrompt', 'grounding'],
+  promptMax: 50000,
+  notices: [
+    'Gemini 3 Pro Image (Nano Banana Pro) supports 1K, 2K and 4K generation and editing with high reasoning thinkingLevel.',
+  ],
+});
+image('google/nano-banana-2', {
+  sources: [
+    'https://aistudio.google.com/docs/image-generation',
+    'https://fal.ai/models/fal-ai/nano-banana-2/edit/api',
+  ],
+  resolutions: ['0.5K', '1K', '2K', '4K'],
+  defaultResolution: '1K',
+  maxReferences: 14,
+  types: ['image', 'video', 'document'],
+  countMaximum: 4,
+  extra: ['thinkingLevel', 'systemPrompt', 'grounding'],
+  promptMax: 50000,
+  notices: [
+    'Gemini 3.1 Flash Image (Nano Banana 2) supports 0.5K–4K generation and editing with minimal or high thinkingLevel.',
+  ],
+});
+image('google/nano-banana-2-lite', {
+  sources: [
+    'https://aistudio.google.com/docs/image-generation',
+    'https://fal.ai/models/google/nano-banana-2-lite/api',
+  ],
+  resolutions: ['1K'],
+  defaultResolution: '1K',
+  maxReferences: 14,
+  types: ['image'],
+  countMaximum: 4,
+  extra: ['thinkingLevel', 'systemPrompt'],
+  promptMax: 50000,
+  notices: [
+    'Gemini 3.1 Flash Lite Image (Nano Banana 2 Lite) targets 1K output; Google Direct supports text-to-image and image editing, while fal exposes text-to-image.',
+  ],
+});
+for (const [id, endpoint] of [
+  ['minimax/h3-image', 'minimax/h3-image'],
+  ['minimax/h3-image-highspeed', 'minimax/h3-image/highspeed'],
+] as const)
+  image(id, {
+    sources: [
+      'https://platform.minimax.io/docs/api-reference/image-generation-h3-generations',
+      'https://platform.minimax.io/docs/api-reference/image-generation-h3-edits',
+      `https://fal.ai/models/${endpoint}/text-to-image/api`,
+    ],
+    resolutions: ['1K', '2K', '4K'],
+    defaultResolution: '2K',
+    maxReferences: 16,
+    countMaximum: 10,
+    extra: ['promptExpansion'],
+    promptMax: 32000,
+    notices: [
+      'MiniMax H3 Image and Highspeed are distinct variants supporting 1K–4K tiers, custom dimensions up to 20MP, 1–10 outputs and 1–16 edit references. Prompt enhancement is configurable on text-to-image and always active on edits.',
+    ],
+  });
+image('bfl/flux-3-image', {
+  sources: [
+    'https://docs.bfl.ai/flux_3/flux3_image_generate',
+    'https://fal.ai/models/blackforestlabs/flux-3/text-to-image/api',
+  ],
+  resolutions: ['768sq', '1K', '1.5K', '2K', '4K'],
+  defaultResolution: '1K',
+  maxReferences: 10,
+  countMaximum: 1,
+  extra: ['promptExpansion'],
+  notices: [
+    'FLUX 3 Image supports 768sq–4K resolution tiers, PNG/JPEG output and up to 10 edit references.',
+  ],
+});
+image('bfl/flux-3-klein', {
+  sources: [
+    'https://docs.bfl.ai/flux_3/flux3_image_klein',
+    'https://fal.ai/models/blackforestlabs/flux-3/klein/text-to-image/api',
+  ],
+  resolutions: ['1K', '2K', '4K'],
+  defaultResolution: '1K',
+  maxReferences: 10,
+  countMaximum: 4,
+  extra: ['promptExpansion'],
+  notices: [
+    'FLUX 3 Klein is a distinct 5.6B open-weights variant supporting 1–4 outputs, custom dimensions and up to 10 edit references.',
   ],
 });
 image('xai/grok-imagine-image-2.0', {
@@ -612,9 +824,12 @@ image('fal/qwen-image-3', {
 
 for (const id of [
   'kling/kling-4.0',
+  'kling/kling-4.0-flash',
   'minimax/h3-highspeed',
   'minimax/h3-lite',
   'google/gemini-omni-1.1-flash',
+  'google/gemini-omni-1.2-flash',
+  'bfl/flux-3-video',
   'xai/grok-imagine-video-1.5',
   'xai/grok-imagine-video-1.5-lite',
   'xai/grok-imagine-video',
@@ -634,19 +849,23 @@ for (const [id, model] of Object.entries(defs))
     const qwen = id.includes('qwen');
     const gpt = id.startsWith('openai/');
     const grok = id.startsWith('xai/');
+    const minimaxImage = id.startsWith('minimax/h3-image');
     model.commonArguments = model.commonArguments.filter((field) =>
       field === 'negativePrompt'
         ? qwen
         : field === 'quality'
           ? gpt || grok
-          : field === 'seed'
-            ? qwen ||
-              id === 'google/nano-banana-2.1' ||
-              id === 'bytedance/seedream-4.5' ||
-              id === 'bytedance/seedream-4.0'
-            : field === 'outputCompression'
-              ? gpt
-              : true,
+          : field === 'size'
+            ? id !== 'bfl/flux-3-image'
+            : field === 'seed'
+              ? qwen ||
+                id.startsWith('google/nano-banana-') ||
+                id === 'bfl/flux-3-klein' ||
+                id === 'bytedance/seedream-4.5' ||
+                id === 'bytedance/seedream-4.0'
+              : field === 'outputCompression'
+                ? gpt || minimaxImage
+                : true,
     );
   }
 

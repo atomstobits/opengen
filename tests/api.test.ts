@@ -25,8 +25,11 @@ describe('public catalog and quote API', () => {
     expect(response.statusCode).toBe(200);
     const entry = response.json();
     expect(entry.company.id).toBe('minimax');
-    expect(entry.series.map((series: { id: string }) => series.id)).toEqual(['minimax/h3']);
-    expect(entry.models).toHaveLength(6);
+    expect(entry.series.map((series: { id: string }) => series.id)).toEqual([
+      'minimax/h3',
+      'minimax/h3-image',
+    ]);
+    expect(entry.models).toHaveLength(8);
     expect(
       entry.models.find((model: { id: string }) => model.id === 'minimax/h3-max'),
     ).toMatchObject({
@@ -53,7 +56,7 @@ describe('public catalog and quote API', () => {
   it('lists one H3 Max variant while retaining both independent provider routes', async () => {
     const app = await setup();
     const models = (await app.inject({ url: '/v1/models' })).json().data;
-    expect(models).toHaveLength(35);
+    expect(models).toHaveLength(49);
     expect(models.filter((model: { id: string }) => model.id === 'minimax/h3-max')).toHaveLength(1);
     expect(models.some((model: { id: string }) => model.id === 'fal/h3-max')).toBe(false);
     const routes = (await app.inject({ url: '/v1/routes?modelId=minimax%2Fh3-max' })).json().data;

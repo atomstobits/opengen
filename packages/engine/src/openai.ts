@@ -15,7 +15,13 @@ import { detectedMediaType } from './output.js';
 import { captureProviderResult, type CaptureProviderOutputs } from './adapter-output.js';
 import type { DeliverySource } from './delivery.js';
 
-const models = new Set(['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare']);
+const models = new Set([
+  'gpt-image-2',
+  'gpt-image-2.5-sunburst',
+  'gpt-image-2.5-flare',
+  'gpt-image-2.6-sunburst',
+  'gpt-image-2.6-flare',
+]);
 const NANO_PER_MICRO = 1_000n;
 
 function safeNonnegativeInt(value: unknown): number | null {
@@ -27,6 +33,7 @@ function safeNonnegativeInt(value: unknown): number | null {
  * $8/1M image input, $30/1M image output). Requires complete conserved token counts.
  */
 export function observedOpenAICostMicros(body: Record<string, unknown>): number | null {
+  if (body.svg_usage !== undefined && body.svg_usage !== null) return null;
   if (!body.usage || typeof body.usage !== 'object' || Array.isArray(body.usage)) return null;
   const usage = providerObject(body.usage);
   const inputTokens = safeNonnegativeInt(usage.input_tokens);
@@ -146,7 +153,7 @@ export function createOpenAIAdapter(
 ): ProviderAdapter {
   const env = options.env ?? process.env;
   const request = options.fetch ?? fetch;
-  const fields: (keyof GenerationArguments)[] = [
+  const fields = (context: Omit<AdapterContext, 'jobId'>): (keyof GenerationArguments)[] => [
     'prompt',
     'resolution',
     'size',
@@ -158,13 +165,14 @@ export function createOpenAIAdapter(
     'outputFormat',
     'outputCompression',
     'background',
+    ...(context.route.upstreamModelId.startsWith('gpt-image-2.6-') ? ['complexity' as const] : []),
   ];
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     if (context.deployment.providerId !== 'openai' || !models.has(context.route.upstreamModelId))
       return 'Unsupported OpenAI image deployment/model.';
     if (!['text-to-image', 'image-edit'].includes(context.input.operation))
       return 'Unsupported OpenAI image operation.';
-    const issue = adapterInputIssue(context, fields);
+    const issue = adapterInputIssue(context, fields(context));
     if (issue) return issue;
     const args = context.input.input,
       typeIssue = referenceTypeIssue(context.input);
@@ -180,6 +188,8 @@ export function createOpenAIAdapter(
         ? ['auto', 'low', 'medium', 'high']
         : ['auto', 'low', 'medium', 'high', 'xhigh', 'max'];
     if (args.quality && !qualities.includes(args.quality)) return 'Unsupported model quality.';
+    if (args.complexity !== undefined && !['low', 'medium', 'high'].includes(args.complexity))
+      return 'Unsupported GPT Image 2.6 complexity.';
     if (
       args.count !== undefined &&
       (!Number.isInteger(args.count) || args.count < 1 || args.count > 10)
@@ -199,7 +209,7 @@ export function createOpenAIAdapter(
   return {
     id: 'openai',
     supportedOperations: ['text-to-image', 'image-edit'],
-    inputFields: () => fields,
+    inputFields: fields,
     preflight,
     isConfigured: (route, deployment) =>
       route.adapter === 'openai' &&
@@ -223,6 +233,9 @@ export function createOpenAIAdapter(
           size: openAIArgumentSize(context.input.input),
           quality: context.input.input.quality ?? 'medium',
           output_format: context.input.input.outputFormat ?? 'png',
+          ...(context.input.input.complexity === undefined
+            ? {}
+            : { complexity: context.input.input.complexity }),
           ...(context.input.input.background === undefined
             ? {}
             : { background: context.input.input.background }),

@@ -69,7 +69,7 @@ describe('actionable, compact catalog discovery', () => {
           expect(result.candidates.every((candidate) => candidate.executable === false)).toBe(true);
         }
       }
-    expect(count).toBe(92);
+    expect(count).toBe(129);
   });
   it('preserves REST/local-fallback/SDK/MCP filter and schema-example parity', async () => {
     const app = await fixture();

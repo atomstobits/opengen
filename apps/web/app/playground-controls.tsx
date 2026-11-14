@@ -32,6 +32,7 @@ const labels: Record<ArgumentName, string> = {
   aspectRatio: 'Aspect ratio',
   count: 'Output count',
   quality: 'Quality',
+  complexity: 'Reasoning complexity',
   outputFormat: 'Output format',
   outputCompression: 'Output compression',
   background: 'Background',

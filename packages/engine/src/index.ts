@@ -1489,7 +1489,8 @@ export class Engine {
           'Continuation requires a completed generation in this workspace with a provider interaction ID.',
         );
       if (
-        input.modelId !== 'google/gemini-omni-1.1-flash' ||
+        (input.modelId !== 'google/gemini-omni-1.1-flash' &&
+          input.modelId !== 'google/gemini-omni-1.2-flash') ||
         previous.input.modelId !== input.modelId
       )
         throw new EngineError(

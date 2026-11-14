@@ -59,6 +59,13 @@ export const companies: Company[] = [
     description:
       'Alibaba’s Qwen model brand, including published image checkpoints and distinct hosted offerings.',
   },
+  {
+    id: 'bfl',
+    name: 'Black Forest Labs',
+    website: 'https://bfl.ai/',
+    description:
+      'The original publisher of the FLUX 3 image, Klein open-weights and video model series.',
+  },
 ];
 
 export const modelSeries: ModelSeries[] = [
@@ -92,8 +99,9 @@ export const modelSeries: ModelSeries[] = [
     id: 'kling/kling-4.0',
     companyId: 'kling',
     name: 'Kling 4.0',
-    description: 'Video generation and editing, compared across documented serving routes.',
-    modelIds: ['kling/kling-4.0'],
+    description:
+      'Kling 4.0 and Kling 4.0 Flash video generation and editing variants across documented serving routes.',
+    modelIds: ['kling/kling-4.0', 'kling/kling-4.0-flash'],
   },
   {
     id: 'alibaba/wan-3.0',
@@ -102,6 +110,14 @@ export const modelSeries: ModelSeries[] = [
     description:
       'Standard and Prime variants, each with independently listed regional provider routes.',
     modelIds: ['alibaba/wan-3.0', 'alibaba/wan-3.0-prime'],
+  },
+  {
+    id: 'alibaba/happy-horse-1.1',
+    companyId: 'alibaba',
+    name: 'HappyHorse 1.1',
+    description:
+      'Alibaba’s HappyHorse 1.1 synchronized audio-video generation and multi-image reference series.',
+    modelIds: ['alibaba/happy-horse-1.1'],
   },
   {
     id: 'minimax/h3',
@@ -119,12 +135,44 @@ export const modelSeries: ModelSeries[] = [
     ],
   },
   {
+    id: 'minimax/h3-image',
+    companyId: 'minimax',
+    name: 'MiniMax H3 Image',
+    description:
+      'MiniMax’s H3 Image and H3 Image Highspeed generation and multi-reference editing variants across MiniMax and fal.',
+    modelIds: ['minimax/h3-image', 'minimax/h3-image-highspeed'],
+  },
+  {
+    id: 'google/gemini-omni-1.2-flash',
+    companyId: 'google',
+    name: 'Gemini Omni 1.2 Flash',
+    description:
+      'Google’s flagship 15-second conversational video generation and editing release across Google AI Studio, fal and Runway.',
+    modelIds: ['google/gemini-omni-1.2-flash'],
+  },
+  {
     id: 'google/gemini-omni-1.1-flash',
     companyId: 'google',
     name: 'Gemini Omni 1.1 Flash',
     description:
-      'The current stable Gemini Omni Flash release and its documented serving providers.',
+      'Previous Gemini Omni Flash release; Google auto-routes 1.1 requests to 1.2 effective December 3, 2026.',
     modelIds: ['google/gemini-omni-1.1-flash'],
+  },
+  {
+    id: 'bfl/flux-3-video',
+    companyId: 'bfl',
+    name: 'FLUX 3 Video',
+    description:
+      'Black Forest Labs’ FLUX 3 Video alongside fal Research’s post-trained FLUX 3 Max Video derivative.',
+    modelIds: ['bfl/flux-3-video', 'fal/flux-3-max-video'],
+  },
+  {
+    id: 'bfl/flux-3-image',
+    companyId: 'bfl',
+    name: 'FLUX 3 Image',
+    description:
+      'Black Forest Labs’ flagship FLUX 3 Image and distinct 5.6B open-weights FLUX 3 Klein variants.',
+    modelIds: ['bfl/flux-3-image', 'bfl/flux-3-klein'],
   },
   {
     id: 'xai/grok-imagine-video',
@@ -137,6 +185,14 @@ export const modelSeries: ModelSeries[] = [
       'xai/grok-imagine-video-1.5-lite',
       'xai/grok-imagine-video',
     ],
+  },
+  {
+    id: 'openai/gpt-image-2.6',
+    companyId: 'openai',
+    name: 'GPT Image 2.6',
+    description:
+      'OpenAI’s latest GPT Image 2.6 Sunburst and Flare variants with explicit reasoning complexity controls.',
+    modelIds: ['openai/gpt-image-2.6-sunburst', 'openai/gpt-image-2.6-flare'],
   },
   {
     id: 'openai/gpt-image-2.5',
@@ -158,6 +214,29 @@ export const modelSeries: ModelSeries[] = [
     name: 'Nano Banana 2.1',
     description: 'Google’s Nano Banana 2.1 image generation and editing release.',
     modelIds: ['google/nano-banana-2.1'],
+  },
+  {
+    id: 'google/nano-banana-pro',
+    companyId: 'google',
+    name: 'Nano Banana Pro',
+    description: 'Google’s Gemini 3 Pro Image reasoning tier across Google AI Studio and fal.',
+    modelIds: ['google/nano-banana-pro'],
+  },
+  {
+    id: 'google/nano-banana-2',
+    companyId: 'google',
+    name: 'Nano Banana 2',
+    description:
+      'Google’s Gemini 3.1 Flash Image 0.5K–4K generation and editing release across Google AI Studio and fal.',
+    modelIds: ['google/nano-banana-2'],
+  },
+  {
+    id: 'google/nano-banana-2-lite',
+    companyId: 'google',
+    name: 'Nano Banana 2 Lite',
+    description:
+      'Google’s ultra-low-latency Gemini 3.1 Flash Lite Image 1K specialist across Google AI Studio and fal.',
+    modelIds: ['google/nano-banana-2-lite'],
   },
   {
     id: 'xai/grok-imagine-image-2.0',

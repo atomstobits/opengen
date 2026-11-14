@@ -58,24 +58,46 @@ function parseGoogleInteractionTokens(
   };
 }
 
-/** Nano Banana 2.1 standard rates per 1M tokens: $1.50 input, $7.50 text/thinking, $30 image output. */
-export function observedGoogleImageCostMicros(body: Record<string, unknown>): number | null {
+const googleImageTokenNanoUsd: Record<string, readonly [bigint, bigint, bigint]> = {
+  'gemini-nano-banana-2.1': [1_500n, 7_500n, 30_000n],
+  'gemini-3-pro-image': [2_000n, 12_000n, 120_000n],
+  'gemini-3.1-flash-image': [500n, 3_000n, 60_000n],
+  'gemini-3.1-flash-lite-image': [250n, 1_500n, 30_000n],
+};
+
+const googleVideoOutputNanoUsd: Record<string, bigint> = {
+  'gemini-omni-1.1-flash': 17_500n,
+  'gemini-omni-1.2-flash': 12_000n,
+};
+
+/** Exact Gemini Developer API standard image token rates per model checkpoint. */
+export function observedGoogleImageCostMicros(
+  body: Record<string, unknown>,
+  upstreamModelId = 'gemini-nano-banana-2.1',
+): number | null {
+  const rates = googleImageTokenNanoUsd[upstreamModelId];
+  if (!rates) return null;
   const parsed = parseGoogleInteractionTokens(body, 'image');
   if (!parsed) return null;
   const nanoUsd =
-    BigInt(parsed.inputTokens) * 1_500n +
-    BigInt(parsed.textAndThoughtTokens) * 7_500n +
-    BigInt(parsed.mediaOutputTokens) * 30_000n;
+    BigInt(parsed.inputTokens) * rates[0] +
+    BigInt(parsed.textAndThoughtTokens) * rates[1] +
+    BigInt(parsed.mediaOutputTokens) * rates[2];
   return nanoToMicrosCeil(nanoUsd);
 }
 
-/** Gemini Omni 1.1 Flash standard rates per 1M tokens: $1.50 input, $9 text/thinking, $17.50 video output. */
-export function observedGoogleVideoCostMicros(body: Record<string, unknown>): number | null {
+/** Gemini Omni 1.1 ($17.50/1M video out) and 1.2 ($12/1M video out) standard token rates. */
+export function observedGoogleVideoCostMicros(
+  body: Record<string, unknown>,
+  upstreamModelId = 'gemini-omni-1.1-flash',
+): number | null {
+  const videoNano = googleVideoOutputNanoUsd[upstreamModelId];
+  if (videoNano === undefined) return null;
   const parsed = parseGoogleInteractionTokens(body, 'video');
   if (!parsed) return null;
   const nanoUsd =
     BigInt(parsed.inputTokens) * 1_500n +
     BigInt(parsed.textAndThoughtTokens) * 9_000n +
-    BigInt(parsed.mediaOutputTokens) * 17_500n;
+    BigInt(parsed.mediaOutputTokens) * videoNano;
   return nanoToMicrosCeil(nanoUsd);
 }

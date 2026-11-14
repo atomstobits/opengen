@@ -101,6 +101,7 @@ export const generationArgumentSchema = z
     outputFormat: z.enum(['png', 'jpeg', 'webp', 'mp4']).optional(),
     outputCompression: z.number().int().min(0).max(100).optional(),
     background: z.enum(['auto', 'opaque', 'transparent']).optional(),
+    complexity: z.enum(['low', 'medium', 'high']).optional(),
     seed: z.number().int().min(-1).max(Number.MAX_SAFE_INTEGER).optional(),
     audio: z.boolean().optional(),
     draft: z.boolean().optional(),
@@ -193,6 +194,9 @@ export function getGenerationDefinition(
   modelId = canonicalModelId(modelId);
   return operationDefinition(modelId, operation, modelDefinitions[modelId]);
 }
+function isGoogleOmni(modelId: string): boolean {
+  return modelId === 'google/gemini-omni-1.1-flash' || modelId === 'google/gemini-omni-1.2-flash';
+}
 function operationDefinition(
   modelId: string,
   operation: Operation,
@@ -202,14 +206,14 @@ function operationDefinition(
   const video = model.modality === 'video';
   const sourceRatioQualified =
     ['image-to-video', 'video-edit', 'video-extend'].includes(operation) &&
-    (modelId !== 'google/gemini-omni-1.1-flash' || operation === 'video-extend');
+    (!isGoogleOmni(modelId) || operation === 'video-extend');
   const capabilities = structuredClone(model.capabilities);
   if (modelId === 'minimax/h3-max' && operation !== 'reference-to-video') {
     capabilities.frameReferenceMix = false;
     capabilities.frames.keyframesMaximum = 0;
     capabilities.frames.timed = false;
   }
-  if (modelId === 'google/gemini-omni-1.1-flash' && !sourceRatioQualified)
+  if (isGoogleOmni(modelId) && !sourceRatioQualified)
     capabilities.aspectRatios = capabilities.aspectRatios.filter((ratio) => ratio !== 'source');
   const forbidden = new Set<string>(
     operation === 'text-to-image' || operation === 'text-to-video'
@@ -226,7 +230,17 @@ function operationDefinition(
             ? ['firstFrame', 'lastFrame', 'sourceVideo']
             : ['firstFrame', 'lastFrame', 'mask'],
   );
-  if (modelId === 'xai/grok-imagine-video' && operation === 'video-edit') forbidden.add('duration');
+  if (!capabilities.references.types.length) forbidden.add('references');
+  if (
+    (modelId === 'xai/grok-imagine-video' || modelId === 'bfl/flux-3-video') &&
+    operation === 'video-edit'
+  )
+    forbidden.add('duration');
+  if (modelId === 'bfl/flux-3-video' && operation === 'video-edit') {
+    forbidden.add('resolution');
+    forbidden.add('aspectRatio');
+    forbidden.add('audio');
+  }
   if (modelId === 'xai/grok-imagine-video' && operation === 'video-extend')
     forbidden.add('resolution');
   const commonArguments = model.commonArguments.filter((field) => !forbidden.has(field));
@@ -236,10 +250,16 @@ function operationDefinition(
         ? operation === 'reference-to-video' && capabilities.frames.keyframesMaximum > 0
         : operation === 'image-to-video'
       : field === 'elements'
-        ? operation === 'image-to-video' || operation === 'reference-to-video'
-        : true,
+        ? operation === 'image-to-video' ||
+          operation === 'reference-to-video' ||
+          operation === 'video-edit'
+        : field === 'shots'
+          ? operation !== 'video-edit' && operation !== 'video-extend'
+          : field === 'promptExpansion' && modelId.startsWith('minimax/h3-image')
+            ? operation === 'text-to-image'
+            : true,
   );
-  const omniVideoEdit = modelId === 'google/gemini-omni-1.1-flash' && operation === 'video-edit';
+  const omniVideoEdit = isGoogleOmni(modelId) && operation === 'video-edit';
   return {
     ...structuredClone(model),
     modelId,
@@ -247,11 +267,14 @@ function operationDefinition(
     capabilities,
     commonArguments,
     modelSpecificArguments,
-    promptRequired: ['text-to-image', 'text-to-video', 'image-edit'].includes(operation),
+    promptRequired:
+      ['text-to-image', 'text-to-video', 'image-edit'].includes(operation) ||
+      (operation === 'video-edit' &&
+        (modelId === 'bfl/flux-3-video' || modelId.startsWith('kling/kling-4.0'))),
     defaults: {
       ...(forbidden.has('resolution') ? {} : { resolution: model.defaults.resolution }),
       ...(video && !forbidden.has('duration') && !omniVideoEdit ? { duration: 5 } : {}),
-      ...(operation === 'image-edit' || omniVideoEdit
+      ...(operation === 'image-edit' || omniVideoEdit || forbidden.has('aspectRatio')
         ? {}
         : {
             aspectRatio: sourceRatioQualified ? 'source' : video ? '16:9' : '1:1',
@@ -355,7 +378,7 @@ function inputIssues(
       'aspectRatio',
       'Source aspect ratio requires source media or an owned continuation.',
     );
-  if (request.modelId === 'kling/kling-4.0') {
+  if (request.modelId.startsWith('kling/kling-4.0')) {
     const images =
       (args.firstFrame ? 1 : 0) +
       (args.lastFrame ? 1 : 0) +
@@ -370,6 +393,20 @@ function inputIssues(
         images,
       );
   }
+  if (
+    request.modelId === 'google/gemini-omni-1.2-flash' &&
+    typeof args.duration === 'number' &&
+    args.duration > 10 &&
+    (request.operation === 'video-extend' ||
+      (request.operation === 'image-to-video' && Boolean(args.lastFrame)))
+  )
+    issue(
+      'unsupported_duration',
+      'duration',
+      'Omni 1.2 video extension and end-frame interpolation support 3–10 seconds.',
+      '3–10',
+      args.duration,
+    );
   if (
     request.modelId === 'xai/grok-imagine-video-1.5' &&
     refs.some((ref) => ref.type === 'image') &&
@@ -585,6 +622,65 @@ function inputIssues(
         'GPT Image dimensions require multiples of 16, edge <=3840, area 655360–8294400 and aspect between 1:3 and 3:1.',
       );
   }
+  if (request.modelId.startsWith('minimax/h3-image') && args.size) {
+    const { width, height } = args.size,
+      area = width * height;
+    if (area < 655_360 || area > 20_000_000 || width / height < 1 / 3 || width / height > 3)
+      issue(
+        'invalid_value',
+        'size',
+        'MiniMax H3 Image custom dimensions require area 655360–20000000 and aspect between 1:3 and 3:1.',
+      );
+  }
+  if (request.modelId === 'bfl/flux-3-klein' && args.size) {
+    const { width, height } = args.size;
+    if (width < 256 || width > 4096 || height < 256 || height > 4096)
+      issue(
+        'invalid_value',
+        'size',
+        'FLUX 3 Klein custom dimensions require width and height between 256 and 4096.',
+      );
+  }
+  if (request.modelId === 'fal/flux-3-max-video' && args.complexity === 'medium')
+    issue(
+      'invalid_value',
+      'complexity',
+      'FLUX 3 Max Video supports low or high complexity.',
+      'low,high',
+      args.complexity,
+    );
+  if (
+    request.modelId === 'google/nano-banana-pro' &&
+    args.thinkingLevel &&
+    args.thinkingLevel !== 'high'
+  )
+    issue(
+      'invalid_value',
+      'thinkingLevel',
+      'Nano Banana Pro supports high thinkingLevel only.',
+      'high',
+      args.thinkingLevel,
+    );
+  if (
+    (request.modelId === 'google/nano-banana-2' ||
+      request.modelId === 'google/nano-banana-2-lite') &&
+    args.thinkingLevel === 'medium'
+  )
+    issue(
+      'invalid_value',
+      'thinkingLevel',
+      'This Nano Banana variant supports minimal or high thinkingLevel.',
+      'minimal,high',
+      args.thinkingLevel,
+    );
+  if (request.modelId === 'bfl/flux-3-image' && args.outputFormat === 'webp')
+    issue(
+      'invalid_value',
+      'outputFormat',
+      'FLUX 3 Image supports PNG and JPEG output formats.',
+      'png,jpeg',
+      args.outputFormat,
+    );
   if (
     (request.modelId === 'bytedance/seedream-5.0-pro' ||
       request.modelId === 'bytedance/seedream-5.0-flash') &&
@@ -730,6 +826,17 @@ export function getGenerationSchema(
   ];
   if (definition.promptRequired)
     properties.prompt = { ...properties.prompt, minLength: 1, pattern: /\S/.source };
+  if (properties.complexity && modelId === 'fal/flux-3-max-video')
+    properties.complexity = { ...properties.complexity, enum: ['low', 'high'] };
+  if (properties.thinkingLevel && modelId === 'google/nano-banana-pro')
+    properties.thinkingLevel = { ...properties.thinkingLevel, enum: ['high'] };
+  if (
+    properties.thinkingLevel &&
+    (modelId === 'google/nano-banana-2' || modelId === 'google/nano-banana-2-lite')
+  )
+    properties.thinkingLevel = { ...properties.thinkingLevel, enum: ['minimal', 'high'] };
+  if (properties.outputFormat && modelId === 'bfl/flux-3-image')
+    properties.outputFormat = { ...properties.outputFormat, enum: ['png', 'jpeg'] };
   if (properties.references) {
     const reference = properties.references.items as Record<string, unknown>;
     const fields = reference.properties as Record<string, unknown>;

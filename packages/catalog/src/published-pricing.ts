@@ -252,6 +252,15 @@ const published: Record<string, PublishedPricing> = {
     ],
     '2026-11-03',
   ),
+  'google-undisclosed|google/gemini-omni-1.2-flash': tariff(
+    'Per 1M tokens: $1.50 input; $9 text/thinking output; $12 video output.',
+    google + '#gemini-omni-1.2-flash',
+    [
+      'Standard processing converts video output at 1,931 / 5,792 / 8,688 / 17,376 tokens per second across 360p / 720p / 1080p / 4K (~$0.023 / $0.070 / $0.104 / $0.209 per video second before input and thinking tokens).',
+      'Single-output text-to-video managed quotes reserve a conservative max-token bound and settle exact reported modality usage; frame, reference, edit and continuation operations remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
   'google-undisclosed|google/gemini-omni-1.1-flash': tariff(
     'Per 1M tokens: $1.50 input; $9 text output; $17.50 video output.',
     google + '#gemini-omni-1.1-flash',
@@ -268,9 +277,56 @@ const published: Record<string, PublishedPricing> = {
       'Batch and search grounding have separate pricing. This adapter uses standard Interactions without grounding; reference/edit operations remain unpriced.',
     ],
   ),
+  'google-undisclosed|google/nano-banana-pro': tariff(
+    'Per 1M tokens: $2.00 input; $12.00 text/thinking output; $120.00 image output.',
+    google + '#gemini-3-pro-image',
+    [
+      'Standard image-output components: 1,120 tokens ($0.1344) at 1K and 2K; 2,000 tokens ($0.24) at 4K. Input and thinking add cost; single-output text-to-image managed quotes reserve a conservative max-token bound.',
+      'Search grounding and reference/edit operations carry separate charges and remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'google-undisclosed|google/nano-banana-2': tariff(
+    'Per 1M tokens: $0.50 input; $3.00 text/thinking output; $60.00 image output.',
+    google + '#gemini-3.1-flash-image',
+    [
+      'Standard image-output components: 747 tokens ($0.0448) at 0.5K, 1,120 ($0.0672) at 1K, 1,680 ($0.1008) at 2K and 2,520 ($0.1512) at 4K. Single-output text-to-image managed quotes reserve a conservative max-token bound.',
+      'Search grounding and reference/edit operations carry separate charges and remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'google-undisclosed|google/nano-banana-2-lite': tariff(
+    'Per 1M tokens: $0.25 input; $1.50 text/thinking output; $30.00 image output.',
+    google + '#gemini-3.1-flash-lite-image',
+    [
+      'Standard 1K image-output component is 1,120 tokens ($0.0336). Input and thinking add cost; single-output text-to-image managed quotes reserve a conservative max-token bound.',
+      'Reference/edit operations remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'minimax-undisclosed|minimax/h3-image': tariff(
+    'Per 1M tokens: $2.30 text input (including prompt enhancement); $1.50 image input; $3.80 image output.',
+    'https://platform.minimax.io/docs/pricing/overview#image',
+    [
+      'Limited-time 50% promotional discount on 4K outputs through November 17, 2026 UTC is excluded from managed reservations.',
+      'Text-to-image managed quotes reserve a conservative max-token bound and settle exact reported token usage on completion; image edits and custom pixel dimensions remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'minimax-undisclosed|minimax/h3-image-highspeed': tariff(
+    'Per 1M tokens: $2.30 text input (including prompt enhancement); $3.00 image input; $7.60 image output.',
+    'https://platform.minimax.io/docs/pricing/overview#image',
+    [
+      'Limited-time 50% promotional discount on 4K outputs through November 17, 2026 UTC is excluded from managed reservations.',
+      'Text-to-image managed quotes reserve a conservative max-token bound and settle exact reported token usage on completion; image edits and custom pixel dimensions remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
   'openai-undisclosed|openai/gpt-image-2': openai('gpt-image-2'),
   'openai-undisclosed|openai/gpt-image-2.5-flare': openai('gpt-image-2.5-flare'),
   'openai-undisclosed|openai/gpt-image-2.5-sunburst': openai('gpt-image-2.5-sunburst'),
+  'openai-undisclosed|openai/gpt-image-2.6-flare': openai('gpt-image-2.6-flare'),
+  'openai-undisclosed|openai/gpt-image-2.6-sunburst': openai('gpt-image-2.6-sunburst'),
   'fal-undisclosed|openai/gpt-image-2': tariff(
     'Per 1M tokens: $5 text input; $8 image input; $30 image output.',
     'https://fal.ai/models/openai/gpt-image-2',
@@ -281,6 +337,151 @@ const published: Record<string, PublishedPricing> = {
   ),
   'fal-undisclosed|openai/gpt-image-2.5-flare': falImage,
   'fal-undisclosed|openai/gpt-image-2.5-sunburst': falImage,
+  'fal-undisclosed|openai/gpt-image-2.6-flare': tariff(
+    'Per 1M tokens: $5 text input; $10 text output; $8 image input; $30 image output.',
+    'https://fal.ai/models/openai/gpt-image-2.6/flare/text-to-image',
+    [
+      'GPT Image 2.6 increases low/medium output tokens relative to 2.5 (4.2x low, 3.3x medium); totals round up to $0.0001.',
+      'Size, quality, prompt length and reference images determine token consumption; no fixed per-image fee applies.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|openai/gpt-image-2.6-sunburst': tariff(
+    'Per 1M tokens: $5 text input; $10 text output; $8 image input; $30 image output.',
+    'https://fal.ai/models/openai/gpt-image-2.6/sunburst/text-to-image',
+    [
+      'GPT Image 2.6 increases low/medium output tokens relative to 2.5 (4.2x low, 3.3x medium); totals round up to $0.0001.',
+      'Size, quality, prompt length and reference images determine token consumption; no fixed per-image fee applies.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|google/nano-banana-pro': tariff(
+    'Base output image: $0.15 at 1K; higher resolution tiers and grounding add cost.',
+    'https://fal.ai/models/fal-ai/nano-banana-pro',
+    [
+      'Single-output 1K text-to-image without grounding uses the $0.15 list estimate; 2K/4K, grounding and edits remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|google/nano-banana-2': tariff(
+    'Base output image: $0.08 at 1K; other resolution tiers and grounding vary.',
+    'https://fal.ai/models/fal-ai/nano-banana-2',
+    [
+      'Single-output 1K text-to-image without grounding uses the $0.08 list estimate; 0.5K/2K/4K, grounding and edits remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|google/nano-banana-2-lite': tariff(
+    'Token-billed Gemini 3.1 Flash Lite Image pass-through on fal.',
+    'https://fal.ai/models/google/nano-banana-2-lite',
+    [
+      'Prompt and thinking token consumption vary per request; no fixed per-image fee is published.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|google/gemini-omni-1.2-flash': tariff(
+    'Output video: $0.0273 / second at 360p; $0.0819 at 720p; $0.1229 at 1080p; $0.2457 at 4K, plus $1.50 / 1M input tokens.',
+    'https://fal.ai/models/google/gemini-omni-flash/v1.2/text-to-video',
+    [
+      'Text-to-video managed quotes combine the output-second list rate with a conservative $1.50 / 1M prompt-token bound; frame, reference, edit and extend operations incur media input token charges and remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'runway-undisclosed|google/gemini-omni-1.2-flash': tariff(
+    'Output video: $0.02 / second at 360p; $0.07 at 720p; $0.10 at 1080p; $0.21 at 4K, plus $0.01 per reference image/keyframe and $0.01 per input-video second.',
+    'https://docs.dev.runwayml.com/guides/pricing/',
+    [
+      'Runway enforces a 6-credit ($0.06) minimum per generation; route remains documented comparison-only.',
+    ],
+    '2026-11-14',
+    outputRates('output-second', [
+      ['360p', 20_000],
+      ['720p', 70_000],
+      ['1080p', 100_000],
+      ['4K', 210_000],
+    ]),
+  ),
+  'fal-undisclosed|minimax/h3-image': tariff(
+    'Per 1M tokens: $2.30 text input; $1.50 image input; $3.80 image output.',
+    'https://fal.ai/models/minimax/h3-image/text-to-image',
+    [
+      'Prompt enhancement and actual delivered pixel dimensions determine token charges; no fixed per-image rate applies.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|minimax/h3-image-highspeed': tariff(
+    'Token-billed MiniMax H3 Image Highspeed pass-through on fal.',
+    'https://fal.ai/models/minimax/h3-image/highspeed/text-to-image',
+    [
+      'fal editorial prose displays base H3 Image rates while MiniMax lists $2.30 text / $3.00 image input / $7.60 image output per 1M tokens for Highspeed; preserve discrepancy without assuming a flat fee.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|kling/kling-4.0': tariff(
+    'Output video without video input: $0.157 / second at 720p; $0.235 at 1080p. With video input: $0.094 / second at 720p; $0.141 at 1080p across active input and output seconds.',
+    'https://fal.ai/models/kling/v4/text-to-video',
+    [
+      'Text-to-video and image-to-video use output-second list estimates; reference-to-video and video-edit remain unpriced because video references/source duration alter total billing.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|kling/kling-4.0-flash': tariff(
+    'Output video without video input: $0.094 / second at 720p. With video input: $0.063 / second billed on output duration plus max(input video duration, output duration).',
+    'https://fal.ai/models/kling/v4/flash/text-to-video',
+    [
+      'Text-to-video and image-to-video use the $0.094 / second list estimate; reference-to-video and video-edit remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'runway-undisclosed|kling/kling-4.0-flash': tariff(
+    'Without input video: 9.4 credits ($0.094) / second at 720p, rounded up to the next whole credit with a 29-credit ($0.29) minimum.',
+    'https://docs.dev.runwayml.com/guides/pricing/',
+    [
+      'With input video, Runway charges 6.3 credits/s of output plus 6.3 credits/s of max(input video duration, output duration).',
+      'Whole-credit rounding and the 29-credit minimum make linear per-second multiplication non-exact at short durations; managed quotes remain unpriced.',
+    ],
+    '2026-11-14',
+    outputRates('output-second', [['720p', 94_000]]),
+  ),
+  'fal-undisclosed|bfl/flux-3-image': tariff(
+    '$0.048 per output megapixel.',
+    'https://fal.ai/models/blackforestlabs/flux-3/text-to-image',
+    [
+      'Actual megapixel count varies with aspect ratio and resolution tier; flat tier fees are not assumed.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|bfl/flux-3-klein': tariff(
+    '$0.009 per output megapixel.',
+    'https://fal.ai/models/blackforestlabs/flux-3/klein/text-to-image',
+    ['Actual megapixel count varies with image_size dimensions; flat tier fees are not assumed.'],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|bfl/flux-3-video': tariff(
+    'Output video: $0.17 / second at 720p; $0.29 at 1080p; $0.32 at 1440p; $0.47 at 2160p.',
+    'https://fal.ai/models/blackforestlabs/flux-3/text-to-video',
+    [
+      'Text-to-video and image-to-video with fixed numeric duration use regular output-second list rates; auto duration, video-edit ($0.03/s source-derived length) and video-extend remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|fal/flux-3-max-video': tariff(
+    'Regular output video list rates: $0.17 / second at 720p; $0.29 at 1080p.',
+    'https://fal.ai/models/blackforestlabs/flux-3-max/text-to-video',
+    [
+      'Temporary 50% promotional rates ($0.085/$0.145 through November 22, 2026 UTC; resuming regular list rates November 23) are excluded so managed reservations never under-reserve.',
+      '2K and 4K list rates are not explicitly itemized in prose and remain unpriced.',
+    ],
+    '2026-11-14',
+  ),
+  'fal-undisclosed|alibaba/happy-horse-1.1': tariff(
+    'Output video: $0.14 / second across 720p and 1080p.',
+    'https://fal.ai/models/alibaba/happy-horse/v1.1/text-to-video',
+    [
+      'Text-to-video and image-to-video use the $0.14 / second list estimate; reference-to-video remains unpriced for managed quotes.',
+    ],
+    '2026-11-14',
+  ),
   'fal-undisclosed|bytedance/seedream-5.5': tariff(
     'Output image: $0.03 at 1K / 1.5K (up to 2.61MP); $0.0405 at 2K. Editing adds $0.012 per input image per output.',
     'https://fal.ai/models/bytedance/seedream/v5.5/text-to-image',

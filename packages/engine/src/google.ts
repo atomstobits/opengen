@@ -14,7 +14,35 @@ import { pollProviderJson, providerObject, submitProviderJson } from './provider
 import { captureProviderResult, type CaptureProviderOutputs } from './adapter-output.js';
 import { observedGoogleImageCostMicros } from './google-usage.js';
 
-const model = 'gemini-nano-banana-2.1';
+const googleImageModels: Record<
+  string,
+  {
+    resolutions: readonly string[];
+    thinkingLevels: readonly string[];
+    allowGrounding: boolean;
+  }
+> = {
+  'gemini-nano-banana-2.1': {
+    resolutions: ['1K', '2K', '4K'],
+    thinkingLevels: ['minimal', 'medium', 'high'],
+    allowGrounding: true,
+  },
+  'gemini-3-pro-image': {
+    resolutions: ['1K', '2K', '4K'],
+    thinkingLevels: ['high'],
+    allowGrounding: true,
+  },
+  'gemini-3.1-flash-image': {
+    resolutions: ['0.5K', '1K', '2K', '4K'],
+    thinkingLevels: ['minimal', 'high'],
+    allowGrounding: true,
+  },
+  'gemini-3.1-flash-lite-image': {
+    resolutions: ['1K'],
+    thinkingLevels: ['minimal', 'high'],
+    allowGrounding: false,
+  },
+};
 const ratios = new Set([
   '1:1',
   '1:4',
@@ -44,7 +72,7 @@ export function createGoogleImageAdapter(
 ): ProviderAdapter {
   const env = options.env ?? process.env;
   const request = options.fetch ?? fetch;
-  const fields: (keyof GenerationArguments)[] = [
+  const fields = (context: Omit<AdapterContext, 'jobId'>): (keyof GenerationArguments)[] => [
     'prompt',
     'references',
     'resolution',
@@ -54,14 +82,17 @@ export function createGoogleImageAdapter(
     'seed',
     'thinkingLevel',
     'systemPrompt',
-    'grounding',
+    ...(googleImageModels[context.route.upstreamModelId]?.allowGrounding
+      ? ['grounding' as const]
+      : []),
   ];
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
-    if (context.deployment.providerId !== 'google' || context.route.upstreamModelId !== model)
-      return 'This adapter supports Gemini Nano Banana 2.1 only.';
+    const spec = googleImageModels[context.route.upstreamModelId];
+    if (context.deployment.providerId !== 'google' || !spec)
+      return 'Unsupported Google Nano Banana model or deployment.';
     if (!['text-to-image', 'image-edit'].includes(context.input.operation))
       return 'This Google adapter supports text-to-image and image editing only.';
-    const issue = adapterInputIssue(context, fields) ?? referenceTypeIssue(context.input);
+    const issue = adapterInputIssue(context, fields(context)) ?? referenceTypeIssue(context.input);
     if (issue) return issue;
     const args = context.input.input;
     const references = referenceUrls(context.input);
@@ -74,8 +105,10 @@ export function createGoogleImageAdapter(
       (references.length < 1 || references.length > 14)
     )
       return 'Nano Banana edits require 1–14 reference images.';
-    if (!['1K', '2K', '4K'].includes((args.resolution ?? '').toUpperCase()))
+    if (!spec.resolutions.includes((args.resolution ?? '').toUpperCase()))
       return 'Unsupported Nano Banana output size.';
+    if (args.thinkingLevel && !spec.thinkingLevels.includes(args.thinkingLevel))
+      return 'Unsupported Nano Banana thinkingLevel.';
     if (args.aspectRatio === 'source' && references.length !== 1)
       return 'Source ratio requires exactly one source image on this Google adapter.';
     if (args.aspectRatio && args.aspectRatio !== 'source' && !ratios.has(args.aspectRatio))
@@ -98,11 +131,11 @@ export function createGoogleImageAdapter(
     id: 'google',
     supportedOperations: ['text-to-image', 'image-edit'],
     preflight,
-    inputFields: () => fields,
+    inputFields: fields,
     isConfigured: (route, deployment) =>
       route.adapter === 'google' &&
       deployment.providerId === 'google' &&
-      route.upstreamModelId === model &&
+      Boolean(googleImageModels[route.upstreamModelId]) &&
       Boolean(
         (env.GEMINI_API_KEY || env.GOOGLE_API_KEY) &&
         (options.captureOutputs || options.storeOutput),
@@ -141,7 +174,7 @@ export function createGoogleImageAdapter(
         'https://generativelanguage.googleapis.com/v1beta/interactions',
         auth(),
         {
-          model,
+          model: context.route.upstreamModelId,
           input: [{ type: 'text', text: args.prompt ?? '' }, ...references],
           ...(args.systemPrompt !== undefined ? { system_instruction: args.systemPrompt } : {}),
           ...(args.seed !== undefined || args.thinkingLevel !== undefined
@@ -179,7 +212,7 @@ export function createGoogleImageAdapter(
         32_000_000,
       );
       if (body.status === 'in_progress') return { status: 'running' };
-      const billedCostMicros = observedGoogleImageCostMicros(body);
+      const billedCostMicros = observedGoogleImageCostMicros(body, context.route.upstreamModelId);
       if (body.status === 'failed' || body.status === 'cancelled')
         return {
           status: body.status,
