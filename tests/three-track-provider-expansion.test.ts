@@ -242,20 +242,7 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
     }
   });
 
-  it('forbids duration on Gemini Omni video-edit and accepts normalized source-video edits on fal', async () => {
-    expect(() =>
-      catalogContext('fal-undisclosed/google/gemini-omni-flash/v1.1/edit', {
-        modelId: 'google/gemini-omni-1.1-flash',
-        routeId: 'fal-undisclosed/google/gemini-omni-flash/v1.1/edit',
-        operation: 'video-edit',
-        input: {
-          prompt: 'Add warm golden sunset lighting.',
-          sourceVideo: { url: 'https://assets.example.com/source.mp4' },
-          resolution: '720p',
-          duration: 5,
-        },
-      }),
-    ).toThrow();
+  it('accepts normalized source-video edits on fal Gemini Omni without injecting duration or aspectRatio, while rejecting explicit duration on fal', async () => {
     const adapter = createFalAdapter({ env: { FAL_KEY: 'fal-fixture-key' } });
     const validCtx = catalogContext('fal-undisclosed/google/gemini-omni-flash/v1.1/edit', {
       modelId: 'google/gemini-omni-1.1-flash',
@@ -268,12 +255,18 @@ describe('Track 3: fal route coverage across Google, OpenAI, ByteDance, Alibaba,
       },
     });
     expect(adapter.preflight!(validCtx)).toBeNull();
-    await expect(
-      adapter.submit({
-        ...validCtx,
-        input: { ...validCtx.input, input: { ...validCtx.input.input, duration: 5 } },
-      }),
-    ).rejects.toThrow(SubmissionRejected);
+    const withDuration = catalogContext('fal-undisclosed/google/gemini-omni-flash/v1.1/edit', {
+      modelId: 'google/gemini-omni-1.1-flash',
+      routeId: 'fal-undisclosed/google/gemini-omni-flash/v1.1/edit',
+      operation: 'video-edit',
+      input: {
+        prompt: 'Add warm golden sunset lighting.',
+        sourceVideo: { url: 'https://assets.example.com/source.mp4' },
+        resolution: '720p',
+        duration: 5,
+      },
+    });
+    await expect(adapter.submit(withDuration)).rejects.toThrow(SubmissionRejected);
   });
 
   it('sends null smart duration on fal Wan and rejects 2K source-ratio Qwen edits without explicit size', () => {

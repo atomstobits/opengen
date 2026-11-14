@@ -226,11 +226,7 @@ function operationDefinition(
             ? ['firstFrame', 'lastFrame', 'sourceVideo']
             : ['firstFrame', 'lastFrame', 'mask'],
   );
-  if (
-    (modelId === 'xai/grok-imagine-video' || modelId === 'google/gemini-omni-1.1-flash') &&
-    operation === 'video-edit'
-  )
-    forbidden.add('duration');
+  if (modelId === 'xai/grok-imagine-video' && operation === 'video-edit') forbidden.add('duration');
   if (modelId === 'xai/grok-imagine-video' && operation === 'video-extend')
     forbidden.add('resolution');
   const commonArguments = model.commonArguments.filter((field) => !forbidden.has(field));
@@ -243,6 +239,7 @@ function operationDefinition(
         ? operation === 'image-to-video' || operation === 'reference-to-video'
         : true,
   );
+  const omniVideoEdit = modelId === 'google/gemini-omni-1.1-flash' && operation === 'video-edit';
   return {
     ...structuredClone(model),
     modelId,
@@ -253,9 +250,8 @@ function operationDefinition(
     promptRequired: ['text-to-image', 'text-to-video', 'image-edit'].includes(operation),
     defaults: {
       ...(forbidden.has('resolution') ? {} : { resolution: model.defaults.resolution }),
-      ...(video && !forbidden.has('duration') ? { duration: 5 } : {}),
-      ...(operation === 'image-edit' ||
-      (modelId === 'google/gemini-omni-1.1-flash' && operation === 'video-edit')
+      ...(video && !forbidden.has('duration') && !omniVideoEdit ? { duration: 5 } : {}),
+      ...(operation === 'image-edit' || omniVideoEdit
         ? {}
         : {
             aspectRatio: sourceRatioQualified ? 'source' : video ? '16:9' : '1:1',
