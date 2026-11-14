@@ -12,7 +12,7 @@ test('company pages expose every owned variant through its canonical series', as
   await expect(
     page.getByRole('heading', { level: 1, name: 'ByteDance', exact: true }),
   ).toBeVisible();
-  await expect(page.getByTestId('series-card')).toHaveCount(3);
+  await expect(page.getByTestId('series-card')).toHaveCount(9);
   for (const [name, href] of [
     ['Seedance 2.5', '/bytedance/seedance-2.5'],
     ['Seedance 2.0', '/bytedance/seedance-2.0'],
@@ -97,7 +97,7 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
     );
   }
   const max = variant(page, 'minimax/h3-max');
-  await expect(max.locator('.route-table tbody tr')).toHaveCount(2);
+  await expect(max.locator('.route-table tbody tr')).toHaveCount(4);
   await expect(max).toContainText('MiniMax');
   await expect(max).toContainText('fal');
   await expect(max).toContainText('Listed as H3 Max');
@@ -108,7 +108,7 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
   await expect(falMax.locator('.provider-name .official-tag')).toHaveCount(0);
   await expect(
     variant(page, 'fal/h3-max-turbo').locator('.provider-name .official-tag'),
-  ).toHaveText('Official');
+  ).toHaveText(['Official', 'Official', 'Official']);
   await expect(variant(page, 'fal/h3-max')).toHaveCount(0);
   await expect(variant(page, 'pika/h3-flex')).toContainText('Pika');
   // Legacy provider-named links select the same canonical Max group.
@@ -123,7 +123,9 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
   await page.screenshot({ path: path.join(evidenceDir, 'series-h3-desktop.png'), fullPage: true });
   await page.goto('/fal/h3-max');
   await expect(page).toHaveURL(/\/minimax\/h3\?variant=minimax%2Fh3-max/);
-  const falTry = variant(page, 'minimax/h3-max').getByRole('link', { name: /Use fal .* route/ });
+  const falTry = variant(page, 'minimax/h3-max')
+    .getByRole('link', { name: /Use fal .* route/ })
+    .first();
   await falTry.click();
   await expect(page.getByLabel('Choose generation model')).toHaveValue('minimax/h3-max');
   await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
@@ -144,7 +146,7 @@ test('Wan keeps Standard and Prime in separate provider tables with all regional
   const prime = variant(page, 'alibaba/wan-3.0-prime');
   await expect(page.getByTestId('series-variant')).toHaveCount(2);
   for (const section of [standard, prime]) {
-    await expect(section.locator('.route-table tbody tr')).toHaveCount(6);
+    await expect(section.locator('.route-table tbody tr')).toHaveCount(9);
     await expect(section.locator('.provider-name .official-tag')).toHaveCount(6);
     for (const location of [
       'Beijing, China',
@@ -351,7 +353,7 @@ test.describe('phone series pages', () => {
     await mkdir(evidenceDir, { recursive: true });
     await page.screenshot({ path: path.join(evidenceDir, 'series-h3-mobile.png'), fullPage: true });
     await page.goto('/bytedance');
-    await expect(page.getByTestId('series-card')).toHaveCount(3);
+    await expect(page.getByTestId('series-card')).toHaveCount(9);
     const companyOverflow = await page.evaluate(() => ({
       page: document.documentElement.scrollWidth,
       viewport: innerWidth,

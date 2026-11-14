@@ -40,8 +40,8 @@ describe('public catalog and quote API', () => {
     const app = await setup();
     const wan = (await app.inject({ url: '/v1/series/alibaba/wan-3.0' })).json();
     expect(wan.models).toHaveLength(2);
-    expect(wan.routes).toHaveLength(12);
-    expect(wan.deployments).toHaveLength(6);
+    expect(wan.routes).toHaveLength(18);
+    expect(wan.deployments).toHaveLength(7);
     expect(new Set(wan.routes.map((route: { modelId: string }) => route.modelId)).size).toBe(2);
     const h3 = (await app.inject({ url: '/v1/series/minimax/h3' })).json();
     expect(h3.models).toHaveLength(6);
@@ -53,11 +53,11 @@ describe('public catalog and quote API', () => {
   it('lists one H3 Max variant while retaining both independent provider routes', async () => {
     const app = await setup();
     const models = (await app.inject({ url: '/v1/models' })).json().data;
-    expect(models).toHaveLength(27);
+    expect(models).toHaveLength(35);
     expect(models.filter((model: { id: string }) => model.id === 'minimax/h3-max')).toHaveLength(1);
     expect(models.some((model: { id: string }) => model.id === 'fal/h3-max')).toBe(false);
     const routes = (await app.inject({ url: '/v1/routes?modelId=minimax%2Fh3-max' })).json().data;
-    expect(routes).toHaveLength(2);
+    expect(routes).toHaveLength(4);
     expect(new Set(routes.map((route: { deploymentId: string }) => route.deploymentId))).toEqual(
       new Set(['minimax-undisclosed', 'fal-undisclosed']),
     );
@@ -65,7 +65,7 @@ describe('public catalog and quote API', () => {
       true,
     );
     expect(
-      routes.find((route: { deploymentId: string }) => route.deploymentId === 'fal-undisclosed'),
+      routes.find((route: { id: string }) => route.id === 'fal-undisclosed/fal-h3-max'),
     ).toMatchObject({
       id: 'fal-undisclosed/fal-h3-max',
       upstreamModelId: 'minimax/h3-max/text-to-video',
@@ -74,7 +74,7 @@ describe('public catalog and quote API', () => {
   it('returns independent regional routes and honest empty observations', async () => {
     const app = await setup();
     const result = (await app.inject({ url: '/v1/routes?modelId=alibaba%2Fwan-3.0' })).json();
-    expect(result.data).toHaveLength(6);
+    expect(result.data).toHaveLength(9);
     const metrics = (await app.inject({ url: '/v1/metrics' })).json();
     expect(
       metrics.data.every(

@@ -92,6 +92,37 @@ const falSeedream = tariff(
     'Editing has additional input-image charges and needs a separate complete formula.',
   ],
 );
+const falSeedanceMini = tariff(
+  '$0.007 per 1,000 video tokens at 480p / 720p.',
+  'https://fal.ai/models/bytedance/seedance-2.0/mini/text-to-video',
+  [
+    'Token count depends on actual output width × height × duration × 24 ÷ 1,024.',
+    'Reference inputs and exact output dimensions require configuration-specific qualification.',
+  ],
+  '2026-11-13',
+  falTextVideoExamples([
+    ['480p', 67_500],
+    ['720p', 151_700],
+  ]),
+);
+const falSeedance1Pro = tariff(
+  '$0.0025 per 1,000 video tokens at 480p / 720p / 1080p.',
+  'https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/text-to-video',
+  [
+    'Token count follows (width × height × fps × duration) ÷ 1,024; 5s 1080p 16:9 is approximately $0.62.',
+    'Actual output dimensions determine token consumption.',
+  ],
+  '2026-11-13',
+);
+const falSeedance1ProFast = tariff(
+  '$0.001 per 1,000 video tokens at 480p / 720p / 1080p.',
+  'https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/fast/text-to-video',
+  [
+    'Token count follows (width × height × fps × duration) ÷ 1,024; 5s 1080p 16:9 is approximately $0.245.',
+    'Actual output dimensions determine token consumption.',
+  ],
+  '2026-11-13',
+);
 
 // Exact deployment + variant keys prevent applying a provider's global tariff to an unqualified regional offering.
 const published: Record<string, PublishedPricing> = {
@@ -100,7 +131,7 @@ const published: Record<string, PublishedPricing> = {
     'https://docs.byteplus.com/en/docs/modelark/model-pricing#dreamina-seedance-2-5-price-examples',
     [
       'The per-second figures are published examples for five seconds of 16:9 output without video input.',
-      'Video input changes token consumption and the minimum billable token count. The provider bills from the actual token usage.',
+      'Non-video-input managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens; video-reference tasks remain unpriced.',
     ],
     '2026-11-06',
     outputRates('output-second', [
@@ -108,6 +139,54 @@ const published: Record<string, PublishedPricing> = {
       ['720p', 231_000],
       ['1080p', 569_000],
     ]).map((rate) => ({ ...rate, approximate: true })),
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedance-2.0': tariff(
+    'Without video input, ModelArk charges $7.00 per million tokens at 480p/720p, $7.70 at 1080p and $4.00 at 4K. With video input, the rates are $4.30, $4.70 and $2.40.',
+    'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+    [
+      'Non-video-input managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens; video-reference tasks remain unpriced.',
+    ],
+    '2026-11-13',
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedance-2.0-fast': tariff(
+    'Without video input, ModelArk charges $5.60 per million tokens at 480p/720p ($3.30 with video input).',
+    'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+    [
+      'Non-video-input managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens; video-reference tasks remain unpriced.',
+    ],
+    '2026-11-13',
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedance-2.0-mini': tariff(
+    'Without video input, ModelArk charges $3.50 per million tokens at 480p/720p ($2.10 with video input).',
+    'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+    [
+      'Non-video-input managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens; video-reference tasks remain unpriced.',
+    ],
+    '2026-11-13',
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedance-1.0-pro': tariff(
+    'ModelArk charges $2.50 per million video tokens across 480p, 720p and 1080p.',
+    'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+    [
+      'Managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens on completion.',
+    ],
+    '2026-11-13',
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedance-1.0-pro-fast': tariff(
+    'ModelArk charges $1.00 per million video tokens across 480p, 720p and 1080p.',
+    'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+    [
+      'Managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens on completion.',
+    ],
+    '2026-11-13',
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedream-5.5': tariff(
+    'Output image: $0.02 at 1K / 1.5K (up to 2.61MP); $0.035 at 2K. Image editing adds $0.008 per input image.',
+    'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+    [
+      'Text-to-image has a complete single-output estimate; image editing incurs additional per-input-image charges.',
+    ],
+    '2026-11-13',
   ),
   'minimax-undisclosed|minimax/h3': tariff(
     'Output video: $0.08 / second at 768P; $0.13 at 2K.',
@@ -192,8 +271,24 @@ const published: Record<string, PublishedPricing> = {
   'openai-undisclosed|openai/gpt-image-2': openai('gpt-image-2'),
   'openai-undisclosed|openai/gpt-image-2.5-flare': openai('gpt-image-2.5-flare'),
   'openai-undisclosed|openai/gpt-image-2.5-sunburst': openai('gpt-image-2.5-sunburst'),
+  'fal-undisclosed|openai/gpt-image-2': tariff(
+    'Per 1M tokens: $5 text input; $8 image input; $30 image output.',
+    'https://fal.ai/models/openai/gpt-image-2',
+    [
+      'Size, quality, prompt length and reference images affect token consumption; published per-image examples are not fixed fees.',
+    ],
+    '2026-11-13',
+  ),
   'fal-undisclosed|openai/gpt-image-2.5-flare': falImage,
   'fal-undisclosed|openai/gpt-image-2.5-sunburst': falImage,
+  'fal-undisclosed|bytedance/seedream-5.5': tariff(
+    'Output image: $0.03 at 1K / 1.5K (up to 2.61MP); $0.0405 at 2K. Editing adds $0.012 per input image per output.',
+    'https://fal.ai/models/bytedance/seedream/v5.5/text-to-image',
+    [
+      'Text-to-image uses fixed output-tier list estimates; image editing incurs per-input-image charges per generated output and remains unpriced.',
+    ],
+    '2026-11-13',
+  ),
   'fal-undisclosed|bytedance/seedream-5.0-pro': falSeedream,
   'fal-undisclosed|google/nano-banana-2.1': tariff(
     'Per 1M tokens: $1.764 input; $8.823 text/thinking output; $35.294 image output.',
@@ -202,9 +297,82 @@ const published: Record<string, PublishedPricing> = {
       'Output resolution, prompt length, reference images and thinking consumption affect the total. Published example totals are not fixed per-image charges.',
     ],
   ),
+  'fal-undisclosed|google/gemini-omni-1.1-flash': tariff(
+    'Output video: $0.03 / second at 360p; $0.10 at 720p; $0.15 at 1080p; $0.30 at 4K.',
+    'https://fal.ai/models/google/gemini-omni-flash/v1.1/text-to-video',
+    [
+      'Text-to-video and image-to-video have fixed output-second list estimates; reference-to-video and source-derived video editing remain comparison-only.',
+    ],
+    '2026-11-13',
+  ),
   'fal-undisclosed|bytedance/seedance-2.0': falSeedance,
   'fal-undisclosed|bytedance/seedance-2.0-fast': falSeedanceFast,
+  'fal-undisclosed|bytedance/seedance-2.0-mini': falSeedanceMini,
   'fal-undisclosed|bytedance/seedance-2.5': falSeedance25,
+  'fal-undisclosed|bytedance/seedance-1.0-pro': falSeedance1Pro,
+  'fal-undisclosed|bytedance/seedance-1.0-pro-fast': falSeedance1ProFast,
+  'fal-undisclosed|alibaba/wan-3.0': tariff(
+    'Output video: $0.05 / second at 480p; $0.10 at 720p; $0.20 at 1080p.',
+    'https://fal.ai/models/alibaba/wan-3.0/text-to-video',
+    [
+      'Provider states pricing is subject to change. Reference-to-video has separate input considerations and remains unpriced.',
+    ],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|alibaba/wan-3.0-prime': tariff(
+    'Output video: $0.068 / second at 480p; $0.14 at 720p; $0.28 at 1080p.',
+    'https://fal.ai/models/alibaba/wan-3.0-prime/text-to-video',
+    ['Provider states pricing is subject to change. Reference-to-video remains unpriced.'],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|fal/qwen-image-3': tariff(
+    'Output image: $0.04 at 1K; $0.075 at 2K.',
+    'https://fal.ai/models/alibaba/qwen-image-3/text-to-image',
+    [
+      'Text-to-image has fixed output-tier list estimates; image-edit reference billing remains unpriced.',
+    ],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|xai/grok-imagine-video-1.5': tariff(
+    'Output video: $0.08 / second at 480p; $0.14 at 720p; $0.25 at 1080p. Input images add $0.01 each.',
+    'https://fal.ai/models/xai/grok-imagine-video/v1.5/text-to-video',
+    [
+      'Only text-to-video without input media has a fixed output-second estimate; image-to-video and reference-to-video incur per-image input charges.',
+    ],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|xai/grok-imagine-video-1.5-lite': tariff(
+    'Output video: $0.02 / second at 480p; $0.03 at 720p; $0.14 at 1080p. Input images add $0.01 each.',
+    'https://fal.ai/models/xai/grok-imagine-video/v1.5/lite/text-to-video',
+    [
+      'Only text-to-video without input media has a fixed output-second estimate; image-to-video incurs an input-image charge.',
+    ],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|xai/grok-imagine-video': tariff(
+    'Output video: $0.05 / second at 480p; $0.07 at 720p, plus $0.01 per input-video second.',
+    'https://fal.ai/models/xai/grok-imagine-video/edit-video',
+    [
+      'Source-video duration determines input billing; edit and extend routes remain comparison-only for managed quotes.',
+    ],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|xai/grok-imagine-image-2.0': tariff(
+    'Per output image: low 1K $0.04 / 1.5K $0.05 / 2K $0.06; medium 1K $0.06 / 1.5K $0.07 / 2K $0.08. Input images add $0.01 each.',
+    'https://fal.ai/models/xai/grok-imagine-image/v2.0/text-to-image',
+    [
+      'Single text-generated images at low/default quality have fixed output-tier estimates; medium/auto quality and image edits remain unpriced.',
+    ],
+    '2026-11-13',
+  ),
+  'fal-undisclosed|minimax/h3': tariff(
+    'Output video: $0.05 / second at 480p; $0.06 at 768p; $0.13 at 2K; $0.16 at 4K.',
+    'https://fal.ai/models/minimax/h3/text-to-video',
+    [
+      'Text-to-video and image-to-video with prompt expansion disabled use output-second list estimates; reference-to-video adds $0.08 per image beyond five and remains unpriced.',
+    ],
+    '2026-11-13',
+  ),
   'fal-undisclosed|minimax/h3-max': tariff(
     'Standard output video: $0.05 / second at 480p; $0.08 at 768p; $0.16 at 1080p.',
     'https://fal.ai/models/minimax/h3-max/text-to-video',

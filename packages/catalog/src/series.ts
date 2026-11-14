@@ -81,6 +81,14 @@ export const modelSeries: ModelSeries[] = [
     ],
   },
   {
+    id: 'bytedance/seedance-1.0',
+    companyId: 'bytedance',
+    name: 'Seedance 1.0',
+    description:
+      'Seedance 1.0 Pro and Pro Fast silent video generation variants across BytePlus and fal.',
+    modelIds: ['bytedance/seedance-1.0-pro', 'bytedance/seedance-1.0-pro-fast'],
+  },
+  {
     id: 'kling/kling-4.0',
     companyId: 'kling',
     name: 'Kling 4.0',
@@ -159,12 +167,50 @@ export const modelSeries: ModelSeries[] = [
     modelIds: ['xai/grok-imagine-image-2.0'],
   },
   {
+    id: 'bytedance/seedream-5.5',
+    companyId: 'bytedance',
+    name: 'Seedream 5.5',
+    description:
+      'ByteDance’s Seedream 5.5 image generation and editing release across BytePlus and fal.',
+    modelIds: ['bytedance/seedream-5.5'],
+  },
+  {
     id: 'bytedance/seedream-5.0-pro',
     companyId: 'bytedance',
     name: 'Seedream 5.0 Pro',
     description:
       'ByteDance’s Pro image generation and editing release, with separate serving-provider routes.',
     modelIds: ['bytedance/seedream-5.0-pro'],
+  },
+  {
+    id: 'bytedance/seedream-5.0-flash',
+    companyId: 'bytedance',
+    name: 'Seedream 5.0 Flash',
+    description:
+      'Fast Seedream 5.0 image generation and multi-reference editing across BytePlus and fal.',
+    modelIds: ['bytedance/seedream-5.0-flash'],
+  },
+  {
+    id: 'bytedance/seedream-5.0-lite',
+    companyId: 'bytedance',
+    name: 'Seedream 5.0 Lite',
+    description:
+      'High-resolution 2K–4K Seedream 5.0 Lite image generation and editing across BytePlus and fal.',
+    modelIds: ['bytedance/seedream-5.0-lite'],
+  },
+  {
+    id: 'bytedance/seedream-4.5',
+    companyId: 'bytedance',
+    name: 'Seedream 4.5',
+    description: 'Seedream 4.5 2K and 4K image generation and editing across BytePlus and fal.',
+    modelIds: ['bytedance/seedream-4.5'],
+  },
+  {
+    id: 'bytedance/seedream-4.0',
+    companyId: 'bytedance',
+    name: 'Seedream 4.0',
+    description: 'Seedream 4.0 1K–4K image generation and editing across BytePlus and fal.',
+    modelIds: ['bytedance/seedream-4.0'],
   },
   {
     id: 'qwen/image-2.1',
@@ -178,8 +224,9 @@ export const modelSeries: ModelSeries[] = [
     id: 'qwen/image-3.0-pro',
     companyId: 'qwen',
     name: 'Qwen Image 3.0 Pro',
-    description: 'The hosted Qwen Image 3.0 Pro generation and editing model.',
-    modelIds: ['alibaba/qwen-image-3.0-pro'],
+    description:
+      'Hosted Qwen Image 3.0 Pro across Alibaba Model Studio regions, plus the separately attributed fal Qwen Image 3 offering.',
+    modelIds: ['alibaba/qwen-image-3.0-pro', 'fal/qwen-image-3'],
   },
 ];
 

@@ -170,7 +170,7 @@ describe('crawler discovery', () => {
   it('lists canonical public paths once and excludes operational URLs', () => {
     const paths = sitemapPaths();
     expect(new Set(paths).size).toBe(paths.length);
-    expect(paths).toHaveLength(39);
+    expect(paths).toHaveLength(45);
     expect(paths).toEqual(
       expect.arrayContaining([
         '/',

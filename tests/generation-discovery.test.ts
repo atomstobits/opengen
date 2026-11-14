@@ -88,7 +88,7 @@ describe('canonical generation discovery transport parity', () => {
     ).json().data;
     const aliasRoutes = (await app.inject({ url: '/v1/routes?modelId=fal%2Fh3-max' })).json().data;
     expect(aliasRoutes).toEqual(canonicalRoutes);
-    expect(aliasRoutes).toHaveLength(2);
+    expect(aliasRoutes).toHaveLength(4);
     const fallback = localCatalog(new Request(`https://opengen.example${aliasPath}`))!;
     expect(await fallback.json()).toEqual(canonical.json());
   });
@@ -117,7 +117,7 @@ describe('canonical generation discovery transport parity', () => {
       );
       expect(legacy).toEqual(exact);
       expect(legacy.model.id).toBe('minimax/h3-max');
-      expect(legacy.routes).toHaveLength(2);
+      expect(legacy.routes).toHaveLength(4);
       const series = content(
         await client.callTool({ name: 'catalog_get', arguments: { id: 'minimax/h3' } }),
       );

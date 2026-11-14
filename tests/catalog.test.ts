@@ -28,7 +28,7 @@ describe('source-backed catalog', () => {
     expect(getModel('fal/h3-max-turbo')?.id).toBe('fal/h3-max-turbo');
     expect(getModel('pika/h3-flex')?.familyId).toBe('minimax-h3');
     const routes = catalog.routes.filter((route) => route.modelId === max?.id);
-    expect(routes).toHaveLength(2);
+    expect(routes).toHaveLength(4);
     expect(routes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -45,8 +45,8 @@ describe('source-backed catalog', () => {
         }),
       ]),
     );
-    expect(catalog.models).toHaveLength(27);
-    expect(catalog.routes).toHaveLength(66);
+    expect(catalog.models).toHaveLength(35);
+    expect(catalog.routes).toHaveLength(132);
   });
   it('resolves Omni Flash as a search alias without creating duplicate live releases', () => {
     expect(searchCatalog('Gemini Omni Flash').map((model) => model.id)).toEqual([
@@ -89,11 +89,14 @@ describe('source-backed catalog', () => {
       route.modelId = canonical;
     }
   });
-  it('lists six separately sourced deployments for each Wan variant', () => {
+  it('lists six separately sourced Alibaba deployments plus fal routes for each Wan variant', () => {
     for (const modelId of ['alibaba/wan-3.0', 'alibaba/wan-3.0-prime']) {
       const routes = catalog.routes.filter((route) => route.modelId === modelId);
-      expect(routes).toHaveLength(6);
-      expect(new Set(routes.map((route) => route.deploymentId)).size).toBe(6);
+      const alibabaRoutes = routes.filter((route) => route.adapter === 'alibaba');
+      expect(alibabaRoutes).toHaveLength(6);
+      expect(new Set(alibabaRoutes.map((route) => route.deploymentId)).size).toBe(6);
+      expect(routes).toHaveLength(9);
+      expect(new Set(routes.map((route) => route.deploymentId)).size).toBe(7);
     }
   });
 });
@@ -144,11 +147,15 @@ describe('regional quote selection', () => {
     };
     const result = quote(canonical, options);
     expect(result.modelId).toBe('minimax/h3-max');
-    expect(result.candidates.map((candidate) => candidate.providerId).sort()).toEqual([
-      'fal',
-      'minimax',
-    ]);
-    expect(result.candidates.every((candidate) => candidate.executable)).toBe(true);
+    expect(new Set(result.candidates.map((candidate) => candidate.providerId))).toEqual(
+      new Set(['fal', 'minimax']),
+    );
+    expect(
+      result.candidates
+        .filter((candidate) => candidate.executable)
+        .map((candidate) => candidate.routeId)
+        .sort(),
+    ).toEqual(['fal-undisclosed/fal-h3-max', 'minimax-undisclosed/minimax-h3-max']);
     expect(quote({ ...canonical, modelId: 'fal/h3-max' }, options)).toEqual(result);
     const pinned = quote({ ...canonical, routeId: 'fal-undisclosed/fal-h3-max' }, options);
     expect(pinned.candidates).toHaveLength(1);
@@ -165,9 +172,10 @@ describe('regional quote selection', () => {
         ]),
       },
     );
-    expect(fullHd.candidates.find((candidate) => candidate.providerId === 'fal')?.executable).toBe(
-      true,
-    );
+    expect(
+      fullHd.candidates.find((candidate) => candidate.routeId === 'fal-undisclosed/fal-h3-max')
+        ?.executable,
+    ).toBe(true);
     expect(fullHd.selectedRouteId).toBe('fal-undisclosed/fal-h3-max');
   });
   it('keeps regional prices separate and refuses to imply execution without configuration', () => {
@@ -218,6 +226,7 @@ describe('regional quote selection', () => {
         modelId: 'bytedance/seedance-2.5',
         operation: 'text-to-video',
         input: { prompt: 'A red kite', resolution: '720p', duration: 5 },
+        routing: { deploymentIds: ['byteplus-undisclosed', 'fal-undisclosed'] },
       },
       { executableRouteIds: catalog.routes.map((route) => route.id) },
     );

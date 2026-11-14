@@ -800,7 +800,7 @@ test('cross-model reuse cannot remove draft processing or fidelity requirements'
   const defaultDraft = await exportedRequest(page);
   await page
     .getByRole('combobox', { name: 'Destination model', exact: true })
-    .selectOption(modelId);
+    .selectOption('minimax/h3-highspeed');
   await page
     .getByRole('combobox', { name: 'Reuse output as', exact: true })
     .selectOption({ label: 'image-to-video · first frame' });

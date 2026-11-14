@@ -129,6 +129,7 @@ function image(
   options: {
     sources: string[];
     resolutions?: string[];
+    defaultResolution?: string;
     maxReferences?: number;
     types?: ReferenceType[];
     countMaximum?: number;
@@ -146,7 +147,7 @@ function image(
     operations: options.operations ?? imageOps,
     commonArguments: options.mask ? [...imageCommon, 'mask'] : imageCommon,
     modelSpecificArguments: options.extra ?? [],
-    defaults: { resolution: '1K' },
+    defaults: { resolution: options.defaultResolution ?? '1K' },
     capabilities: {
       resolutions: options.resolutions ?? ['1K', '2K', '4K'],
       aspectRatios: wideRatios,
@@ -201,6 +202,39 @@ for (const [id, resolutions] of [
       'Audio-only conditioning is not qualified for this model. Strict frame mode cannot be mixed with omni references. A resolution tier is not an exact pixel-dimension guarantee across wrappers.',
     ],
   });
+video('bytedance/seedance-1.0-pro', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedance-1-0-pro',
+    'https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/image-to-video/api',
+  ],
+  resolutions: ['480p', '720p', '1080p'],
+  minimum: 2,
+  maximum: 12,
+  referenceMaximum: {},
+  operations: ['text-to-video', 'image-to-video'],
+  audio: 'unsupported',
+  extra: ['watermark'],
+  notices: [
+    'Seedance 1.0 Pro generates silent video without native audio. Strict first/last-frame mode is supported on native BytePlus; fal v1/pro routes expose text-to-video and image-to-video.',
+  ],
+});
+video('bytedance/seedance-1.0-pro-fast', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedance-1-0-pro-fast',
+    'https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/fast/image-to-video/api',
+  ],
+  resolutions: ['480p', '720p', '1080p'],
+  minimum: 2,
+  maximum: 12,
+  referenceMaximum: {},
+  operations: ['text-to-video', 'image-to-video'],
+  audio: 'unsupported',
+  extra: ['watermark'],
+  notices: [
+    'Seedance 1.0 Pro Fast supports text-to-video and first-frame image-to-video without last-frame or reference-image modes, and generates silent video.',
+  ],
+});
+defs['bytedance/seedance-1.0-pro-fast']!.capabilities.frames.last = false;
 video('kling/kling-4.0', {
   sources: [
     'https://dev.runwayml.com/learn/kling-4-0-api',
@@ -256,6 +290,27 @@ for (const [id, resolutions] of [
       'Native frames and omni references are separate modes. Native last-only support is conflicting in prose/child descriptions and remains unqualified. Video and audio each have a combined 15-second input budget; byte/duration inspection is required separately.',
     ],
   });
+// Keep native MiniMax's narrower API profiles for route validation; the public profile is the union.
+const nativeH3 = structuredClone(defs['minimax/h3']!);
+export const nativeH3Definition: ModelDefinition = {
+  ...nativeH3,
+  commonArguments: nativeH3.commonArguments.filter((field) => field !== 'seed'),
+  capabilities: { ...nativeH3.capabilities, audio: 'always-on' },
+};
+video('minimax/h3', {
+  sources: [minimax, 'https://fal.ai/models/minimax/h3/reference-to-video/api'],
+  resolutions: ['480p', '768p', '2K', '4K'],
+  defaultResolution: '768p',
+  minimum: 4,
+  maximum: 15,
+  referenceMaximum: { image: 9, video: 3, audio: 3 },
+  extra: ['promptExpansion', 'targetAudio'],
+  promptMax: 50000,
+  notices: [
+    'MiniMax H3 is served natively by MiniMax (768p/2K) and on fal (480p/768p/2K/4K). The model profile is a capability union; native MiniMax and fal route limits are validated separately.',
+    ...nativeH3.notices,
+  ],
+});
 // The owner confirmed that the native and fal Max names refer to one exact variant.
 // Keep native's narrower API profile for route validation; the public profile is the union.
 const nativeH3Max = structuredClone(defs['minimax/h3-max']!);
@@ -437,6 +492,20 @@ image('xai/grok-imagine-image-2.0', {
     '1.5K and maximum count differ across schema/guide channels. Quality-model retirement is not proof that the quality argument was retired. Delivery URL versus base64 is broker-owned.',
   ],
 });
+image('bytedance/seedream-5.5', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-5',
+    'https://fal.ai/models/bytedance/seedream/v5.5/edit/api',
+  ],
+  resolutions: ['1K', '1.5K', '2K'],
+  maxReferences: 14,
+  countMaximum: 6,
+  extra: ['background', 'watermark'],
+  promptMax: 4000,
+  notices: [
+    'Native BytePlus synchronous generation returns one image and accepts up to 14 edit references; fal v5.5 accepts up to 10 edit references and 1–6 outputs.',
+  ],
+});
 image('bytedance/seedream-5.0-pro', {
   sources: [
     'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro',
@@ -448,6 +517,64 @@ image('bytedance/seedream-5.0-pro', {
   promptMax: 4000,
   notices: [
     'Layer decomposition and constrained transparent image editing are distinct modes; source/PNG requirements cannot be inferred from a background flag. Some wrappers silently retain only the last ten references; OpenGen rejects overflow.',
+  ],
+});
+image('bytedance/seedream-5.0-flash', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-flash',
+    'https://fal.ai/models/bytedance/seedream/v5/flash/edit/api',
+  ],
+  resolutions: ['1K', '1.5K', '2K'],
+  maxReferences: 10,
+  countMaximum: 6,
+  extra: ['background', 'watermark'],
+  promptMax: 4000,
+  notices: [
+    'Fast Seedream 5.0 release; native BytePlus returns one image synchronously while both native BytePlus and fal v5/flash accept up to 10 edit references.',
+  ],
+});
+image('bytedance/seedream-5.0-lite', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-lite',
+    'https://fal.ai/models/bytedance/seedream/v5/lite/edit/api',
+  ],
+  resolutions: ['2K', '3K', '4K'],
+  defaultResolution: '2K',
+  maxReferences: 14,
+  countMaximum: 6,
+  extra: ['watermark'],
+  promptMax: 4000,
+  notices: [
+    'Seedream 5.0 Lite operates in the high-resolution 2K–4K pixel range (3,686,400–16,777,216 pixels); 1K is not supported. Native BytePlus accepts up to 14 edit references while fal v5/lite accepts up to 10.',
+  ],
+});
+image('bytedance/seedream-4.5', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedream-4-5',
+    'https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit/api',
+  ],
+  resolutions: ['2K', '4K'],
+  defaultResolution: '2K',
+  maxReferences: 14,
+  countMaximum: 6,
+  extra: ['watermark'],
+  promptMax: 4000,
+  notices: [
+    'Seedream 4.5 supports 2K and 4K tiers; native BytePlus returns fixed JPEG output while fal v4.5 exposes seed without watermark or format controls.',
+  ],
+});
+image('bytedance/seedream-4.0', {
+  sources: [
+    'https://docs.byteplus.com/en/docs/modelark/seedream-4-0',
+    'https://fal.ai/models/fal-ai/bytedance/seedream/v4/edit/api',
+  ],
+  resolutions: ['1K', '2K', '4K'],
+  maxReferences: 14,
+  countMaximum: 6,
+  extra: ['watermark'],
+  promptMax: 4000,
+  notices: [
+    'Seedream 4.0 supports 1K, 2K and 4K tiers; native BytePlus returns fixed JPEG output while fal v4 exposes seed without watermark or format controls.',
   ],
 });
 for (const [id, verification] of [
@@ -469,10 +596,22 @@ for (const [id, verification] of [
       'Published weights do not establish a hosted offering. Base/Turbo/hosted Pro identities differ. Prompt-guided RGBA is not a native background-control guarantee. Regional model access must be independently qualified.',
     ],
   });
+image('fal/qwen-image-3', {
+  sources: [
+    'https://fal.ai/models/alibaba/qwen-image-3/text-to-image/api',
+    'https://fal.ai/models/alibaba/qwen-image-3/edit/api',
+  ],
+  resolutions: ['1K', '2K'],
+  maxReferences: 3,
+  countMaximum: 4,
+  extra: ['promptExtend'],
+  notices: [
+    'fal hosts this endpoint as alibaba/qwen-image-3 without disclosing the exact upstream checkpoint suffix; it remains separate from alibaba/qwen-image-3.0-pro until equivalence is confirmed.',
+  ],
+});
 
 for (const id of [
   'kling/kling-4.0',
-  'minimax/h3',
   'minimax/h3-highspeed',
   'minimax/h3-lite',
   'google/gemini-omni-1.1-flash',
@@ -501,7 +640,10 @@ for (const [id, model] of Object.entries(defs))
         : field === 'quality'
           ? gpt || grok
           : field === 'seed'
-            ? qwen || id === 'google/nano-banana-2.1'
+            ? qwen ||
+              id === 'google/nano-banana-2.1' ||
+              id === 'bytedance/seedream-4.5' ||
+              id === 'bytedance/seedream-4.0'
             : field === 'outputCompression'
               ? gpt
               : true,
