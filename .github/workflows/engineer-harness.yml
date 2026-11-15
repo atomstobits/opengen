@@ -1,0 +1,150 @@
+name: Engineer Harness
+
+# SECURITY: This workflow runs with write-scoped tokens and checks out only
+# default-branch code (`persist-credentials: false`). Never check out or execute
+# PR-head code here.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to synchronize
+        required: true
+        type: number
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, dequeued]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: ['Checks']
+    types: [completed]
+
+permissions:
+  actions: read
+  checks: write
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  sync:
+    if: >-
+      ${{
+        (
+          github.event_name != 'workflow_run' ||
+          (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests[0].number != null)
+        ) &&
+        (
+          github.event_name != 'issue_comment' ||
+          (
+            github.event.issue.pull_request != null &&
+            (
+              github.event.comment.user.login == (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ||
+              github.event.comment.user.login == format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ||
+              contains(github.event.comment.body, '@codex') ||
+              contains(github.event.comment.body, 'codex-auto-review') ||
+              contains(github.event.comment.body, '/harness-requeue')
+            )
+          )
+        ) &&
+        (
+          github.event_name != 'pull_request_review' ||
+          github.event.review.user.login == (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ||
+          github.event.review.user.login == format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ||
+          github.event.review.state == 'approved' ||
+          github.event.review.state == 'changes_requested'
+        ) &&
+        (
+          github.event_name != 'pull_request_review_comment' ||
+          (
+            github.event.comment.user.login != (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') &&
+            github.event.comment.user.login != format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector')
+          )
+        )
+      }}
+    concurrency:
+      group: engineer-harness-${{ inputs.pr_number || github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Resolve target pull request
+        id: pr
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              const pullRequestNumber = Number(context.payload.inputs?.pr_number);
+              if (!Number.isSafeInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+                core.setFailed('A positive pull request number is required.');
+                return;
+              }
+              core.setOutput('number', String(pullRequestNumber));
+              return;
+            }
+
+            if (
+              context.eventName === 'pull_request_target' ||
+              context.eventName === 'pull_request_review' ||
+              context.eventName === 'pull_request_review_comment'
+            ) {
+              core.setOutput('number', String(context.payload.pull_request.number));
+              return;
+            }
+
+            if (context.eventName === 'issue_comment') {
+              core.setOutput('number', String(context.payload.issue.number));
+              return;
+            }
+
+            const workflowRun = context.payload.workflow_run;
+            const pullRequests = workflowRun.pull_requests ?? [];
+            if (pullRequests.length === 0) {
+              core.setFailed('No associated pull request found for this workflow_run event.');
+              return;
+            }
+
+            core.setOutput('number', String(pullRequests[0].number));
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Synchronize engineer harness state
+        id: harness_sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          CODEX_REVIEW_ACTOR: ${{ vars.CODEX_REVIEW_ACTOR != '' && vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector' }}
+          ENGINEER_HARNESS_MAX_ROUNDS: ${{ vars.ENGINEER_HARNESS_MAX_ROUNDS != '' && vars.ENGINEER_HARNESS_MAX_ROUNDS || '5' }}
+          ENGINEER_HARNESS_MERGE_POLICY: ${{ vars.ENGINEER_HARNESS_MERGE_POLICY != '' && vars.ENGINEER_HARNESS_MERGE_POLICY || 'auto-merge' }}
+        run: |
+          set -euo pipefail
+          output="$(node --import tsx scripts/engineer-harness/src/cli.ts sync)"
+          printf '%s\n' "$output"
+          status="$(printf '%s\n' "$output" | tail -n 1)"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+
+      - name: Enqueue pull request when merge policy is satisfied
+        if: ${{ steps.harness_sync.outputs.status == 'ready-merge' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ENGINEER_HARNESS_QUEUE_TOKEN: ${{ secrets.ENGINEER_HARNESS_QUEUE_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          CODEX_REVIEW_ACTOR: ${{ vars.CODEX_REVIEW_ACTOR != '' && vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector' }}
+          ENGINEER_HARNESS_MAX_ROUNDS: ${{ vars.ENGINEER_HARNESS_MAX_ROUNDS != '' && vars.ENGINEER_HARNESS_MAX_ROUNDS || '5' }}
+          ENGINEER_HARNESS_MERGE_POLICY: ${{ vars.ENGINEER_HARNESS_MERGE_POLICY != '' && vars.ENGINEER_HARNESS_MERGE_POLICY || 'auto-merge' }}
+        run: node --import tsx scripts/engineer-harness/src/cli.ts merge

@@ -1,0 +1,227 @@
+name: Codex Auto Review
+
+# SECURITY: This workflow runs on pull_request_target and intentionally does not
+# check out PR code. Never add actions/checkout or execute PR-head code here.
+# On an open-source repository, automatic review requests run only for same-repo
+# branches authored by collaborators with write/admin access so external forks
+# cannot consume Codex review quota automatically.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: codex-auto-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  request:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      CODEX_REVIEW_REQUEST_TOKEN: ${{ secrets.CODEX_REVIEW_REQUEST_TOKEN }}
+      CODEX_REVIEW_ACTOR: ${{ vars.CODEX_REVIEW_ACTOR != '' && vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector' }}
+    steps:
+      - name: Request Codex review for current head
+        if: ${{ env.CODEX_REVIEW_REQUEST_TOKEN != '' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ env.CODEX_REVIEW_REQUEST_TOKEN }}
+          script: |
+            const pullRequest = context.payload.pull_request;
+            const headSha = pullRequest.head.sha;
+            const { owner, repo } = context.repo;
+            const baseFullName = `${owner}/${repo}`;
+            const headFullName = pullRequest.head?.repo?.full_name ?? null;
+
+            if (headFullName !== baseFullName) {
+              core.info(
+                `Skipping automatic Codex review request for cross-repository PR (${headFullName ?? 'unknown'} -> ${baseFullName}).`,
+              );
+              return;
+            }
+
+            const prAuthor = pullRequest.user?.login ?? '';
+            if (!prAuthor) {
+              core.info('Skipping automatic Codex review request because PR author login is missing.');
+              return;
+            }
+
+            let authorPermission = 'none';
+            try {
+              const { data: permData } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner,
+                repo,
+                username: prAuthor,
+              });
+              authorPermission = permData.permission;
+            } catch (error) {
+              core.warning(
+                `Could not verify collaborator permission for ${prAuthor} (${error.message}); skipping automatic Codex request.`,
+              );
+              return;
+            }
+
+            if (authorPermission !== 'admin' && authorPermission !== 'write') {
+              core.info(
+                `Skipping automatic Codex review request for ${prAuthor} (permission: ${authorPermission}).`,
+              );
+              return;
+            }
+
+            const marker = `<!-- codex-auto-review:${headSha} -->`;
+            const body = [
+              marker,
+              `@codex review current head ${headSha} with extra focus on linked issue completeness, unnecessary complexity, clean architecture, runtime safety, AI maintainability, tests, and type-safety regressions. If this PR links issue(s), read the original issue(s) and verify the implementation addresses the stated request, acceptance criteria, and risk areas; treat clear gaps as blocking findings.`,
+            ].join('\n');
+
+            const { data: authenticatedUser } = await github.rest.users.getAuthenticated();
+            const trustedMarkerAuthor = authenticatedUser.login;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pullRequest.number,
+              per_page: 100,
+            });
+
+            const existingRequest = comments.find(
+              (comment) =>
+                comment.user?.login === trustedMarkerAuthor && comment.body?.includes(marker),
+            );
+            if (existingRequest !== undefined) {
+              core.info(`Codex review was already requested for ${headSha}.`);
+              return;
+            }
+
+            const codexActor = process.env.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector';
+            let reviews = [];
+            try {
+              reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner,
+                repo,
+                pull_number: pullRequest.number,
+                per_page: 100,
+              });
+            } catch (error) {
+              core.warning(
+                `The reviews could not be listed (${error.message}); requesting as if there were none.`,
+              );
+            }
+
+            const reviewedCommit = (text) =>
+              /codex-review-receipt/.test(text ?? '')
+                ? (text.match(/\*\*Reviewed commit:\*\*\s*`([0-9a-f]{7,40})`/)?.[1] ?? null)
+                : null;
+            const requestedHead = (text) =>
+              (text ?? '').match(/<!--\s*codex-auto-review:([a-f0-9]{7,40})\s*-->/i)?.[1]?.toLowerCase() ??
+              (text ?? '').match(/@codex\s+review[\s\S]*?\bcurrent head\s+([a-f0-9]{7,40})\b/i)?.[1]?.toLowerCase() ??
+              null;
+            const isTrustedRequestAuthor = (comment) =>
+              comment.user?.login === trustedMarkerAuthor ||
+              comment.user?.login === 'github-actions[bot]' ||
+              comment.author_association === undefined ||
+              ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(comment.author_association);
+            const requests = comments
+              .filter(isTrustedRequestAuthor)
+              .map((comment) => ({
+                head: requestedHead(comment.body),
+                time: Date.parse(comment.created_at),
+              }))
+              .filter((request) => request.head !== null && !Number.isNaN(request.time));
+            const fromCodex = (entry) =>
+              entry.user?.login === codexActor || entry.user?.login === `${codexActor}[bot]`;
+
+            const reviewOnHead = reviews.find(
+              (review) => fromCodex(review) && review.commit_id === headSha,
+            );
+            const existingReceipt =
+              reviewOnHead ??
+              comments.find((entry) => {
+                const commit = fromCodex(entry) ? reviewedCommit(entry.body) : null;
+                if (commit === null || !headSha.startsWith(commit)) {
+                  return false;
+                }
+                const receiptTime = Date.parse(entry.created_at);
+                const latestRequest = requests
+                  .filter((request) => request.time <= receiptTime)
+                  .sort((a, b) => b.time - a.time)[0];
+                return latestRequest !== undefined && headSha.startsWith(latestRequest.head);
+              });
+
+            if (existingReceipt !== undefined) {
+              core.info(`Codex already reviewed ${headSha}: no new request.`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pullRequest.number,
+              body,
+            });
+
+            core.info(`Requested Codex review for ${headSha}.`);
+
+      - name: Request manual Codex review
+        if: ${{ env.CODEX_REVIEW_REQUEST_TOKEN == '' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const pullRequest = context.payload.pull_request;
+            const headSha = pullRequest.head.sha;
+            const { owner, repo } = context.repo;
+            const baseFullName = `${owner}/${repo}`;
+            const headFullName = pullRequest.head?.repo?.full_name ?? null;
+
+            if (headFullName !== baseFullName) {
+              core.info('Skipping manual Codex review prompt on cross-repository PR.');
+              return;
+            }
+
+            const marker = `<!-- codex-manual-review-required:${headSha} -->`;
+            const manualCommand = [
+              `ATcodex review current head ${headSha}`,
+              'with extra focus on linked issue completeness, unnecessary complexity, clean architecture, runtime safety, AI maintainability, tests, and type-safety regressions. If this PR links issue(s), read the original issue(s) and verify the implementation addresses the stated request, acceptance criteria, and risk areas; treat clear gaps as blocking findings.',
+            ].join(' ');
+            const body = [
+              marker,
+              'Codex review is required for the current head, but this workflow cannot request it with `GITHUB_TOKEN` because comments authored by `github-actions[bot]` are not associated with a Codex-connected account.',
+              '',
+              'A repository member with Codex connected should post this comment after replacing `AT` with `@`:',
+              '',
+              '```md',
+              manualCommand,
+              '```',
+              '',
+              'To automate this, configure `CODEX_REVIEW_REQUEST_TOKEN` as a fine-grained token owned by a Codex-connected repository member.',
+            ].join('\n');
+
+            const trustedMarkerAuthor = 'github-actions[bot]';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pullRequest.number,
+              per_page: 100,
+            });
+
+            const existingRequest = comments.find(
+              (comment) =>
+                comment.user?.login === trustedMarkerAuthor && comment.body?.includes(marker),
+            );
+            if (existingRequest !== undefined) {
+              core.info(`Manual Codex review was already requested for ${headSha}.`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pullRequest.number,
+              body,
+            });
+
+            core.info(`Requested manual Codex review for ${headSha}.`);
