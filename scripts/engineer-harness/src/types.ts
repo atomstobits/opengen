@@ -32,6 +32,11 @@ export interface PullRequestReview {
   authorLogin: string | null;
   authorType: string | null;
   authorAssociation: string;
+  /**
+   * Repository permission (`admin`, `write`, `read`, `none`) from REST
+   * `collaborators/{login}/permission`, populated for human approving reviews on current head.
+   */
+  authorPermission?: string;
   body: string;
   state: string;
   submittedAt: string;

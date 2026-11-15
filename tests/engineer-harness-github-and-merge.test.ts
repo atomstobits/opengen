@@ -94,6 +94,9 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
         }
 
         if (body.query.includes('EngineerHarnessReviews')) {
+          expect(body.query).toContain(
+            'states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]',
+          );
           const cursor = body.variables['reviewsCursor'];
           reviewCursors.push(cursor);
           const firstPage = cursor === null;
@@ -173,6 +176,16 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
                             author: { login: 'troll' },
                             reactionGroups: [],
                           },
+                          {
+                            databaseId: 4,
+                            body: `/harness-requeue ${HEAD_SHA}`,
+                            url: 'https://github.test/comment/4',
+                            createdAt: '2026-11-14T00:02:30.000Z',
+                            updatedAt: '2026-11-14T00:02:30.000Z',
+                            authorAssociation: 'MEMBER',
+                            author: { login: 'lookup-failed-member' },
+                            reactionGroups: [],
+                          },
                         ],
                   },
                 },
@@ -239,17 +252,21 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
     const snapshot = await client.getPullRequestSnapshot(17);
     expect(snapshot.authorLogin).toBe('maintainer');
     expect(snapshot.authorPermission).toBe('write');
-    expect(snapshot.reviews.map((r) => r.id)).toEqual(['REV_1', 'REV_2']);
+    expect(snapshot.reviews.map((r) => [r.id, r.authorPermission])).toEqual([
+      ['REV_1', undefined],
+      ['REV_2', 'write'],
+    ]);
     expect(snapshot.reviewThreads.map((t) => t.id)).toEqual(['THREAD_1', 'THREAD_2']);
     expect(reviewCursors).toEqual([null, 'review-cursor-1']);
     expect(threadCursors).toEqual([null, 'thread-cursor-1']);
     expect(commentCursors).toEqual([null, 'comment-cursor-1']);
-    // `maintainer` is both PR author and `@codex review` author -> looked up once; `bystander` -> skipped.
-    expect(permissionLookups.sort()).toEqual(['maintainer', 'troll']);
+    // `maintainer` is PR author, `@codex review` author, and `REV_2` approver -> looked up once; `bystander` -> skipped; 404 -> `'unknown'`.
+    expect(permissionLookups.sort()).toEqual(['lookup-failed-member', 'maintainer', 'troll']);
     expect(snapshot.issueComments.map((c) => c.authorPermission)).toEqual([
       'write',
       undefined,
       'none',
+      'unknown',
     ]);
   });
 
@@ -541,6 +558,7 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
   const mockGitHubEnvironment = (options: {
     headRepo: string;
     authorPermission?: string;
+    approverPermission?: string;
     humanApproved?: boolean;
     baseRefName?: string;
   }) => {
@@ -568,7 +586,12 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
           });
         }
         if (url.includes('/collaborators/')) {
-          return jsonResponse({ permission: options.authorPermission ?? 'write' });
+          const isApprover = url.includes('/collaborators/approver-user/permission');
+          return jsonResponse({
+            permission: isApprover
+              ? (options.approverPermission ?? 'write')
+              : (options.authorPermission ?? 'write'),
+          });
         }
         if (url.includes('/issues/42/comments?per_page=100')) {
           return jsonResponse([]);
@@ -640,7 +663,7 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
                               submittedAt: '2026-11-14T00:04:00.000Z',
                               url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-1',
                               authorAssociation: 'MEMBER',
-                              author: { login: 'maintainer', __typename: 'User' },
+                              author: { login: 'approver-user', __typename: 'User' },
                               commit: { oid: HEAD_SHA },
                             },
                           ]
@@ -791,7 +814,34 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
       );
       expect(approvedFork.enqueuedCalls).toHaveLength(1);
 
-      // 4. Unknown CLI subcommand rejects with usage help.
+      // 4. Fork PR approved by a read-only organization MEMBER (`approverPermission: 'read'`) -> stays ready-human.
+      stdout.length = 0;
+      const readOnlyApprovedFork = mockGitHubEnvironment({
+        headRepo: 'fork-user/opengen',
+        humanApproved: true,
+        approverPermission: 'read',
+      });
+      await runSync();
+      await runMerge();
+      expect(stdout.join('')).toContain('ready-human\n');
+      expect(readOnlyApprovedFork.enqueuedCalls).toEqual([]);
+
+      // 5. `ENGINEER_HARNESS_MERGE_POLICY=human-approval-required` enqueues once a write collaborator approves.
+      process.env['ENGINEER_HARNESS_MERGE_POLICY'] = 'human-approval-required';
+      stdout.length = 0;
+      const humanPolicyApproved = mockGitHubEnvironment({
+        headRepo: 'atomstobits/opengen',
+        humanApproved: true,
+        approverPermission: 'write',
+      });
+      await runSync();
+      await runMerge();
+      expect(stdout.join('')).toContain(
+        'Added pull request to the main merge queue at position 1.',
+      );
+      expect(humanPolicyApproved.enqueuedCalls).toHaveLength(1);
+
+      // 6. Unknown CLI subcommand rejects with usage help.
       await expect(main(['unknown'])).rejects.toThrow('Usage: node --import tsx');
     } finally {
       process.env = previousEnv;

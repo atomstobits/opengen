@@ -451,6 +451,13 @@ const EFFECTIVE_DECISION_STATES: ReadonlyArray<string> = [
   'DISMISSED',
 ];
 
+const mayApprovePullRequest = (review: PullRequestReview): boolean => {
+  if (review.authorPermission !== undefined) {
+    return COLLABORATOR_WRITE_PERMISSIONS.includes(review.authorPermission);
+  }
+  return COLLABORATOR_ASSOCIATIONS.includes(review.authorAssociation);
+};
+
 const getApprovalSummary = (
   snapshot: PullRequestSnapshot,
   requiresHumanApproval: boolean,
@@ -489,7 +496,7 @@ const getApprovalSummary = (
   for (const [login, { review }] of latestDecisionByLogin.entries()) {
     if (
       review.state === 'APPROVED' &&
-      COLLABORATOR_ASSOCIATIONS.includes(review.authorAssociation) &&
+      mayApprovePullRequest(review) &&
       review.commitOid === snapshot.headSha
     ) {
       validApprovers.push(login);

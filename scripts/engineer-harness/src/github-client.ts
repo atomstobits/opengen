@@ -80,7 +80,7 @@ const reviewNodeSchema = z.object({
   id: z.string(),
   body: z.string(),
   state: z.string(),
-  submittedAt: z.string(),
+  submittedAt: z.string().nullable(),
   url: z.string(),
   authorAssociation: z.string(),
   author: z
@@ -478,7 +478,7 @@ const toPullRequestReview = (review: z.infer<typeof reviewNodeSchema>): PullRequ
   authorAssociation: review.authorAssociation,
   body: review.body,
   state: review.state,
-  submittedAt: review.submittedAt,
+  submittedAt: review.submittedAt ?? '',
   url: review.url,
   commitOid: review.commit?.oid ?? null,
 });
@@ -530,6 +530,12 @@ const needsCommentPermissionCheck = (comment: IssueComment): boolean =>
   comment.authorLogin !== 'github-actions[bot]' &&
   comment.authorLogin !== 'github-actions' &&
   (hasQueueRetryCommand(comment.body) || hasCodexReviewRequest(comment.body));
+
+const needsReviewPermissionCheck = (review: PullRequestReview, headSha: string): boolean =>
+  review.authorType !== 'Bot' &&
+  review.authorLogin !== null &&
+  review.state === 'APPROVED' &&
+  review.commitOid === headSha;
 
 export class GitHubClient {
   private readonly owner: string;
@@ -597,7 +603,7 @@ export class GitHubClient {
 
     const parsedResponse = pullRequestGraphqlResponseSchema.parse(graphqlResponse);
     const pullRequest = parsedResponse.data.repository.pullRequest;
-    const [ciChecks, listedComments, reviewThreads, reviews, mergeQueue] = await Promise.all([
+    const [ciChecks, listedComments, reviewThreads, listedReviews, mergeQueue] = await Promise.all([
       this.getCheckRuns(pullRequest.headRefOid),
       this.listGraphqlIssueComments(prNumber),
       this.listReviewThreads(prNumber),
@@ -617,6 +623,9 @@ export class GitHubClient {
         ...listedComments
           .filter(needsCommentPermissionCheck)
           .flatMap((comment) => (comment.authorLogin === null ? [] : [comment.authorLogin])),
+        ...listedReviews
+          .filter((review) => needsReviewPermissionCheck(review, pullRequest.headRefOid))
+          .flatMap((review) => (review.authorLogin === null ? [] : [review.authorLogin])),
       ]),
     ];
     const permissions = await this.lookupCollaboratorPermissions(loginsToCheck);
@@ -627,6 +636,14 @@ export class GitHubClient {
           ? permissions.get(comment.authorLogin)
           : undefined;
       return permission === undefined ? comment : { ...comment, authorPermission: permission };
+    });
+
+    const reviews = listedReviews.map((review) => {
+      const permission =
+        review.authorLogin !== null && needsReviewPermissionCheck(review, pullRequest.headRefOid)
+          ? permissions.get(review.authorLogin)
+          : undefined;
+      return permission === undefined ? review : { ...review, authorPermission: permission };
     });
 
     const authorPermission =
@@ -967,6 +984,7 @@ export class GitHubClient {
           );
           permissions.set(login, collaboratorPermissionResponseSchema.parse(response).permission);
         } catch (error) {
+          permissions.set(login, 'unknown');
           console.error(
             `engineer-harness: no repository permission read for ${login}: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -1159,7 +1177,11 @@ export class GitHubClient {
             ) {
               repository(owner: $owner, name: $repo) {
                 pullRequest(number: $pullRequestNumber) {
-                  reviews(first: 100, after: $reviewsCursor) {
+                  reviews(
+                    first: 100
+                    after: $reviewsCursor
+                    states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]
+                  ) {
                     pageInfo {
                       hasNextPage
                       endCursor

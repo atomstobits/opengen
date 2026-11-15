@@ -207,11 +207,6 @@ export const runSync = async (): Promise<void> => {
 
 export const runMerge = async (): Promise<void> => {
   const config = loadConfigFromEnv(process.env);
-  if (config.mergePolicy !== 'auto-merge') {
-    process.stdout.write('Merge policy requires human approval.\n');
-    return;
-  }
-
   const { client, prNumber } = await createPullRequestClientFromEnv();
   const snapshot = await client.getPullRequestSnapshot(prNumber);
 

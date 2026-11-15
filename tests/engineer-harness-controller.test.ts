@@ -499,6 +499,32 @@ describe('evaluateHarness: open-source public repository security boundaries', (
     );
     expect(staleOrBotApproved.status).toBe('ready-human');
 
+    // A read-only organization MEMBER (`authorPermission: 'read'`) submitting APPROVED on HEAD_SHA
+    // never unlocks ready-merge.
+    const readOnlyMemberApproved = evaluateHarness(
+      {
+        ...forkSnapshot,
+        reviews: [
+          {
+            id: 'REV_READONLY_MEMBER',
+            authorLogin: 'readonly-member',
+            authorType: 'User',
+            authorAssociation: 'MEMBER',
+            authorPermission: 'read',
+            body: 'LGTM',
+            state: 'APPROVED',
+            submittedAt: '2026-11-14T00:04:15.000Z',
+            url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-30',
+            commitOid: HEAD_SHA,
+          },
+        ],
+      },
+      createInitialHarnessState(),
+      baseConfig(),
+    );
+    expect(readOnlyMemberApproved.status).toBe('ready-human');
+    expect(readOnlyMemberApproved.approvals.validApprovers).toEqual([]);
+
     // Once a human collaborator approves the exact current headSha, the fork PR transitions to ready-merge.
     const collaboratorApproved = evaluateHarness(
       {
@@ -806,10 +832,11 @@ describe('evaluateHarness: merge queue rejection and /harness-requeue', () => {
     const parsedState = parseHarnessStateComment(renderedState);
     expect(parsedState).toEqual(held.state);
 
-    // Non-collaborator OR read-only organization MEMBER /harness-requeue does NOT release the hold.
+    // Non-collaborator, read-only organization MEMBER, or failed lookup (`unknown`) /harness-requeue does NOT release the hold.
     for (const [authorAssociation, authorPermission] of [
       ['NONE', 'read'],
       ['MEMBER', 'read'],
+      ['MEMBER', 'unknown'],
       ['COLLABORATOR', 'none'],
     ] as const) {
       const unauthorizedRetry = evaluateHarness(

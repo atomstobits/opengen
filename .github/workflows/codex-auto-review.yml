@@ -120,18 +120,43 @@ jobs:
               (text ?? '').match(/<!--\s*codex-auto-review:([a-f0-9]{7,40})\s*-->/i)?.[1]?.toLowerCase() ??
               (text ?? '').match(/@codex\s+review[\s\S]*?\bcurrent head\s+([a-f0-9]{7,40})\b/i)?.[1]?.toLowerCase() ??
               null;
-            const isTrustedRequestAuthor = (comment) =>
-              comment.user?.login === trustedMarkerAuthor ||
-              comment.user?.login === 'github-actions[bot]' ||
-              comment.author_association === undefined ||
-              ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(comment.author_association);
-            const requests = comments
-              .filter(isTrustedRequestAuthor)
-              .map((comment) => ({
-                head: requestedHead(comment.body),
-                time: Date.parse(comment.created_at),
-              }))
-              .filter((request) => request.head !== null && !Number.isNaN(request.time));
+            const permissionCache = new Map([
+              [trustedMarkerAuthor, 'write'],
+              ['github-actions[bot]', 'write'],
+              ['github-actions', 'write'],
+              [prAuthor, authorPermission],
+            ]);
+            const hasWritePermission = async (comment) => {
+              const login = comment.user?.login ?? '';
+              if (!login) {
+                return false;
+              }
+              if (!permissionCache.has(login)) {
+                try {
+                  const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+                    owner,
+                    repo,
+                    username: login,
+                  });
+                  permissionCache.set(login, perm.permission);
+                } catch {
+                  permissionCache.set(login, 'unknown');
+                }
+              }
+              const resolved = permissionCache.get(login);
+              return resolved === 'admin' || resolved === 'write';
+            };
+            const requests = [];
+            for (const comment of comments) {
+              const head = requestedHead(comment.body);
+              const time = Date.parse(comment.created_at);
+              if (head === null || Number.isNaN(time)) {
+                continue;
+              }
+              if (await hasWritePermission(comment)) {
+                requests.push({ head, time });
+              }
+            }
             const normalizeActor = (login) =>
               String(login ?? '')
                 .trim()

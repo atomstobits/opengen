@@ -78,6 +78,9 @@ describe('engineer-harness.yml workflow contract and security invariants', () =>
     expect(forkReviewWorkflow).toContain(
       'github.event.pull_request.head.repo.full_name != github.repository',
     );
+    expect(forkReviewWorkflow).toMatch(
+      /run: \|\n {10}echo "Signaling Engineer Harness sync for fork PR #\$\{PR_NUMBER\}\."\n/,
+    );
   });
 
   it('keeps workflow event filters coupled to controller.ts request and requeue syntax', () => {
@@ -306,6 +309,7 @@ describe('codex-auto-review.yml request script behavior and OSS fork/permission 
     headFullName?: string | null;
     prAuthor?: string;
     authorPermission?: string | Error;
+    commenterPermissions?: Record<string, string>;
     comments?: Array<Record<string, unknown>>;
     reviews?: Array<Record<string, unknown>> | null;
   }) => {
@@ -313,12 +317,16 @@ describe('codex-auto-review.yml request script behavior and OSS fork/permission 
     let permissionLookups = 0;
     const listCommentsToken = Symbol('listComments');
     const listReviewsToken = Symbol('listReviews');
+    const prAuthorLogin = options.prAuthor ?? 'lxa2b';
 
     const github = {
       rest: {
         repos: {
-          getCollaboratorPermissionLevel: async () => {
+          getCollaboratorPermissionLevel: async ({ username }: { username: string }) => {
             permissionLookups += 1;
+            if (username !== prAuthorLogin) {
+              return { data: { permission: options.commenterPermissions?.[username] ?? 'none' } };
+            }
             if (options.authorPermission instanceof Error) {
               throw options.authorPermission;
             }
@@ -429,12 +437,14 @@ describe('codex-auto-review.yml request script behavior and OSS fork/permission 
       expect(withFormalReview.posted).toEqual([]);
     }
 
-    // External user (`author_association: 'NONE'`) trying to spoof an intervening request on OTHER
-    // does not hide a valid collaborator request + Codex receipt on HEAD.
+    // External user (`author_association: 'NONE'`) or read-only org member (`permission: 'read'`)
+    // trying to spoof an intervening request on OTHER does not hide a valid collaborator receipt on HEAD.
     const trollIntervening = await runRequestScript({
+      commenterPermissions: { 'readonly-member': 'read' },
       comments: [
         commentBy('lxa2b', `@codex review current head ${HEAD}`, 'MEMBER'),
         commentBy('troll-user', `@codex review current head ${OTHER}`, 'NONE'),
+        commentBy('readonly-member', `@codex review current head ${OTHER}`, 'MEMBER'),
         commentBy('chatgpt-codex-connector[bot]', cleanReceipt(HEAD), 'NONE'),
       ],
     });

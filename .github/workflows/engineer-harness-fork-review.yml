@@ -41,4 +41,5 @@ jobs:
       - name: Signal privileged harness sync via workflow_run
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: echo "Signaling Engineer Harness sync for fork PR #${PR_NUMBER}."
+        run: |
+          echo "Signaling Engineer Harness sync for fork PR #${PR_NUMBER}."
