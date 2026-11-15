@@ -239,6 +239,18 @@ export const runMerge = async (): Promise<void> => {
     return;
   }
 
+  if (evaluation.state.lastEnqueuedHeadSha !== snapshot.headSha) {
+    const enqueuedState = {
+      ...evaluation.state,
+      lastEnqueuedHeadSha: snapshot.headSha,
+    };
+    await client.upsertHarnessStateComment(
+      snapshot.number,
+      existingStateComment?.id ?? null,
+      formatHarnessStateComment(enqueuedState, evaluation),
+    );
+  }
+
   if (landed.kind === 'already-queued') {
     process.stdout.write(`Pull request is already in the ${snapshot.baseRefName} merge queue.\n`);
     return;

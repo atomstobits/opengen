@@ -13,6 +13,10 @@ const harnessWorkflow = readFileSync(
   resolve(repoRoot, '.github/workflows/engineer-harness.yml'),
   'utf8',
 );
+const forkReviewWorkflow = readFileSync(
+  resolve(repoRoot, '.github/workflows/engineer-harness-fork-review.yml'),
+  'utf8',
+);
 const autoReviewWorkflow = readFileSync(
   resolve(repoRoot, '.github/workflows/codex-auto-review.yml'),
   'utf8',
@@ -38,7 +42,7 @@ const actorClause = (field: string): string =>
   `${field} == (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') || ${field} == format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector')`;
 
 describe('engineer-harness.yml workflow contract and security invariants', () => {
-  it('triggers on Checks workflow_run and dequeued PRs while filtering noisy events on the sync job', () => {
+  it('triggers on base-branch edits, Checks, and fork review signals while filtering noisy or unprivileged fork runs', () => {
     const onBlock = harnessWorkflow.slice(
       harnessWorkflow.indexOf('\non:\n'),
       harnessWorkflow.indexOf('\npermissions:\n'),
@@ -52,22 +56,28 @@ describe('engineer-harness.yml workflow contract and security invariants', () =>
       'workflow_run',
     ]);
     expect(onBlock).toMatch(
-      /pull_request_target:\n {4}types: \[opened, synchronize, reopened, ready_for_review, dequeued\]\n/,
+      /pull_request_target:\n {4}types: \[opened, edited, synchronize, reopened, ready_for_review, dequeued\]\n/,
     );
     expect(onBlock).toMatch(
-      /workflow_run:\n {4}workflows: \['Checks'\]\n {4}types: \[completed\]\n/,
+      /workflow_run:\n {4}workflows: \['Checks', 'Engineer Harness Fork Review'\]\n {4}types: \[completed\]\n/,
     );
 
     const expectedClauses = [
-      "( github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests[0].number != null) )",
+      "( github.event_name != 'pull_request_target' || github.event.action != 'edited' || github.event.changes.base != null )",
+      "( github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Checks' && github.event.workflow_run.event == 'pull_request') || ( github.event.workflow_run.name == 'Engineer Harness Fork Review' && (github.event.workflow_run.event == 'pull_request_review' || github.event.workflow_run.event == 'pull_request_review_comment') && github.event.workflow_run.conclusion == 'success' ) )",
       `( github.event_name != 'issue_comment' || ( github.event.issue.pull_request != null && ( ${actorClause('github.event.comment.user.login')} || contains(github.event.comment.body, '@codex') || contains(github.event.comment.body, 'codex-auto-review') || contains(github.event.comment.body, '/harness-requeue') ) ) )`,
-      `( github.event_name != 'pull_request_review' || ${actorClause('github.event.review.user.login')} || github.event.review.state == 'approved' || github.event.review.state == 'changes_requested' )`,
-      `( github.event_name != 'pull_request_review_comment' || ( github.event.comment.user.login != (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') && github.event.comment.user.login != format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ) )`,
+      `( github.event_name != 'pull_request_review' || ( github.event.pull_request.head.repo.full_name == github.repository && ( ${actorClause('github.event.review.user.login')} || github.event.review.state == 'approved' || github.event.review.state == 'changes_requested' ) ) )`,
+      `( github.event_name != 'pull_request_review_comment' || ( github.event.pull_request.head.repo.full_name == github.repository && github.event.comment.user.login != (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') && github.event.comment.user.login != format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ) )`,
     ];
     expect(jobCondition).toBe(expectedClauses.join(' && '));
-    expect(jobCondition).not.toContain('pull_request_target');
     expect(jobCondition).not.toContain('workflow_dispatch');
     expect(jobCondition).not.toContain('dequeued');
+
+    expect(forkReviewWorkflow).toContain('name: Engineer Harness Fork Review');
+    expect(forkReviewWorkflow).toMatch(/^permissions: \{\}$/m);
+    expect(forkReviewWorkflow).toContain(
+      'github.event.pull_request.head.repo.full_name != github.repository',
+    );
   });
 
   it('keeps workflow event filters coupled to controller.ts request and requeue syntax', () => {
@@ -103,7 +113,7 @@ describe('engineer-harness.yml workflow contract and security invariants', () =>
   it('uses job-level concurrency, checks out only default-branch code with persist-credentials: false, and SHA-pins all external actions', () => {
     expect(harnessWorkflow).not.toMatch(/^concurrency:/m);
     expect(syncSection).toMatch(
-      /^ {4}concurrency:\n {6}group: engineer-harness-\$\{\{ inputs\.pr_number \|\| github\.event\.pull_request\.number \|\| github\.event\.issue\.number \|\| github\.event\.workflow_run\.pull_requests\[0\]\.number \|\| github\.run_id \}\}\n {6}cancel-in-progress: false\n/m,
+      /^ {4}concurrency:\n {6}group: engineer-harness-\$\{\{ inputs\.pr_number \|\| github\.event\.pull_request\.number \|\| github\.event\.issue\.number \|\| github\.event\.workflow_run\.pull_requests\[0\]\.number \|\| github\.event\.workflow_run\.head_sha \|\| github\.run_id \}\}\n {6}cancel-in-progress: false\n/m,
     );
 
     const checkouts = [
@@ -112,10 +122,11 @@ describe('engineer-harness.yml workflow contract and security invariants', () =>
     expect(checkouts).toEqual([
       '        with:\n          ref: ${{ github.event.repository.default_branch }}\n          persist-credentials: false\n',
     ]);
-    expect(harnessWorkflow).not.toMatch(/pull_request\.head|head_ref|head_sha|head_branch/);
 
-    // codex-auto-review.yml must NEVER check out repository or PR code.
+    // codex-auto-review.yml and engineer-harness-fork-review.yml must NEVER check out repository or PR code.
     expect(autoReviewWorkflow).not.toMatch(/uses:\s*actions\/checkout/);
+    expect(forkReviewWorkflow).not.toMatch(/uses:\s*actions\/checkout/);
+    expect([...forkReviewWorkflow.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)]).toEqual([]);
 
     // Every external `uses:` across harness + CI workflows must be pinned to a 40-char commit SHA.
     for (const wf of [harnessWorkflow, autoReviewWorkflow, checkWorkflow]) {
@@ -127,6 +138,103 @@ describe('engineer-harness.yml workflow contract and security invariants', () =>
         expect(target).toMatch(/^[^@]+@[0-9a-f]{40}$/);
       }
     }
+  });
+
+  it('resolves pull request numbers across direct, fork-branch, deleted-fork, and orphaned workflow_run events', async () => {
+    const lines = harnessWorkflow.split('\n');
+    const start = lines.findIndex((line) => line.trim() === 'script: |');
+    expect(start).toBeGreaterThan(0);
+    const firstBodyLine = lines[start + 1] ?? '';
+    const indent = firstBodyLine.match(/^ */)?.[0].length ?? 0;
+    const bodyLines: string[] = [];
+    for (const line of lines.slice(start + 1)) {
+      if (line.trim() !== '' && (line.match(/^ */)?.[0].length ?? 0) < indent) {
+        break;
+      }
+      bodyLines.push(line.slice(indent));
+    }
+    const AsyncFunction = Object.getPrototypeOf(async () => undefined).constructor as new (
+      ...args: string[]
+    ) => (github: unknown, context: unknown, core: unknown) => Promise<void>;
+    const resolvePrScript = new AsyncFunction('github', 'context', 'core', bodyLines.join('\n'));
+
+    const runResolve = async (options: {
+      workflowRun: Record<string, unknown>;
+      branchPulls?: Array<Record<string, unknown>>;
+      commitPulls?: Array<Record<string, unknown>>;
+    }): Promise<string | undefined> => {
+      const outputs = new Map<string, string>();
+      await resolvePrScript(
+        {
+          rest: {
+            pulls: {
+              list: async () => ({ data: options.branchPulls ?? [] }),
+            },
+            repos: {
+              listPullRequestsAssociatedWithCommit: async () => ({
+                data: options.commitPulls ?? [],
+              }),
+            },
+          },
+        },
+        {
+          eventName: 'workflow_run',
+          repo: { owner: 'atomstobits', repo: 'opengen' },
+          payload: { workflow_run: options.workflowRun },
+        },
+        {
+          setOutput: (k: string, v: string) => outputs.set(k, v),
+          setFailed: (msg: string) => {
+            throw new Error(msg);
+          },
+          info: () => undefined,
+        },
+      );
+      return outputs.get('number');
+    };
+
+    // 1. Same-repo workflow_run with populated pull_requests.
+    await expect(runResolve({ workflowRun: { pull_requests: [{ number: 7 }] } })).resolves.toBe(
+      '7',
+    );
+
+    // 2. Fork PR workflow_run where pull_requests is empty -> resolved via head owner:branch.
+    await expect(
+      runResolve({
+        workflowRun: {
+          pull_requests: [],
+          head_repository: { owner: { login: 'fork-user' } },
+          head_branch: 'feat-1',
+          head_sha: 'a'.repeat(40),
+        },
+        branchPulls: [{ number: 19, head: { sha: 'a'.repeat(40) } }],
+      }),
+    ).resolves.toBe('19');
+
+    // 3. Deleted-fork workflow_run where head_repository is null -> resolved via commit association.
+    await expect(
+      runResolve({
+        workflowRun: {
+          pull_requests: [],
+          head_repository: null,
+          head_branch: 'feat-2',
+          head_sha: 'b'.repeat(40),
+        },
+        commitPulls: [{ number: 23, state: 'open' }],
+      }),
+    ).resolves.toBe('23');
+
+    // 4. Orphaned workflow_run -> empty output so sync steps skip cleanly without failing.
+    await expect(
+      runResolve({
+        workflowRun: {
+          pull_requests: [],
+          head_repository: { owner: { login: 'fork-user' } },
+          head_branch: 'gone',
+          head_sha: 'c'.repeat(40),
+        },
+      }),
+    ).resolves.toBe('');
   });
 });
 

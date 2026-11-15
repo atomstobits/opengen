@@ -81,7 +81,11 @@ const baseSnapshot = (overrides: Partial<PullRequestSnapshot> = {}): PullRequest
   ...overrides,
 });
 
-const codexRequestAndCleanReceipt = (sha: string = HEAD_SHA): IssueComment[] => [
+const codexRequestAndCleanReceipt = (
+  sha: string = HEAD_SHA,
+  requestAt = '2026-11-14T00:02:00.000Z',
+  receiptAt = '2026-11-14T00:03:00.000Z',
+): IssueComment[] => [
   {
     id: 1000,
     authorLogin: 'maintainer',
@@ -89,16 +93,16 @@ const codexRequestAndCleanReceipt = (sha: string = HEAD_SHA): IssueComment[] => 
     authorPermission: 'write',
     body: `<!-- codex-auto-review:${sha} -->\n@codex review current head ${sha}`,
     url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-1000',
-    createdAt: '2026-11-14T00:02:00.000Z',
-    updatedAt: '2026-11-14T00:02:00.000Z',
+    createdAt: requestAt,
+    updatedAt: requestAt,
   },
   {
     id: 1001,
     authorLogin: 'chatgpt-codex-connector',
     body: `<!-- codex-review-receipt:v1 -->\n\nCodex Review: Didn't find any major issues.\n\n**Reviewed commit:** \`${sha.slice(0, 10)}\``,
     url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-1001',
-    createdAt: '2026-11-14T00:03:00.000Z',
-    updatedAt: '2026-11-14T00:03:00.000Z',
+    createdAt: receiptAt,
+    updatedAt: receiptAt,
   },
 ];
 
@@ -236,7 +240,35 @@ describe('evaluateHarness: CI and Codex gates', () => {
     expect(evaluation.codex.currentHeadReviewed).toBe(false);
   });
 
-  it('rejects a Codex issue-comment receipt whose Reviewed commit SHA does not match current head', () => {
+  it('rejects a Codex issue-comment receipt when Reviewed commit SHA is missing or does not match current head', () => {
+    const missingSha = evaluateHarness(
+      baseSnapshot({
+        issueComments: [
+          {
+            id: 998,
+            authorLogin: 'maintainer',
+            authorPermission: 'write',
+            body: `<!-- codex-auto-review:${HEAD_SHA} -->\n@codex review current head ${HEAD_SHA}`,
+            url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-998',
+            createdAt: '2026-11-14T00:02:00.000Z',
+            updatedAt: '2026-11-14T00:02:00.000Z',
+          },
+          {
+            id: 999,
+            authorLogin: 'chatgpt-codex-connector',
+            body: '<!-- codex-review-receipt:v1 -->\n\nCodex Review: No issues found.',
+            url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-999',
+            createdAt: '2026-11-14T00:03:00.000Z',
+            updatedAt: '2026-11-14T00:03:00.000Z',
+          },
+        ],
+      }),
+      createInitialHarnessState(),
+      baseConfig(),
+    );
+    expect(missingSha.status).toBe('awaiting-codex');
+    expect(missingSha.codex.currentHeadReviewed).toBe(false);
+
     const evaluation = evaluateHarness(
       baseSnapshot({
         issueComments: [
@@ -265,6 +297,58 @@ describe('evaluateHarness: CI and Codex gates', () => {
 
     expect(evaluation.status).toBe('awaiting-codex');
     expect(evaluation.codex.currentHeadReviewed).toBe(false);
+  });
+
+  it('recognizes both bare and [bot]-suffixed Codex actor logins across receipts, reviews, and reactions', () => {
+    for (const [configuredActor, candidateLogin] of [
+      ['chatgpt-codex-connector', 'chatgpt-codex-connector[bot]'],
+      ['chatgpt-codex-connector[bot]', 'chatgpt-codex-connector'],
+    ] as const) {
+      const cleanComments = codexRequestAndCleanReceipt();
+      cleanComments[1] = { ...cleanComments[1]!, authorLogin: candidateLogin };
+
+      const cleanEval = evaluateHarness(
+        baseSnapshot({ issueComments: cleanComments }),
+        createInitialHarnessState(),
+        baseConfig({ codexReviewActor: configuredActor }),
+      );
+      expect(cleanEval.status).toBe('ready-merge');
+
+      const inProgressComments = codexRequestAndCleanReceipt();
+      inProgressComments[0] = {
+        ...inProgressComments[0]!,
+        reactionGroups: [{ content: 'EYES', userLogins: [candidateLogin] }],
+      };
+      inProgressComments[1] = { ...inProgressComments[1]!, authorLogin: candidateLogin };
+      const eyesEval = evaluateHarness(
+        baseSnapshot({ issueComments: inProgressComments }),
+        createInitialHarnessState(),
+        baseConfig({ codexReviewActor: configuredActor }),
+      );
+      expect(eyesEval.status).toBe('awaiting-codex');
+
+      const findingEval = evaluateHarness(
+        baseSnapshot({
+          reviews: [
+            {
+              id: 'REV_BOT_FORM',
+              authorLogin: candidateLogin,
+              authorType: 'Bot',
+              authorAssociation: 'NONE',
+              body: '[P2] Validate pagination cursor.',
+              state: 'COMMENTED',
+              submittedAt: '2026-11-14T00:03:00.000Z',
+              url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-9',
+              commitOid: HEAD_SHA,
+            },
+          ],
+        }),
+        createInitialHarnessState(),
+        baseConfig({ codexReviewActor: configuredActor }),
+      );
+      expect(findingEval.status).toBe('needs-local-claude');
+      expect(findingEval.codex.topLevelFindings).toHaveLength(1);
+    }
   });
 
   it('blocks on P0-P3 Codex findings and unresolved inline threads, and clears when a newer clean review arrives', () => {
@@ -330,7 +414,7 @@ describe('evaluateHarness: CI and Codex gates', () => {
           {
             id: 1003,
             authorLogin: 'chatgpt-codex-connector',
-            body: 'Codex Review: No issues found.',
+            body: `Codex Review: No issues found.\n\n**Reviewed commit:** \`${HEAD_SHA.slice(0, 10)}\``,
             url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-1003',
             createdAt: '2026-11-14T00:04:30.000Z',
             updatedAt: '2026-11-14T00:04:30.000Z',
@@ -438,6 +522,77 @@ describe('evaluateHarness: open-source public repository security boundaries', (
     );
     expect(collaboratorApproved.status).toBe('ready-merge');
     expect(collaboratorApproved.approvals.validApprovers).toEqual(['maintainer']);
+
+    // A subsequent CHANGES_REQUESTED or DISMISSED review from the same collaborator on the same head
+    // (including equal submittedAt timestamps) supersedes the earlier APPROVED review, whereas a
+    // non-decision COMMENTED note leaves the approval intact.
+    const supersededSameTimestamp = evaluateHarness(
+      {
+        ...forkSnapshot,
+        reviews: [
+          {
+            id: 'REV_HUMAN_APPROVE',
+            authorLogin: 'maintainer',
+            authorType: 'User',
+            authorAssociation: 'MEMBER',
+            body: 'Approved',
+            state: 'APPROVED',
+            submittedAt: '2026-11-14T00:04:30.000Z',
+            url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-4',
+            commitOid: HEAD_SHA,
+          },
+          {
+            id: 'REV_HUMAN_REJECT',
+            authorLogin: 'maintainer',
+            authorType: 'User',
+            authorAssociation: 'MEMBER',
+            body: 'Wait, found a regression.',
+            state: 'CHANGES_REQUESTED',
+            submittedAt: '2026-11-14T00:04:30.000Z',
+            url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-5',
+            commitOid: HEAD_SHA,
+          },
+        ],
+      },
+      createInitialHarnessState(),
+      baseConfig(),
+    );
+    expect(supersededSameTimestamp.status).toBe('ready-human');
+    expect(supersededSameTimestamp.approvals.validApprovers).toEqual([]);
+
+    const commentedAfterApprove = evaluateHarness(
+      {
+        ...forkSnapshot,
+        reviews: [
+          {
+            id: 'REV_HUMAN_APPROVE',
+            authorLogin: 'maintainer',
+            authorType: 'User',
+            authorAssociation: 'MEMBER',
+            body: 'Approved',
+            state: 'APPROVED',
+            submittedAt: '2026-11-14T00:04:30.000Z',
+            url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-4',
+            commitOid: HEAD_SHA,
+          },
+          {
+            id: 'REV_HUMAN_COMMENT',
+            authorLogin: 'maintainer',
+            authorType: 'User',
+            authorAssociation: 'MEMBER',
+            body: 'Nit: follow-up in docs.',
+            state: 'COMMENTED',
+            submittedAt: '2026-11-14T00:04:45.000Z',
+            url: 'https://github.com/atomstobits/opengen/pull/42#pullrequestreview-6',
+            commitOid: HEAD_SHA,
+          },
+        ],
+      },
+      createInitialHarnessState(),
+      baseConfig(),
+    );
+    expect(commentedAfterApprove.status).toBe('ready-merge');
+    expect(commentedAfterApprove.approvals.validApprovers).toEqual(['maintainer']);
   });
 
   it('forces human collaborator approval for same-repo PRs when author lacks write/admin permission', () => {
@@ -475,7 +630,7 @@ describe('evaluateHarness: open-source public repository security boundaries', (
           {
             id: 2001,
             authorLogin: 'chatgpt-codex-connector',
-            body: 'Codex Review: No issues found.',
+            body: `Codex Review: No issues found.\n\n**Reviewed commit:** \`${HEAD_SHA.slice(0, 10)}\``,
             url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-2001',
             createdAt: '2026-11-14T00:03:00.000Z',
             updatedAt: '2026-11-14T00:03:00.000Z',
@@ -651,28 +806,34 @@ describe('evaluateHarness: merge queue rejection and /harness-requeue', () => {
     const parsedState = parseHarnessStateComment(renderedState);
     expect(parsedState).toEqual(held.state);
 
-    // Non-collaborator /harness-requeue does NOT release the hold.
-    const unauthorizedRetry = evaluateHarness(
-      {
-        ...rejectedSnapshot,
-        issueComments: [
-          ...codexRequestAndCleanReceipt(),
-          {
-            id: 3000,
-            authorLogin: 'outsider',
-            authorAssociation: 'NONE',
-            authorPermission: 'read',
-            body: `/harness-requeue ${HEAD_SHA}`,
-            url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-3000',
-            createdAt: '2026-11-14T00:05:00.000Z',
-            updatedAt: '2026-11-14T00:05:00.000Z',
-          },
-        ],
-      },
-      held.state,
-      baseConfig(),
-    );
-    expect(unauthorizedRetry.status).toBe('needs-local-claude');
+    // Non-collaborator OR read-only organization MEMBER /harness-requeue does NOT release the hold.
+    for (const [authorAssociation, authorPermission] of [
+      ['NONE', 'read'],
+      ['MEMBER', 'read'],
+      ['COLLABORATOR', 'none'],
+    ] as const) {
+      const unauthorizedRetry = evaluateHarness(
+        {
+          ...rejectedSnapshot,
+          issueComments: [
+            ...codexRequestAndCleanReceipt(),
+            {
+              id: 3000,
+              authorLogin: 'readonly-member',
+              authorAssociation,
+              authorPermission,
+              body: `/harness-requeue ${HEAD_SHA}`,
+              url: 'https://github.com/atomstobits/opengen/pull/42#issuecomment-3000',
+              createdAt: '2026-11-14T00:05:00.000Z',
+              updatedAt: '2026-11-14T00:05:00.000Z',
+            },
+          ],
+        },
+        held.state,
+        baseConfig(),
+      );
+      expect(unauthorizedRetry.status).toBe('needs-local-claude');
+    }
 
     // Collaborator /harness-requeue after removedAt releases the hold back to ready-merge.
     const authorizedRetry = evaluateHarness(
@@ -726,8 +887,9 @@ describe('evaluateHarness: merge queue rejection and /harness-requeue', () => {
     expect(secondRejection.status).toBe('needs-local-claude');
   });
 
-  it('does not bind a pre-force-push queue removal to the newly force-pushed head', () => {
-    const evaluation = evaluateHarness(
+  it('does not bind an earlier head queue removal to a newly pushed normal or force-pushed head', () => {
+    // 1. Force-push after enqueue before first rejection sync.
+    const forcePushed = evaluateHarness(
       baseSnapshot({
         issueComments: codexRequestAndCleanReceipt(),
         mergeQueueRemoval: queueRemoval({
@@ -739,9 +901,74 @@ describe('evaluateHarness: merge queue rejection and /harness-requeue', () => {
       createInitialHarnessState(),
       baseConfig(),
     );
+    expect(forcePushed.status).toBe('ready-merge');
+    expect(forcePushed.ci.queueRejection).toBeNull();
 
-    expect(evaluation.status).toBe('ready-merge');
-    expect(evaluation.ci.queueRejection).toBeNull();
+    // 2. Normal push advances head A (HEAD_SHA) -> head B (OTHER_SHA) before first rejection sync,
+    //    verified across timeline `enqueuedHeadSha`, persisted `lastEnqueuedHeadSha`, and commit timing.
+    const timelineBound = evaluateHarness(
+      baseSnapshot({
+        headSha: OTHER_SHA,
+        headCommittedAt: '2026-11-14T00:04:45.000Z',
+        issueComments: codexRequestAndCleanReceipt(
+          OTHER_SHA,
+          '2026-11-14T00:05:00.000Z',
+          '2026-11-14T00:05:30.000Z',
+        ),
+        mergeQueueRemoval: queueRemoval({
+          enqueuedAt: '2026-11-14T00:01:00.000Z',
+          removedAt: '2026-11-14T00:04:00.000Z',
+          enqueuedHeadSha: HEAD_SHA,
+          headAdvancedAfterEnqueue: true,
+        }),
+      }),
+      createInitialHarnessState(),
+      baseConfig(),
+    );
+    expect(timelineBound.status).toBe('ready-merge');
+    expect(timelineBound.ci.queueRejection).toBeNull();
+    expect(timelineBound.state.queueHold).toEqual({ key: '9'.repeat(40), headSha: HEAD_SHA });
+
+    const commitTimingFallback = evaluateHarness(
+      baseSnapshot({
+        headSha: OTHER_SHA,
+        headCommittedAt: '2026-11-14T00:04:45.000Z',
+        issueComments: codexRequestAndCleanReceipt(
+          OTHER_SHA,
+          '2026-11-14T00:05:00.000Z',
+          '2026-11-14T00:05:30.000Z',
+        ),
+        mergeQueueRemoval: queueRemoval({
+          enqueuedAt: '2026-11-14T00:01:00.000Z',
+          removedAt: '2026-11-14T00:04:00.000Z',
+        }),
+      }),
+      createInitialHarnessState(),
+      baseConfig(),
+    );
+    expect(commitTimingFallback.status).toBe('ready-merge');
+    expect(commitTimingFallback.ci.queueRejection).toBeNull();
+    expect(commitTimingFallback.state.queueHold).toEqual({ key: '9'.repeat(40), headSha: null });
+
+    const persistedEnqueueBound = evaluateHarness(
+      baseSnapshot({
+        headSha: OTHER_SHA,
+        headCommittedAt: '2026-11-14T00:00:30.000Z',
+        issueComments: codexRequestAndCleanReceipt(OTHER_SHA),
+        mergeQueueRemoval: queueRemoval({
+          enqueuedAt: '2026-11-14T00:01:00.000Z',
+          removedAt: '2026-11-14T00:04:00.000Z',
+        }),
+      }),
+      { ...createInitialHarnessState(), lastEnqueuedHeadSha: HEAD_SHA },
+      baseConfig(),
+    );
+    expect(persistedEnqueueBound.status).toBe('ready-merge');
+    expect(persistedEnqueueBound.ci.queueRejection).toBeNull();
+    expect(persistedEnqueueBound.state.queueHold).toEqual({
+      key: '9'.repeat(40),
+      headSha: HEAD_SHA,
+    });
   });
 });
 

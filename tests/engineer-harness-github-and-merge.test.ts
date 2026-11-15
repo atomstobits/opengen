@@ -31,10 +31,11 @@ afterEach(() => {
 });
 
 describe('GitHubClient snapshots, permissions, and state comments', () => {
-  it('paginates review threads and GraphQL issue comments and batches collaborator permission lookups once per login', async () => {
+  it('paginates reviews, review threads, and GraphQL issue comments and batches collaborator permission lookups once per login', async () => {
     const permissionLookups: string[] = [];
     const threadCursors: unknown[] = [];
     const commentCursors: unknown[] = [];
+    const reviewCursors: unknown[] = [];
 
     vi.stubGlobal(
       'fetch',
@@ -86,7 +87,39 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
                   commits: {
                     nodes: [{ commit: { committedDate: '2026-11-14T00:00:00.000Z' } }],
                   },
-                  reviews: { nodes: [] },
+                },
+              },
+            },
+          });
+        }
+
+        if (body.query.includes('EngineerHarnessReviews')) {
+          const cursor = body.variables['reviewsCursor'];
+          reviewCursors.push(cursor);
+          const firstPage = cursor === null;
+          const idx = firstPage ? 1 : 2;
+          return jsonResponse({
+            data: {
+              repository: {
+                pullRequest: {
+                  reviews: {
+                    pageInfo: {
+                      hasNextPage: firstPage,
+                      endCursor: firstPage ? 'review-cursor-1' : null,
+                    },
+                    nodes: [
+                      {
+                        id: `REV_${idx}`,
+                        body: `Review ${idx}`,
+                        state: firstPage ? 'COMMENTED' : 'APPROVED',
+                        submittedAt: `2026-11-14T00:0${idx}:00.000Z`,
+                        url: `https://github.test/review/${idx}`,
+                        authorAssociation: 'MEMBER',
+                        author: { login: 'maintainer', __typename: 'User' },
+                        commit: { oid: HEAD_SHA },
+                      },
+                    ],
+                  },
                 },
               },
             },
@@ -206,7 +239,9 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
     const snapshot = await client.getPullRequestSnapshot(17);
     expect(snapshot.authorLogin).toBe('maintainer');
     expect(snapshot.authorPermission).toBe('write');
+    expect(snapshot.reviews.map((r) => r.id)).toEqual(['REV_1', 'REV_2']);
     expect(snapshot.reviewThreads.map((t) => t.id)).toEqual(['THREAD_1', 'THREAD_2']);
+    expect(reviewCursors).toEqual([null, 'review-cursor-1']);
     expect(threadCursors).toEqual([null, 'thread-cursor-1']);
     expect(commentCursors).toEqual([null, 'comment-cursor-1']);
     // `maintainer` is both PR author and `@codex review` author -> looked up once; `bystander` -> skipped.
@@ -238,6 +273,27 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
         removedAt: '2026-11-14T01:12:00Z',
         reason: 'failed_checks',
         mergeGroupSha,
+        enqueuedHeadSha: null,
+        headAdvancedAfterEnqueue: false,
+      },
+      headForcePushedAt: null,
+    });
+
+    // Normal push after removal preserves the rejected head SHA (`a`.repeat(40)) and marks headAdvancedAfterEnqueue.
+    expect(
+      summarizeMergeQueueTimeline([
+        { __typename: 'PullRequestCommit', commit: { oid: 'a'.repeat(40) } },
+        ...timelineNodes,
+        { __typename: 'PullRequestCommit', commit: { oid: HEAD_SHA } },
+      ]),
+    ).toEqual({
+      removal: {
+        enqueuedAt: '2026-11-14T01:00:00Z',
+        removedAt: '2026-11-14T01:12:00Z',
+        reason: 'failed_checks',
+        mergeGroupSha,
+        enqueuedHeadSha: 'a'.repeat(40),
+        headAdvancedAfterEnqueue: true,
       },
       headForcePushedAt: null,
     });
@@ -293,12 +349,53 @@ describe('GitHubClient snapshots, permissions, and state comments', () => {
         removedAt: '2026-11-14T01:12:00Z',
         reason: 'failed_checks',
         mergeGroupSha,
+        enqueuedHeadSha: null,
+        headAdvancedAfterEnqueue: false,
         runUrl: 'https://github.com/atomstobits/opengen/actions/runs/501',
         failedJobs: ['containers', 'secrets'],
       },
       headForcePushedAt: null,
     });
     expect(requestedUrls.some((u) => u.includes('/actions/workflows/check.yml/runs'))).toBe(true);
+  });
+
+  it('mutates only harness-owned agent:* labels without overwriting unrelated maintainer labels', async () => {
+    const calls: Array<{ method: string; url: string; body?: unknown }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          method: init?.method ?? 'GET',
+          url: String(input),
+          ...(init?.body === undefined ? {} : { body: JSON.parse(String(init.body)) }),
+        });
+        return init?.method === 'DELETE' ? new Response(null, { status: 204 }) : jsonResponse([]);
+      }),
+    );
+
+    const client = new GitHubClient({
+      owner: 'atomstobits',
+      repo: 'opengen',
+      token: 'test-token',
+      apiBaseUrl: 'https://github.test',
+    });
+
+    await client.syncIssueLabels(
+      42,
+      ['enhancement', 'release-blocker', 'agent:awaiting-codex'],
+      ['agent:ready-merge'],
+    );
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://github.test/repos/atomstobits/opengen/issues/42/labels',
+        body: { labels: ['agent:ready-merge'] },
+      },
+      {
+        method: 'DELETE',
+        url: 'https://github.test/repos/atomstobits/opengen/issues/42/labels/agent%3Aawaiting-codex',
+      },
+    ]);
   });
 
   it('ignores spoofed state comments from non-github-actions users when reading harness state', async () => {
@@ -450,6 +547,7 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
     const enqueuedCalls: Array<{ pullRequestId: string; expectedHeadOid: string; auth: string }> =
       [];
     const createdChecks: unknown[] = [];
+    const postedComments: string[] = [];
 
     vi.stubGlobal(
       'fetch',
@@ -475,13 +573,17 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
         if (url.includes('/issues/42/comments?per_page=100')) {
           return jsonResponse([]);
         }
-        if (url.endsWith('/labels') && init?.method === 'POST') {
+        if (url.endsWith('/labels') && init?.method === 'POST' && !url.includes('/issues/')) {
           return jsonResponse({}, 422);
         }
-        if (url.endsWith('/issues/42/labels') && init?.method === 'PUT') {
+        if (url.endsWith('/issues/42/labels') && init?.method === 'POST') {
           return jsonResponse([]);
         }
+        if (url.includes('/issues/42/labels/') && init?.method === 'DELETE') {
+          return new Response(null, { status: 204 });
+        }
         if (url.endsWith('/issues/42/comments') && init?.method === 'POST') {
+          postedComments.push((JSON.parse(String(init.body)) as { body: string }).body);
           return jsonResponse({ id: 99 }, 201);
         }
         if (url.endsWith('/check-runs') && init?.method === 'POST') {
@@ -517,7 +619,18 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
                     commits: {
                       nodes: [{ commit: { committedDate: '2026-11-14T00:00:00.000Z' } }],
                     },
+                  },
+                },
+              },
+            });
+          }
+          if (body.query.includes('EngineerHarnessReviews')) {
+            return jsonResponse({
+              data: {
+                repository: {
+                  pullRequest: {
                     reviews: {
+                      pageInfo: { hasNextPage: false, endCursor: null },
                       nodes: options.humanApproved
                         ? [
                             {
@@ -620,7 +733,7 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
       }),
     );
 
-    return { enqueuedCalls, createdChecks };
+    return { enqueuedCalls, createdChecks, postedComments };
   };
 
   it('syncs and enqueues a trusted internal PR, refuses an unapproved fork PR, and enqueues an approved fork PR', async () => {
@@ -651,6 +764,7 @@ describe('CLI runSync and runMerge end-to-end flows', () => {
           auth: 'Bearer test-mq',
         },
       ]);
+      expect(internal.postedComments.at(-1)).toContain(`"lastEnqueuedHeadSha":"${HEAD_SHA}"`);
 
       // 2. External fork PR without collaborator approval -> ready-human -> NOT enqueued.
       stdout.length = 0;

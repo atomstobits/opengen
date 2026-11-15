@@ -109,6 +109,10 @@ export interface MergeQueueRemoval {
   removedAt: string;
   reason: string;
   mergeGroupSha: string | null;
+  /** Head SHA on the PR at the time it entered the merge queue, when recoverable from timeline. */
+  enqueuedHeadSha?: string | null;
+  /** True when a commit or force-push occurred on the PR after the corresponding enqueue event. */
+  headAdvancedAfterEnqueue?: boolean;
   runUrl: string | null;
   failedJobs: string[];
 }
@@ -130,6 +134,7 @@ export interface HarnessState {
   halted: boolean;
   haltReason: string | null;
   queueHold?: QueueHold | null;
+  lastEnqueuedHeadSha?: string | null;
 }
 
 export interface QueueHold {

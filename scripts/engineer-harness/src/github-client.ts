@@ -122,7 +122,9 @@ const mergeQueueTimelineNodeSchema = z.object({
   __typename: z.string(),
   createdAt: z.string().optional(),
   reason: z.string().nullable().optional(),
+  commit: z.object({ oid: z.string() }).nullable().optional(),
   beforeCommit: z.object({ oid: z.string() }).nullable().optional(),
+  afterCommit: z.object({ oid: z.string() }).nullable().optional(),
 });
 
 const mergeQueueTimelineGraphqlResponseSchema = z.object({
@@ -162,38 +164,99 @@ const FAILED_JOB_CONCLUSIONS: ReadonlyArray<string> = ['failure', 'timed_out', '
 
 export type MergeQueueTimelineNode = z.infer<typeof mergeQueueTimelineNodeSchema>;
 
+export type MergeQueueHistoryRemoval = Pick<
+  MergeQueueRemoval,
+  | 'enqueuedAt'
+  | 'removedAt'
+  | 'reason'
+  | 'mergeGroupSha'
+  | 'enqueuedHeadSha'
+  | 'headAdvancedAfterEnqueue'
+>;
+
 export interface MergeQueueHistory {
-  removal: Pick<MergeQueueRemoval, 'enqueuedAt' | 'removedAt' | 'reason' | 'mergeGroupSha'> | null;
+  removal: MergeQueueHistoryRemoval | null;
   headForcePushedAt: string | null;
 }
 
 export const summarizeMergeQueueTimeline = (
   nodes: ReadonlyArray<MergeQueueTimelineNode | null>,
 ): MergeQueueHistory => {
+  const nonNullNodes = nodes.filter((node): node is MergeQueueTimelineNode => node !== null);
+  const hasCommitItems = nonNullNodes.some((node) => node.__typename === 'PullRequestCommit');
+  const orderedNodes = hasCommitItems
+    ? nonNullNodes
+    : nonNullNodes
+        .filter(
+          (node): node is MergeQueueTimelineNode & { createdAt: string } =>
+            node.createdAt !== undefined,
+        )
+        .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+
+  let currentHeadSha: string | null = null;
   let enqueuedAt: string | null = null;
-  let removal: MergeQueueHistory['removal'] = null;
+  let activeEnqueueHeadSha: string | null = null;
+  let activeHeadAdvanced = false;
+  let removal: MergeQueueHistoryRemoval | null = null;
   let headForcePushedAt: string | null = null;
 
-  const dated = nodes
-    .flatMap((node) =>
-      node === null || node.createdAt === undefined ? [] : [{ ...node, createdAt: node.createdAt }],
-    )
-    .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
-
-  for (const node of dated) {
-    if (node.__typename === 'HeadRefForcePushedEvent') {
-      headForcePushedAt = node.createdAt;
-    } else if (node.__typename === 'AddedToMergeQueueEvent') {
+  for (const node of orderedNodes) {
+    if (node.__typename === 'PullRequestCommit') {
+      const oid = node.commit?.oid ?? null;
+      if (oid !== null) {
+        currentHeadSha = oid;
+      }
+      if (enqueuedAt !== null) {
+        activeHeadAdvanced = true;
+      }
+      if (removal !== null) {
+        removal.headAdvancedAfterEnqueue = true;
+      }
+    } else if (node.__typename === 'HeadRefForcePushedEvent') {
+      if (node.createdAt !== undefined) {
+        headForcePushedAt = node.createdAt;
+      }
+      if (
+        enqueuedAt !== null &&
+        activeEnqueueHeadSha === null &&
+        node.beforeCommit?.oid !== undefined
+      ) {
+        activeEnqueueHeadSha = node.beforeCommit.oid;
+      }
+      if (
+        removal !== null &&
+        (removal.enqueuedHeadSha === undefined || removal.enqueuedHeadSha === null) &&
+        node.beforeCommit?.oid !== undefined &&
+        removal.headAdvancedAfterEnqueue !== true
+      ) {
+        removal.enqueuedHeadSha = node.beforeCommit.oid;
+      }
+      if (node.afterCommit?.oid !== undefined) {
+        currentHeadSha = node.afterCommit.oid;
+      }
+      if (enqueuedAt !== null) {
+        activeHeadAdvanced = true;
+      }
+      if (removal !== null) {
+        removal.headAdvancedAfterEnqueue = true;
+      }
+    } else if (node.__typename === 'AddedToMergeQueueEvent' && node.createdAt !== undefined) {
       enqueuedAt = node.createdAt;
+      activeEnqueueHeadSha = currentHeadSha;
+      activeHeadAdvanced = false;
       removal = null;
-    } else if (node.__typename === 'RemovedFromMergeQueueEvent') {
+    } else if (node.__typename === 'RemovedFromMergeQueueEvent' && node.createdAt !== undefined) {
       removal = {
         enqueuedAt: enqueuedAt ?? node.createdAt,
         removedAt: node.createdAt,
         reason: node.reason ?? '',
         mergeGroupSha: node.beforeCommit?.oid ?? null,
+        enqueuedHeadSha: activeEnqueueHeadSha,
+        headAdvancedAfterEnqueue: activeHeadAdvanced,
       };
       enqueuedAt = null;
+      activeEnqueueHeadSha = null;
+      activeHeadAdvanced = false;
     }
   }
 
@@ -280,7 +343,17 @@ const pullRequestGraphqlResponseSchema = z.object({
             }),
           ),
         }),
+      }),
+    }),
+  }),
+});
+
+const reviewsGraphqlResponseSchema = z.object({
+  data: z.object({
+    repository: z.object({
+      pullRequest: z.object({
         reviews: z.object({
+          pageInfo: pageInfoSchema,
           nodes: z.array(reviewNodeSchema),
         }),
       }),
@@ -510,23 +583,6 @@ export class GitHubClient {
                     }
                   }
                 }
-                reviews(first: 100) {
-                  nodes {
-                    id
-                    body
-                    state
-                    submittedAt
-                    url
-                    authorAssociation
-                    author {
-                      login
-                      __typename
-                    }
-                    commit {
-                      oid
-                    }
-                  }
-                }
               }
             }
           }
@@ -541,10 +597,11 @@ export class GitHubClient {
 
     const parsedResponse = pullRequestGraphqlResponseSchema.parse(graphqlResponse);
     const pullRequest = parsedResponse.data.repository.pullRequest;
-    const [ciChecks, listedComments, reviewThreads, mergeQueue] = await Promise.all([
+    const [ciChecks, listedComments, reviewThreads, reviews, mergeQueue] = await Promise.all([
       this.getCheckRuns(pullRequest.headRefOid),
       this.listGraphqlIssueComments(prNumber),
       this.listReviewThreads(prNumber),
+      this.listReviews(prNumber),
       this.getMergeQueueRemoval(prNumber),
     ]);
 
@@ -595,7 +652,7 @@ export class GitHubClient {
       ...(authorPermission === undefined ? {} : { authorPermission }),
       labels: pullRequest.labels.nodes.map((label) => label.name),
       reviewThreads,
-      reviews: pullRequest.reviews.nodes.map(toPullRequestReview),
+      reviews,
       issueComments,
       ciChecks,
       mergeQueueRemoval: mergeQueue.removal,
@@ -613,10 +670,20 @@ export class GitHubClient {
             pullRequest(number: $pullRequestNumber) {
               timelineItems(
                 last: 100
-                itemTypes: [ADDED_TO_MERGE_QUEUE_EVENT, REMOVED_FROM_MERGE_QUEUE_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]
+                itemTypes: [
+                  PULL_REQUEST_COMMIT
+                  ADDED_TO_MERGE_QUEUE_EVENT
+                  REMOVED_FROM_MERGE_QUEUE_EVENT
+                  HEAD_REF_FORCE_PUSHED_EVENT
+                ]
               ) {
                 nodes {
                   __typename
+                  ... on PullRequestCommit {
+                    commit {
+                      oid
+                    }
+                  }
                   ... on AddedToMergeQueueEvent {
                     createdAt
                   }
@@ -629,6 +696,12 @@ export class GitHubClient {
                   }
                   ... on HeadRefForcePushedEvent {
                     createdAt
+                    beforeCommit {
+                      oid
+                    }
+                    afterCommit {
+                      oid
+                    }
                   }
                 }
               }
@@ -764,13 +837,32 @@ export class GitHubClient {
     currentLabels: string[],
     desiredAgentLabels: string[],
   ): Promise<void> {
-    const nonAgentLabels = currentLabels.filter((label) => !isEngineerHarnessPrLabel(label));
-    const nextLabels = [...nonAgentLabels, ...desiredAgentLabels];
+    const desiredSet = new Set(desiredAgentLabels.filter(isEngineerHarnessPrLabel));
+    const currentAgentSet = new Set<string>(currentLabels.filter(isEngineerHarnessPrLabel));
 
-    await this.requestJson(`/repos/${this.owner}/${this.repo}/issues/${prNumber}/labels`, {
-      method: 'PUT',
-      body: JSON.stringify({ labels: nextLabels }),
-    });
+    const labelsToAdd = [...desiredSet].filter((label) => !currentAgentSet.has(label));
+    const labelsToRemove = ENGINEER_HARNESS_PR_LABELS.filter(
+      (label) => currentAgentSet.has(label) && !desiredSet.has(label),
+    );
+
+    if (labelsToAdd.length > 0) {
+      await this.requestJson(
+        `/repos/${this.owner}/${this.repo}/issues/${prNumber}/labels`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ labels: labelsToAdd }),
+        },
+        [200, 201],
+      );
+    }
+
+    for (const label of labelsToRemove) {
+      await this.requestJson(
+        `/repos/${this.owner}/${this.repo}/issues/${prNumber}/labels/${encodeURIComponent(label)}`,
+        { method: 'DELETE' },
+        [200, 204, 404],
+      );
+    }
   }
 
   public async createCheckRun(
@@ -1050,16 +1142,98 @@ export class GitHubClient {
     return reviewThreads;
   }
 
-  private async getCheckRuns(headSha: string): Promise<CheckRunStatus[]> {
-    const response = await this.requestJson(
-      `/repos/${this.owner}/${this.repo}/commits/${headSha}/check-runs?per_page=100`,
-      {
-        method: 'GET',
-      },
-    );
+  private async listReviews(prNumber: number): Promise<PullRequestReview[]> {
+    const reviews: PullRequestReview[] = [];
+    let cursor: string | null = null;
 
-    const parsedResponse = checkRunsResponseSchema.parse(response);
-    return parsedResponse.check_runs.map(toCheckRunStatus);
+    while (true) {
+      const response = await this.requestJson('/graphql', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: `
+            query EngineerHarnessReviews(
+              $owner: String!
+              $repo: String!
+              $pullRequestNumber: Int!
+              $reviewsCursor: String
+            ) {
+              repository(owner: $owner, name: $repo) {
+                pullRequest(number: $pullRequestNumber) {
+                  reviews(first: 100, after: $reviewsCursor) {
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                    nodes {
+                      id
+                      body
+                      state
+                      submittedAt
+                      url
+                      authorAssociation
+                      author {
+                        login
+                        __typename
+                      }
+                      commit {
+                        oid
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          variables: {
+            owner: this.owner,
+            repo: this.repo,
+            pullRequestNumber: prNumber,
+            reviewsCursor: cursor,
+          },
+        }),
+      });
+
+      const parsedResponse = reviewsGraphqlResponseSchema.parse(response);
+      const page = parsedResponse.data.repository.pullRequest.reviews;
+      reviews.push(...page.nodes.map(toPullRequestReview));
+
+      if (!page.pageInfo.hasNextPage) {
+        break;
+      }
+
+      cursor = page.pageInfo.endCursor;
+      if (cursor === null) {
+        throw new Error('GitHub reported more reviews without a pagination cursor.');
+      }
+    }
+
+    return reviews;
+  }
+
+  private async getCheckRuns(headSha: string): Promise<CheckRunStatus[]> {
+    const checkRuns: CheckRunStatus[] = [];
+    let page = 1;
+
+    while (true) {
+      const suffix = page === 1 ? 'per_page=100' : `per_page=100&page=${page}`;
+      const response = await this.requestJson(
+        `/repos/${this.owner}/${this.repo}/commits/${headSha}/check-runs?${suffix}`,
+        {
+          method: 'GET',
+        },
+      );
+
+      const pageRuns = checkRunsResponseSchema.parse(response).check_runs.map(toCheckRunStatus);
+      checkRuns.push(...pageRuns);
+
+      if (pageRuns.length < 100) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return checkRuns;
   }
 
   private async requestGraphql(

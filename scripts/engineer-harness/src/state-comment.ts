@@ -189,8 +189,15 @@ const isHarnessState = (value: unknown): value is HarnessState => {
       (typeof Reflect.get(queueHold, 'headSha') === 'string' ||
         Reflect.get(queueHold, 'headSha') === null));
 
+  const lastEnqueuedHeadSha: unknown = Reflect.get(value, 'lastEnqueuedHeadSha');
+  const hasValidLastEnqueuedHeadSha =
+    lastEnqueuedHeadSha === undefined ||
+    lastEnqueuedHeadSha === null ||
+    typeof lastEnqueuedHeadSha === 'string';
+
   return (
     hasValidQueueHold &&
+    hasValidLastEnqueuedHeadSha &&
     Reflect.get(value, 'version') === 1 &&
     typeof Reflect.get(value, 'roundsUsed') === 'number' &&
     (typeof Reflect.get(value, 'lastTaskSignature') === 'string' ||

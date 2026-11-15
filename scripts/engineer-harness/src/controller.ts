@@ -87,10 +87,18 @@ const getPrioritySeverity = (body: string): 'P0' | 'P1' | 'P2' | 'P3' | null => 
   );
 };
 
+const normalizeBotLogin = (login: string): string =>
+  login
+    .trim()
+    .replace(/\[bot\]$/i, '')
+    .toLowerCase();
+
 export const isConfiguredActorLogin = (
   candidateLogin: string | null,
   configuredActor: string,
-): boolean => candidateLogin === configuredActor;
+): boolean =>
+  candidateLogin !== null &&
+  normalizeBotLogin(candidateLogin) === normalizeBotLogin(configuredActor);
 
 const isAtOrAfter = (candidateTimestamp: string, lowerBoundTimestamp: string): boolean => {
   const candidateTime = Date.parse(candidateTimestamp);
@@ -143,10 +151,7 @@ const mayRequestCodexReview = (comment: IssueComment): boolean => {
   if (comment.authorPermission !== undefined) {
     return COLLABORATOR_WRITE_PERMISSIONS.includes(comment.authorPermission);
   }
-  if (comment.authorAssociation !== undefined) {
-    return COLLABORATOR_ASSOCIATIONS.includes(comment.authorAssociation);
-  }
-  return true;
+  return COLLABORATOR_ASSOCIATIONS.includes(comment.authorAssociation ?? '');
 };
 
 const hasInProgressCodexReaction = (comment: IssueComment, actor: string): boolean =>
@@ -219,7 +224,7 @@ const isCodexIssueReviewCommentOnHead = (
   actor: string,
 ): boolean => {
   const reviewedCommitSha = getCodexReviewedCommitSha(comment.body);
-  if (reviewedCommitSha !== null && !isShaPrefixForHead(reviewedCommitSha, snapshot.headSha)) {
+  if (reviewedCommitSha === null || !isShaPrefixForHead(reviewedCommitSha, snapshot.headSha)) {
     return false;
   }
 
@@ -245,9 +250,12 @@ export const QUEUE_RETRY_COMMAND = '/harness-requeue';
 
 export const QUEUE_REMOVAL_FAILED_CHECKS = 'failed_checks';
 
-const mayRetryQueue = (comment: IssueComment): boolean =>
-  COLLABORATOR_WRITE_PERMISSIONS.includes(comment.authorPermission ?? '') ||
-  COLLABORATOR_ASSOCIATIONS.includes(comment.authorAssociation ?? '');
+const mayRetryQueue = (comment: IssueComment): boolean => {
+  if (comment.authorPermission !== undefined) {
+    return COLLABORATOR_WRITE_PERMISSIONS.includes(comment.authorPermission);
+  }
+  return COLLABORATOR_ASSOCIATIONS.includes(comment.authorAssociation ?? '');
+};
 
 export const hasQueueRetryCommand = (body: string): boolean =>
   getQueueRetryRequestedSha(body) !== null;
@@ -266,24 +274,48 @@ const isStrictlyAfter = (
   return Date.parse(candidateTimestamp) > Date.parse(lowerBoundTimestamp);
 };
 
+const resolveRejectedQueueHeadSha = (
+  snapshot: PullRequestSnapshot,
+  removal: NonNullable<PullRequestSnapshot['mergeQueueRemoval']>,
+  lastEnqueuedHeadSha: string | null,
+): string | null => {
+  if (removal.enqueuedHeadSha !== undefined && removal.enqueuedHeadSha !== null) {
+    return removal.enqueuedHeadSha;
+  }
+  if (lastEnqueuedHeadSha !== null) {
+    return lastEnqueuedHeadSha;
+  }
+  if (
+    removal.headAdvancedAfterEnqueue === true ||
+    isStrictlyAfter(snapshot.headForcePushedAt, removal.enqueuedAt) ||
+    isStrictlyAfter(snapshot.headCommittedAt, removal.enqueuedAt)
+  ) {
+    return null;
+  }
+  return snapshot.headSha;
+};
+
 const getQueueRejection = (
   snapshot: PullRequestSnapshot,
-  previousHold: QueueHold | null,
+  previousState: HarnessState,
 ): { rejection: QueueRejection | null; hold: QueueHold | null } => {
   const removal = snapshot.mergeQueueRemoval ?? null;
   if (removal === null || removal.reason !== QUEUE_REMOVAL_FAILED_CHECKS) {
     return { rejection: null, hold: null };
   }
 
+  const previousHold = previousState.queueHold ?? null;
   const key = removal.mergeGroupSha ?? removal.removedAt;
   const hold: QueueHold =
     previousHold !== null && previousHold.key === key
       ? previousHold
       : {
           key,
-          headSha: isStrictlyAfter(snapshot.headForcePushedAt, removal.enqueuedAt)
-            ? null
-            : snapshot.headSha,
+          headSha: resolveRejectedQueueHeadSha(
+            snapshot,
+            removal,
+            previousState.lastEnqueuedHeadSha ?? null,
+          ),
         };
 
   if (hold.headSha !== snapshot.headSha) {
@@ -410,37 +442,59 @@ export const isTrustedInternalPullRequest = (snapshot: PullRequestSnapshot): boo
     return COLLABORATOR_WRITE_PERMISSIONS.includes(snapshot.authorPermission);
   }
 
-  if (snapshot.authorAssociation !== undefined) {
-    return COLLABORATOR_ASSOCIATIONS.includes(snapshot.authorAssociation);
-  }
-
-  return true;
+  return COLLABORATOR_ASSOCIATIONS.includes(snapshot.authorAssociation ?? '');
 };
 
-const isCollaboratorApproval = (review: PullRequestReview, headSha: string): boolean => {
-  if (review.state !== 'APPROVED') {
-    return false;
-  }
-
-  if (review.commitOid !== headSha) {
-    return false;
-  }
-
-  if (review.authorType === 'Bot') {
-    return false;
-  }
-
-  return COLLABORATOR_ASSOCIATIONS.includes(review.authorAssociation);
-};
+const EFFECTIVE_DECISION_STATES: ReadonlyArray<string> = [
+  'APPROVED',
+  'CHANGES_REQUESTED',
+  'DISMISSED',
+];
 
 const getApprovalSummary = (
   snapshot: PullRequestSnapshot,
   requiresHumanApproval: boolean,
 ): ApprovalSummary => {
-  const validApprovers = snapshot.reviews
-    .filter((review) => isCollaboratorApproval(review, snapshot.headSha))
-    .map((review) => review.authorLogin)
-    .filter((login): login is string => login !== null);
+  const latestDecisionByLogin = new Map<
+    string,
+    { review: PullRequestReview; submittedTime: number; index: number }
+  >();
+
+  snapshot.reviews.forEach((review, index) => {
+    if (review.authorType === 'Bot' || review.authorLogin === null) {
+      return;
+    }
+    if (!EFFECTIVE_DECISION_STATES.includes(review.state)) {
+      return;
+    }
+
+    const submittedTime = Date.parse(review.submittedAt);
+    const normalizedTime = Number.isNaN(submittedTime) ? Number.NEGATIVE_INFINITY : submittedTime;
+    const existing = latestDecisionByLogin.get(review.authorLogin);
+
+    if (
+      existing === undefined ||
+      normalizedTime > existing.submittedTime ||
+      (normalizedTime === existing.submittedTime && index >= existing.index)
+    ) {
+      latestDecisionByLogin.set(review.authorLogin, {
+        review,
+        submittedTime: normalizedTime,
+        index,
+      });
+    }
+  });
+
+  const validApprovers: string[] = [];
+  for (const [login, { review }] of latestDecisionByLogin.entries()) {
+    if (
+      review.state === 'APPROVED' &&
+      COLLABORATOR_ASSOCIATIONS.includes(review.authorAssociation) &&
+      review.commitOid === snapshot.headSha
+    ) {
+      validApprovers.push(login);
+    }
+  }
 
   return {
     required: requiresHumanApproval,
@@ -786,13 +840,25 @@ export const evaluateHarness = (
   previousState: HarnessState,
   config: HarnessConfig,
 ): HarnessEvaluation => {
-  const queue = getQueueRejection(snapshot, previousState.queueHold ?? null);
+  const queue = getQueueRejection(snapshot, previousState);
   const evaluation = evaluateGates(snapshot, previousState, config, queue.rejection);
-  const { queueHold: _previousHold, ...state } = evaluation.state;
+  const {
+    queueHold: _previousHold,
+    lastEnqueuedHeadSha: _previousEnqueuedHeadSha,
+    ...state
+  } = evaluation.state;
+  const retainedEnqueuedHeadSha =
+    queue.hold === null && previousState.lastEnqueuedHeadSha === snapshot.headSha
+      ? previousState.lastEnqueuedHeadSha
+      : null;
 
   return {
     ...evaluation,
-    state: queue.hold === null ? state : { ...state, queueHold: queue.hold },
+    state: {
+      ...state,
+      ...(queue.hold === null ? {} : { queueHold: queue.hold }),
+      ...(retainedEnqueuedHeadSha === null ? {} : { lastEnqueuedHeadSha: retainedEnqueuedHeadSha }),
+    },
   };
 };
 

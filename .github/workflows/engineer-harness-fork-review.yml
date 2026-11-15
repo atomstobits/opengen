@@ -1,0 +1,44 @@
+name: Engineer Harness Fork Review
+
+# SECURITY: Lightweight unprivileged signal workflow for fork pull request reviews.
+# On fork PRs, GitHub runs pull_request_review and pull_request_review_comment with a
+# read-only GITHUB_TOKEN and no repository secrets. This workflow runs with zero
+# permissions and zero checkouts so Engineer Harness (`on.workflow_run`) can synchronize
+# from the default branch with write permissions.
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  signal:
+    if: >-
+      ${{
+        github.event.pull_request.head.repo.full_name != github.repository &&
+        (
+          (
+            github.event_name == 'pull_request_review' &&
+            (
+              github.event.review.user.login == (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ||
+              github.event.review.user.login == format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') ||
+              github.event.review.state == 'approved' ||
+              github.event.review.state == 'changes_requested'
+            )
+          ) ||
+          (
+            github.event_name == 'pull_request_review_comment' &&
+            github.event.comment.user.login != (vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector') &&
+            github.event.comment.user.login != format('{0}[bot]', vars.CODEX_REVIEW_ACTOR || 'chatgpt-codex-connector')
+          )
+        )
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Signal privileged harness sync via workflow_run
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "Signaling Engineer Harness sync for fork PR #${PR_NUMBER}."

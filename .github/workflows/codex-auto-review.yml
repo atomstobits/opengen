@@ -132,8 +132,13 @@ jobs:
                 time: Date.parse(comment.created_at),
               }))
               .filter((request) => request.head !== null && !Number.isNaN(request.time));
+            const normalizeActor = (login) =>
+              String(login ?? '')
+                .trim()
+                .replace(/\[bot\]$/i, '')
+                .toLowerCase();
             const fromCodex = (entry) =>
-              entry.user?.login === codexActor || entry.user?.login === `${codexActor}[bot]`;
+              entry.user?.login != null && normalizeActor(entry.user.login) === normalizeActor(codexActor);
 
             const reviewOnHead = reviews.find(
               (review) => fromCodex(review) && review.commit_id === headSha,
