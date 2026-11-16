@@ -102,6 +102,42 @@ Applying requires an explicit resource/cost decision and `OPENGEN_BILLABLE_RUNTI
 
 Before applying: enable required GCP APIs; create restricted runtime/deployer identities; configure federation; create the approved database and backups; upload secrets securely; build and scan the backend image; and verify public catalog/SEO behavior with no credentials.
 
+## Updating deployed images
+
+Both `opengen-api` (Cloud Run service) and `opengen-worker` (Cloud Run worker pool) execute the `server` stage of [`Dockerfile`](../Dockerfile), pinned to the same 64-character `@sha256:` image digest. `infra/update-gcp-image.sh` wraps Cloud Build submission, immutable Artifact Registry digest lookup, optional atomic updates to git-ignored `infra/.local/opengen.env`, and `infra/deploy-gcp.sh` planning or rollout.
+
+Like `infra/deploy-gcp.sh`, `infra/update-gcp-image.sh` defaults to `--plan` and performs zero cloud builds or runtime mutations unless `--build` or `--apply` is passed:
+
+```sh
+# Clear any shell-level OPENGEN_API_IMAGE override so --env-file governs digest resolution
+unset OPENGEN_API_IMAGE
+
+# 1. Offline validation and plan preview (requires a clean Git checkout; no gcloud calls)
+bash infra/update-gcp-image.sh --env-file infra/.local/opengen.env --plan
+
+# 2. Build the Dockerfile server stage in Cloud Build, resolve its @sha256 digest,
+#    update OPENGEN_API_IMAGE in infra/.local/opengen.env (0600), and preview deploy-gcp.sh --plan
+bash infra/update-gcp-image.sh --env-file infra/.local/opengen.env --build
+
+# 3. Roll out the already-built pinned digest to opengen-api and opengen-worker
+OPENGEN_BILLABLE_RUNTIME_APPROVED=yes \
+  bash infra/update-gcp-image.sh --env-file infra/.local/opengen.env --skip-build --apply
+```
+
+To build and roll out in a single step after completing preflight and cutover checks, omit `--skip-build`:
+
+```sh
+OPENGEN_BILLABLE_RUNTIME_APPROVED=yes \
+  bash infra/update-gcp-image.sh --env-file infra/.local/opengen.env --apply
+```
+
+Safety and rollback boundaries:
+
+- **Clean committed source only:** image builds reject uncommitted edits or non-ignored untracked files (`git status --porcelain --untracked-files=normal`) and tag `${OPENGEN_REGION}-docker.pkg.dev/${OPENGEN_PROJECT_ID}/${OPENGEN_ARTIFACT_REPOSITORY:-opengen}/api:<12-char-commit-sha>` before resolving the exact `image_summary.fully_qualified_digest` (`@sha256:<64-hex>`). `.gcloudignore` excludes `.git`, `node_modules`, `.next`, `.local`, and `.env*` from the Cloud Build upload context.
+- **Safe `--env-file` handling:** `--env-file` parses plain `KEY=VALUE` lines without shell evaluation, rejects symlinks, tracked or unignored in-repository files, command/variable expansions, and unsupported or literal secret variable names, and lets explicit caller environment variables (such as one-shot `OPENGEN_BILLABLE_RUNTIME_APPROVED=yes`) override file defaults. Exporting variables in the shell without `--env-file` is also supported.
+- **Migrations vs. code-only rollbacks:** for schema-compatible updates, restore the previous `@sha256:` digest recorded by `--build` into `OPENGEN_API_IMAGE` and run `--skip-build --apply`. For upgrades containing new SQL migrations, take a verified Cloud SQL backup, run `node scripts/core-activation-preflight.mjs`, and quiesce admissions/workers first per [OPERATIONS.md](OPERATIONS.md#upgrades) and [CORE-ACTIVATION-PREFLIGHT.md](CORE-ACTIVATION-PREFLIGHT.md); do not roll back to an older schema cohort once post-migration jobs or ledger rows exist.
+- **Frontend and self-hosted Compose updates:** Vercel deploys `apps/web` directly from source (`deploy/cloud/vercel-project-settings.json`, via `npx vercel deploy --prod` or the linked production branch) rather than a container image. Self-hosted Compose installations rebuild local `web`, `api` and `worker` containers with `docker compose --env-file .env -f deploy/compose.yaml up --build --detach --wait`.
+
 ## References
 
 - [Vercel monorepos](https://vercel.com/docs/monorepos)

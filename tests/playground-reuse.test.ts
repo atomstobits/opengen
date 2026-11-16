@@ -42,6 +42,19 @@ describe('owned reuse routing restrictions', () => {
     expect(eligible(policy)).toEqual([]);
   });
 
+  it('restricts undisclosed endpoint policies to aggregator routes without admitting regional author routes', () => {
+    expect(
+      new Set(eligible({ endpointRegions: ['undisclosed'] }).map((route) => route.deploymentId)),
+    ).toEqual(
+      new Set([
+        'fal-undisclosed',
+        'pika-undisclosed',
+        'replicate-undisclosed',
+        'runway-undisclosed',
+      ]),
+    );
+  });
+
   it('applies model-specific provider exceptions together with the author constraint', () => {
     expect(
       eligible({
@@ -71,5 +84,18 @@ describe('owned reuse routing restrictions', () => {
     expect(eligibleReuseRoutes(model, routes, deployments, draft, 'image-to-video')).toHaveLength(
       1,
     );
+  });
+
+  it('orders eligible destination routes with official providers first', () => {
+    const seedance = catalog.models.find((item) => item.id === 'bytedance/seedance-2.5')!;
+    const unordered = [...catalog.routes.filter((item) => item.modelId === seedance.id)].reverse();
+    const ordered = eligibleReuseRoutes(
+      seedance,
+      unordered,
+      catalog.deployments,
+      request({}),
+      'image-to-video',
+    );
+    expect(ordered[0]?.id).toBe('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5');
   });
 });

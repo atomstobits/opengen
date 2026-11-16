@@ -30,10 +30,17 @@ describe('hosted native API routing', () => {
       new Request('https://opengen.example/v1/routes?modelId=fal%2Fh3-max'),
     )!;
     const maxRoutes = (await legacy.json()).data;
-    expect(maxRoutes).toHaveLength(4);
+    expect(maxRoutes).toHaveLength(5);
+    expect(maxRoutes[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(
       maxRoutes.every((route: { modelId: string }) => route.modelId === 'minimax/h3-max'),
     ).toBe(true);
+    const seedance = localCatalog(
+      new Request('https://opengen.example/v1/routes?modelId=bytedance%2Fseedance-2.5'),
+    )!;
+    expect((await seedance.json()).data[0]?.id).toBe(
+      'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+    );
     expect(
       maxRoutes.map((route: { providerModelName: string }) => route.providerModelName),
     ).toEqual(expect.arrayContaining(['MiniMax H3 Max', 'H3 Max']));
@@ -46,7 +53,7 @@ describe('hosted native API routing', () => {
     const regional = localCatalog(
       new Request('https://opengen.example/v1/routes?modelId=alibaba%2Fwan-3.0'),
     )!;
-    expect((await regional.json()).data).toHaveLength(9);
+    expect((await regional.json()).data).toHaveLength(14);
     expect(localCatalog(new Request('https://opengen.example/v1/metrics'))).toBeUndefined();
     expect(localCatalog(new Request('https://opengen.example/v1/generations'))).toBeUndefined();
     const head = await nativeGateway(

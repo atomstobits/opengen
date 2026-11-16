@@ -76,7 +76,7 @@ describe('fal H3 Max Turbo scoped standard tariff', () => {
     expect(getModel('fal/h3-max-turbo')!.id).toBe('fal/h3-max-turbo');
     expect(getModel('fal/h3-max')!.id).toBe('minimax/h3-max');
     const maxRoutes = catalog.routes.filter((route) => route.modelId === 'minimax/h3-max');
-    expect(maxRoutes).toHaveLength(4);
+    expect(maxRoutes).toHaveLength(5);
     expect(catalog.routes.filter((route) => route.modelId === 'fal/h3-max-turbo')).toHaveLength(3);
     const falMax = maxRoutes.find((route) => route.id === 'fal-undisclosed/fal-h3-max')!;
     expect(falMax.rates.map((rate) => rate.usdMicros)).toEqual([50_000, 80_000, 160_000]);

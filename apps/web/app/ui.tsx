@@ -435,6 +435,60 @@ export function PercentileControl({
   );
 }
 
+function findRouteRate(route: Route, resolution: string, modality: Model['modality']) {
+  const unit = modality === 'video' ? 'output-second' : 'image';
+  const matches = (rate: Rate) =>
+    rate.unit === unit && rate.resolution.toLowerCase() === resolution.toLowerCase();
+  const published = route.publishedPricing;
+  const qualifiedRate = route.rates.find(matches);
+  const preferredQuality = route.modelId.startsWith('openai/gpt-image-')
+    ? 'medium'
+    : route.modelId === 'xai/grok-imagine-image-2.0'
+      ? 'low'
+      : undefined;
+  const eligiblePublished = (published?.outputRates ?? []).filter(
+    (rate) => matches(rate) && (!rate.operation || route.operations.includes(rate.operation)),
+  );
+  const publishedRate =
+    (preferredQuality
+      ? eligiblePublished.find((rate) => rate.quality === preferredQuality)
+      : undefined) ?? eligiblePublished[0];
+  return { unit, published, qualifiedRate, publishedRate, rate: qualifiedRate ?? publishedRate };
+}
+
+function ProviderTariff({ route }: { route: Route }) {
+  const published = route.publishedPricing;
+  if (!published) return null;
+  const source = published.source;
+  const conditions = Array.from(
+    new Set([...(published.conditions ?? []), ...(source.note ? [source.note] : [])]),
+  );
+  const checked = `Checked ${source.checkedAt}`;
+  const hoverDetails = [published.summary, ...conditions, checked].filter(Boolean).join('\n');
+  return (
+    <details className="price-details tariff-only">
+      <summary title={hoverDetails}>
+        <span className="tariff-summary">{published.summary}</span>
+      </summary>
+      <div className="price-detail-body">
+        <p className="published-tariff">{published.summary}</p>
+        <p>Published tariff · request quote unqualified</p>
+        {conditions.length > 0 && (
+          <ul>
+            {conditions.map((condition) => (
+              <li key={condition}>{condition}</li>
+            ))}
+          </ul>
+        )}
+        <p>{checked}</p>
+        <a href={source.url} target="_blank" rel="noreferrer">
+          Price source ↗
+        </a>
+      </div>
+    </details>
+  );
+}
+
 function ProviderPrice({
   route,
   resolution,
@@ -444,25 +498,20 @@ function ProviderPrice({
   resolution: string;
   modality: Model['modality'];
 }) {
-  const unit = modality === 'video' ? 'output-second' : 'image';
-  const matches = (rate: Rate) =>
-    rate.unit === unit && rate.resolution.toLowerCase() === resolution.toLowerCase();
-  const published = route.publishedPricing;
-  const qualifiedRate = route.rates.find(matches);
-  const publishedRate = published?.outputRates?.find(
-    (rate) =>
-      matches(rate) &&
-      (!rate.operation ||
-        (route.operations.length === 1 && route.operations[0] === rate.operation)),
+  const { unit, published, qualifiedRate, publishedRate, rate } = findRouteRate(
+    route,
+    resolution,
+    modality,
   );
-  const rate = qualifiedRate ?? publishedRate;
   const source = qualifiedRate ? route.pricingSource : (published?.source ?? route.pricingSource);
-  const conditions = [
-    rate ? `Resolution: ${rate.resolution}` : 'No per-output price for this selection.',
-    ...(rate?.note ? [rate.note] : []),
-    ...(published?.conditions ?? []),
-    ...(source.note && !rate?.note ? [source.note] : []),
-  ];
+  const conditions = Array.from(
+    new Set([
+      rate ? `Resolution: ${rate.resolution}` : 'No per-output price for this selection.',
+      ...(rate?.note ? [rate.note] : []),
+      ...(published?.conditions ?? []),
+      ...(source.note && !rate?.note ? [source.note] : []),
+    ]),
+  );
   const checked = `Checked ${source.checkedAt}`;
   const hoverDetails = [published?.summary, ...conditions, checked].filter(Boolean).join('\n');
   return (
@@ -533,7 +582,7 @@ export function ProviderTable({
   const observations = metrics ?? localMetrics;
   const selectedPercentile = percentile ?? localPercentile;
   const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
-  const groupedRoutes = groupRoutesByProvider(routes, deployments);
+  const groupedRoutes = groupRoutesByProvider(routes, deployments, model.authorProviderIds);
   const sampledRoutes = new Map(
     observations.filter((item) => item.sampleCount > 0).map((item) => [item.routeId, item]),
   );
@@ -589,6 +638,10 @@ export function ProviderTable({
                   : null;
               const providerTooltip = [statusTooltip, regionTooltip].filter(Boolean).join(' ');
               const providerTooltipId = `${providerTooltipPrefix}-${route.id}`;
+              const resolutions = route.resolutions.length ? route.resolutions : [''];
+              const hasResolutionRate = resolutions.some(
+                (resolution) => findRouteRate(route, resolution, model.modality).rate != null,
+              );
               return (
                 <tr key={route.id} data-route-id={route.id}>
                   <td>
@@ -682,14 +735,18 @@ export function ProviderTable({
                     </code>
                   </td>
                   <td className="price-cell">
-                    {(route.resolutions.length ? route.resolutions : ['']).map((resolution) => (
-                      <ProviderPrice
-                        key={resolution}
-                        route={route}
-                        resolution={resolution}
-                        modality={model.modality}
-                      />
-                    ))}
+                    {!hasResolutionRate && route.publishedPricing ? (
+                      <ProviderTariff route={route} />
+                    ) : (
+                      resolutions.map((resolution) => (
+                        <ProviderPrice
+                          key={resolution}
+                          route={route}
+                          resolution={resolution}
+                          modality={model.modality}
+                        />
+                      ))
+                    )}
                   </td>
                   {showCompletion && (
                     <td className="metric-cell">

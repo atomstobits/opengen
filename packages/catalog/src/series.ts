@@ -5,6 +5,7 @@ import {
   type ModelSeries,
 } from '@media-router/contracts';
 import { catalog } from './data';
+import { selectModelRoutes } from './route-order';
 
 export const companies: Company[] = [
   {
@@ -348,17 +349,23 @@ export function getSeriesDetail(id: string) {
   if (!series) return undefined;
   const modelIds = new Set(series.modelIds);
   const models = catalog.models.filter((model) => modelIds.has(model.id));
-  const routes = catalog.routes.filter((route) => modelIds.has(route.modelId));
-  const deploymentIds = new Set(routes.map((route) => route.deploymentId));
-  const deployments = catalog.deployments.filter((deployment) => deploymentIds.has(deployment.id));
-  const providerIds = new Set(deployments.map((deployment) => deployment.providerId));
+  const routes = models.flatMap((model) => selectModelRoutes(model.id, catalog));
+  const deploymentIds = [...new Set(routes.map((route) => route.deploymentId))];
+  const deployments = deploymentIds.flatMap((deploymentId) => {
+    const deployment = catalog.deployments.find((item) => item.id === deploymentId);
+    return deployment ? [deployment] : [];
+  });
+  const providerIds = [...new Set(deployments.map((deployment) => deployment.providerId))];
   return {
     series,
     company: getCompany(series.companyId)!,
     models,
     routes,
     deployments,
-    providers: catalog.providers.filter((provider) => providerIds.has(provider.id)),
+    providers: providerIds.flatMap((providerId) => {
+      const provider = catalog.providers.find((item) => item.id === providerId);
+      return provider ? [provider] : [];
+    }),
   };
 }
 

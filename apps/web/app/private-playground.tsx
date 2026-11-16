@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { groupRoutesByProvider } from '@media-router/catalog';
 import type {
   Catalog,
   GenerateInput,
@@ -147,7 +148,7 @@ function resultReceipt(job: Job): ResultReceipt {
 
 export function Playground({
   model,
-  routes,
+  routes: rawRoutes,
   catalog,
   initialRouteId,
   initialOperation,
@@ -168,6 +169,15 @@ export function Playground({
   onModelDraft?: (transfer: PlaygroundDraftTransfer) => void;
   onDraftTransferConsumed?: () => void;
 }) {
+  const routes = useMemo(
+    () =>
+      groupRoutesByProvider(
+        rawRoutes,
+        new Map(catalog.deployments.map((item) => [item.id, item])),
+        model.authorProviderIds,
+      ),
+    [catalog.deployments, model.authorProviderIds, rawRoutes],
+  );
   const initial = () =>
     initialPlaygroundRequest(model, routes, initialRouteId, initialOperation, initialRegion);
   const selectionEdited = useRef(false);

@@ -17,7 +17,7 @@ import type {
   OwnedOutputAccess,
   AssetStore,
 } from '@media-router/engine';
-import { agentEntry, agentSkill, canonicalModelId } from '@media-router/contracts';
+import { agentEntry, agentSkill } from '@media-router/contracts';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { constrainInput, type Principal, type KeyScope } from '@media-router/engine';
@@ -30,6 +30,7 @@ import {
   generationProfiles,
   catalogSearchQuerySchema,
   getCompanyDetail,
+  getModelRoutes,
   getSeriesDetail,
   quote,
   searchCatalog,
@@ -408,9 +409,7 @@ export async function buildApp(options: AppOptions = {}) {
   app.get('/v1/providers', async () => ({ data: catalog.providers }));
   app.get('/v1/deployments', async () => ({ data: catalog.deployments }));
   app.get<{ Querystring: { modelId?: string } }>('/v1/routes', async (request) => ({
-    data: catalog.routes.filter(
-      (r) => !request.query.modelId || r.modelId === canonicalModelId(request.query.modelId),
-    ),
+    data: request.query.modelId ? getModelRoutes(request.query.modelId) : catalog.routes,
   }));
   app.post('/v1/quotes', async (request) =>
     makeQuote(parseInput(request.body), await quotePrincipal(request)),

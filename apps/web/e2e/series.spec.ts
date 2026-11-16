@@ -40,6 +40,10 @@ test('company pages expose every owned variant through its canonical series', as
     catalog.routes.filter((route) => route.modelId === 'bytedance/seedance-2.5').length,
   );
   const prices = variant(page, 'bytedance/seedance-2.5');
+  await expect(prices.locator('.route-table tbody tr').first()).toHaveAttribute(
+    'data-route-id',
+    'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+  );
   await expect(prices.getByRole('link', { name: 'BytePlus', exact: true })).toHaveCount(1);
   const byteplus = prices.locator(
     '[data-route-id="byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5"]',
@@ -53,12 +57,21 @@ test('company pages expose every owned variant through its canonical series', as
     prices.locator(
       '[data-route-id="fal-undisclosed/bytedance/seedance-2.5/text-to-video"] .price-details summary',
     ),
-  ).toHaveText([/480p\s*≈\$0\.2205\s*\/ sec/, /720p\s*≈\$0\.473\s*\/ sec/, /1080p\s*—/]);
+  ).toHaveText([
+    /480p\s*≈\$0\.2205\s*\/ sec/,
+    /720p\s*≈\$0\.473\s*\/ sec/,
+    /1080p\s*≈\$1\.164\s*\/ sec/,
+  ]);
   await expect(
     prices.locator(
       '[data-route-id="fal-undisclosed/bytedance/seedance-2.5/image-to-video"] .price-details summary',
     ),
-  ).toHaveText([/480p\s*—/, /720p\s*—/, /1080p\s*—/]);
+  ).toHaveText([
+    /480p\s*≈\$0\.2205\s*\/ sec/,
+    /720p\s*≈\$0\.473\s*\/ sec/,
+    /1080p\s*≈\$1\.164\s*\/ sec/,
+  ]);
+  await expect(prices.locator('.unknown-price')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'ByteDance', exact: true }).first()).toHaveAttribute(
     'href',
     '/bytedance',
@@ -97,9 +110,14 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
     );
   }
   const max = variant(page, 'minimax/h3-max');
-  await expect(max.locator('.route-table tbody tr')).toHaveCount(4);
+  await expect(max.locator('.route-table tbody tr')).toHaveCount(5);
+  await expect(max.locator('.route-table tbody tr').first()).toHaveAttribute(
+    'data-route-id',
+    'minimax-undisclosed/minimax-h3-max',
+  );
   await expect(max).toContainText('MiniMax');
   await expect(max).toContainText('fal');
+  await expect(max).toContainText('Runway');
   await expect(max).toContainText('Listed as H3 Max');
   await expect(max.locator('.variant-attribution .official-tag')).toHaveText('Official');
   const nativeMax = max.locator('tr[data-route-id="minimax-undisclosed/minimax-h3-max"]');
@@ -146,8 +164,9 @@ test('Wan keeps Standard and Prime in separate provider tables with all regional
   const prime = variant(page, 'alibaba/wan-3.0-prime');
   await expect(page.getByTestId('series-variant')).toHaveCount(2);
   for (const section of [standard, prime]) {
-    await expect(section.locator('.route-table tbody tr')).toHaveCount(9);
+    await expect(section.locator('.route-table tbody tr')).toHaveCount(14);
     await expect(section.locator('.provider-name .official-tag')).toHaveCount(6);
+    await expect(section.locator('.unknown-price')).toHaveCount(0);
     for (const location of [
       'Beijing, China',
       'Singapore',
@@ -290,7 +309,11 @@ test('a new route choice overrides a legacy handoff and stays selected while edi
   await expect(route).toHaveValue('alibaba/eu-central-1/wan-3.0-prime');
   await page.getByLabel('Choose generation model').selectOption('bytedance/seedance-2.5');
   await expect(page.getByRole('heading', { name: 'Seedance 2.5', exact: true })).toBeVisible();
-  await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue('auto');
+  await expect(route).toHaveValue('auto');
+  await expect(route.locator('option').nth(1)).toHaveAttribute(
+    'value',
+    'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+  );
 });
 
 test('provider metrics stay regional and the percentile picker reads the selected observation', async ({
@@ -378,11 +401,18 @@ test('published token tariffs render as crawlable information without claiming a
   expect(await raw.text()).toContain('class="published-tariff"');
   await page.goto('/openai/gpt-image-2.5');
   const row = variant(page, route.modelId).locator(`[data-route-id="${route.id}"]`);
-  const price = row.locator('.price-details summary').filter({ hasText: /^1K/ });
-  await expect(price).toHaveText(/1K\s*—/);
+  const summaries = row.locator('.price-details summary');
+  await expect(summaries).toHaveText([
+    /1K\s*≈\$0\.0132\s*\/ image/,
+    /2K\s*≈\$0\.0268\s*\/ image/,
+    /4K\s*≈\$0\.026\s*\/ image/,
+  ]);
+  const price = summaries.first();
   await expect(price).toHaveAttribute('title', /per 1M tokens/i);
+  await expect(row.locator('.unknown-price')).toHaveCount(0);
   await expect(row.locator('.published-tariff').filter({ visible: true })).toHaveCount(0);
   await price.click();
+  await expect(row.locator('.published-tariff').filter({ visible: true })).toHaveCount(1);
   await expect(row).toContainText(/per 1M tokens/i);
   await expect(row).toContainText('Published tariff');
   await expect(row).toContainText('request quote unqualified');
@@ -397,5 +427,6 @@ test('published token tariffs render as crawlable information without claiming a
     page.locator(
       '[data-route-id="replicate-undisclosed/bytedance-seedream-5.0-pro"] .price-details summary',
     ),
-  ).toHaveText([/1K\s*\$0\.045\s*\/ image/, /1\.5K\s*—/, /2K\s*\$0\.09\s*\/ image/]);
+  ).toHaveText([/1K\s*\$0\.045\s*\/ image/, /2K\s*\$0\.09\s*\/ image/]);
+  await expect(page.locator('.unknown-price')).toHaveCount(0);
 });

@@ -6,6 +6,7 @@ import {
   catalog,
   getCompany,
   getModel,
+  getModelRoutes,
   getSeries,
   modelSeries,
   seriesHref,
@@ -64,13 +65,15 @@ export default async function ModelSeriesPage({ params, searchParams }: Props) {
     const model = getModel(modelId);
     return model ? [model] : [];
   });
-  const routes = catalog.routes.filter((route) => series.modelIds.includes(route.modelId));
-  const servingProviderIds = new Set(
-    routes.flatMap((route) => {
-      const deployment = catalog.deployments.find((item) => item.id === route.deploymentId);
-      return deployment ? [deployment.providerId] : [];
-    }),
-  );
+  const routes = models.flatMap((model) => getModelRoutes(model.id, catalog));
+  const servingProviderIds = [
+    ...new Set(
+      routes.flatMap((route) => {
+        const deployment = catalog.deployments.find((item) => item.id === route.deploymentId);
+        return deployment ? [deployment.providerId] : [];
+      }),
+    ),
+  ];
   const first = models[0]!;
   return (
     <>
@@ -112,7 +115,7 @@ export default async function ModelSeriesPage({ params, searchParams }: Props) {
               <span>{models.length === 1 ? 'exact variant' : 'exact variants'}</span>
             </div>
             <div>
-              <strong>{servingProviderIds.size}</strong>
+              <strong>{servingProviderIds.length}</strong>
               <span>serving providers</span>
             </div>
             <div>
@@ -158,9 +161,11 @@ export default async function ModelSeriesPage({ params, searchParams }: Props) {
               </p>
               <h3>Which providers are listed?</h3>
               <p>
-                {catalog.providers
-                  .filter((provider) => servingProviderIds.has(provider.id))
-                  .map((provider) => provider.name)
+                {servingProviderIds
+                  .flatMap((providerId) => {
+                    const provider = catalog.providers.find((item) => item.id === providerId);
+                    return provider ? [provider.name] : [];
+                  })
                   .join(', ')}
                 . Every documented regional deployment has its own provider row; a listed offering
                 is not a claim that credentials are configured or that a live generation was tested.

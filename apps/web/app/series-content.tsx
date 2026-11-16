@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getModelRoutes } from '@media-router/catalog';
 import type { Catalog, Model } from '@media-router/contracts';
 import {
   CopyButton,
@@ -26,7 +27,7 @@ export function SeriesProviders({
   const [percentile, setPercentile] = useState<LatencyPercentile>('p50');
   const variants = models.map((model) => ({
     model,
-    routes: catalog.routes.filter((route) => route.modelId === model.id),
+    routes: getModelRoutes(model.id, catalog),
   }));
   const routeIds = new Set(variants.flatMap(({ routes }) => routes.map((route) => route.id)));
   const showCompletionControl = metrics.some(

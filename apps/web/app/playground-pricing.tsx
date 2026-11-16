@@ -24,25 +24,219 @@ export function routeIdentity(catalog: Catalog, route: Route) {
   };
 }
 
+type PublishedOutputRate = NonNullable<
+  NonNullable<Route['publishedPricing']>['outputRates']
+>[number];
+type PublishedQuality = NonNullable<PublishedOutputRate['quality']>;
+
+function routeDefaultQuality(
+  route: Route,
+  modelId: string,
+  operation: GenerateInput['operation'],
+): PublishedQuality | undefined {
+  if (modelId.startsWith('openai/gpt-image-')) return 'medium';
+  if (modelId === 'xai/grok-imagine-image-2.0') {
+    if (route.deploymentId === 'xai-undisclosed' || route.deploymentId === 'fal-undisclosed') {
+      return operation === 'image-edit' ? 'medium' : 'low';
+    }
+    if (
+      route.deploymentId === 'replicate-undisclosed' ||
+      route.deploymentId === 'runway-undisclosed'
+    ) {
+      return 'medium';
+    }
+  }
+  return undefined;
+}
+
+function routeSupportsDraft(route: Route, modelId: string, draft: GenerateInput): boolean {
+  if (!route.operations.includes(draft.operation)) return false;
+  const args = draft.input;
+  if (
+    args.resolution &&
+    !route.resolutions.some((res) => res.toLowerCase() === args.resolution!.toLowerCase())
+  ) {
+    return false;
+  }
+  const falMax = modelId === 'minimax/h3-max' && route.adapter === 'fal';
+  const falH3 = modelId === 'minimax/h3' && route.adapter === 'fal';
+  if (typeof args.duration === 'number' && !falMax && !route.durations.includes(args.duration)) {
+    return false;
+  }
+  if (route.adapter === 'minimax' && modelId === 'minimax/h3-max' && args.keyframes?.length) {
+    return false;
+  }
+  if ((falMax || falH3) && (args.references?.length ?? 0) > 12) {
+    return false;
+  }
+  if (
+    (route.adapter === 'byteplus' || route.adapter === 'alibaba') &&
+    args.references?.length &&
+    (args.firstFrame || args.lastFrame || args.keyframes?.length)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function runwayTaskMinimumMicros(modelId: string): number {
+  if (modelId === 'bytedance/seedance-2.5') return 800_000;
+  if (modelId === 'bytedance/seedance-2.0' || modelId === 'bytedance/seedance-2.0-fast') {
+    return 440_000;
+  }
+  if (modelId === 'bytedance/seedance-2.0-mini') return 280_000;
+  if (modelId === 'kling/kling-4.0-flash') return 290_000;
+  if (modelId === 'google/gemini-omni-1.2-flash') return 60_000;
+  return 0;
+}
+
+function findPlaygroundRate(
+  route: Route,
+  model: Pick<Model, 'id' | 'modality'>,
+  draft: GenerateInput,
+):
+  | {
+      rate: PublishedOutputRate;
+      qualified: boolean;
+      approximate: boolean;
+      quality?: string;
+    }
+  | undefined {
+  if (!routeSupportsDraft(route, model.id, draft)) return undefined;
+  const args = draft.input;
+  const extraInputs = Boolean(
+    args.references?.length ||
+    (args.sourceVideo &&
+      route.upstreamModelId !== 'blackforestlabs/flux-3/edit-video' &&
+      route.upstreamModelId !== 'x-ai/grok-imagine-video/video-to-video') ||
+    args.mask ||
+    args.elements?.length ||
+    args.keyframes?.length ||
+    draft.previousJobId,
+  );
+  const frameSurcharge =
+    Boolean(args.firstFrame || args.lastFrame) &&
+    ((model.id.startsWith('xai/grok-imagine-video') &&
+      route.deploymentId !== 'replicate-undisclosed') ||
+      model.id.startsWith('google/gemini-omni-') ||
+      (route.deploymentId === 'minimax-undisclosed' && model.id.startsWith('minimax/h3')) ||
+      (route.deploymentId === 'runway-undisclosed' &&
+        (model.id === 'minimax/h3' || model.id === 'minimax/h3-max')));
+  const paidExpansion =
+    (route.adapter === 'minimax' &&
+      !route.upstreamModelId.startsWith('MiniMax-H3-Image') &&
+      args.promptExpansion !== undefined &&
+      (route.upstreamModelId !== 'MiniMax-H3-Max' ||
+        ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||
+    ((model.id.startsWith('minimax/h3') ||
+      model.id === 'fal/h3-max-turbo' ||
+      model.id === 'pika/h3-flex') &&
+      !model.id.startsWith('minimax/h3-image') &&
+      ![undefined, false, 'none', 'disabled'].includes(args.promptExpansion));
+  if (
+    extraInputs ||
+    frameSurcharge ||
+    paidExpansion ||
+    args.size ||
+    args.draft ||
+    args.draftJobId ||
+    args.grounding ||
+    args.layers ||
+    args.thinking ||
+    args.targetAudio ||
+    args.shots?.length ||
+    args.codec ||
+    args.bitrateMode
+  ) {
+    return undefined;
+  }
+  const targetQuality = args.quality ?? routeDefaultQuality(route, model.id, draft.operation);
+  const grokLowOnly =
+    route.upstreamModelId === 'grok-imagine-image-2.0' ||
+    route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image';
+  const qualified =
+    args.duration !== 'auto' &&
+    (!grokLowOnly ||
+      ((args.count ?? 1) === 1 && (args.quality === undefined || args.quality === 'low')))
+      ? getPublishedRate(route, draft.operation, args.resolution)
+      : undefined;
+  if (qualified) {
+    return {
+      rate: qualified,
+      qualified: true,
+      approximate: false,
+      ...(targetQuality ? { quality: targetQuality } : {}),
+    };
+  }
+  if (
+    route.deploymentId === 'runway-undisclosed' &&
+    model.id.startsWith('openai/gpt-image-2.5-') &&
+    args.aspectRatio &&
+    args.aspectRatio !== '1:1'
+  ) {
+    return undefined;
+  }
+  const unit = model.modality === 'image' ? 'image' : 'output-second';
+  const allRates = (route.publishedPricing?.outputRates ?? []).filter(
+    (entry) => entry.unit === unit,
+  );
+  const hasQualityTiers = allRates.some((entry) => entry.quality !== undefined);
+  const rates = hasQualityTiers
+    ? targetQuality
+      ? allRates.filter((entry) => entry.quality === targetQuality)
+      : []
+    : allRates;
+  const target = (args.resolution ?? '').toLowerCase();
+  const published =
+    rates.find(
+      (entry) => entry.resolution.toLowerCase() === target && entry.operation === draft.operation,
+    ) ??
+    rates.find(
+      (entry) => entry.resolution.toLowerCase() === target && entry.operation === undefined,
+    ) ??
+    (!target ? rates[0] : undefined);
+  if (!published) return undefined;
+  if (
+    route.deploymentId === 'runway-undisclosed' &&
+    typeof args.duration === 'number' &&
+    published.unit === 'output-second' &&
+    published.usdMicros * args.duration < runwayTaskMinimumMicros(model.id)
+  ) {
+    return undefined;
+  }
+  const quality = published.quality ?? targetQuality;
+  return {
+    rate: published,
+    qualified: false,
+    approximate: Boolean(published.approximate),
+    ...(quality ? { quality } : {}),
+  };
+}
+
 function PublishedRate({
   route,
+  model,
   draft,
   details = false,
 }: {
   route: Route;
+  model: Pick<Model, 'id' | 'modality'>;
   draft: GenerateInput;
   details?: boolean;
 }) {
-  const rate = getPublishedRate(route, draft.operation, draft.input.resolution);
+  const resolved = findPlaygroundRate(route, model, draft);
+  const rate = resolved?.rate;
   const tariff = route.publishedPricing;
-  const source = rate ? route.pricingSource : (tariff?.source ?? route.pricingSource);
+  const source = resolved?.qualified
+    ? route.pricingSource
+    : (tariff?.source ?? route.pricingSource);
   return (
     <div className={styles.rate}>
       {rate ? (
         <strong>
+          {resolved?.approximate && '≈'}
           {usd(rate.usdMicros)} USD / {rate.unit === 'image' ? 'output image' : 'output second'}
-          {' · '}
-          {rate.resolution}
+          {rate.resolution ? ` · ${rate.resolution}` : ''}
         </strong>
       ) : tariff ? (
         <strong>{tariff.summary}</strong>
@@ -53,9 +247,10 @@ function PublishedRate({
         Price source ↗
       </a>
       {details && rate?.note && <p>{rate.note}</p>}
-      {details && !rate && tariff && (
+      {details && !resolved?.qualified && tariff && (
         <details>
           <summary>Tariff conditions</summary>
+          {rate && <p>{tariff.summary}</p>}
           <ul>
             {tariff.conditions.map((condition) => (
               <li key={condition}>{condition}</li>
@@ -110,23 +305,37 @@ export function PlaygroundPricing({
     catalog.deployments,
     draft,
     draft.operation,
-  ).filter((route) => route.status !== 'retired' && (!draft.routeId || route.id === draft.routeId));
+  ).filter(
+    (route) =>
+      route.status !== 'retired' &&
+      (!draft.routeId || route.id === draft.routeId) &&
+      routeSupportsDraft(route, model.id, draft),
+  );
   const displayRoute =
     priceRoutes.find((route) => route.id === active?.id) ??
     (priceRoutes.length === 1 ? priceRoutes[0] : undefined);
   const displayIdentity = displayRoute && routeIdentity(catalog, displayRoute);
-  const priceSource = priceRoutes.every(
-    (route) => route.pricingSource.url === priceRoutes[0]?.pricingSource.url,
-  )
-    ? priceRoutes[0]?.pricingSource.url
-    : undefined;
-  const rates = priceRoutes.map((route) =>
-    getPublishedRate(route, draft.operation, draft.input.resolution),
+  const resolvedRates = priceRoutes.map((route) => findPlaygroundRate(route, model, draft));
+  const sources = priceRoutes.map((route, index) =>
+    resolvedRates[index]?.qualified
+      ? route.pricingSource.url
+      : (route.publishedPricing?.source.url ?? route.pricingSource.url),
   );
-  const unit = rates[0]?.unit;
-  const comparable = rates.length > 0 && rates.every((rate) => rate && rate.unit === unit);
-  const minimum = comparable ? Math.min(...rates.map((rate) => rate!.usdMicros)) : null;
-  const maximum = comparable ? Math.max(...rates.map((rate) => rate!.usdMicros)) : null;
+  const priceSource = sources.every((url) => url === sources[0]) ? sources[0] : undefined;
+  const unit = resolvedRates[0]?.rate.unit;
+  const quality = resolvedRates[0]?.quality;
+  const comparable =
+    resolvedRates.length > 0 &&
+    resolvedRates.every(
+      (entry) => entry !== undefined && entry.rate.unit === unit && entry.quality === quality,
+    );
+  const approximateRange = comparable && resolvedRates.some((entry) => entry!.approximate);
+  const minimum = comparable
+    ? Math.min(...resolvedRates.map((entry) => entry!.rate.usdMicros))
+    : null;
+  const maximum = comparable
+    ? Math.max(...resolvedRates.map((entry) => entry!.rate.usdMicros))
+    : null;
   const estimate =
     selected?.estimatedCostMicros != null
       ? usd(selected.estimatedCostMicros)
@@ -154,13 +363,13 @@ export function PlaygroundPricing({
             <p className={styles.routeLabel}>
               {displayIdentity!.label} · {displayIdentity!.region}
             </p>
-            <PublishedRate route={displayRoute} draft={draft} details />
+            <PublishedRate route={displayRoute} model={model} draft={draft} details />
           </>
         ) : (
           <>
             <p className={styles.routeLabel}>
               {minimum !== null && maximum !== null
-                ? `${usd(minimum)}${minimum === maximum ? '' : `–${usd(maximum)}`} USD / ${unit === 'image' ? 'output image' : 'output second'} · ${draft.input.resolution}`
+                ? `${approximateRange ? '≈' : ''}${usd(minimum)}${minimum === maximum ? '' : `–${usd(maximum)}`} USD / ${unit === 'image' ? 'output image' : 'output second'} · ${draft.input.resolution}`
                 : priceRoutes.length
                   ? 'Rates vary by provider and endpoint region'
                   : 'Price unavailable for these settings'}
@@ -181,7 +390,7 @@ export function PlaygroundPricing({
                         <b>
                           {identity.label} · {identity.region}
                         </b>
-                        <PublishedRate route={route} draft={draft} />
+                        <PublishedRate route={route} model={model} draft={draft} details />
                       </li>
                     );
                   })}

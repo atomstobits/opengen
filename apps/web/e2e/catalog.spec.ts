@@ -1,10 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { catalog, quote } from '@media-router/catalog';
+import { catalog, modelSeries, quote } from '@media-router/catalog';
 import type { GenerateInput } from '@media-router/contracts';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const evidenceDir = path.resolve(import.meta.dirname, '../../..', 'docs/evidence');
+const seriesGroups = (page: import('@playwright/test').Page) =>
+  page.getByTestId('model-series-group');
+const seriesGroup = (page: import('@playwright/test').Page, seriesId: string) =>
+  page.locator(`[data-testid="model-series-group"][data-series-id="${seriesId}"]`);
 const cards = (page: import('@playwright/test').Page) => page.locator('.model-directory-card');
 const card = (page: import('@playwright/test').Page, modelId: string) =>
   page.locator(`.model-directory-card[data-model-id="${modelId}"]`);
@@ -16,12 +20,27 @@ test('the model catalog filters discovery while model pages preserve every regio
   await expect(
     page.getByRole('heading', { level: 1, name: 'Find your next model.' }),
   ).toBeVisible();
+  await expect(seriesGroups(page)).toHaveCount(modelSeries.length);
   await expect(cards(page)).toHaveCount(catalog.models.length);
+  await expect(
+    seriesGroup(page, 'bytedance/seedance-2.5').locator('.model-directory-card'),
+  ).toHaveCount(1);
+  await expect(
+    seriesGroup(page, 'bytedance/seedance-2.0').locator('.model-directory-card'),
+  ).toHaveCount(3);
+  await expect(seriesGroup(page, 'alibaba/wan-3.0').locator('.model-directory-card')).toHaveCount(
+    2,
+  );
+  const h3Group = seriesGroup(page, 'minimax/h3');
+  await expect(h3Group.locator('.model-directory-card')).toHaveCount(6);
+  await expect(h3Group.locator('[data-model-id="fal/h3-max-turbo"]')).toContainText('by fal');
+  await expect(h3Group.locator('[data-model-id="pika/h3-flex"]')).toContainText('by Pika');
   await expect(page.locator('.hero')).toHaveCount(0);
   await expect(page.locator('.playground-view')).toHaveCount(0);
   await mkdir(evidenceDir, { recursive: true });
   await page.screenshot({ path: path.join(evidenceDir, 'catalog-desktop.png') });
   await page.getByLabel('Search models, providers or regions').fill('Wan 3.0');
+  await expect(seriesGroups(page)).toHaveCount(1);
   await expect(cards(page)).toHaveCount(2);
   await page.getByLabel('Filter endpoint region').selectOption('ap-southeast-1');
   await expect(card(page, 'alibaba/wan-3.0')).toBeVisible();
@@ -29,7 +48,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await card(page, 'alibaba/wan-3.0').getByRole('link', { name: 'Wan 3.0', exact: true }).click();
   await expect(page).toHaveURL(/\/alibaba\/wan-3\.0$/);
   const standard = page.locator('[data-testid="series-variant"][data-model-id="alibaba/wan-3.0"]');
-  await expect(standard.locator('.route-table tbody tr')).toHaveCount(9);
+  await expect(standard.locator('.route-table tbody tr')).toHaveCount(14);
   for (const region of [
     'Beijing, China',
     'Singapore',
@@ -48,6 +67,7 @@ test('catalog search and image filtering preserve the exact variant when opening
 }) => {
   await page.goto('/models');
   await page.getByLabel('Search models, providers or regions').fill('Seedance 2.0');
+  await expect(seriesGroups(page)).toHaveCount(1);
   await expect(cards(page)).toHaveCount(3);
   const mini = card(page, 'bytedance/seedance-2.0-mini');
   await expect(mini.getByRole('link', { name: 'Seedance 2.0 Mini', exact: true })).toHaveAttribute(
@@ -66,14 +86,21 @@ test('catalog search and image filtering preserve the exact variant when opening
   await page.getByRole('button', { name: 'Image', exact: true }).click();
   await expect(cards(page).filter({ hasText: 'Seedance' })).toHaveCount(0);
   await page.getByLabel('Search models, providers or regions').fill('Sunburst');
+  await expect(seriesGroups(page)).toHaveCount(2);
   await expect(cards(page)).toHaveCount(2);
+  const gptImage25 = seriesGroup(page, 'openai/gpt-image-2.5');
+  await expect(gptImage25.getByRole('heading', { level: 2 })).toHaveText('GPT Image 2.5');
+  await expect(gptImage25).toContainText('1 of 2 variants');
+  await expect(
+    gptImage25.getByRole('link', { name: 'GPT Image 2.5 Flare', exact: true }),
+  ).toHaveAttribute('href', '/openai/gpt-image-2.5?variant=openai%2Fgpt-image-2.5-flare');
   const sunburst = card(page, 'openai/gpt-image-2.5-sunburst');
-  await expect(sunburst.getByRole('heading', { level: 2 })).toHaveText('GPT Image 2.5 Sunburst');
+  await expect(sunburst.getByRole('heading', { level: 3 })).toHaveText('GPT Image 2.5 Sunburst');
   await expect(
     sunburst.getByRole('link', { name: 'Compare providers', exact: true }),
   ).toHaveAttribute('href', '/openai/gpt-image-2.5');
   const sunburst26 = card(page, 'openai/gpt-image-2.6-sunburst');
-  await expect(sunburst26.getByRole('heading', { level: 2 })).toHaveText('GPT Image 2.6 Sunburst');
+  await expect(sunburst26.getByRole('heading', { level: 3 })).toHaveText('GPT Image 2.6 Sunburst');
   await expect(
     sunburst26.getByRole('link', { name: 'Compare providers', exact: true }),
   ).toHaveAttribute('href', '/openai/gpt-image-2.6');
@@ -112,7 +139,7 @@ test('the separate playground quotes comparison-only routes and preserves a sele
     .fill('A quiet coastal road at sunrise, filmed in a slow tracking shot.');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   const pricing = page.getByRole('region', { name: 'Wan 3.0 pricing' });
-  await expect(pricing.getByText('Quote details · 9 routes')).toBeVisible();
+  await expect(pricing.getByText('Quote details · 14 routes')).toBeVisible();
   await expect(pricing).toContainText(
     'No qualified adapter and regional credentials are configured.',
   );

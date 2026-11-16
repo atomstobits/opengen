@@ -51,6 +51,9 @@ function routeChoice(catalog: Catalog, route: Route) {
   const model = catalog.models.find((item) => item.id === route.modelId);
   const deployment = catalog.deployments.find((item) => item.id === route.deploymentId);
   const provider = catalog.providers.find((item) => item.id === deployment?.providerId);
+  const official = Boolean(
+    model && deployment && model.authorProviderIds.includes(deployment.providerId),
+  );
   const endpoint = deployment?.endpointRegion ?? 'unknown';
   const modelName = model?.name ?? route.modelId;
   const providerLabel =
@@ -65,7 +68,7 @@ function routeChoice(catalog: Catalog, route: Route) {
       entry.unit === 'image' &&
       (entry.operation === undefined || entry.operation === 'text-to-image'),
   );
-  return { route, modelName, providerLabel, region, rate, resolution };
+  return { route, modelName, providerLabel, region, rate, resolution, official };
 }
 
 type Choice = ReturnType<typeof routeChoice>;
@@ -84,7 +87,8 @@ export function PrivateComparison({ catalog }: { catalog: Catalog }) {
         route.status !== 'retired' && route.adapter && route.operations.includes('text-to-image'),
     )
     .map((route) => routeChoice(catalog, route))
-    .filter((choice) => choice.rate !== undefined);
+    .filter((choice) => choice.rate !== undefined)
+    .sort((left, right) => Number(right.official) - Number(left.official));
 
   return (
     <>

@@ -1,10 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { getCompany, getSeriesForModel, modelSeries, seriesHref } from '@media-router/catalog';
+import { getModelRoutes, modelSeries, seriesHref } from '@media-router/catalog';
 import type { Catalog, Operation } from '@media-router/contracts';
+import {
+  buildCatalogModelEntries,
+  describeEndpointRegions,
+  groupCatalogModels,
+  variantGridColumns,
+} from './model-groups';
 import { Icon, Playground, regionNames } from './ui';
 import type { PlaygroundDraftTransfer } from './private-playground';
+
+function routeCountLabel(count: number, region: string): string {
+  if (region === 'all') return count === 1 ? 'provider route' : 'provider routes';
+  return count === 1 ? 'matching route' : 'matching routes';
+}
 
 export function ModelsCatalog({
   catalog,
@@ -20,42 +31,22 @@ export function ModelsCatalog({
   const [query, setQuery] = useState(initialQuery);
   const [modality, setModality] = useState(initialModality);
   const [region, setRegion] = useState(initialRegion);
-  const entries = useMemo(
-    () =>
-      catalog.models.map((model) => {
-        const series = getSeriesForModel(model.id);
-        const company = series ? getCompany(series.companyId) : undefined;
-        const routes = catalog.routes.filter((route) => route.modelId === model.id);
-        const deployments = catalog.deployments.filter((deployment) =>
-          routes.some((route) => route.deploymentId === deployment.id),
-        );
-        const search = [
-          model.name,
-          model.id,
-          model.creator,
-          company?.name,
-          ...model.aliases,
-          ...deployments.map(
-            (deployment) =>
-              `${deployment.name} ${regionNames[deployment.endpointRegion] ?? deployment.endpointRegion}`,
-          ),
-        ]
-          .join(' ')
-          .toLowerCase();
-        return { model, company, routes, deployments, search };
-      }),
-    [catalog],
-  );
+  const entries = useMemo(() => buildCatalogModelEntries(catalog, regionNames), [catalog]);
   const regions = [
     ...new Set(catalog.deployments.map((deployment) => deployment.endpointRegion)),
   ].sort();
-  const filtered = entries.filter(
-    (entry) =>
-      (modality === 'all' || entry.model.modality === modality) &&
-      (region === 'all' ||
-        entry.deployments.some((deployment) => deployment.endpointRegion === region)) &&
-      entry.search.includes(query.trim().toLowerCase()),
+  const filtered = useMemo(
+    () =>
+      entries.filter(
+        (entry) =>
+          (modality === 'all' || entry.model.modality === modality) &&
+          (region === 'all' ||
+            entry.deployments.some((deployment) => deployment.endpointRegion === region)) &&
+          entry.search.includes(query.trim().toLowerCase()),
+      ),
+    [entries, modality, region, query],
   );
+  const groups = useMemo(() => groupCatalogModels(entries, filtered), [entries, filtered]);
   return (
     <>
       <div className="catalog-toolbar">
@@ -99,85 +90,218 @@ export function ModelsCatalog({
       </div>
       <div className="catalog-results-heading">
         <p aria-live="polite">
-          {filtered.length} {filtered.length === 1 ? 'model' : 'models'}
+          {groups.length} model series · {filtered.length}{' '}
+          {filtered.length === 1 ? 'exact variant' : 'exact variants'}
         </p>
-        <span>Exact variants. Separate regional providers.</span>
+        <span>Grouped by model series. Separate regional providers.</span>
       </div>
       <div className="model-directory-list">
-        {filtered.map(({ model, company, routes, deployments }) => {
-          const matchingDeployments = deployments.filter(
-            (deployment) => region === 'all' || deployment.endpointRegion === region,
+        {groups.map((group) => {
+          const variantItems = group.entries.map((entry) => {
+            const matchingDeployments = entry.deployments.filter(
+              (deployment) => region === 'all' || deployment.endpointRegion === region,
+            );
+            const matchingRoutes = entry.routes.filter((route) =>
+              matchingDeployments.some((deployment) => deployment.id === route.deploymentId),
+            );
+            return {
+              ...entry,
+              matchingDeployments,
+              matchingRoutes,
+              regionText: describeEndpointRegions(matchingRoutes.length, matchingDeployments),
+            };
+          });
+
+          if (group.totalVariants <= 1) {
+            const { model, company, matchingRoutes, regionText } = variantItems[0]!;
+            const href = seriesHref(model.id);
+            return (
+              <section
+                className="model-series-group single-variant"
+                key={group.id}
+                data-series-id={group.id}
+                data-testid="model-series-group"
+                data-media={group.modality}
+                aria-label={`${group.name} model series`}
+              >
+                <article
+                  className="model-directory-card"
+                  data-model-id={model.id}
+                  data-media={model.modality}
+                >
+                  <div className="model-directory-main">
+                    <div className="model-directory-publisher">
+                      <span className={`model-glyph ${model.modality}`} aria-hidden="true">
+                        {model.modality === 'video' ? '▶' : '▧'}
+                      </span>
+                      {company ? (
+                        <a href={`/${company.id}`}>{company.name}</a>
+                      ) : (
+                        <span>{model.creator}</span>
+                      )}
+                      {company && company.name !== model.creator && (
+                        <span className="variant-creator">by {model.creator}</span>
+                      )}
+                      <span className="modality-tag">
+                        {model.modality === 'video' ? 'Video' : 'Image'}
+                      </span>
+                      {model.openness === 'open-weights' && (
+                        <span className="weight-tag">Open weights</span>
+                      )}
+                    </div>
+                    <h2>
+                      <a href={href}>
+                        {model.name}
+                        <Icon name="arrow" size={20} />
+                      </a>
+                    </h2>
+                    <p>{model.description}</p>
+                    <div className="model-directory-source">
+                      <code>{model.id}</code>
+                      <a href={model.source.url} target="_blank" rel="noreferrer">
+                        Original model ↗
+                      </a>
+                    </div>
+                  </div>
+                  <div className="model-directory-offerings">
+                    <div className="model-directory-route-stat">
+                      <strong>
+                        {matchingRoutes.length}{' '}
+                        <span>{routeCountLabel(matchingRoutes.length, region)}</span>
+                      </strong>
+                      <p>{regionText}</p>
+                    </div>
+                    <a href={href}>
+                      Compare providers <Icon name="arrow" size={15} />
+                    </a>
+                  </div>
+                </article>
+              </section>
+            );
+          }
+
+          const groupRoutesCount = variantItems.reduce(
+            (sum, item) => sum + item.matchingRoutes.length,
+            0,
           );
-          const matchingRoutes = routes.filter((route) =>
-            matchingDeployments.some((deployment) => deployment.id === route.deploymentId),
-          );
-          const disclosedRegions = new Set(
-            matchingDeployments
-              .filter(
-                (deployment) =>
-                  !['undisclosed', 'unknown', 'global'].includes(deployment.endpointRegion),
-              )
-              .map((deployment) => deployment.endpointRegion),
-          );
-          const regionText = disclosedRegions.size
-            ? `${disclosedRegions.size} disclosed endpoint ${disclosedRegions.size === 1 ? 'region' : 'regions'}`
-            : matchingDeployments.some((deployment) => deployment.endpointRegion === 'global')
-              ? 'Global endpoint'
-              : 'Region not disclosed';
+          const groupDeployments = variantItems.flatMap((item) => item.matchingDeployments);
+          const groupRegionText = describeEndpointRegions(groupRoutesCount, groupDeployments);
+          const columns = variantGridColumns(variantItems.length);
+
           return (
-            <article
-              className="model-directory-card"
-              key={model.id}
-              data-model-id={model.id}
-              data-media={model.modality}
+            <section
+              className="model-series-group has-variants"
+              key={group.id}
+              data-series-id={group.id}
+              data-testid="model-series-group"
+              data-media={group.modality}
+              aria-label={`${group.name} model series`}
             >
-              <div className="model-directory-main">
-                <div className="model-directory-publisher">
-                  {company ? (
-                    <a href={`/${company.id}`}>{company.name}</a>
-                  ) : (
-                    <span>{model.creator}</span>
-                  )}
-                  <span className="modality-tag">
-                    {model.modality === 'video' ? 'Video' : 'Image'}
-                  </span>
-                  {model.openness === 'open-weights' && (
-                    <span className="weight-tag">Open weights</span>
+              <div className="model-series-header">
+                <div className="model-series-intro">
+                  <div className="model-series-kicker">
+                    <span className={`model-glyph ${group.modality}`} aria-hidden="true">
+                      {group.modality === 'video' ? '▶' : '▧'}
+                    </span>
+                    {group.company ? (
+                      <a href={`/${group.company.id}`}>{group.company.name}</a>
+                    ) : (
+                      <span>{variantItems[0]!.model.creator}</span>
+                    )}
+                    <span className="modality-tag">
+                      {group.modality === 'video' ? 'Video' : 'Image'}
+                    </span>
+                    <span className="variant-count-tag">
+                      {variantItems.length === group.totalVariants
+                        ? `${group.totalVariants} variants`
+                        : `${variantItems.length} of ${group.totalVariants} variants`}
+                    </span>
+                  </div>
+                  <h2 className="model-series-title">
+                    {group.href ? (
+                      <a href={group.href}>
+                        {group.name}
+                        <Icon name="arrow" size={20} />
+                      </a>
+                    ) : (
+                      group.name
+                    )}
+                  </h2>
+                  <p className="model-series-description">{group.description}</p>
+                </div>
+                <div className="model-series-summary">
+                  <div className="model-directory-route-stat">
+                    <strong>
+                      {groupRoutesCount} <span>{routeCountLabel(groupRoutesCount, region)}</span>
+                    </strong>
+                    <p>{groupRegionText}</p>
+                  </div>
+                  {group.href && (
+                    <a href={group.href}>
+                      Explore series <Icon name="arrow" size={15} />
+                    </a>
                   )}
                 </div>
-                <h2>
-                  <a href={seriesHref(model.id)}>
-                    {model.name}
-                    <Icon name="arrow" size={20} />
-                  </a>
-                </h2>
-                <p>{model.description}</p>
-                <div className="model-directory-source">
-                  <code>{model.id}</code>
-                  <a href={model.source.url} target="_blank" rel="noreferrer">
-                    Original model ↗
-                  </a>
+              </div>
+              <div className="model-series-variants" data-columns={columns}>
+                {variantItems.map(({ model, matchingRoutes, regionText }) => {
+                  const href = seriesHref(model.id);
+                  return (
+                    <article
+                      className="model-directory-card variant-card"
+                      key={model.id}
+                      data-model-id={model.id}
+                      data-media={model.modality}
+                    >
+                      <div className="model-directory-main">
+                        <div className="model-directory-publisher">
+                          <span className="variant-creator">by {model.creator}</span>
+                          {model.openness === 'open-weights' && (
+                            <span className="weight-tag">Open weights</span>
+                          )}
+                        </div>
+                        <h3>
+                          <a href={href}>
+                            {model.name}
+                            <Icon name="arrow" size={17} />
+                          </a>
+                        </h3>
+                        <p>{model.description}</p>
+                        <div className="model-directory-source">
+                          <code>{model.id}</code>
+                          <a href={model.source.url} target="_blank" rel="noreferrer">
+                            Original model ↗
+                          </a>
+                        </div>
+                      </div>
+                      <div className="model-directory-offerings">
+                        <div className="model-directory-route-stat">
+                          <strong>
+                            {matchingRoutes.length}{' '}
+                            <span>{routeCountLabel(matchingRoutes.length, region)}</span>
+                          </strong>
+                          <p>{regionText}</p>
+                        </div>
+                        <a href={href}>
+                          Compare providers <Icon name="arrow" size={14} />
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {group.hiddenSiblings.length > 0 && (
+                <div className="model-series-siblings">
+                  <span>Also in {group.name}:</span>
+                  {group.hiddenSiblings.map((sibling) => (
+                    <a key={sibling.id} href={seriesHref(sibling.id)}>
+                      {sibling.name}
+                      <Icon name="chevron" size={11} />
+                    </a>
+                  ))}
                 </div>
-              </div>
-              <div className="model-directory-offerings">
-                <strong>
-                  {matchingRoutes.length}{' '}
-                  <span>
-                    {region === 'all'
-                      ? matchingRoutes.length === 1
-                        ? 'provider route'
-                        : 'provider routes'
-                      : matchingRoutes.length === 1
-                        ? 'matching route'
-                        : 'matching routes'}
-                  </span>
-                </strong>
-                <p>{regionText}</p>
-                <a href={seriesHref(model.id)}>
-                  Compare providers <Icon name="arrow" size={15} />
-                </a>
-              </div>
-            </article>
+              )}
+            </section>
           );
         })}
       </div>
@@ -256,9 +380,8 @@ export function PlaygroundApp({
   );
   const model = catalog.models.find((value) => value.id === selection.modelId)!;
   const routes = useMemo(
-    () =>
-      catalog.routes.filter((route) => route.modelId === model.id && route.status !== 'retired'),
-    [catalog.routes, model.id],
+    () => getModelRoutes(model.id, catalog).filter((route) => route.status !== 'retired'),
+    [catalog, model.id],
   );
   return (
     <>

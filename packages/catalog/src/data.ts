@@ -9,17 +9,20 @@ import type {
   Source,
 } from '@media-router/contracts';
 import { publishedPricingFor } from './published-pricing';
+import { groupRoutesByProvider } from './route-order';
 
 const checkedAt = '2026-11-02';
-const source = (url: string, note?: string): Source => ({
+const recheckedAt = '2026-11-14';
+const source = (url: string, note?: string, checkedOn = checkedAt): Source => ({
   url,
-  checkedAt,
+  checkedAt: checkedOn,
   ...(note ? { note } : {}),
 });
-const unknownPrice = (url: string) =>
+const unknownPrice = (url: string, checkedOn = checkedAt) =>
   source(
     url,
     'No request-price formula has been qualified for this route. A catalog listing is not a live verification.',
+    checkedOn,
   );
 
 const providers: Provider[] = [
@@ -294,7 +297,7 @@ const models: Model[] = [
     'minimax-h3',
     'video',
     'https://platform.minimax.io/docs/api-reference/video-generation-v2-create',
-    'MiniMax H3 Max, served by MiniMax and fal under provider-specific names.',
+    'MiniMax H3 Max, served by MiniMax, fal and Runway under provider-specific names.',
     { aliases: ['H3 Max', 'H3 Max · fal', 'MiniMax H3 Max · MiniMax', 'fal/h3-max'] },
   ),
   model(
@@ -642,6 +645,7 @@ const videoOps: Operation[] = [
   'video-edit',
   'video-extend',
 ];
+const genVideoOps: Operation[] = ['text-to-video', 'image-to-video', 'reference-to-video'];
 const routes: Route[] = [];
 const durations = (minimum: number, maximum: number) =>
   Array.from({ length: maximum - minimum + 1 }, (_, index) => minimum + index);
@@ -730,49 +734,55 @@ function route(
   });
 }
 
-const seed20 = 'https://docs.byteplus.com/en/docs/ModelArk/seedance-2-0';
-route(
-  'bytedance/seedance-2.0',
-  'byteplus-undisclosed',
-  'dreamina-seedance-2-0-260128',
-  seed20,
-  videoOps,
-  ['480p', '720p', '1080p', '4K'],
-  durations(4, 15),
-);
-route(
-  'bytedance/seedance-2.0-fast',
-  'byteplus-undisclosed',
-  'dreamina-seedance-2-0-fast-260128',
-  seed20,
-  videoOps,
-  ['480p', '720p'],
-  durations(4, 15),
-);
-route(
-  'bytedance/seedance-2.0-mini',
-  'byteplus-undisclosed',
-  'dreamina-seedance-2-0-mini-260615',
-  seed20,
-  videoOps,
-  ['480p', '720p'],
-  durations(4, 15),
-);
+function pikaDocRoute(
+  modelId: string,
+  upstream: string,
+  operations: Operation[],
+  resolutions: string[],
+  allowedDurations: number[] = [],
+): void {
+  routes.push({
+    id: `pika-undisclosed/${upstream}`,
+    modelId,
+    deploymentId: 'pika-undisclosed',
+    upstreamModelId: upstream,
+    operations,
+    resolutions,
+    durations: allowedDurations,
+    fidelity: 'unknown',
+    adapter: null,
+    status: 'documented',
+    rates: [],
+    pricingSource: unknownPrice(`https://dev.pika.art/models/${upstream}`, recheckedAt),
+    source: source(
+      `https://dev.pika.art/models/${upstream}/api`,
+      'Documented Pika catalog endpoint and published tariff verified; adapter schema translation is not yet enabled.',
+      recheckedAt,
+    ),
+  });
+}
+
+const runwayModelsUrl = 'https://docs.dev.runwayml.com/guides/models/';
+const runwayPricingUrl = 'https://docs.dev.runwayml.com/guides/pricing/';
+
 route(
   'bytedance/seedance-2.5',
   'runway-undisclosed',
   'seedance2_5',
-  'https://docs.dev.runwayml.com/guides/models/',
-  ['text-to-video', 'image-to-video'],
-  ['480p', '720p'],
+  runwayModelsUrl,
+  [...videoOps],
+  ['480p', '720p', '1080p'],
   durations(4, 30),
+  {
+    pricingSource: unknownPrice(runwayPricingUrl, recheckedAt),
+  },
 );
 route(
   'bytedance/seedance-2.5',
   'replicate-undisclosed',
   'bytedance/seedance-2.5',
   'https://replicate.com/bytedance/seedance-2.5',
-  ['text-to-video', 'image-to-video', 'reference-to-video'],
+  [...genVideoOps],
   ['480p', '720p'],
   durations(4, 30),
   { adapter: 'replicate' },
@@ -793,17 +803,19 @@ route(
         resolution: '720p',
         unit: 'output-second' as const,
         usdMicros: 157_000,
+        note: 'Standard list rate ($0.157/sec). Active 20% off Runway promotion through November 30, 2026 UTC bills $0.1256/sec.',
       },
       {
         operation: operation as Operation,
         resolution: '1080p',
         unit: 'output-second' as const,
         usdMicros: 235_000,
+        note: 'Standard list rate ($0.235/sec). Active 20% off Runway promotion through November 30, 2026 UTC bills $0.188/sec.',
       },
     ]),
     pricingSource: source(
       'https://dev.runwayml.com/learn/kling-4-0-api',
-      'Output-only generation list tariff including generated sound. Video input/edit operations have separate input billing and are not priced by this formula. Provider page prices are dated November 3 UTC, observed November 2 in America/Los_Angeles.',
+      'Standard output-only generation list tariff including generated sound; 20% promotional discount ($0.1256/$0.188 per second) runs through November 30, 2026 UTC. Video input/edit operations have separate input billing and are not priced by this formula.',
     ),
   },
 );
@@ -1147,9 +1159,16 @@ route(
   'fal-seedance-us-account-enabled',
   'account-enabled-seedance-2.0-us',
   'https://fal.ai/seedance-2.0-us-hosting',
-  ['text-to-video', 'image-to-video', 'reference-to-video'],
+  [...genVideoOps],
   ['480p', '720p'],
   durations(4, 15),
+  {
+    pricingSource: source(
+      'https://fal.ai/models/bytedance/seedance-2.0/us/text-to-video',
+      'US-hosted token tariff ($0.0168 per 1,000 video tokens at 480p/720p); requires approved US-company account onboarding.',
+      recheckedAt,
+    ),
+  },
 );
 
 const h3 = 'https://platform.minimax.io/docs/api-reference/video-generation-v2-create';
@@ -1807,14 +1826,6 @@ route(
     },
   },
 );
-route(
-  'bytedance/seedream-5.0-pro',
-  'byteplus-undisclosed',
-  'dola-seedream-5-0-pro-260628',
-  'https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro',
-  imageOps,
-  ['1K', '1.5K', '2K'],
-);
 for (const [modelId, upstream, docUrl, resolutions, prices, pricingNote] of [
   [
     'bytedance/seedream-5.5',
@@ -1894,7 +1905,7 @@ route(
   'bytedance/seedream-5-pro',
   'https://replicate.com/bytedance/seedream-5-pro/readme',
   imageOps,
-  ['1K', '1.5K', '2K'],
+  ['1K', '2K'],
   [],
   { adapter: 'replicate' },
 );
@@ -2092,6 +2103,316 @@ for (const [modelId, prefix, resolutions] of [
   }
 }
 
+// Documented Pika aggregator endpoints across hosted catalog models.
+for (const [modelId, prefix, maximumDuration, resolutions] of [
+  ['bytedance/seedance-2.5', 'bytedance/seedance-2.5', 30, ['480p', '720p', '1080p']],
+  ['bytedance/seedance-2.0', 'bytedance/seedance-2.0', 15, ['480p', '720p', '1080p', '4K']],
+  ['bytedance/seedance-2.0-fast', 'bytedance/seedance-2.0-fast', 15, ['480p', '720p']],
+  ['bytedance/seedance-2.0-mini', 'bytedance/seedance-2.0-mini', 15, ['480p', '720p']],
+] as const) {
+  for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+    pikaDocRoute(
+      modelId,
+      `${prefix}/${operation}`,
+      [operation],
+      [...resolutions],
+      durations(4, maximumDuration),
+    );
+  }
+}
+for (const [slug, operation] of [
+  ['text-to-video', 'text-to-video'],
+  ['image-to-video', 'image-to-video'],
+  ['omni-video', 'reference-to-video'],
+] as const) {
+  pikaDocRoute(
+    'alibaba/wan-3.0',
+    `alibaba/wan3.0-video/${slug}`,
+    [operation],
+    ['480p', '720p', '1080p'],
+    durations(2, 30),
+  );
+  pikaDocRoute(
+    'alibaba/wan-3.0-prime',
+    `alibaba/wan3.0-video-prime/${slug}`,
+    [operation],
+    ['480p', '720p', '1080p'],
+    durations(2, 30),
+  );
+  pikaDocRoute(
+    'kling/kling-4.0',
+    `kling/kling-4.0/${slug}`,
+    [operation],
+    ['720p', '1080p'],
+    durations(3, 30),
+  );
+}
+for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
+  pikaDocRoute(
+    'minimax/h3',
+    `minimax/h3/${operation}`,
+    [operation],
+    ['768p', '2K'],
+    durations(4, 15),
+  );
+}
+for (const [slug, operation] of [
+  ['text-to-video', 'text-to-video'],
+  ['image-to-video', 'image-to-video'],
+  ['reference-to-video', 'reference-to-video'],
+  ['video-to-video', 'video-edit'],
+] as const) {
+  pikaDocRoute(
+    'google/gemini-omni-1.1-flash',
+    `google/gemini-omni-1.1-flash/${slug}`,
+    [operation],
+    ['360p', '720p', '1080p', '4K'],
+    durations(3, 10),
+  );
+}
+pikaDocRoute(
+  'xai/grok-imagine-video-1.5',
+  'x-ai/grok-imagine-video-1.5/image-to-video',
+  ['image-to-video'],
+  ['480p', '720p'],
+  durations(1, 15),
+);
+pikaDocRoute(
+  'xai/grok-imagine-video',
+  'x-ai/grok-imagine-video/video-to-video',
+  ['video-edit'],
+  ['480p', '720p'],
+  durations(1, 15),
+);
+for (const [modelId, prefix, resolutions] of [
+  ['bytedance/seedream-5.0-pro', 'bytedance/seedream-5.0-pro', ['1K', '1.5K', '2K']],
+  ['google/nano-banana-2.1', 'google/gemini-nano-banana-2.1', ['1K', '2K', '4K']],
+  ['openai/gpt-image-2.5-flare', 'openai/gpt-image-2.5-flare', ['1K', '2K', '4K']],
+  ['openai/gpt-image-2.5-sunburst', 'openai/gpt-image-2.5-sunburst', ['1K', '2K', '4K']],
+  ['openai/gpt-image-2', 'openai/gpt-image-2', ['1K', '2K', '4K']],
+  ['xai/grok-imagine-image-2.0', 'x-ai/grok-imagine-image-2.0', ['1K', '2K']],
+] as const) {
+  pikaDocRoute(modelId, `${prefix}/text-to-image`, ['text-to-image'], [...resolutions]);
+  pikaDocRoute(modelId, `${prefix}/image-to-image`, ['image-edit'], [...resolutions]);
+}
+
+// Documented official Replicate aggregator models.
+for (const [modelId, upstream, ops, resolutions, allowedDurations] of [
+  [
+    'bytedance/seedance-2.0',
+    'bytedance/seedance-2.0',
+    genVideoOps,
+    ['480p', '720p', '1080p', '4K'],
+    durations(4, 15),
+  ],
+  [
+    'bytedance/seedance-2.0-fast',
+    'bytedance/seedance-2.0-fast',
+    genVideoOps,
+    ['480p', '720p'],
+    durations(4, 15),
+  ],
+  [
+    'bytedance/seedance-2.0-mini',
+    'bytedance/seedance-2.0-mini',
+    genVideoOps,
+    ['480p', '720p'],
+    durations(4, 15),
+  ],
+  ['kling/kling-4.0', 'kwaivgi/kling-v4.0', genVideoOps, ['720p', '1080p'], durations(3, 30)],
+  [
+    'alibaba/wan-3.0',
+    'alibaba/wan-3',
+    ['text-to-video', 'image-to-video'],
+    ['480p', '720p', '1080p'],
+    durations(2, 30),
+  ],
+  [
+    'alibaba/wan-3.0-prime',
+    'alibaba/wan-3-prime',
+    ['text-to-video', 'image-to-video'],
+    ['480p', '720p', '1080p'],
+    durations(2, 30),
+  ],
+  ['alibaba/qwen-image-3.0-pro', 'alibaba/qwen-image-3-pro', imageOps, ['1K', '2K'], []],
+  ['minimax/h3', 'minimax/h3', genVideoOps, ['768p', '2K'], durations(4, 15)],
+  ['minimax/h3-highspeed', 'minimax/h3-highspeed', genVideoOps, ['768p'], durations(4, 15)],
+  ['minimax/h3-lite', 'minimax/h3-lite', genVideoOps, ['480p', '768p'], durations(4, 15)],
+  [
+    'google/gemini-omni-1.1-flash',
+    'google/gemini-omni-1.1',
+    [...genVideoOps, 'video-edit'],
+    ['360p', '720p', '1080p', '4K'],
+    durations(3, 10),
+  ],
+  ['google/nano-banana-2.1', 'google/nano-banana-2.1', imageOps, ['1K', '2K', '4K'], []],
+  ['openai/gpt-image-2', 'openai/gpt-image-2', imageOps, ['1K', '2K', '4K'], []],
+  ['openai/gpt-image-2.5-flare', 'openai/gpt-image-2.5-flare', imageOps, ['1K', '2K', '4K'], []],
+  [
+    'openai/gpt-image-2.5-sunburst',
+    'openai/gpt-image-2.5-sunburst',
+    imageOps,
+    ['1K', '2K', '4K'],
+    [],
+  ],
+  ['xai/grok-imagine-image-2.0', 'xai/grok-imagine-image-2', imageOps, ['1K', '2K'], []],
+  [
+    'xai/grok-imagine-video-1.5',
+    'xai/grok-imagine-video-1.5',
+    ['image-to-video'],
+    ['480p', '720p'],
+    durations(1, 15),
+  ],
+  [
+    'xai/grok-imagine-video',
+    'xai/grok-imagine-video',
+    ['video-edit'],
+    ['480p', '720p'],
+    durations(1, 15),
+  ],
+] as const) {
+  const url = `https://replicate.com/${upstream}`;
+  route(
+    modelId,
+    'replicate-undisclosed',
+    upstream,
+    url,
+    [...ops],
+    [...resolutions],
+    [...allowedDurations],
+    {
+      pricingSource: unknownPrice(url, recheckedAt),
+    },
+  );
+}
+route(
+  'xai/grok-imagine-video',
+  'replicate-undisclosed',
+  'xai/grok-imagine-video-extension',
+  'https://replicate.com/xai/grok-imagine-video-extension',
+  ['video-extend'],
+  ['480p', '720p'],
+  durations(2, 10),
+  {
+    id: 'replicate-undisclosed/xai-grok-imagine-video-extension',
+    pricingSource: unknownPrice(
+      'https://replicate.com/xai/grok-imagine-video-extension',
+      recheckedAt,
+    ),
+  },
+);
+
+// Documented Runway aggregator models.
+for (const [modelId, upstream, ops, resolutions, allowedDurations, providerModelName] of [
+  [
+    'bytedance/seedance-2.0',
+    'seedance2',
+    genVideoOps,
+    ['480p', '720p', '1080p', '4K'],
+    durations(4, 15),
+    undefined,
+  ],
+  [
+    'bytedance/seedance-2.0-fast',
+    'seedance2_fast',
+    genVideoOps,
+    ['480p', '720p'],
+    durations(4, 15),
+    undefined,
+  ],
+  [
+    'bytedance/seedance-2.0-mini',
+    'seedance2_mini',
+    genVideoOps,
+    ['480p', '720p'],
+    durations(4, 15),
+    undefined,
+  ],
+  [
+    'alibaba/wan-3.0',
+    'wan3',
+    ['text-to-video', 'image-to-video'],
+    ['480p', '720p', '1080p'],
+    durations(2, 30),
+    undefined,
+  ],
+  [
+    'alibaba/wan-3.0-prime',
+    'wan3_prime',
+    ['text-to-video', 'image-to-video'],
+    ['480p', '720p', '1080p'],
+    durations(2, 30),
+    undefined,
+  ],
+  ['minimax/h3', 'hailuo3', genVideoOps, ['768p', '2K'], durations(4, 15), 'MiniMax H3'],
+  [
+    'minimax/h3-max',
+    'h3_max',
+    ['text-to-video', 'image-to-video'],
+    ['480p', '768p'],
+    durations(5, 15),
+    'MiniMax H3 Max',
+  ],
+  [
+    'google/gemini-omni-1.1-flash',
+    'gemini_omni_flash_1.1',
+    videoOps,
+    ['360p', '720p', '1080p', '4K'],
+    durations(3, 10),
+    undefined,
+  ],
+  [
+    'xai/grok-imagine-video-1.5',
+    'grok_imagine_1_5',
+    genVideoOps,
+    ['480p', '720p', '1080p'],
+    durations(1, 15),
+    undefined,
+  ],
+  [
+    'xai/grok-imagine-video-1.5-lite',
+    'grok_imagine_1_5_lite',
+    ['text-to-video', 'image-to-video'],
+    ['480p', '720p', '1080p'],
+    durations(1, 15),
+    undefined,
+  ],
+  ['bytedance/seedream-5.0-pro', 'seedream5_pro', imageOps, ['1K', '2K'], [], undefined],
+  ['google/nano-banana-2.1', 'nano_banana_2.1', imageOps, ['1K', '2K', '4K'], [], undefined],
+  ['xai/grok-imagine-image-2.0', 'grok_imagine_image_2', imageOps, ['1K', '2K'], [], undefined],
+  ['openai/gpt-image-2', 'gpt_image_2', imageOps, ['1K', '2K', '4K'], [], undefined],
+  [
+    'openai/gpt-image-2.5-flare',
+    'gpt_image_2_5_flare',
+    imageOps,
+    ['1K', '2K', '4K'],
+    [],
+    undefined,
+  ],
+  [
+    'openai/gpt-image-2.5-sunburst',
+    'gpt_image_2_5_sunburst',
+    imageOps,
+    ['1K', '2K', '4K'],
+    [],
+    undefined,
+  ],
+] as const) {
+  route(
+    modelId,
+    'runway-undisclosed',
+    upstream,
+    runwayModelsUrl,
+    [...ops],
+    [...resolutions],
+    [...allowedDurations],
+    {
+      pricingSource: unknownPrice(runwayPricingUrl, recheckedAt),
+      ...(providerModelName ? { providerModelName } : {}),
+    },
+  );
+}
+
 const qwen =
   'https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference';
 // All six Alibaba Cloud Model Studio regions explicitly document Qwen Image 2.1 Turbo/Pro and 3.0 Pro with workspace MaAS endpoints.
@@ -2137,4 +2458,17 @@ for (const route of routes) {
   if (publishedPricing) route.publishedPricing = publishedPricing;
 }
 
-export const catalog: Catalog = { providers, deployments, models, routes };
+const deploymentsById = new Map(deployments.map((deployment) => [deployment.id, deployment]));
+const catalogModelIds = new Set(models.map((entry) => entry.id));
+const orderedRoutes: Route[] = [
+  ...models.flatMap((entry) =>
+    groupRoutesByProvider(
+      routes.filter((item) => item.modelId === entry.id),
+      deploymentsById,
+      entry.authorProviderIds,
+    ),
+  ),
+  ...routes.filter((item) => !catalogModelIds.has(item.modelId)),
+];
+
+export const catalog: Catalog = { providers, deployments, models, routes: orderedRoutes };
