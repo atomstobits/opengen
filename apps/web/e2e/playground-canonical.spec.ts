@@ -800,10 +800,10 @@ test('cross-model reuse cannot remove draft processing or fidelity requirements'
   const defaultDraft = await exportedRequest(page);
   await page
     .getByRole('combobox', { name: 'Destination model', exact: true })
-    .selectOption('minimax/h3-highspeed');
+    .selectOption('alibaba/qwen-image-2.1-pro');
   await page
     .getByRole('combobox', { name: 'Reuse output as', exact: true })
-    .selectOption({ label: 'image-to-video · first frame' });
+    .selectOption({ label: 'image-edit · image reference' });
   await expect(
     page.getByRole('button', { name: 'Use output as input', exact: true }),
   ).toBeDisabled();

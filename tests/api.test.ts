@@ -43,30 +43,30 @@ describe('public catalog and quote API', () => {
     const app = await setup();
     const wan = (await app.inject({ url: '/v1/series/alibaba/wan-3.0' })).json();
     expect(wan.models).toHaveLength(2);
-    expect(wan.routes).toHaveLength(18);
-    expect(wan.deployments).toHaveLength(7);
+    expect(wan.routes).toHaveLength(28);
+    expect(wan.deployments).toHaveLength(10);
     expect(new Set(wan.routes.map((route: { modelId: string }) => route.modelId)).size).toBe(2);
     const h3 = (await app.inject({ url: '/v1/series/minimax/h3' })).json();
     expect(h3.models).toHaveLength(6);
     expect(h3.providers.map((provider: { id: string }) => provider.id)).toEqual(
-      expect.arrayContaining(['minimax', 'fal', 'pika']),
+      expect.arrayContaining(['minimax', 'fal', 'pika', 'replicate', 'runway']),
     );
     expect((await app.inject({ url: '/v1/series/minimax/not-a-model' })).statusCode).toBe(404);
   });
-  it('lists one H3 Max variant while retaining both independent provider routes', async () => {
+  it('lists one H3 Max variant while retaining independent provider routes', async () => {
     const app = await setup();
     const models = (await app.inject({ url: '/v1/models' })).json().data;
     expect(models).toHaveLength(49);
     expect(models.filter((model: { id: string }) => model.id === 'minimax/h3-max')).toHaveLength(1);
     expect(models.some((model: { id: string }) => model.id === 'fal/h3-max')).toBe(false);
     const routes = (await app.inject({ url: '/v1/routes?modelId=minimax%2Fh3-max' })).json().data;
-    expect(routes).toHaveLength(4);
+    expect(routes).toHaveLength(5);
     expect(routes[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(
       (await app.inject({ url: '/v1/routes?modelId=bytedance%2Fseedance-2.5' })).json().data[0]?.id,
     ).toBe('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5');
     expect(new Set(routes.map((route: { deploymentId: string }) => route.deploymentId))).toEqual(
-      new Set(['minimax-undisclosed', 'fal-undisclosed']),
+      new Set(['minimax-undisclosed', 'fal-undisclosed', 'runway-undisclosed']),
     );
     expect(routes.every((route: { modelId: string }) => route.modelId === 'minimax/h3-max')).toBe(
       true,
@@ -81,7 +81,7 @@ describe('public catalog and quote API', () => {
   it('returns independent regional routes and honest empty observations', async () => {
     const app = await setup();
     const result = (await app.inject({ url: '/v1/routes?modelId=alibaba%2Fwan-3.0' })).json();
-    expect(result.data).toHaveLength(9);
+    expect(result.data).toHaveLength(14);
     const metrics = (await app.inject({ url: '/v1/metrics' })).json();
     expect(
       metrics.data.every(

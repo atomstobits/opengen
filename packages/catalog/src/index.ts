@@ -188,7 +188,7 @@ export function validateCatalog(): string[] {
     if (route.rates.some((rate) => !Number.isSafeInteger(rate.usdMicros) || rate.usdMicros < 0))
       errors.push(`Invalid rate for ${route.id}`);
     if (route.publishedPricing) {
-      const { summary, source, conditions } = route.publishedPricing;
+      const { summary, source, conditions, outputRates } = route.publishedPricing;
       let validSource = false;
       try {
         const url = new URL(source.url);
@@ -200,6 +200,7 @@ export function validateCatalog(): string[] {
         !summary.trim() ||
         !conditions.length ||
         conditions.some((condition) => !condition.trim()) ||
+        outputRates?.some((rate) => !Number.isSafeInteger(rate.usdMicros) || rate.usdMicros < 0) ||
         !validSource ||
         !/^\d{4}-\d{2}-\d{2}$/.test(source.checkedAt) ||
         !Number.isFinite(Date.parse(source.checkedAt))

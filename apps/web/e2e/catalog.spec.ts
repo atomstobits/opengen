@@ -48,7 +48,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await card(page, 'alibaba/wan-3.0').getByRole('link', { name: 'Wan 3.0', exact: true }).click();
   await expect(page).toHaveURL(/\/alibaba\/wan-3\.0$/);
   const standard = page.locator('[data-testid="series-variant"][data-model-id="alibaba/wan-3.0"]');
-  await expect(standard.locator('.route-table tbody tr')).toHaveCount(9);
+  await expect(standard.locator('.route-table tbody tr')).toHaveCount(14);
   for (const region of [
     'Beijing, China',
     'Singapore',
@@ -139,7 +139,7 @@ test('the separate playground quotes comparison-only routes and preserves a sele
     .fill('A quiet coastal road at sunrise, filmed in a slow tracking shot.');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   const pricing = page.getByRole('region', { name: 'Wan 3.0 pricing' });
-  await expect(pricing.getByText('Quote details · 9 routes')).toBeVisible();
+  await expect(pricing.getByText('Quote details · 14 routes')).toBeVisible();
   await expect(pricing).toContainText(
     'No qualified adapter and regional credentials are configured.',
   );

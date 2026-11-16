@@ -24,25 +24,57 @@ export function routeIdentity(catalog: Catalog, route: Route) {
   };
 }
 
+type PublishedOutputRate = NonNullable<
+  NonNullable<Route['publishedPricing']>['outputRates']
+>[number];
+
+function findPlaygroundRate(
+  route: Route,
+  modality: Model['modality'],
+  operation: GenerateInput['operation'],
+  resolution?: string,
+): { rate: PublishedOutputRate; qualified: boolean; approximate: boolean } | undefined {
+  const qualified = getPublishedRate(route, operation, resolution);
+  if (qualified) return { rate: qualified, qualified: true, approximate: false };
+  const unit = modality === 'image' ? 'image' : 'output-second';
+  const rates = (route.publishedPricing?.outputRates ?? []).filter((entry) => entry.unit === unit);
+  const target = (resolution ?? '').toLowerCase();
+  const published =
+    rates.find(
+      (entry) => entry.resolution.toLowerCase() === target && entry.operation === operation,
+    ) ??
+    rates.find(
+      (entry) => entry.resolution.toLowerCase() === target && entry.operation === undefined,
+    ) ??
+    (!target ? rates[0] : undefined);
+  if (!published) return undefined;
+  return { rate: published, qualified: false, approximate: Boolean(published.approximate) };
+}
+
 function PublishedRate({
   route,
+  modality,
   draft,
   details = false,
 }: {
   route: Route;
+  modality: Model['modality'];
   draft: GenerateInput;
   details?: boolean;
 }) {
-  const rate = getPublishedRate(route, draft.operation, draft.input.resolution);
+  const resolved = findPlaygroundRate(route, modality, draft.operation, draft.input.resolution);
+  const rate = resolved?.rate;
   const tariff = route.publishedPricing;
-  const source = rate ? route.pricingSource : (tariff?.source ?? route.pricingSource);
+  const source = resolved?.qualified
+    ? route.pricingSource
+    : (tariff?.source ?? route.pricingSource);
   return (
     <div className={styles.rate}>
       {rate ? (
         <strong>
+          {resolved?.approximate && '≈'}
           {usd(rate.usdMicros)} USD / {rate.unit === 'image' ? 'output image' : 'output second'}
-          {' · '}
-          {rate.resolution}
+          {rate.resolution ? ` · ${rate.resolution}` : ''}
         </strong>
       ) : tariff ? (
         <strong>{tariff.summary}</strong>
@@ -53,9 +85,10 @@ function PublishedRate({
         Price source ↗
       </a>
       {details && rate?.note && <p>{rate.note}</p>}
-      {details && !rate && tariff && (
+      {details && !resolved?.qualified && tariff && (
         <details>
           <summary>Tariff conditions</summary>
+          {rate && <p>{tariff.summary}</p>}
           <ul>
             {tariff.conditions.map((condition) => (
               <li key={condition}>{condition}</li>
@@ -115,18 +148,25 @@ export function PlaygroundPricing({
     priceRoutes.find((route) => route.id === active?.id) ??
     (priceRoutes.length === 1 ? priceRoutes[0] : undefined);
   const displayIdentity = displayRoute && routeIdentity(catalog, displayRoute);
-  const priceSource = priceRoutes.every(
-    (route) => route.pricingSource.url === priceRoutes[0]?.pricingSource.url,
-  )
-    ? priceRoutes[0]?.pricingSource.url
-    : undefined;
-  const rates = priceRoutes.map((route) =>
-    getPublishedRate(route, draft.operation, draft.input.resolution),
+  const resolvedRates = priceRoutes.map((route) =>
+    findPlaygroundRate(route, model.modality, draft.operation, draft.input.resolution),
   );
-  const unit = rates[0]?.unit;
-  const comparable = rates.length > 0 && rates.every((rate) => rate && rate.unit === unit);
-  const minimum = comparable ? Math.min(...rates.map((rate) => rate!.usdMicros)) : null;
-  const maximum = comparable ? Math.max(...rates.map((rate) => rate!.usdMicros)) : null;
+  const sources = priceRoutes.map((route, index) =>
+    resolvedRates[index]?.qualified
+      ? route.pricingSource.url
+      : (route.publishedPricing?.source.url ?? route.pricingSource.url),
+  );
+  const priceSource = sources.every((url) => url === sources[0]) ? sources[0] : undefined;
+  const unit = resolvedRates[0]?.rate.unit;
+  const comparable =
+    resolvedRates.length > 0 && resolvedRates.every((entry) => entry && entry.rate.unit === unit);
+  const approximateRange = comparable && resolvedRates.some((entry) => entry!.approximate);
+  const minimum = comparable
+    ? Math.min(...resolvedRates.map((entry) => entry!.rate.usdMicros))
+    : null;
+  const maximum = comparable
+    ? Math.max(...resolvedRates.map((entry) => entry!.rate.usdMicros))
+    : null;
   const estimate =
     selected?.estimatedCostMicros != null
       ? usd(selected.estimatedCostMicros)
@@ -154,13 +194,13 @@ export function PlaygroundPricing({
             <p className={styles.routeLabel}>
               {displayIdentity!.label} · {displayIdentity!.region}
             </p>
-            <PublishedRate route={displayRoute} draft={draft} details />
+            <PublishedRate route={displayRoute} modality={model.modality} draft={draft} details />
           </>
         ) : (
           <>
             <p className={styles.routeLabel}>
               {minimum !== null && maximum !== null
-                ? `${usd(minimum)}${minimum === maximum ? '' : `–${usd(maximum)}`} USD / ${unit === 'image' ? 'output image' : 'output second'} · ${draft.input.resolution}`
+                ? `${approximateRange ? '≈' : ''}${usd(minimum)}${minimum === maximum ? '' : `–${usd(maximum)}`} USD / ${unit === 'image' ? 'output image' : 'output second'} · ${draft.input.resolution}`
                 : priceRoutes.length
                   ? 'Rates vary by provider and endpoint region'
                   : 'Price unavailable for these settings'}
@@ -181,7 +221,7 @@ export function PlaygroundPricing({
                         <b>
                           {identity.label} · {identity.region}
                         </b>
-                        <PublishedRate route={route} draft={draft} />
+                        <PublishedRate route={route} modality={model.modality} draft={draft} />
                       </li>
                     );
                   })}

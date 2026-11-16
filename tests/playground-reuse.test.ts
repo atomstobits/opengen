@@ -42,6 +42,19 @@ describe('owned reuse routing restrictions', () => {
     expect(eligible(policy)).toEqual([]);
   });
 
+  it('restricts undisclosed endpoint policies to aggregator routes without admitting regional author routes', () => {
+    expect(
+      new Set(eligible({ endpointRegions: ['undisclosed'] }).map((route) => route.deploymentId)),
+    ).toEqual(
+      new Set([
+        'fal-undisclosed',
+        'pika-undisclosed',
+        'replicate-undisclosed',
+        'runway-undisclosed',
+      ]),
+    );
+  });
+
   it('applies model-specific provider exceptions together with the author constraint', () => {
     expect(
       eligible({

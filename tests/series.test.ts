@@ -59,7 +59,7 @@ describe('public company and model-series identity', () => {
             .map((route) => route.deploymentId),
         ),
       ).sort(),
-    ).toEqual(['fal-undisclosed', 'minimax-undisclosed']);
+    ).toEqual(['fal-undisclosed', 'minimax-undisclosed', 'runway-undisclosed']);
     expect(catalog.models.find((model) => model.id === 'pika/h3-flex')?.creator).toBe('Pika');
     for (const id of h3.modelIds)
       expect(catalog.routes.some((route) => route.modelId === id)).toBe(true);

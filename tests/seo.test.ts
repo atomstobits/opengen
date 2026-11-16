@@ -156,9 +156,9 @@ describe('truthful server-rendered evidence', () => {
   });
 
   it('groups interleaved deployments by serving provider and preserves their route IDs', () => {
-    const first = getRoute('byteplus-undisclosed/bytedance-seedance-2.0')!;
-    const middle = getRoute('fal-undisclosed/bytedance/seedance-2.0/text-to-video')!;
-    const last = getRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0')!;
+    const first = getRoute('fal-undisclosed/bytedance/seedance-2.0/text-to-video')!;
+    const middle = getRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0')!;
+    const last = getRoute('fal-seedance-us-account-enabled/bytedance-seedance-2.0')!;
     const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
     expect(
       groupRoutesByProvider([first, middle, last], deployments).map((route) => route.id),

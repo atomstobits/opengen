@@ -54,11 +54,11 @@ function ctx(routeKey: string, operation: Operation, input: GenerationArguments)
 }
 
 describe('November 2026 frontier models & provider routes', () => {
-  it('catalogs 49 exact variants, 12 companies, 19 deployments and 182 documented/live routes without merging derivatives', () => {
+  it('catalogs 49 exact variants, 12 companies, 19 deployments and 255 documented/live routes without merging derivatives', () => {
     expect(catalog.models).toHaveLength(49);
     expect(catalog.providers).toHaveLength(12);
     expect(catalog.deployments).toHaveLength(19);
-    expect(catalog.routes).toHaveLength(182);
+    expect(catalog.routes).toHaveLength(255);
 
     for (const distinctPair of [
       ['openai/gpt-image-2.6-sunburst', 'openai/gpt-image-2.6-flare'],

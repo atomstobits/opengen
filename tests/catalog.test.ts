@@ -36,7 +36,7 @@ describe('source-backed catalog', () => {
     expect(getModel('fal/h3-max-turbo')?.id).toBe('fal/h3-max-turbo');
     expect(getModel('pika/h3-flex')?.familyId).toBe('minimax-h3');
     const routes = catalog.routes.filter((route) => route.modelId === max?.id);
-    expect(routes).toHaveLength(4);
+    expect(routes).toHaveLength(5);
     expect(routes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -51,10 +51,14 @@ describe('source-backed catalog', () => {
           upstreamModelId: 'minimax/h3-max/text-to-video',
           providerModelName: 'H3 Max',
         }),
+        expect.objectContaining({
+          id: 'runway-undisclosed/minimax-h3-max',
+          deploymentId: 'runway-undisclosed',
+        }),
       ]),
     );
     expect(catalog.models).toHaveLength(49);
-    expect(catalog.routes).toHaveLength(182);
+    expect(catalog.routes).toHaveLength(255);
   });
   it('resolves Omni Flash as a search alias without creating duplicate live releases', () => {
     expect(searchCatalog('Gemini Omni Flash').map((model) => model.id)).toEqual([
@@ -150,14 +154,22 @@ describe('source-backed catalog', () => {
       catalog.routes.splice(0, catalog.routes.length, ...original);
     }
   });
-  it('lists six separately sourced Alibaba deployments plus fal routes for each Wan variant', () => {
+  it('lists six separately sourced Alibaba deployments plus aggregator offerings for each Wan variant', () => {
     for (const modelId of ['alibaba/wan-3.0', 'alibaba/wan-3.0-prime']) {
       const routes = catalog.routes.filter((route) => route.modelId === modelId);
       const alibabaRoutes = routes.filter((route) => route.adapter === 'alibaba');
       expect(alibabaRoutes).toHaveLength(6);
       expect(new Set(alibabaRoutes.map((route) => route.deploymentId)).size).toBe(6);
-      expect(routes).toHaveLength(9);
-      expect(new Set(routes.map((route) => route.deploymentId)).size).toBe(7);
+      expect(routes).toHaveLength(14);
+      expect(new Set(routes.map((route) => route.deploymentId))).toEqual(
+        new Set([
+          ...alibabaRoutes.map((route) => route.deploymentId),
+          'fal-undisclosed',
+          'pika-undisclosed',
+          'replicate-undisclosed',
+          'runway-undisclosed',
+        ]),
+      );
     }
   });
 });
@@ -209,7 +221,7 @@ describe('regional quote selection', () => {
     const result = quote(canonical, options);
     expect(result.modelId).toBe('minimax/h3-max');
     expect(new Set(result.candidates.map((candidate) => candidate.providerId))).toEqual(
-      new Set(['fal', 'minimax']),
+      new Set(['fal', 'minimax', 'runway']),
     );
     expect(
       result.candidates
@@ -287,7 +299,7 @@ describe('regional quote selection', () => {
         modelId: 'bytedance/seedance-2.5',
         operation: 'text-to-video',
         input: { prompt: 'A red kite', resolution: '720p', duration: 5 },
-        routing: { deploymentIds: ['byteplus-undisclosed', 'fal-undisclosed'] },
+        routing: { deploymentIds: ['fal-undisclosed', 'pika-undisclosed', 'runway-undisclosed'] },
       },
       { executableRouteIds: catalog.routes.map((route) => route.id) },
     );
