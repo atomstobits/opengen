@@ -12,6 +12,12 @@ import {
   validateSeriesCatalog,
 } from '@media-router/catalog';
 import { playgroundHref } from '../apps/web/app/links';
+import {
+  buildCatalogModelEntries,
+  describeEndpointRegions,
+  groupCatalogModels,
+  variantGridColumns,
+} from '../apps/web/app/model-groups';
 
 describe('public company and model-series identity', () => {
   it('assigns every exact model once and validates canonical company paths', () => {
@@ -107,5 +113,126 @@ describe('public company and model-series identity', () => {
     expect(seriesHref('missing/model')).toBeUndefined();
     expect(getCompanySeries('missing')).toEqual([]);
     expect(getCompanyModels('missing')).toEqual([]);
+  });
+});
+
+describe('models page variant grouping', () => {
+  const regionLabels = {
+    'cn-beijing': 'Beijing, China',
+    'ap-southeast-1': 'Singapore',
+    'ap-northeast-1': 'Tokyo, Japan',
+    'eu-central-1': 'Frankfurt, Germany',
+    'us-east-1': 'Virginia, US',
+    'cn-hongkong': 'Hong Kong, China',
+  };
+
+  it('groups every exact variant under its canonical model series without merging distinct versions', () => {
+    const entries = buildCatalogModelEntries(catalog, regionLabels);
+    const groups = groupCatalogModels(entries, entries);
+    expect(groups).toHaveLength(modelSeries.length);
+    expect(new Set(groups.map((group) => group.id))).toEqual(
+      new Set(modelSeries.map((series) => series.id)),
+    );
+    expect(groups.flatMap((group) => group.entries.map((entry) => entry.model.id))).toHaveLength(
+      catalog.models.length,
+    );
+
+    const seedance25 = groups.find((group) => group.id === 'bytedance/seedance-2.5')!;
+    const seedance20 = groups.find((group) => group.id === 'bytedance/seedance-2.0')!;
+    const seedance10 = groups.find((group) => group.id === 'bytedance/seedance-1.0')!;
+    expect(seedance25.entries.map((entry) => entry.model.id)).toEqual(['bytedance/seedance-2.5']);
+    expect(seedance20.entries.map((entry) => entry.model.id)).toEqual([
+      'bytedance/seedance-2.0',
+      'bytedance/seedance-2.0-fast',
+      'bytedance/seedance-2.0-mini',
+    ]);
+    expect(seedance10.entries.map((entry) => entry.model.id)).toEqual([
+      'bytedance/seedance-1.0-pro',
+      'bytedance/seedance-1.0-pro-fast',
+    ]);
+
+    const h3 = groups.find((group) => group.id === 'minimax/h3')!;
+    expect(h3.entries.map((entry) => entry.model.id)).toEqual([
+      'minimax/h3',
+      'minimax/h3-highspeed',
+      'minimax/h3-lite',
+      'minimax/h3-max',
+      'fal/h3-max-turbo',
+      'pika/h3-flex',
+    ]);
+  });
+
+  it('pulls non-adjacent variants of the same model together in canonical series order', () => {
+    const entries = buildCatalogModelEntries(catalog, regionLabels);
+    const byId = new Map(entries.map((entry) => [entry.model.id, entry]));
+    const interleaved = [
+      byId.get('bytedance/seedance-2.0-mini')!,
+      byId.get('kling/kling-4.0-flash')!,
+      byId.get('bytedance/seedance-2.0')!,
+      byId.get('fal/h3-max-turbo')!,
+      byId.get('kling/kling-4.0')!,
+      byId.get('bytedance/seedance-2.0-fast')!,
+      byId.get('minimax/h3')!,
+    ];
+    const groups = groupCatalogModels(entries, interleaved);
+    expect(groups.map((group) => group.id)).toEqual([
+      'bytedance/seedance-2.0',
+      'kling/kling-4.0',
+      'minimax/h3',
+    ]);
+    expect(groups[0]!.entries.map((entry) => entry.model.id)).toEqual([
+      'bytedance/seedance-2.0',
+      'bytedance/seedance-2.0-fast',
+      'bytedance/seedance-2.0-mini',
+    ]);
+    expect(groups[1]!.entries.map((entry) => entry.model.id)).toEqual([
+      'kling/kling-4.0',
+      'kling/kling-4.0-flash',
+    ]);
+    expect(groups[2]!.entries.map((entry) => entry.model.id)).toEqual([
+      'minimax/h3',
+      'fal/h3-max-turbo',
+    ]);
+  });
+
+  it('matches derivative variants when searching by series name and tracks hidden siblings on narrow filters', () => {
+    const entries = buildCatalogModelEntries(catalog, regionLabels);
+    const fluxVideoMatches = entries.filter((entry) => entry.search.includes('flux 3 video'));
+    const fluxVideoGroups = groupCatalogModels(entries, fluxVideoMatches);
+    expect(fluxVideoGroups).toHaveLength(1);
+    expect(fluxVideoGroups[0]!.entries.map((entry) => entry.model.id)).toEqual([
+      'bfl/flux-3-video',
+      'fal/flux-3-max-video',
+    ]);
+
+    const sunburstMatches = entries.filter((entry) => entry.search.includes('sunburst'));
+    const sunburstGroups = groupCatalogModels(entries, sunburstMatches);
+    expect(sunburstGroups.map((group) => group.id)).toEqual([
+      'openai/gpt-image-2.6',
+      'openai/gpt-image-2.5',
+    ]);
+    expect(sunburstGroups[0]!.hiddenSiblings.map((model) => model.id)).toEqual([
+      'openai/gpt-image-2.6-flare',
+    ]);
+    expect(sunburstGroups[1]!.hiddenSiblings.map((model) => model.id)).toEqual([
+      'openai/gpt-image-2.5-flare',
+    ]);
+  });
+
+  it('describes regional coverage truthfully and selects balanced variant grid column counts', () => {
+    const entries = buildCatalogModelEntries(catalog, regionLabels);
+    const wan = entries.filter((entry) => entry.series?.id === 'alibaba/wan-3.0');
+    expect(
+      describeEndpointRegions(
+        wan.reduce((sum, entry) => sum + entry.routes.length, 0),
+        wan.flatMap((entry) => entry.deployments),
+      ),
+    ).toBe('6 disclosed endpoint regions');
+    expect(describeEndpointRegions(0, [])).toBe('No hosted routes listed');
+    expect(variantGridColumns(1)).toBe(1);
+    expect(variantGridColumns(2)).toBe(2);
+    expect(variantGridColumns(3)).toBe(3);
+    expect(variantGridColumns(4)).toBe(2);
+    expect(variantGridColumns(6)).toBe(3);
   });
 });
