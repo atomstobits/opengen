@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { modelSeries, seriesHref } from '@media-router/catalog';
+import { getModelRoutes, modelSeries, seriesHref } from '@media-router/catalog';
 import type { Catalog, Operation } from '@media-router/contracts';
 import {
   buildCatalogModelEntries,
@@ -380,9 +380,8 @@ export function PlaygroundApp({
   );
   const model = catalog.models.find((value) => value.id === selection.modelId)!;
   const routes = useMemo(
-    () =>
-      catalog.routes.filter((route) => route.modelId === model.id && route.status !== 'retired'),
-    [catalog.routes, model.id],
+    () => getModelRoutes(model.id, catalog).filter((route) => route.status !== 'retired'),
+    [catalog, model.id],
   );
   return (
     <>

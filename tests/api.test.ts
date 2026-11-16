@@ -61,6 +61,10 @@ describe('public catalog and quote API', () => {
     expect(models.some((model: { id: string }) => model.id === 'fal/h3-max')).toBe(false);
     const routes = (await app.inject({ url: '/v1/routes?modelId=minimax%2Fh3-max' })).json().data;
     expect(routes).toHaveLength(4);
+    expect(routes[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
+    expect(
+      (await app.inject({ url: '/v1/routes?modelId=bytedance%2Fseedance-2.5' })).json().data[0]?.id,
+    ).toBe('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5');
     expect(new Set(routes.map((route: { deploymentId: string }) => route.deploymentId))).toEqual(
       new Set(['minimax-undisclosed', 'fal-undisclosed']),
     );

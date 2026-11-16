@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { getModelRoutes } from '@media-router/catalog';
 import type {
   Catalog,
   GenerateInput,
@@ -109,8 +110,8 @@ export function OutputReuse({
   const options = catalog.models
     .filter((model) => allowModelTransfer || model.id === draft.modelId)
     .map((model) => {
-      const routes = catalog.routes.filter(
-        (route) => route.modelId === model.id && route.status !== 'retired',
+      const routes = getModelRoutes(model.id, catalog).filter(
+        (route) => route.status !== 'retired',
       );
       return { model, routes, destinations: reuseDestinations(model.id, routes, output.mediaType) };
     })

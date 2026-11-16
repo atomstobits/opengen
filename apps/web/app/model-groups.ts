@@ -1,4 +1,4 @@
-import { getCompany, getSeriesForModel, seriesHref } from '@media-router/catalog';
+import { getCompany, getModelRoutes, getSeriesForModel, seriesHref } from '@media-router/catalog';
 import type {
   Catalog,
   Company,
@@ -36,7 +36,7 @@ export function buildCatalogModelEntries(
   return catalog.models.map((model) => {
     const series = getSeriesForModel(model.id);
     const company = series ? getCompany(series.companyId) : undefined;
-    const routes = catalog.routes.filter((route) => route.modelId === model.id);
+    const routes = getModelRoutes(model.id, catalog);
     const deployments = catalog.deployments.filter((deployment) =>
       routes.some((route) => route.deploymentId === deployment.id),
     );

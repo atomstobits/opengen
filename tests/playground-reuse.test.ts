@@ -72,4 +72,17 @@ describe('owned reuse routing restrictions', () => {
       1,
     );
   });
+
+  it('orders eligible destination routes with official providers first', () => {
+    const seedance = catalog.models.find((item) => item.id === 'bytedance/seedance-2.5')!;
+    const unordered = [...catalog.routes.filter((item) => item.modelId === seedance.id)].reverse();
+    const ordered = eligibleReuseRoutes(
+      seedance,
+      unordered,
+      catalog.deployments,
+      request({}),
+      'image-to-video',
+    );
+    expect(ordered[0]?.id).toBe('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5');
+  });
 });

@@ -533,7 +533,7 @@ export function ProviderTable({
   const observations = metrics ?? localMetrics;
   const selectedPercentile = percentile ?? localPercentile;
   const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
-  const groupedRoutes = groupRoutesByProvider(routes, deployments);
+  const groupedRoutes = groupRoutesByProvider(routes, deployments, model.authorProviderIds);
   const sampledRoutes = new Map(
     observations.filter((item) => item.sampleCount > 0).map((item) => [item.routeId, item]),
   );

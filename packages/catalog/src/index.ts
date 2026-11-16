@@ -11,6 +11,7 @@ import {
   canonicalModelId,
 } from '@media-router/contracts';
 import type {
+  Catalog,
   CatalogSearchFilters,
   GenerationDefinition,
   GenerationProfile,
@@ -23,11 +24,13 @@ import type {
   RouteMetrics,
 } from '@media-router/contracts';
 import { catalog } from './data';
+import { groupRoutesByProvider, selectModelRoutes } from './route-order';
 import { validateSeriesCatalog } from './series';
 import { generationExamples } from './examples';
 import { boundedTokenQuote } from './token-pricing';
 
 export { catalog } from './data';
+export { groupRoutesByProvider } from './route-order';
 export { boundedTokenQuote } from './token-pricing';
 export {
   companies,
@@ -59,6 +62,12 @@ export function getModel(id: string): Model | undefined {
 }
 export function getRoute(id: string): Route | undefined {
   return catalog.routes.find((item) => item.id === id);
+}
+export function getModelRoutes(
+  id: string,
+  sourceCatalog: Pick<Catalog, 'models' | 'deployments' | 'routes'> = catalog,
+): Route[] {
+  return selectModelRoutes(id, sourceCatalog);
 }
 
 export { catalogSearchFiltersSchema, catalogSearchQuerySchema };
@@ -147,11 +156,22 @@ export function validateCatalog(): string[] {
       ids.add(item.id);
     }
   }
+  const deploymentsById = new Map(
+    catalog.deployments.map((deployment) => [deployment.id, deployment]),
+  );
   for (const model of catalog.models) {
     if (new Set(model.authorProviderIds).size !== model.authorProviderIds.length)
       errors.push(`Duplicate author provider for ${model.id}`);
     for (const id of model.authorProviderIds)
       if (!providerIds.has(id)) errors.push(`Unknown author provider ${id} for ${model.id}`);
+    const modelRoutes = catalog.routes.filter((route) => route.modelId === model.id);
+    const orderedRoutes = groupRoutesByProvider(
+      modelRoutes,
+      deploymentsById,
+      model.authorProviderIds,
+    );
+    if (modelRoutes.some((route, index) => route.id !== orderedRoutes[index]?.id))
+      errors.push(`Official routes must precede third-party routes for ${model.id}`);
   }
   for (const deployment of catalog.deployments) {
     if (!providerIds.has(deployment.providerId))

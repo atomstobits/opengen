@@ -31,9 +31,16 @@ describe('hosted native API routing', () => {
     )!;
     const maxRoutes = (await legacy.json()).data;
     expect(maxRoutes).toHaveLength(4);
+    expect(maxRoutes[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(
       maxRoutes.every((route: { modelId: string }) => route.modelId === 'minimax/h3-max'),
     ).toBe(true);
+    const seedance = localCatalog(
+      new Request('https://opengen.example/v1/routes?modelId=bytedance%2Fseedance-2.5'),
+    )!;
+    expect((await seedance.json()).data[0]?.id).toBe(
+      'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+    );
     expect(
       maxRoutes.map((route: { providerModelName: string }) => route.providerModelName),
     ).toEqual(expect.arrayContaining(['MiniMax H3 Max', 'H3 Max']));

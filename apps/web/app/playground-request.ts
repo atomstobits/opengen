@@ -1,3 +1,4 @@
+import { groupRoutesByProvider } from '@media-router/catalog';
 import type { Catalog, GenerateInput, Model, Operation, Route } from '@media-router/contracts';
 import {
   generationArgumentSchema,
@@ -54,25 +55,30 @@ export function eligibleReuseRoutes(
   const providers =
     policy.modelProviderExceptions?.find((item) => item.modelId === model.id)?.providerIds ??
     policy.providerIds;
-  return routes.filter((route) => {
-    const deployment = deployments.find(({ id }) => id === route.deploymentId);
-    return (
-      !!deployment &&
-      route.operations.includes(operation) &&
-      (!policy.modelIds || policy.modelIds.includes(model.id)) &&
-      (!providers || providers.includes(deployment.providerId)) &&
-      (!policy.authorOnly || model.authorProviderIds.includes(deployment.providerId)) &&
-      (!policy.deploymentIds || policy.deploymentIds.includes(deployment.id)) &&
-      (!policy.endpointRegions || policy.endpointRegions.includes(deployment.endpointRegion)) &&
-      (!policy.processingRegions ||
-        (!!deployment.processingRegions?.length &&
-          deployment.processingRegions.every((region) =>
-            policy.processingRegions!.includes(region),
-          ))) &&
-      (!policy.processingScopes || policy.processingScopes.includes(deployment.scope)) &&
-      (policy.fidelity !== 'native' || route.fidelity === 'native')
-    );
-  });
+  const deploymentMap = new Map(deployments.map((deployment) => [deployment.id, deployment]));
+  return groupRoutesByProvider(
+    routes.filter((route) => {
+      const deployment = deploymentMap.get(route.deploymentId);
+      return (
+        !!deployment &&
+        route.operations.includes(operation) &&
+        (!policy.modelIds || policy.modelIds.includes(model.id)) &&
+        (!providers || providers.includes(deployment.providerId)) &&
+        (!policy.authorOnly || model.authorProviderIds.includes(deployment.providerId)) &&
+        (!policy.deploymentIds || policy.deploymentIds.includes(deployment.id)) &&
+        (!policy.endpointRegions || policy.endpointRegions.includes(deployment.endpointRegion)) &&
+        (!policy.processingRegions ||
+          (!!deployment.processingRegions?.length &&
+            deployment.processingRegions.every((region) =>
+              policy.processingRegions!.includes(region),
+            ))) &&
+        (!policy.processingScopes || policy.processingScopes.includes(deployment.scope)) &&
+        (policy.fidelity !== 'native' || route.fidelity === 'native')
+      );
+    }),
+    deploymentMap,
+    model.authorProviderIds,
+  );
 }
 
 /** Validation and export use exactly the same canonical parser as admission. */

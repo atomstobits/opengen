@@ -40,6 +40,10 @@ test('company pages expose every owned variant through its canonical series', as
     catalog.routes.filter((route) => route.modelId === 'bytedance/seedance-2.5').length,
   );
   const prices = variant(page, 'bytedance/seedance-2.5');
+  await expect(prices.locator('.route-table tbody tr').first()).toHaveAttribute(
+    'data-route-id',
+    'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+  );
   await expect(prices.getByRole('link', { name: 'BytePlus', exact: true })).toHaveCount(1);
   const byteplus = prices.locator(
     '[data-route-id="byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5"]',
@@ -98,6 +102,10 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
   }
   const max = variant(page, 'minimax/h3-max');
   await expect(max.locator('.route-table tbody tr')).toHaveCount(4);
+  await expect(max.locator('.route-table tbody tr').first()).toHaveAttribute(
+    'data-route-id',
+    'minimax-undisclosed/minimax-h3-max',
+  );
   await expect(max).toContainText('MiniMax');
   await expect(max).toContainText('fal');
   await expect(max).toContainText('Listed as H3 Max');
@@ -290,7 +298,11 @@ test('a new route choice overrides a legacy handoff and stays selected while edi
   await expect(route).toHaveValue('alibaba/eu-central-1/wan-3.0-prime');
   await page.getByLabel('Choose generation model').selectOption('bytedance/seedance-2.5');
   await expect(page.getByRole('heading', { name: 'Seedance 2.5', exact: true })).toBeVisible();
-  await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue('auto');
+  await expect(route).toHaveValue('auto');
+  await expect(route.locator('option').nth(1)).toHaveAttribute(
+    'value',
+    'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+  );
 });
 
 test('provider metrics stay regional and the percentile picker reads the selected observation', async ({

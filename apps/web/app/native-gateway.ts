@@ -1,8 +1,4 @@
-import {
-  billingOperationTargets,
-  operationTargets,
-  canonicalModelId,
-} from '@media-router/contracts';
+import { billingOperationTargets, operationTargets } from '@media-router/contracts';
 import {
   catalog,
   generationProfiles,
@@ -10,6 +6,7 @@ import {
   companies,
   modelSeries,
   getCompanyDetail,
+  getModelRoutes,
   getSeriesDetail,
   searchCatalog,
 } from '@media-router/catalog';
@@ -156,11 +153,9 @@ export function localCatalog(request: Request): Response | undefined {
   if (url.pathname === '/v1/routes')
     return publicJson(
       {
-        data: catalog.routes.filter(
-          (route) =>
-            !url.searchParams.get('modelId') ||
-            route.modelId === canonicalModelId(url.searchParams.get('modelId')!),
-        ),
+        data: url.searchParams.get('modelId')
+          ? getModelRoutes(url.searchParams.get('modelId')!)
+          : catalog.routes,
       },
       method,
     );

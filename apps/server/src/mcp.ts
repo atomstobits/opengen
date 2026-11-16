@@ -9,6 +9,7 @@ import {
   catalog,
   generationProfiles,
   getCompanyDetail,
+  getModelRoutes,
   getSeriesDetail,
   getSeriesForModel,
   searchCatalog,
@@ -253,7 +254,7 @@ export async function registerMcp(app: FastifyInstance, context: Context) {
         const model = catalog.models.find((item) => item.id === canonicalModelId(id));
         const series = getSeriesDetail(id);
         if (model && !series) {
-          const routes = catalog.routes.filter((item) => item.modelId === model.id);
+          const routes = getModelRoutes(model.id);
           const deploymentIds = new Set(routes.map((route) => route.deploymentId));
           return result({
             model: { ...model, generationProfiles: generationProfiles(model.id) },

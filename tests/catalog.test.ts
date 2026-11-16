@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { catalog, getModel, quote, searchCatalog, validateCatalog } from '@media-router/catalog';
+import {
+  catalog,
+  getModel,
+  getModelRoutes,
+  getSeriesDetail,
+  quote,
+  searchCatalog,
+  validateCatalog,
+} from '@media-router/catalog';
 import type { GenerateInput } from '@media-router/contracts';
 
 const input: GenerateInput = {
@@ -87,6 +95,59 @@ describe('source-backed catalog', () => {
       expect(validateCatalog()).toContain(`Noncanonical model reference for ${route.id}`);
     } finally {
       route.modelId = canonical;
+    }
+  });
+  it('places official routes before third-party routes for every model and series detail', () => {
+    const deployments = new Map(
+      catalog.deployments.map((deployment) => [deployment.id, deployment]),
+    );
+    for (const model of catalog.models) {
+      const rawRoutes = catalog.routes.filter((route) => route.modelId === model.id);
+      const selectedRoutes = getModelRoutes(model.id);
+      expect(selectedRoutes.map((route) => route.id)).toEqual(rawRoutes.map((route) => route.id));
+      let seenThirdParty = false;
+      for (const route of selectedRoutes) {
+        const providerId = deployments.get(route.deploymentId)?.providerId ?? '';
+        const isOfficial = model.authorProviderIds.includes(providerId);
+        if (isOfficial) {
+          expect(seenThirdParty).toBe(false);
+        } else {
+          seenThirdParty = true;
+        }
+      }
+    }
+    expect(getModelRoutes('bytedance/seedance-2.5')[0]?.id).toBe(
+      'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+    );
+    expect(getModelRoutes('minimax/h3-max')[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
+    expect(getModelRoutes('fal/h3-max')[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
+    expect(getModelRoutes('openai/gpt-image-2.5-flare')[0]?.id).toBe(
+      'openai-undisclosed/openai-gpt-image-2.5-flare',
+    );
+    expect(getModelRoutes('google/nano-banana-2.1')[0]?.id).toBe(
+      'google-undisclosed/google-nano-banana-2.1',
+    );
+    expect(getSeriesDetail('bytedance/seedance-2.5')?.providers[0]?.id).toBe('byteplus');
+    expect(getSeriesDetail('openai/gpt-image-2.5')?.providers[0]?.id).toBe('openai');
+    expect(getSeriesDetail('google/nano-banana-2.1')?.providers[0]?.id).toBe('google');
+  });
+  it('rejects catalog ordering when a third-party route precedes an official route', () => {
+    const original = [...catalog.routes];
+    try {
+      const officialIndex = catalog.routes.findIndex(
+        (route) => route.id === 'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
+      );
+      const runwayIndex = catalog.routes.findIndex(
+        (route) => route.id === 'runway-undisclosed/bytedance-seedance-2.5',
+      );
+      const official = catalog.routes[officialIndex]!;
+      catalog.routes[officialIndex] = catalog.routes[runwayIndex]!;
+      catalog.routes[runwayIndex] = official;
+      expect(validateCatalog()).toContain(
+        'Official routes must precede third-party routes for bytedance/seedance-2.5',
+      );
+    } finally {
+      catalog.routes.splice(0, catalog.routes.length, ...original);
     }
   });
   it('lists six separately sourced Alibaba deployments plus fal routes for each Wan variant', () => {

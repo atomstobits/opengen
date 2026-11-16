@@ -9,6 +9,7 @@ import type {
   Source,
 } from '@media-router/contracts';
 import { publishedPricingFor } from './published-pricing';
+import { groupRoutesByProvider } from './route-order';
 
 const checkedAt = '2026-11-02';
 const source = (url: string, note?: string): Source => ({
@@ -2137,4 +2138,17 @@ for (const route of routes) {
   if (publishedPricing) route.publishedPricing = publishedPricing;
 }
 
-export const catalog: Catalog = { providers, deployments, models, routes };
+const deploymentsById = new Map(deployments.map((deployment) => [deployment.id, deployment]));
+const catalogModelIds = new Set(models.map((entry) => entry.id));
+const orderedRoutes: Route[] = [
+  ...models.flatMap((entry) =>
+    groupRoutesByProvider(
+      routes.filter((item) => item.modelId === entry.id),
+      deploymentsById,
+      entry.authorProviderIds,
+    ),
+  ),
+  ...routes.filter((item) => !catalogModelIds.has(item.modelId)),
+];
+
+export const catalog: Catalog = { providers, deployments, models, routes: orderedRoutes };
