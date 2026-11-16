@@ -329,6 +329,99 @@ describe('informational provider tariffs', () => {
     );
     expect(grokMediumHtml).toContain('$0.06–$0.063 USD / output image · 1K');
     expect(grokMediumHtml).not.toContain('$0.04 USD / output image · 1K');
+
+    // Media-reference inputs drop output-only fallback rates and show qualified tariff descriptions instead.
+    const seedanceModel = catalog.models.find((entry) => entry.id === 'bytedance/seedance-2.0')!;
+    const seedanceRoutes = catalog.routes.filter((route) => route.modelId === seedanceModel.id);
+    const seedanceRefDraft = initialPlaygroundRequest(
+      seedanceModel,
+      seedanceRoutes,
+      undefined,
+      'reference-to-video',
+    );
+    seedanceRefDraft.input.resolution = '720p';
+    seedanceRefDraft.input.references = [
+      { type: 'video', asset: { url: 'https://media.example.com/ref.mp4' } },
+    ];
+    const seedanceRefHtml = renderToStaticMarkup(
+      createElement(PlaygroundPricing, {
+        catalog,
+        model: seedanceModel,
+        routes: seedanceRoutes,
+        draft: seedanceRefDraft,
+        quote: null,
+        job: null,
+        readiness: 'Ready',
+        mobileStatus: 'Ready',
+        busy: null,
+        ready: false,
+        canGenerate: false,
+        onQuote: () => {},
+        onGenerate: () => {},
+        error: '',
+      }),
+    );
+    expect(seedanceRefHtml).toContain('Rates vary by provider and endpoint region');
+    expect(seedanceRefHtml).not.toContain('$0.18 USD / output second');
+    expect(seedanceRefHtml).toContain('$0.22 at 720p');
+
+    // Unsupported route resolutions are excluded from Playground fallback pricing.
+    const grokVideoModel = catalog.models.find(
+      (entry) => entry.id === 'xai/grok-imagine-video-1.5',
+    )!;
+    const grokVideoRoutes = catalog.routes.filter((route) => route.modelId === grokVideoModel.id);
+    const falGrokRef = grokVideoRoutes.find(
+      (route) => route.id === 'fal-undisclosed/xai/grok-imagine-video/v1.5/reference-to-video',
+    )!;
+    const grok1080Auto = initialPlaygroundRequest(
+      grokVideoModel,
+      grokVideoRoutes,
+      undefined,
+      'reference-to-video',
+    );
+    grok1080Auto.input.resolution = '1080p';
+    const grok1080AutoHtml = renderToStaticMarkup(
+      createElement(PlaygroundPricing, {
+        catalog,
+        model: grokVideoModel,
+        routes: grokVideoRoutes,
+        draft: grok1080Auto,
+        quote: null,
+        job: null,
+        readiness: 'Ready',
+        mobileStatus: 'Ready',
+        busy: null,
+        ready: false,
+        canGenerate: false,
+        onQuote: () => {},
+        onGenerate: () => {},
+        error: '',
+      }),
+    );
+    expect(grok1080AutoHtml).toContain('xAI');
+    expect(grok1080AutoHtml).not.toContain('fal.ai');
+
+    const grok1080Pinned = { ...grok1080Auto, routeId: falGrokRef.id };
+    const grok1080PinnedHtml = renderToStaticMarkup(
+      createElement(PlaygroundPricing, {
+        catalog,
+        model: grokVideoModel,
+        routes: grokVideoRoutes,
+        draft: grok1080Pinned,
+        quote: null,
+        job: null,
+        readiness: 'Ready',
+        mobileStatus: 'Ready',
+        busy: null,
+        ready: false,
+        canGenerate: false,
+        onQuote: () => {},
+        onGenerate: () => {},
+        error: '',
+      }),
+    );
+    expect(grok1080PinnedHtml).toContain('Price unavailable for these settings');
+    expect(grok1080PinnedHtml).not.toContain('$0.25 USD / output second');
   });
 
   it('requires dated HTTPS evidence for an informational tariff', () => {

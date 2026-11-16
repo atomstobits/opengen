@@ -49,6 +49,36 @@ function routeDefaultQuality(
   return undefined;
 }
 
+function routeSupportsDraft(route: Route, modelId: string, draft: GenerateInput): boolean {
+  if (!route.operations.includes(draft.operation)) return false;
+  const args = draft.input;
+  if (
+    args.resolution &&
+    !route.resolutions.some((res) => res.toLowerCase() === args.resolution!.toLowerCase())
+  ) {
+    return false;
+  }
+  const falMax = modelId === 'minimax/h3-max' && route.adapter === 'fal';
+  const falH3 = modelId === 'minimax/h3' && route.adapter === 'fal';
+  if (typeof args.duration === 'number' && !falMax && !route.durations.includes(args.duration)) {
+    return false;
+  }
+  if (route.adapter === 'minimax' && modelId === 'minimax/h3-max' && args.keyframes?.length) {
+    return false;
+  }
+  if ((falMax || falH3) && (args.references?.length ?? 0) > 12) {
+    return false;
+  }
+  if (
+    (route.adapter === 'byteplus' || route.adapter === 'alibaba') &&
+    args.references?.length &&
+    (args.firstFrame || args.lastFrame || args.keyframes?.length)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function findPlaygroundRate(
   route: Route,
   model: Pick<Model, 'id' | 'modality'>,
@@ -61,8 +91,48 @@ function findPlaygroundRate(
       quality?: string;
     }
   | undefined {
+  if (!routeSupportsDraft(route, model.id, draft)) return undefined;
   const args = draft.input;
-  if (args.size || args.draft || args.grounding || args.layers || args.targetAudio) {
+  const extraInputs = Boolean(
+    args.references?.length ||
+    (args.sourceVideo && route.upstreamModelId !== 'blackforestlabs/flux-3/edit-video') ||
+    args.mask ||
+    args.elements?.length ||
+    args.keyframes?.length ||
+    draft.previousJobId,
+  );
+  const frameSurcharge =
+    Boolean(args.firstFrame || args.lastFrame) &&
+    (model.id.startsWith('xai/grok-imagine-video') ||
+      model.id.startsWith('google/gemini-omni-') ||
+      model.id === 'runway/gen4.6' ||
+      (route.deploymentId === 'runway-undisclosed' && model.id === 'minimax/h3-max'));
+  const paidExpansion =
+    (route.adapter === 'minimax' &&
+      !route.upstreamModelId.startsWith('MiniMax-H3-Image') &&
+      args.promptExpansion !== undefined &&
+      (route.upstreamModelId !== 'MiniMax-H3-Max' ||
+        ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||
+    ((model.id.startsWith('minimax/h3') ||
+      model.id === 'fal/h3-max-turbo' ||
+      model.id === 'pika/h3-flex') &&
+      !model.id.startsWith('minimax/h3-image') &&
+      ![undefined, false, 'none', 'disabled'].includes(args.promptExpansion));
+  if (
+    extraInputs ||
+    frameSurcharge ||
+    paidExpansion ||
+    args.size ||
+    args.draft ||
+    args.draftJobId ||
+    args.grounding ||
+    args.layers ||
+    args.thinking ||
+    args.targetAudio ||
+    args.shots?.length ||
+    args.codec ||
+    args.bitrateMode
+  ) {
     return undefined;
   }
   const targetQuality = args.quality ?? routeDefaultQuality(route, model.id, draft.operation);
@@ -70,7 +140,9 @@ function findPlaygroundRate(
     route.upstreamModelId === 'grok-imagine-image-2.0' ||
     route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image';
   const qualified =
-    !grokLowOnly || args.quality === undefined || args.quality === 'low'
+    args.duration !== 'auto' &&
+    (!grokLowOnly ||
+      ((args.count ?? 1) === 1 && (args.quality === undefined || args.quality === 'low')))
       ? getPublishedRate(route, draft.operation, args.resolution)
       : undefined;
   if (qualified) {
@@ -210,7 +282,12 @@ export function PlaygroundPricing({
     catalog.deployments,
     draft,
     draft.operation,
-  ).filter((route) => route.status !== 'retired' && (!draft.routeId || route.id === draft.routeId));
+  ).filter(
+    (route) =>
+      route.status !== 'retired' &&
+      (!draft.routeId || route.id === draft.routeId) &&
+      routeSupportsDraft(route, model.id, draft),
+  );
   const displayRoute =
     priceRoutes.find((route) => route.id === active?.id) ??
     (priceRoutes.length === 1 ? priceRoutes[0] : undefined);
