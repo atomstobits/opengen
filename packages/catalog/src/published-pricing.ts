@@ -1,6 +1,8 @@
 import { canonicalModelId, type Rate, type Route } from '@media-router/contracts';
 
 type PublishedPricing = NonNullable<Route['publishedPricing']>;
+type PublishedOutputRate = NonNullable<PublishedPricing['outputRates']>[number];
+type PublishedQuality = NonNullable<PublishedOutputRate['quality']>;
 const checkedAt = '2026-11-02';
 const recheckedAt = '2026-11-14';
 const regionUnknown = 'No region-specific tariff or inference/storage residency was verified.';
@@ -46,10 +48,21 @@ const approxVideoRates = (
 const approxImageRates = (
   amounts: [string, number][],
   note: string,
+  quality?: PublishedQuality,
 ): PublishedPricing['outputRates'] =>
   outputRates('image', amounts, note).map((rate) => ({
     ...rate,
     approximate: true,
+    ...(quality ? { quality } : {}),
+  }));
+const qualityImageRates = (
+  quality: PublishedQuality,
+  amounts: [string, number][],
+  note?: string,
+): PublishedPricing['outputRates'] =>
+  outputRates('image', amounts, note).map((rate) => ({
+    ...rate,
+    quality,
   }));
 
 const minimax = 'https://platform.minimax.io/docs/pricing/overview#video';
@@ -69,6 +82,11 @@ const gptImage2Tokens: [string, number][] = [
   ['2K', 3_568],
   ['4K', 3_336],
 ];
+const gptImage2HighTokens: [string, number][] = [
+  ['1K', 7_024],
+  ['2K', 14_272],
+  ['4K', 13_344],
+];
 const gptImage25Tokens: [string, number][] = [
   ['1K', 439],
   ['2K', 892],
@@ -83,6 +101,7 @@ const gptImageApproxRates = (
   tokensByResolution: [string, number][],
   usdPerMillionOutputTokens: number,
   note: string,
+  quality: PublishedQuality = 'medium',
 ) =>
   approxImageRates(
     tokensByResolution.map(([resolution, tokens]) => [
@@ -90,7 +109,36 @@ const gptImageApproxRates = (
       Math.round((tokens * usdPerMillionOutputTokens) / 100) * 100,
     ]),
     note,
+    quality,
   );
+const gptImageFamilyApproxRates = (
+  family: 'gpt-image-2' | 'gpt-image-2.5' | 'gpt-image-2.6',
+  usdPerMillionOutputTokens: number,
+  mediumNote: string,
+  highNote?: string,
+  maxNote?: string,
+): PublishedPricing['outputRates'] => {
+  if (family === 'gpt-image-2.6') {
+    return gptImageApproxRates(gptImage26Tokens, usdPerMillionOutputTokens, mediumNote, 'medium');
+  }
+  if (family === 'gpt-image-2') {
+    return [
+      ...gptImageApproxRates(gptImage2Tokens, usdPerMillionOutputTokens, mediumNote, 'medium')!,
+      ...(highNote
+        ? gptImageApproxRates(gptImage2HighTokens, usdPerMillionOutputTokens, highNote, 'high')!
+        : []),
+    ];
+  }
+  return [
+    ...gptImageApproxRates(gptImage25Tokens, usdPerMillionOutputTokens, mediumNote, 'medium')!,
+    ...(highNote
+      ? gptImageApproxRates(gptImage2Tokens, usdPerMillionOutputTokens, highNote, 'high')!
+      : []),
+    ...(maxNote
+      ? gptImageApproxRates(gptImage2HighTokens, usdPerMillionOutputTokens, maxNote, 'max')!
+      : []),
+  ];
+};
 
 const openai = (model: string) => {
   const isGpt2 = model === 'gpt-image-2';
@@ -105,19 +153,27 @@ const openai = (model: string) => {
       'Size, quality and actual token consumption determine the total. Text-to-image managed quotes reserve a conservative max-token bound and settle exact reported token usage on completion; image edits remain unpriced.',
     ],
     isGpt26 ? recheckedAt : '2026-11-06',
-    gptImageApproxRates(
-      isGpt2 ? gptImage2Tokens : isGpt26 ? gptImage26Tokens : gptImage25Tokens,
+    gptImageFamilyApproxRates(
+      isGpt2 ? 'gpt-image-2' : isGpt26 ? 'gpt-image-2.6' : 'gpt-image-2.5',
       30,
       isGpt2
         ? 'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) from OpenAI’s GptImageTokenCalculator; high quality is ≈$0.2107 / $0.4282 / $0.4003 and prompt/reference tokens add cost.'
         : isGpt26
           ? 'Medium-quality canonical image-output token equivalent (3.3× GPT Image 2.5 medium tokens at $30 / 1M output tokens); quality, complexity and prompt/reference tokens determine total cost.'
           : 'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) from OpenAI’s GptImageTokenCalculator; high quality is ≈$0.0527 / $0.107 / $0.1001, max is ≈$0.2107 / $0.4282 / $0.4003, and prompt/reference tokens add cost.',
+      isGpt2
+        ? 'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) from OpenAI’s GptImageTokenCalculator at $30 / 1M output tokens; prompt/reference tokens add cost.'
+        : isGpt26
+          ? undefined
+          : 'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) from OpenAI’s GptImageTokenCalculator at $30 / 1M output tokens; prompt/reference tokens add cost.',
+      isGpt2 || isGpt26
+        ? undefined
+        : 'Max-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) from OpenAI’s GptImageTokenCalculator at $30 / 1M output tokens; prompt/reference tokens add cost.',
     ),
   );
 };
 
-const falGptImage = (url: string, family: 'gpt-image-2' | 'gpt-image-2.5' | 'gpt-image-2.6') =>
+const falGptImage = (url: string, family: 'gpt-image-2' | 'gpt-image-2.6' | 'gpt-image-2.5') =>
   tariff(
     family === 'gpt-image-2.6'
       ? 'Per 1M tokens: $5 text input; $10 text output; $8 image input; $30 image output.'
@@ -133,18 +189,20 @@ const falGptImage = (url: string, family: 'gpt-image-2' | 'gpt-image-2.5' | 'gpt
           'Quality (default high on fal, medium in adapter), size, prompt length and reference images determine total cost.',
         ],
     recheckedAt,
-    gptImageApproxRates(
-      family === 'gpt-image-2'
-        ? gptImage2Tokens
-        : family === 'gpt-image-2.6'
-          ? gptImage26Tokens
-          : gptImage25Tokens,
+    gptImageFamilyApproxRates(
+      family,
       30,
       family === 'gpt-image-2'
         ? 'Adapter medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $30 / 1M output tokens; upstream high default is ≈$0.2107 / $0.4282 / $0.4003 plus prompt/reference tokens.'
         : family === 'gpt-image-2.6'
           ? 'Adapter medium-quality canonical image-output token equivalent (3.3× GPT Image 2.5 medium tokens at $30 / 1M output tokens); quality, reasoning_effort and prompt/reference tokens add cost.'
           : 'Adapter medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $30 / 1M output tokens (fal short-prompt 1K/4K text-to-image examples: $0.0133 / $0.0260); upstream high default is ≈$0.0528 / $0.107 / $0.1003 plus input tokens.',
+      family === 'gpt-image-2.6'
+        ? undefined
+        : 'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $30 / 1M output tokens; prompt and reference tokens add cost.',
+      family === 'gpt-image-2.5'
+        ? 'Max-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $30 / 1M output tokens; prompt and reference tokens add cost.'
+        : undefined,
     ),
   );
 
@@ -277,12 +335,18 @@ const pikaGpt25 = (variant: 'flare' | 'sunburst', op: 'text-to-image' | 'image-t
       'Token consumption depends on prompt length, quality (low through max), output dimensions and reference images.',
     ],
     recheckedAt,
-    gptImageApproxRates(
-      gptImage25Tokens,
+    gptImageFamilyApproxRates(
+      'gpt-image-2.5',
       28.5,
       op === 'image-to-image'
         ? 'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; prompt ($4.75/1M) and input-image ($7.60/1M) tokens add cost.'
-        : 'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; high is ≈$0.0501 / $0.1017 / $0.0951 and prompt tokens ($4.75/1M) add cost.',
+        : 'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; high is ≈$0.05 / $0.1017 / $0.0951 and prompt tokens ($4.75/1M) add cost.',
+      op === 'image-to-image'
+        ? 'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; prompt ($4.75/1M) and input-image ($7.60/1M) tokens add cost.'
+        : 'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; prompt tokens ($4.75/1M) add cost.',
+      op === 'image-to-image'
+        ? 'Max-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; prompt ($4.75/1M) and input-image ($7.60/1M) tokens add cost.'
+        : 'Max-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $28.50 / 1M output tokens; prompt tokens ($4.75/1M) add cost.',
     ),
   );
 
@@ -726,15 +790,26 @@ const published: Record<string, PublishedPricing> = {
       'Only one text-generated image at absent/low quality and 1K/2K has a qualified estimate. Auto/medium quality, edits and input media remain unpriced by the execution quote.',
     ],
     '2026-11-03',
-    outputRates(
-      'image',
-      [
-        ['1K', 40_000],
-        ['1.5K', 50_000],
-        ['2K', 60_000],
-      ],
-      'Low-quality text-to-image output tariff; medium quality is $0.06/$0.07/$0.08 and edits add $0.01 per input image.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 40_000],
+          ['1.5K', 50_000],
+          ['2K', 60_000],
+        ],
+        'Low-quality text-to-image output tariff; medium quality is $0.06/$0.07/$0.08 and edits add $0.01 per input image.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 60_000],
+          ['1.5K', 70_000],
+          ['2K', 80_000],
+        ],
+        'Medium-quality output tariff; edits add $0.01 per input image.',
+      )!,
+    ],
   ),
 
   // Google first-party
@@ -1406,15 +1481,26 @@ const published: Record<string, PublishedPricing> = {
       'Single text-generated images at low/default quality have fixed output-tier estimates; medium/auto quality and image edits (+$0.01 per input image) remain unpriced.',
     ],
     '2026-11-13',
-    outputRates(
-      'image',
-      [
-        ['1K', 40_000],
-        ['1.5K', 50_000],
-        ['2K', 60_000],
-      ],
-      'Low-quality output rate; medium quality is $0.06/$0.07/$0.08 and edits add $0.01 per input image.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 40_000],
+          ['1.5K', 50_000],
+          ['2K', 60_000],
+        ],
+        'Low-quality output rate; medium quality is $0.06/$0.07/$0.08 and edits add $0.01 per input image.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 60_000],
+          ['1.5K', 70_000],
+          ['2K', 80_000],
+        ],
+        'Medium-quality output rate; edits add $0.01 per input image.',
+      )!,
+    ],
   ),
 
   // Pika aggregator routes
@@ -1640,10 +1726,11 @@ const published: Record<string, PublishedPricing> = {
       'Token consumption varies with output dimensions, quality (low/medium/high) and prompt length.',
     ],
     recheckedAt,
-    gptImageApproxRates(
-      gptImage2Tokens,
+    gptImageFamilyApproxRates(
+      'gpt-image-2',
       22.5,
       'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $22.50 / 1M output tokens; high is ≈$0.158 / $0.3211 / $0.3002 and prompt tokens ($3.75/1M) add cost.',
+      'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $22.50 / 1M output tokens; prompt tokens ($3.75/1M) add cost.',
     ),
   ),
   'pika-undisclosed|openai/gpt-image-2/image-to-image': tariff(
@@ -1651,10 +1738,11 @@ const published: Record<string, PublishedPricing> = {
     'https://dev.pika.art/models/openai/gpt-image-2/image-to-image',
     ['Image editing on Pika uses higher per-token input/output tiers than text-to-image.'],
     recheckedAt,
-    gptImageApproxRates(
-      gptImage2Tokens,
+    gptImageFamilyApproxRates(
+      'gpt-image-2',
       30,
       'Medium-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $30 / 1M output tokens; prompt ($5/1M) and input-image ($8/1M) tokens add cost.',
+      'High-quality canonical image-output token equivalent (1024×1024, 2048×2048, 3840×2160) at $30 / 1M output tokens; prompt ($5/1M) and input-image ($8/1M) tokens add cost.',
     ),
   ),
   'pika-undisclosed|xai/grok-imagine-image-2.0': tariff(
@@ -1664,14 +1752,24 @@ const published: Record<string, PublishedPricing> = {
       'Quality tier (low/medium/auto) and input-image count (+$0.0105 each on edit) determine cost.',
     ],
     recheckedAt,
-    outputRates(
-      'image',
-      [
-        ['1K', 42_000],
-        ['2K', 63_000],
-      ],
-      'Low-quality output rate; medium quality is $0.063/$0.084 and edits add $0.0105 per input image.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 42_000],
+          ['2K', 63_000],
+        ],
+        'Low-quality output rate; medium quality is $0.063/$0.084 and edits add $0.0105 per input image.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 63_000],
+          ['2K', 84_000],
+        ],
+        'Medium-quality output rate; edits add $0.0105 per input image.',
+      )!,
+    ],
   ),
   'pika-undisclosed|xai/grok-imagine-video-1.5': tariff(
     'Output video: $0.084 / second at 480p; $0.147 at 720p (+$0.0105 / input image).',
@@ -1883,15 +1981,44 @@ const published: Record<string, PublishedPricing> = {
       'Priced per output image by quality tier rather than resolution; default quality is auto ($0.128).',
     ],
     recheckedAt,
-    outputRates(
-      'image',
-      [
-        ['1K', 128_000],
-        ['2K', 128_000],
-        ['4K', 128_000],
-      ],
-      'Default auto/high quality rate ($0.128/image across 1K–4K); medium is $0.047 and low is $0.012.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 12_000],
+          ['2K', 12_000],
+          ['4K', 12_000],
+        ],
+        'Low-quality output rate ($0.012/image across 1K–4K); medium is $0.047 and high/auto is $0.128.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 47_000],
+          ['2K', 47_000],
+          ['4K', 47_000],
+        ],
+        'Medium-quality output rate ($0.047/image across 1K–4K); Replicate auto/high is $0.128 and low is $0.012.',
+      )!,
+      ...qualityImageRates(
+        'high',
+        [
+          ['1K', 128_000],
+          ['2K', 128_000],
+          ['4K', 128_000],
+        ],
+        'High-quality output rate ($0.128/image across 1K–4K); medium is $0.047 and low is $0.012.',
+      )!,
+      ...qualityImageRates(
+        'auto',
+        [
+          ['1K', 128_000],
+          ['2K', 128_000],
+          ['4K', 128_000],
+        ],
+        'Auto-quality output rate ($0.128/image across 1K–4K); medium is $0.047 and low is $0.012.',
+      )!,
+    ],
   ),
   'replicate-undisclosed|openai/gpt-image-2.5-flare': tariff(
     'Per output image by quality: low $0.012; medium $0.047; high $0.128; xhigh/auto $0.25; max $0.50.',
@@ -1900,14 +2027,29 @@ const published: Record<string, PublishedPricing> = {
       'Priced per output image by quality tier rather than resolution; default quality is auto ($0.25).',
     ],
     recheckedAt,
-    outputRates(
-      'image',
+    (
       [
-        ['1K', 250_000],
-        ['2K', 250_000],
-        ['4K', 250_000],
-      ],
-      'Default auto/xhigh quality rate ($0.25/image across 1K–4K); low $0.012, medium $0.047, high $0.128, max $0.50.',
+        ['low', 12_000, 'Low-quality output rate ($0.012/image across 1K–4K).'],
+        [
+          'medium',
+          47_000,
+          'Medium-quality output rate ($0.047/image across 1K–4K); Replicate auto/xhigh default is $0.25.',
+        ],
+        ['high', 128_000, 'High-quality output rate ($0.128/image across 1K–4K).'],
+        ['xhigh', 250_000, 'Extra-high quality output rate ($0.25/image across 1K–4K).'],
+        ['auto', 250_000, 'Auto-quality output rate ($0.25/image across 1K–4K).'],
+        ['max', 500_000, 'Max-quality output rate ($0.50/image across 1K–4K).'],
+      ] as const
+    ).flatMap(([quality, usdMicros, note]) =>
+      qualityImageRates(
+        quality,
+        [
+          ['1K', usdMicros],
+          ['2K', usdMicros],
+          ['4K', usdMicros],
+        ],
+        note,
+      )!,
     ),
   ),
   'replicate-undisclosed|openai/gpt-image-2.5-sunburst': tariff(
@@ -1917,14 +2059,29 @@ const published: Record<string, PublishedPricing> = {
       'Priced per output image by quality tier rather than resolution; default quality is auto ($0.25).',
     ],
     recheckedAt,
-    outputRates(
-      'image',
+    (
       [
-        ['1K', 250_000],
-        ['2K', 250_000],
-        ['4K', 250_000],
-      ],
-      'Default auto/xhigh quality rate ($0.25/image across 1K–4K); low $0.012, medium $0.047, high $0.128, max $0.50.',
+        ['low', 12_000, 'Low-quality output rate ($0.012/image across 1K–4K).'],
+        [
+          'medium',
+          47_000,
+          'Medium-quality output rate ($0.047/image across 1K–4K); Replicate auto/xhigh default is $0.25.',
+        ],
+        ['high', 128_000, 'High-quality output rate ($0.128/image across 1K–4K).'],
+        ['xhigh', 250_000, 'Extra-high quality output rate ($0.25/image across 1K–4K).'],
+        ['auto', 250_000, 'Auto-quality output rate ($0.25/image across 1K–4K).'],
+        ['max', 500_000, 'Max-quality output rate ($0.50/image across 1K–4K).'],
+      ] as const
+    ).flatMap(([quality, usdMicros, note]) =>
+      qualityImageRates(
+        quality,
+        [
+          ['1K', usdMicros],
+          ['2K', usdMicros],
+          ['4K', usdMicros],
+        ],
+        note,
+      )!,
     ),
   ),
   'replicate-undisclosed|xai/grok-imagine-image-2.0': tariff(
@@ -1934,14 +2091,24 @@ const published: Record<string, PublishedPricing> = {
       'Replicate defaults to medium quality ($0.06 at 1K, $0.08 at 2K) and adds $0.01 per input image megapixel when editing.',
     ],
     recheckedAt,
-    outputRates(
-      'image',
-      [
-        ['1K', 60_000],
-        ['2K', 80_000],
-      ],
-      'Default medium-quality output rate; low quality is $0.04/$0.06 and edits add $0.01 per input MP.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 40_000],
+          ['2K', 60_000],
+        ],
+        'Low-quality output rate; Replicate default is medium ($0.06/$0.08) and edits add $0.01 per input MP.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 60_000],
+          ['2K', 80_000],
+        ],
+        'Default medium-quality output rate; low quality is $0.04/$0.06 and edits add $0.01 per input MP.',
+      )!,
+    ],
   ),
   'replicate-undisclosed|xai/grok-imagine-video-1.5': tariff(
     'Image-to-video output: $0.08 / second at 480p and 720p.',
@@ -2062,7 +2229,7 @@ const published: Record<string, PublishedPricing> = {
     'Standard: $0.157 / second at 720p; $0.235 at 1080p (promo through Nov 30, 2026 UTC: $0.1256 / $0.188).',
     runwayPricing,
     [
-      'Active 20% off promotional rates through November 30, 2026 UTC are 12.56 / 18.8 credits ($0.1256 / $0.188) per second without video input, or 7.52 / 11.28 credits ($0.0752 / $0.1128) per input and output second with video input.',
+      'Active 20% off promotional rates through November 30, 2026 UTC are 12.56 / 18.8 credits ($0.1256 / $0.188) per second without video input, or 7.52 / 11.28 credits ($0.0752 / $0.1128) per second on output duration plus max(input video duration, output duration) with video input.',
       'Execution quotes conservatively reserve standard list rates ($0.157 / $0.235 per second) for text/image-to-video.',
     ],
     recheckedAt,
@@ -2223,14 +2390,24 @@ const published: Record<string, PublishedPricing> = {
       'Runway defaults to medium quality (6 / 8 credits = $0.06 / $0.08) and adds 1 credit ($0.01) per reference image.',
     ],
     recheckedAt,
-    outputRates(
-      'image',
-      [
-        ['1K', 60_000],
-        ['2K', 80_000],
-      ],
-      'Default medium-quality output rate; low quality is $0.04/$0.06 and reference images add $0.01 each.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 40_000],
+          ['2K', 60_000],
+        ],
+        'Low-quality output rate; Runway default is medium ($0.06/$0.08) and reference images add $0.01 each.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 60_000],
+          ['2K', 80_000],
+        ],
+        'Default medium-quality output rate; low quality is $0.04/$0.06 and reference images add $0.01 each.',
+      )!,
+    ],
   ),
   'runway-undisclosed|openai/gpt-image-2': tariff(
     'Per output image by quality & size: low $0.01–$0.02; medium $0.05–$0.11; high (default) $0.20 at 1K/2K, $0.41 at 4K.',
@@ -2239,15 +2416,44 @@ const published: Record<string, PublishedPricing> = {
       '1–41 Runway credits ($0.01/credit) per output image depending on quality (low/medium/high) and resolution.',
     ],
     recheckedAt,
-    outputRates(
-      'image',
-      [
-        ['1K', 200_000],
-        ['2K', 200_000],
-        ['4K', 410_000],
-      ],
-      'Default high/auto quality rate (20 / 20 / 41 Runway credits at $0.01/credit); medium is $0.05/$0.05/$0.11 and low is $0.01/$0.01/$0.02.',
-    ),
+    [
+      ...qualityImageRates(
+        'low',
+        [
+          ['1K', 10_000],
+          ['2K', 10_000],
+          ['4K', 20_000],
+        ],
+        'Low-quality output rate (1 / 1 / 2 Runway credits at $0.01/credit); medium is $0.05/$0.05/$0.11 and high/auto is $0.20/$0.20/$0.41.',
+      )!,
+      ...qualityImageRates(
+        'medium',
+        [
+          ['1K', 50_000],
+          ['2K', 50_000],
+          ['4K', 110_000],
+        ],
+        'Medium-quality output rate (5 / 5 / 11 Runway credits at $0.01/credit); Runway high/auto default is $0.20/$0.20/$0.41.',
+      )!,
+      ...qualityImageRates(
+        'high',
+        [
+          ['1K', 200_000],
+          ['2K', 200_000],
+          ['4K', 410_000],
+        ],
+        'High-quality output rate (20 / 20 / 41 Runway credits at $0.01/credit); medium is $0.05/$0.05/$0.11 and low is $0.01/$0.01/$0.02.',
+      )!,
+      ...qualityImageRates(
+        'auto',
+        [
+          ['1K', 200_000],
+          ['2K', 200_000],
+          ['4K', 410_000],
+        ],
+        'Auto-quality output rate (20 / 20 / 41 Runway credits at $0.01/credit); medium is $0.05/$0.05/$0.11 and low is $0.01/$0.01/$0.02.',
+      )!,
+    ],
   ),
   'runway-undisclosed|openai/gpt-image-2.5-flare': tariff(
     'Per output image: $0.01–$0.75 by quality, resolution and aspect ratio (1:1 high default: $0.11 / $0.16 / $0.19 at 1K / 2K / 4K; +$0.01 / ref image).',
@@ -2263,6 +2469,7 @@ const published: Record<string, PublishedPricing> = {
         ['4K', 190_000],
       ],
       'Default high-quality 1:1 rate (11 / 16 / 19 Runway credits at $0.01/credit); non-square ratios cost $0.04–$0.15 at high, quality spans $0.01–$0.75, and reference images add $0.01 per output.',
+      'high',
     ),
   ),
   'runway-undisclosed|openai/gpt-image-2.5-sunburst': tariff(
@@ -2279,6 +2486,7 @@ const published: Record<string, PublishedPricing> = {
         ['4K', 190_000],
       ],
       'Default high-quality 1:1 rate (11 / 16 / 19 Runway credits at $0.01/credit); non-square ratios cost $0.04–$0.15 at high, quality spans $0.01–$0.75, and reference images add $0.01 per output.',
+      'high',
     ),
   ),
 };

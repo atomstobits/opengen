@@ -206,11 +206,129 @@ describe('informational provider tariffs', () => {
         expect(playgroundHtml, `Missing Playground price on ${route.id}`).not.toContain(
           'Price unavailable for these settings',
         );
-        expect(playgroundHtml, `Missing Playground USD rate on ${route.id}`).toMatch(
-          /\$\d+\.\d+\s+USD \/ output (image|second)/,
-        );
+        const unitemizedInitialQuality =
+          (route.deploymentId === 'runway-undisclosed' &&
+            route.modelId.startsWith('openai/gpt-image-2.5-')) ||
+          (route.deploymentId === 'pika-undisclosed' &&
+            route.modelId === 'xai/grok-imagine-image-2.0');
+        if (unitemizedInitialQuality) {
+          expect(playgroundHtml, `Missing dollar tariff summary on ${route.id}`).toMatch(
+            /\$\d+\.\d+/,
+          );
+          const itemizedDraft = {
+            ...draft,
+            input: {
+              ...draft.input,
+              quality: route.deploymentId === 'runway-undisclosed' ? 'high' : 'medium',
+            },
+          };
+          const itemizedHtml = renderToStaticMarkup(
+            createElement(PlaygroundPricing, {
+              catalog,
+              model,
+              routes,
+              draft: itemizedDraft,
+              quote: null,
+              job: null,
+              readiness: 'Ready',
+              mobileStatus: 'Ready',
+              busy: null,
+              ready: false,
+              canGenerate: false,
+              onQuote: () => {},
+              onGenerate: () => {},
+              error: '',
+            }),
+          );
+          expect(itemizedHtml, `Missing itemized quality rate on ${route.id}`).toMatch(
+            /\$\d+\.\d+\s+USD \/ output image/,
+          );
+        } else {
+          expect(playgroundHtml, `Missing Playground USD rate on ${route.id}`).toMatch(
+            /\$\d+\.\d+\s+USD \/ output (image|second)/,
+          );
+        }
       }
     }
+  });
+
+  it('matches draft quality in Playground pricing and excludes unmatched quality tiers from numeric ranges', () => {
+    const flareModel = catalog.models.find((entry) => entry.id === 'openai/gpt-image-2.5-flare')!;
+    const flareRoutes = catalog.routes.filter((route) => route.modelId === flareModel.id);
+    const replicateFlare = flareRoutes.find(
+      (route) => route.deploymentId === 'replicate-undisclosed',
+    )!;
+    const renderFlare = (draft = initialPlaygroundRequest(flareModel, flareRoutes)) =>
+      renderToStaticMarkup(
+        createElement(PlaygroundPricing, {
+          catalog,
+          model: flareModel,
+          routes: flareRoutes,
+          draft,
+          quote: null,
+          job: null,
+          readiness: 'Ready',
+          mobileStatus: 'Ready',
+          busy: null,
+          ready: false,
+          canGenerate: false,
+          onQuote: () => {},
+          onGenerate: () => {},
+          error: '',
+        }),
+      );
+
+    // Default draft quality is medium: Replicate resolves $0.047 (medium), Runway (high-only) stays out of the numeric range.
+    const defaultAutoHtml = renderFlare();
+    expect(defaultAutoHtml).toContain('Rates vary by provider and endpoint region');
+    expect(defaultAutoHtml).toContain('$0.047 USD / output image · 1K');
+    expect(defaultAutoHtml).not.toContain('$0.25 USD / output image · 1K');
+
+    // At high quality (1:1), all five providers resolve high-tier rates and aggregate cleanly.
+    const highDraft = initialPlaygroundRequest(flareModel, flareRoutes);
+    highDraft.input.quality = 'high';
+    const highAutoHtml = renderFlare(highDraft);
+    expect(highAutoHtml).toContain('≈$0.05–$0.128 USD / output image · 1K');
+    expect(highAutoHtml).toContain('≈$0.11 USD / output image · 1K');
+
+    // Selecting Replicate updates dynamically across quality tiers.
+    for (const [quality, expected] of [
+      ['low', '$0.012 USD / output image · 1K'],
+      ['medium', '$0.047 USD / output image · 1K'],
+      ['high', '$0.128 USD / output image · 1K'],
+      ['xhigh', '$0.25 USD / output image · 1K'],
+      ['max', '$0.50 USD / output image · 1K'],
+    ] as const) {
+      const pinned = initialPlaygroundRequest(flareModel, flareRoutes, replicateFlare.id);
+      pinned.input.quality = quality;
+      expect(renderFlare(pinned)).toContain(expected);
+    }
+
+    // Grok Imagine Image 2.0 does not retain the $0.04 low-quality rate when medium quality is selected.
+    const grokModel = catalog.models.find((entry) => entry.id === 'xai/grok-imagine-image-2.0')!;
+    const grokRoutes = catalog.routes.filter((route) => route.modelId === grokModel.id);
+    const grokMedium = initialPlaygroundRequest(grokModel, grokRoutes);
+    grokMedium.input.quality = 'medium';
+    const grokMediumHtml = renderToStaticMarkup(
+      createElement(PlaygroundPricing, {
+        catalog,
+        model: grokModel,
+        routes: grokRoutes,
+        draft: grokMedium,
+        quote: null,
+        job: null,
+        readiness: 'Ready',
+        mobileStatus: 'Ready',
+        busy: null,
+        ready: false,
+        canGenerate: false,
+        onQuote: () => {},
+        onGenerate: () => {},
+        error: '',
+      }),
+    );
+    expect(grokMediumHtml).toContain('$0.06–$0.063 USD / output image · 1K');
+    expect(grokMediumHtml).not.toContain('$0.04 USD / output image · 1K');
   });
 
   it('requires dated HTTPS evidence for an informational tariff', () => {

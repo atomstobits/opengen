@@ -172,7 +172,7 @@ for (const viewport of [
     await expect(page.getByRole('combobox', { name: 'Operation' })).toHaveValue('image-edit');
     const pricing = page.getByRole('region', { name: 'GPT Image 2 pricing' });
     const quoteButton = page.getByRole('button', { name: 'Get a quote', exact: true });
-    await expect(pricing).toContainText('≈$0.0527–$0.20 USD / output image · 1K');
+    await expect(pricing).toContainText('≈$0.047–$0.0527 USD / output image · 1K');
     await pricing.locator('summary', { hasText: 'View 5 regional route prices' }).click();
     await expect(pricing).toContainText('≈$0.0527 USD / output image · 1K');
     await expect(

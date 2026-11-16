@@ -27,42 +27,109 @@ export function routeIdentity(catalog: Catalog, route: Route) {
 type PublishedOutputRate = NonNullable<
   NonNullable<Route['publishedPricing']>['outputRates']
 >[number];
+type PublishedQuality = NonNullable<PublishedOutputRate['quality']>;
+
+function routeDefaultQuality(
+  route: Route,
+  modelId: string,
+  operation: GenerateInput['operation'],
+): PublishedQuality | undefined {
+  if (modelId.startsWith('openai/gpt-image-')) return 'medium';
+  if (modelId === 'xai/grok-imagine-image-2.0') {
+    if (route.deploymentId === 'xai-undisclosed' || route.deploymentId === 'fal-undisclosed') {
+      return operation === 'image-edit' ? 'medium' : 'low';
+    }
+    if (
+      route.deploymentId === 'replicate-undisclosed' ||
+      route.deploymentId === 'runway-undisclosed'
+    ) {
+      return 'medium';
+    }
+  }
+  return undefined;
+}
 
 function findPlaygroundRate(
   route: Route,
-  modality: Model['modality'],
-  operation: GenerateInput['operation'],
-  resolution?: string,
-): { rate: PublishedOutputRate; qualified: boolean; approximate: boolean } | undefined {
-  const qualified = getPublishedRate(route, operation, resolution);
-  if (qualified) return { rate: qualified, qualified: true, approximate: false };
-  const unit = modality === 'image' ? 'image' : 'output-second';
-  const rates = (route.publishedPricing?.outputRates ?? []).filter((entry) => entry.unit === unit);
-  const target = (resolution ?? '').toLowerCase();
+  model: Pick<Model, 'id' | 'modality'>,
+  draft: GenerateInput,
+):
+  | {
+      rate: PublishedOutputRate;
+      qualified: boolean;
+      approximate: boolean;
+      quality?: string;
+    }
+  | undefined {
+  const args = draft.input;
+  if (args.size || args.draft || args.grounding || args.layers || args.targetAudio) {
+    return undefined;
+  }
+  const targetQuality = args.quality ?? routeDefaultQuality(route, model.id, draft.operation);
+  const grokLowOnly =
+    route.upstreamModelId === 'grok-imagine-image-2.0' ||
+    route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image';
+  const qualified =
+    !grokLowOnly || args.quality === undefined || args.quality === 'low'
+      ? getPublishedRate(route, draft.operation, args.resolution)
+      : undefined;
+  if (qualified) {
+    return {
+      rate: qualified,
+      qualified: true,
+      approximate: false,
+      ...(targetQuality ? { quality: targetQuality } : {}),
+    };
+  }
+  if (
+    route.deploymentId === 'runway-undisclosed' &&
+    model.id.startsWith('openai/gpt-image-2.5-') &&
+    args.aspectRatio &&
+    args.aspectRatio !== '1:1'
+  ) {
+    return undefined;
+  }
+  const unit = model.modality === 'image' ? 'image' : 'output-second';
+  const allRates = (route.publishedPricing?.outputRates ?? []).filter(
+    (entry) => entry.unit === unit,
+  );
+  const hasQualityTiers = allRates.some((entry) => entry.quality !== undefined);
+  const rates = hasQualityTiers
+    ? targetQuality
+      ? allRates.filter((entry) => entry.quality === targetQuality)
+      : []
+    : allRates;
+  const target = (args.resolution ?? '').toLowerCase();
   const published =
     rates.find(
-      (entry) => entry.resolution.toLowerCase() === target && entry.operation === operation,
+      (entry) => entry.resolution.toLowerCase() === target && entry.operation === draft.operation,
     ) ??
     rates.find(
       (entry) => entry.resolution.toLowerCase() === target && entry.operation === undefined,
     ) ??
     (!target ? rates[0] : undefined);
   if (!published) return undefined;
-  return { rate: published, qualified: false, approximate: Boolean(published.approximate) };
+  const quality = published.quality ?? targetQuality;
+  return {
+    rate: published,
+    qualified: false,
+    approximate: Boolean(published.approximate),
+    ...(quality ? { quality } : {}),
+  };
 }
 
 function PublishedRate({
   route,
-  modality,
+  model,
   draft,
   details = false,
 }: {
   route: Route;
-  modality: Model['modality'];
+  model: Pick<Model, 'id' | 'modality'>;
   draft: GenerateInput;
   details?: boolean;
 }) {
-  const resolved = findPlaygroundRate(route, modality, draft.operation, draft.input.resolution);
+  const resolved = findPlaygroundRate(route, model, draft);
   const rate = resolved?.rate;
   const tariff = route.publishedPricing;
   const source = resolved?.qualified
@@ -148,9 +215,7 @@ export function PlaygroundPricing({
     priceRoutes.find((route) => route.id === active?.id) ??
     (priceRoutes.length === 1 ? priceRoutes[0] : undefined);
   const displayIdentity = displayRoute && routeIdentity(catalog, displayRoute);
-  const resolvedRates = priceRoutes.map((route) =>
-    findPlaygroundRate(route, model.modality, draft.operation, draft.input.resolution),
-  );
+  const resolvedRates = priceRoutes.map((route) => findPlaygroundRate(route, model, draft));
   const sources = priceRoutes.map((route, index) =>
     resolvedRates[index]?.qualified
       ? route.pricingSource.url
@@ -158,8 +223,12 @@ export function PlaygroundPricing({
   );
   const priceSource = sources.every((url) => url === sources[0]) ? sources[0] : undefined;
   const unit = resolvedRates[0]?.rate.unit;
+  const quality = resolvedRates[0]?.quality;
   const comparable =
-    resolvedRates.length > 0 && resolvedRates.every((entry) => entry && entry.rate.unit === unit);
+    resolvedRates.length > 0 &&
+    resolvedRates.every(
+      (entry) => entry !== undefined && entry.rate.unit === unit && entry.quality === quality,
+    );
   const approximateRange = comparable && resolvedRates.some((entry) => entry!.approximate);
   const minimum = comparable
     ? Math.min(...resolvedRates.map((entry) => entry!.rate.usdMicros))
@@ -194,7 +263,7 @@ export function PlaygroundPricing({
             <p className={styles.routeLabel}>
               {displayIdentity!.label} · {displayIdentity!.region}
             </p>
-            <PublishedRate route={displayRoute} modality={model.modality} draft={draft} details />
+            <PublishedRate route={displayRoute} model={model} draft={draft} details />
           </>
         ) : (
           <>
@@ -221,7 +290,7 @@ export function PlaygroundPricing({
                         <b>
                           {identity.label} · {identity.region}
                         </b>
-                        <PublishedRate route={route} modality={model.modality} draft={draft} />
+                        <PublishedRate route={route} model={model} draft={draft} details />
                       </li>
                     );
                   })}

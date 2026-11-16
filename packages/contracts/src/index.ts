@@ -136,7 +136,12 @@ export interface Route {
     source: Source;
     conditions: string[];
     /** Published per-output prices for comparison only. */
-    outputRates?: Array<Rate & { approximate?: true }>;
+    outputRates?: Array<
+      Rate & {
+        approximate?: true;
+        quality?: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+      }
+    >;
   };
   pricingSource: Source;
   source: Source;

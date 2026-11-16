@@ -109,6 +109,9 @@ Both `opengen-api` (Cloud Run service) and `opengen-worker` (Cloud Run worker po
 Like `infra/deploy-gcp.sh`, `infra/update-gcp-image.sh` defaults to `--plan` and performs zero cloud builds or runtime mutations unless `--build` or `--apply` is passed:
 
 ```sh
+# Clear any shell-level OPENGEN_API_IMAGE override so --env-file governs digest resolution
+unset OPENGEN_API_IMAGE
+
 # 1. Offline validation and plan preview (requires a clean Git checkout; no gcloud calls)
 bash infra/update-gcp-image.sh --env-file infra/.local/opengen.env --plan
 

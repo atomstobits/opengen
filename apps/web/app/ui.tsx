@@ -441,9 +441,18 @@ function findRouteRate(route: Route, resolution: string, modality: Model['modali
     rate.unit === unit && rate.resolution.toLowerCase() === resolution.toLowerCase();
   const published = route.publishedPricing;
   const qualifiedRate = route.rates.find(matches);
-  const publishedRate = published?.outputRates?.find(
+  const preferredQuality = route.modelId.startsWith('openai/gpt-image-')
+    ? 'medium'
+    : route.modelId === 'xai/grok-imagine-image-2.0'
+      ? 'low'
+      : undefined;
+  const eligiblePublished = (published?.outputRates ?? []).filter(
     (rate) => matches(rate) && (!rate.operation || route.operations.includes(rate.operation)),
   );
+  const publishedRate =
+    (preferredQuality
+      ? eligiblePublished.find((rate) => rate.quality === preferredQuality)
+      : undefined) ?? eligiblePublished[0];
   return { unit, published, qualifiedRate, publishedRate, rate: qualifiedRate ?? publishedRate };
 }
 
