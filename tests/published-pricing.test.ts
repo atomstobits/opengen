@@ -422,6 +422,33 @@ describe('informational provider tariffs', () => {
     );
     expect(grok1080PinnedHtml).toContain('Price unavailable for these settings');
     expect(grok1080PinnedHtml).not.toContain('$0.25 USD / output second');
+
+    // Frame-input surcharges (such as Runway and native MiniMax H3 image-to-video) withhold output-only fallback rates.
+    const h3Model = catalog.models.find((entry) => entry.id === 'minimax/h3')!;
+    const h3Routes = catalog.routes.filter((route) => route.modelId === h3Model.id);
+    const runwayH3 = h3Routes.find((route) => route.deploymentId === 'runway-undisclosed')!;
+    const h3FrameDraft = initialPlaygroundRequest(h3Model, h3Routes, runwayH3.id, 'image-to-video');
+    h3FrameDraft.input.firstFrame = { url: 'https://media.example.com/start.png' };
+    const h3FrameHtml = renderToStaticMarkup(
+      createElement(PlaygroundPricing, {
+        catalog,
+        model: h3Model,
+        routes: h3Routes,
+        draft: h3FrameDraft,
+        quote: null,
+        job: null,
+        readiness: 'Ready',
+        mobileStatus: 'Ready',
+        busy: null,
+        ready: false,
+        canGenerate: false,
+        onQuote: () => {},
+        onGenerate: () => {},
+        error: '',
+      }),
+    );
+    expect(h3FrameHtml).not.toContain('$0.10 USD / output second');
+    expect(h3FrameHtml).toContain('+$0.02 / start or reference image');
   });
 
   it('requires dated HTTPS evidence for an informational tariff', () => {

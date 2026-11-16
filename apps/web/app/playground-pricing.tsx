@@ -79,6 +79,17 @@ function routeSupportsDraft(route: Route, modelId: string, draft: GenerateInput)
   return true;
 }
 
+function runwayTaskMinimumMicros(modelId: string): number {
+  if (modelId === 'bytedance/seedance-2.5') return 800_000;
+  if (modelId === 'bytedance/seedance-2.0' || modelId === 'bytedance/seedance-2.0-fast') {
+    return 440_000;
+  }
+  if (modelId === 'bytedance/seedance-2.0-mini') return 280_000;
+  if (modelId === 'kling/kling-4.0-flash') return 290_000;
+  if (modelId === 'google/gemini-omni-1.2-flash') return 60_000;
+  return 0;
+}
+
 function findPlaygroundRate(
   route: Route,
   model: Pick<Model, 'id' | 'modality'>,
@@ -95,7 +106,9 @@ function findPlaygroundRate(
   const args = draft.input;
   const extraInputs = Boolean(
     args.references?.length ||
-    (args.sourceVideo && route.upstreamModelId !== 'blackforestlabs/flux-3/edit-video') ||
+    (args.sourceVideo &&
+      route.upstreamModelId !== 'blackforestlabs/flux-3/edit-video' &&
+      route.upstreamModelId !== 'x-ai/grok-imagine-video/video-to-video') ||
     args.mask ||
     args.elements?.length ||
     args.keyframes?.length ||
@@ -103,10 +116,12 @@ function findPlaygroundRate(
   );
   const frameSurcharge =
     Boolean(args.firstFrame || args.lastFrame) &&
-    (model.id.startsWith('xai/grok-imagine-video') ||
+    ((model.id.startsWith('xai/grok-imagine-video') &&
+      route.deploymentId !== 'replicate-undisclosed') ||
       model.id.startsWith('google/gemini-omni-') ||
-      model.id === 'runway/gen4.6' ||
-      (route.deploymentId === 'runway-undisclosed' && model.id === 'minimax/h3-max'));
+      (route.deploymentId === 'minimax-undisclosed' && model.id.startsWith('minimax/h3')) ||
+      (route.deploymentId === 'runway-undisclosed' &&
+        (model.id === 'minimax/h3' || model.id === 'minimax/h3-max')));
   const paidExpansion =
     (route.adapter === 'minimax' &&
       !route.upstreamModelId.startsWith('MiniMax-H3-Image') &&
@@ -181,6 +196,14 @@ function findPlaygroundRate(
     ) ??
     (!target ? rates[0] : undefined);
   if (!published) return undefined;
+  if (
+    route.deploymentId === 'runway-undisclosed' &&
+    typeof args.duration === 'number' &&
+    published.unit === 'output-second' &&
+    published.usdMicros * args.duration < runwayTaskMinimumMicros(model.id)
+  ) {
+    return undefined;
+  }
   const quality = published.quality ?? targetQuality;
   return {
     rate: published,
