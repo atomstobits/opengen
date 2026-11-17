@@ -402,6 +402,133 @@ export function validateBucket(value, c) {
     'bucket exact CORS/lifecycle',
   );
 }
+export function bucketPolicyReconciliationPlan(options) {
+  const c = configuration(options);
+  const desiredPolicy = bucketPolicy(c);
+  return {
+    mode: 'dry-run',
+    operation: 'reconcile-bucket-policy',
+    configuration: c,
+    patchUrl: `https://storage.googleapis.com/storage/v1/b/${c.bucket}`,
+    desiredPolicy,
+    mutated: false,
+    notes: [
+      'Dry-run default performs no bucket PATCH mutation.',
+      'Reconciliation removes the legacy 7-day inputs/ age-delete rule so SQL accepted-use pins govern input cleanup.',
+      'Applies exact CORS responseHeader list (Content-Type, ETag, If-None-Match, x-goog-if-generation-match) for conditional uploads.',
+      'Ordinary bootstrap never invokes reconciliation implicitly.',
+    ],
+  };
+}
+function validateReconcilableLifecycle(lifecycle) {
+  const rules = lifecycle?.rule ?? [];
+  if (!Array.isArray(rules))
+    throw new Error(
+      'Existing resource drift: unrecognized bucket lifecycle structure requires manual review.',
+    );
+  for (const rule of rules) {
+    const cond = rule?.condition ?? {};
+    const prefixes = cond.matchesPrefix;
+    const condKeys = Object.keys(cond).filter((k) => cond[k] !== undefined);
+    const recognized =
+      rule?.action?.type === 'Delete' &&
+      Object.keys(rule.action).length === 1 &&
+      cond.age === 7 &&
+      Array.isArray(prefixes) &&
+      prefixes.length > 0 &&
+      prefixes.every((p) => p === 'inputs/' || p === 'outputs/') &&
+      condKeys.every((k) => k === 'age' || k === 'matchesPrefix');
+    if (!recognized)
+      throw new Error(
+        'Existing resource drift: unrecognized bucket lifecycle rule requires manual review before reconciliation.',
+      );
+  }
+  return rules.some((rule) => (rule?.condition?.matchesPrefix ?? []).includes('inputs/'));
+}
+/** Explicit operator-gated bucket policy reconciliation; never invoked by ordinary bootstrap. */
+export async function reconcileBucketPolicy(options, driver) {
+  if (options.apply && options.plan) throw new Error('Choose plan/dry-run or apply.');
+  const plan = bucketPolicyReconciliationPlan(options);
+  const c = plan.configuration;
+  const desiredPolicy = plan.desiredPolicy;
+  if (options.plan || (!options.apply && !options.inspect && !driver)) return plan;
+  if (options.apply && options.receipt !== undefined && !isAbsolute(options.receipt))
+    throw new Error('Receipt path must be absolute.');
+  const cloud = driver ?? cloudDriver();
+  const existing = await cloud.command(
+    ['storage', 'buckets', 'describe', `gs://${c.bucket}`, '--project', c.project, '--raw'],
+    { absent: true },
+  );
+  if (!existing)
+    throw new Error(
+      'Bucket policy reconciliation requires an existing private bucket; run bootstrap first.',
+    );
+  ensure(
+    existing.name === c.bucket &&
+      existing.location?.toLowerCase() === c.region &&
+      existing.storageClass === 'STANDARD',
+    'bucket identity/location/class',
+  );
+  ensure(
+    existing.iamConfiguration?.uniformBucketLevelAccess?.enabled === true &&
+      existing.iamConfiguration?.publicAccessPrevention === 'enforced',
+    'bucket uniform/private access',
+  );
+  const removesLegacyInputsAgeRule = validateReconcilableLifecycle(existing.lifecycle);
+  const corsChanged = canonical(existing.cors ?? []) !== canonical(desiredPolicy.cors);
+  const lifecycleChanged =
+    canonical(existing.lifecycle ?? {}) !== canonical(desiredPolicy.lifecycle);
+  const changed = corsChanged || lifecycleChanged;
+  if (!options.apply) {
+    return {
+      mode: 'dry-run',
+      operation: 'reconcile-bucket-policy',
+      project: c.project,
+      region: c.region,
+      bucket: c.bucket,
+      publicOrigin: c.publicOrigin,
+      changed,
+      corsChanged,
+      lifecycleChanged,
+      removesLegacyInputsAgeRule,
+      currentPolicy: { cors: existing.cors ?? [], lifecycle: existing.lifecycle ?? {} },
+      desiredPolicy,
+      mutated: false,
+    };
+  }
+  if (changed) {
+    options.onProgress?.('bucket: applying pin-safe lifecycle and conditional-upload CORS policy');
+    await cloud.rest(
+      'PATCH',
+      `https://storage.googleapis.com/storage/v1/b/${c.bucket}`,
+      desiredPolicy,
+    );
+  }
+  const verified = await cloud.command(
+    ['storage', 'buckets', 'describe', `gs://${c.bucket}`, '--project', c.project, '--raw'],
+    { absent: true },
+  );
+  if (!verified) throw new Error('Reconciled bucket could not be re-read for verification.');
+  validateBucket(verified, c);
+  const result = {
+    schemaVersion: 1,
+    mode: 'applied',
+    operation: 'reconcile-bucket-policy',
+    project: c.project,
+    region: c.region,
+    bucket: c.bucket,
+    publicOrigin: c.publicOrigin,
+    changed,
+    corsChanged,
+    lifecycleChanged,
+    removesLegacyInputsAgeRule,
+    desiredPolicy,
+    mutated: changed,
+  };
+  if (options.saveReceipt) await options.saveReceipt(result);
+  else if (options.receipt) await privateReceipt(options.receipt, result);
+  return result;
+}
 const specs = (c, plan) => [
   ...Object.entries(c.accounts).map(([role, email], index) => ({
     name: `account:${role}`,
@@ -838,14 +965,23 @@ export async function bootstrapCli(args) {
       bucket: { type: 'string' },
       'public-origin': { type: 'string' },
       receipt: { type: 'string' },
+      'reconcile-bucket-policy': { type: 'boolean' },
+      inspect: { type: 'boolean' },
       apply: { type: 'boolean' },
       plan: { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
   if (values.help)
-    return 'node infra/gcp-bootstrap.mjs --project EXISTING_PROJECT --region us-central1 --bucket UNIQUE_PRIVATE_BUCKET [--public-origin https://opengen.dev] [--apply --receipt /absolute/infra/.local/bootstrap.json]';
+    return 'node infra/gcp-bootstrap.mjs --project EXISTING_PROJECT --region us-central1 --bucket UNIQUE_PRIVATE_BUCKET [--public-origin https://opengen.dev] [--reconcile-bucket-policy [--inspect|--apply]] [--apply --receipt /absolute/infra/.local/bootstrap.json]';
   if (values.apply && values.plan) throw new Error('Choose plan or apply.');
+  if (values['reconcile-bucket-policy']) {
+    return reconcileBucketPolicy({
+      ...values,
+      publicOrigin: values['public-origin'],
+      onProgress: (event) => console.error(`OpenGen bucket reconciliation: ${event}`),
+    });
+  }
   return bootstrap({
     ...values,
     publicOrigin: values['public-origin'],

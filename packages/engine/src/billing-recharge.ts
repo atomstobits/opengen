@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { CreditInTransaction, VerifiedPaymentEvent } from './payments.js';
 import {
+  calculateProcessingFee,
   centsToMicros,
   PaymentError,
   isPaymentRiskEvent,
@@ -56,6 +57,9 @@ export interface RechargeAttempt {
   workspaceId: string;
   policyVersion: number;
   amountCents: number;
+  feeCents: number;
+  totalChargeCents: number;
+  feeRateBps: 0 | 290 | 440;
   admissionMonth: string;
   status: RechargeStatus;
   createdAt: string;
@@ -75,10 +79,13 @@ interface AttemptRow {
   processor_environment_id: string;
   processor_account_id: string;
   amount_cents: number;
+  fee_cents?: number;
+  fee_rate_bps?: 0 | 290 | 440;
+  total_charge_cents?: number;
   admission_month: string;
   status: RechargeStatus;
   stripe_idempotency_key: string;
-  request_version: 'recharge_pi_v1';
+  request_version: 'recharge_pi_v1' | 'recharge_pi_fee_v2';
   api_version: '2026-10-28.endive';
   payment_intent_id: string | null;
   external_started_at: Date | null;
@@ -103,18 +110,32 @@ export interface RechargeStoreOptions {
   now?: () => Date;
 }
 const columns = "*,to_char(admission_month,'YYYY-MM-DD') AS admission_month";
-const view = (row: AttemptRow): RechargeAttempt => ({
-  id: row.id,
-  workspaceId: row.workspace_id,
-  policyVersion: row.policy_version,
-  amountCents: row.amount_cents,
-  admissionMonth: row.admission_month,
-  status: row.status,
-  createdAt: row.created_at.toISOString(),
-  updatedAt: row.updated_at.toISOString(),
-  creditedAt: row.credited_at?.toISOString() ?? null,
-  failureCode: row.failure_code,
-});
+const attemptTotals = (
+  row: Pick<AttemptRow, 'amount_cents' | 'fee_cents' | 'fee_rate_bps' | 'total_charge_cents'>,
+) => {
+  const feeCents = row.fee_cents ?? 0;
+  const totalChargeCents = row.total_charge_cents ?? row.amount_cents + feeCents;
+  const feeRateBps = (row.fee_rate_bps ?? 0) as 0 | 290 | 440;
+  return { feeCents, totalChargeCents, feeRateBps };
+};
+const view = (row: AttemptRow): RechargeAttempt => {
+  const { feeCents, totalChargeCents, feeRateBps } = attemptTotals(row);
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    policyVersion: row.policy_version,
+    amountCents: row.amount_cents,
+    feeCents,
+    totalChargeCents,
+    feeRateBps,
+    admissionMonth: row.admission_month,
+    status: row.status,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    creditedAt: row.credited_at?.toISOString() ?? null,
+    failureCode: row.failure_code,
+  };
+};
 const month = (at: Date) =>
   `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}-01`;
 
@@ -141,6 +162,7 @@ export class RechargeStore {
         'Original recharge ownership needs review.',
         409,
       );
+    const { feeCents, totalChargeCents } = attemptTotals(row);
     return claimPaymentOwnershipInTransaction(client, {
       processorEnvironmentId: this.processorEnvironment.id,
       livemode: this.processorEnvironment.livemode,
@@ -149,6 +171,8 @@ export class RechargeStore {
       kind: 'automatic',
       localId: row.id,
       amountCents: row.amount_cents,
+      feeCents,
+      totalChargeCents,
       creditReference: canonicalFundingCreditReference('automatic', row.id),
     });
   }
@@ -306,12 +330,13 @@ export class RechargeStore {
         return null;
       const mandate = await this.mandate(client, policy);
       if (!mandate) return null;
+      const fee = calculateProcessingFee(policy.amountCents, mandate.card_country ?? null);
       const id = randomUUID();
       const row = (
         await client.query<AttemptRow>(
           `INSERT INTO mr_billing_recharge_attempts
-        (id,workspace_id,policy_version,policy_snapshot,mandate_id,customer_id,payment_method_id,livemode,amount_cents,admission_month,status,stripe_idempotency_key,processor_environment_id,processor_account_id)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'queued',$11,$12,$13) RETURNING ${columns}`,
+        (id,workspace_id,policy_version,policy_snapshot,mandate_id,customer_id,payment_method_id,livemode,amount_cents,fee_cents,fee_rate_bps,total_charge_cents,admission_month,status,stripe_idempotency_key,request_version,processor_environment_id,processor_account_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'queued',$14,'recharge_pi_fee_v2',$15,$16) RETURNING ${columns}`,
           [
             id,
             workspaceId,
@@ -322,6 +347,9 @@ export class RechargeStore {
             mandate.payment_method_id,
             this.processorEnvironment.livemode,
             policy.amountCents,
+            fee.feeCents,
+            fee.feeRateBps,
+            fee.totalChargeCents,
             bucket,
             `opengen-recharge-${id}`,
             this.processorEnvironment.id,
@@ -337,6 +365,7 @@ export class RechargeStore {
     });
   }
   private valid(row: AttemptRow, payment: RechargePayment) {
+    const expectedTotal = attemptTotals(row).totalChargeCents;
     return (
       /^pi_[A-Za-z0-9_]+$/.test(payment.id) &&
       (!row.payment_intent_id || row.payment_intent_id === payment.id) &&
@@ -344,10 +373,10 @@ export class RechargeStore {
       payment.payment_method === row.payment_method_id &&
       payment.livemode === row.livemode &&
       payment.currency === 'usd' &&
-      payment.amount === row.amount_cents &&
+      payment.amount === expectedTotal &&
       Number.isSafeInteger(payment.amount_received) &&
       payment.amount_received >= 0 &&
-      payment.amount_received <= row.amount_cents
+      payment.amount_received <= expectedTotal
     );
   }
   private async pendingRisk(client: PoolClient, row: AttemptRow, intent: string) {
@@ -540,6 +569,7 @@ export class RechargeStore {
     let payment: RechargePayment;
     try {
       const row = result.row;
+      const { feeCents, totalChargeCents, feeRateBps } = attemptTotals(row);
       payment = row.payment_intent_id
         ? await transport.retrieveRecharge(row.payment_intent_id)
         : await transport.createRecharge({
@@ -548,6 +578,9 @@ export class RechargeStore {
             customerId: row.customer_id,
             paymentMethodId: row.payment_method_id,
             amountCents: row.amount_cents,
+            feeCents,
+            totalChargeCents,
+            feeRateBps,
             stripeIdempotencyKey: row.stripe_idempotency_key,
             requestVersion: row.request_version,
             apiVersion: row.api_version,
@@ -665,12 +698,13 @@ export class RechargeStore {
         'INSERT INTO mr_billing_recharge_events(id,attempt_id,type,object_id) VALUES($1,$2,$3,$4)',
         [event.id, row.id, event.type, id],
       );
+      const expectedTotal = attemptTotals(row).totalChargeCents;
       if (
         event.type === 'payment_intent.succeeded' &&
         event.data.object.status === 'succeeded' &&
-        event.data.object.amount_received === row.amount_cents &&
+        event.data.object.amount_received === expectedTotal &&
         payment.status === 'succeeded' &&
-        payment.amount_received === row.amount_cents &&
+        payment.amount_received === expectedTotal &&
         !row.credited_at
       ) {
         // Same client, same ledger primitive; no generation cap/month reset.
@@ -730,6 +764,8 @@ export class RechargeStore {
     attemptId: string;
     paymentIntentId: string;
     amountCents: number;
+    feeCents: number;
+    totalChargeCents: number;
     clientSecret: string;
   }> {
     assertBillingProcessorTransport(this.processorEnvironment, transport);
@@ -818,10 +854,13 @@ export class RechargeStore {
       const current = await snapshot(client);
       if (current.payment_intent_id !== row.payment_intent_id)
         throw new PaymentError('recovery_changed', 'The original payment changed.', 409);
+      const { feeCents, totalChargeCents } = attemptTotals(row);
       return {
         attemptId: row.id,
         paymentIntentId: row.payment_intent_id!,
         amountCents: row.amount_cents,
+        feeCents,
+        totalChargeCents,
         clientSecret: recovery.clientSecret,
       };
     });

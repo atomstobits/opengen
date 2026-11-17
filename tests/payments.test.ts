@@ -6,8 +6,8 @@ import { fixtureCredit, paymentFixture } from './payment-fixture.js';
 
 it('converts only bounded whole USD cents to safe integer microUSD', () => {
   expect(centsToMicros(500)).toBe(5000000);
-  expect(centsToMicros(100000)).toBe(1000000000);
-  for (const amount of [0, -1, 499, 100001, 1000.1, NaN, Infinity, Number.MAX_SAFE_INTEGER])
+  expect(centsToMicros(999900)).toBe(9999000000);
+  for (const amount of [0, -1, 499, 999901, 1000.1, NaN, Infinity, Number.MAX_SAFE_INTEGER])
     expect(() => centsToMicros(amount)).toThrow();
 });
 
@@ -107,6 +107,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('customer prepaid ledger reconci
         id,
         workspaceId: f.workspace,
         amountCents: 1000,
+        feeCents: 0,
+        totalChargeCents: 1000,
+        feeRateBps: 0,
         creditMicros: 10000000,
         currency: 'USD',
         status: 'created',
@@ -230,11 +233,11 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('customer prepaid ledger reconci
         stripeIdempotencyKey: f.requests[1]!.stripeIdempotencyKey,
         expiresAt: f.requests[1]!.expiresAt,
         integrationIdentifier: f.requests[1]!.integrationIdentifier,
-        requestVersion: 'checkout_hosted_page_v2',
+        requestVersion: 'checkout_hosted_page_fee_v3',
         apiVersion: '2026-10-28.endive',
       });
       expect(f.requests[1]).toMatchObject({
-        requestVersion: 'checkout_hosted_page_v2',
+        requestVersion: 'checkout_hosted_page_fee_v3',
         apiVersion: '2026-10-28.endive',
       });
       const frozenRequest = (request: (typeof f.requests)[number]) => ({

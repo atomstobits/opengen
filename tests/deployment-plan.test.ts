@@ -9,6 +9,9 @@ const script = fileURLToPath(new URL('../infra/deploy-gcp.sh', import.meta.url))
 const billingConfigurationNames = [
   'OPENGEN_BILLING_MANUAL',
   'OPENGEN_BILLING_CHECKOUT',
+  'OPENGEN_BILLING_RECHARGE',
+  'OPENGEN_BILLING_PUBLISHABLE_KEY',
+  'OPENGEN_BILLING_PORTAL_CONFIGURATION',
   'OPENGEN_BILLING_PROCESSOR_ENVIRONMENT',
   'OPENGEN_BILLING_PROCESSOR_ACCOUNT',
   'OPENGEN_BILLING_MANUAL_WORKSPACE',
@@ -266,36 +269,40 @@ describe('review-only GCP deployment plans', () => {
     }
   });
 
-  it('rejects scoped billing worker bindings, shared secret aliases and unreviewed configuration names', () => {
-    const cases: NodeJS.ProcessEnv[] = billingConfigurationNames.flatMap((name) => [
-      { OPENGEN_PROVIDER_SECRET_BINDINGS: `${name}=billing-config:5` },
-      // A different version of the same shared secret still leaks its role boundary.
-      { OPENGEN_API_SECRET_BINDINGS: `${name}=vault-master:12` },
-      {
-        OPENGEN_API_SECRET_BINDINGS: `${name}=billing-config:5`,
-        OPENGEN_PROVIDER_SECRET_BINDINGS: 'FAL_KEY=billing-config:8',
-      },
-    ]);
-    cases.push(
-      { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_UNREVIEWED=billing-config:5' },
-      { OPENGEN_PROVIDER_SECRET_BINDINGS: 'OPENGEN_BILLING_UNREVIEWED=billing-config:5' },
-      { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_TERMS_TEXT=billing-config:latest' },
-      { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_MANUAL=billing-config:0' },
-      { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_TERMS_TEXT=fixture-private-terms, clause' },
-      { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_TERMS_TEXT=fixture-private-terms\nclause' },
-      {
-        OPENGEN_API_SECRET_BINDINGS:
-          'OPENGEN_BILLING_CHECKOUT=first:2,OPENGEN_BILLING_CHECKOUT=second:3',
-      },
-    );
-    for (const settings of cases) {
-      const result = plan(settings);
-      expect(result.status, Object.keys(settings).join(',')).toBe(2);
-      expect(result.stdout).not.toContain('gcloud');
-      expect(result.stderr).not.toContain('fixture-private-terms');
-      expect(result.stderr).not.toContain('Forbidden cloud invocation');
-    }
-  });
+  it(
+    'rejects scoped billing worker bindings, shared secret aliases and unreviewed configuration names',
+    { timeout: 60_000 },
+    () => {
+      const cases: NodeJS.ProcessEnv[] = billingConfigurationNames.flatMap((name) => [
+        { OPENGEN_PROVIDER_SECRET_BINDINGS: `${name}=billing-config:5` },
+        // A different version of the same shared secret still leaks its role boundary.
+        { OPENGEN_API_SECRET_BINDINGS: `${name}=vault-master:12` },
+        {
+          OPENGEN_API_SECRET_BINDINGS: `${name}=billing-config:5`,
+          OPENGEN_PROVIDER_SECRET_BINDINGS: 'FAL_KEY=billing-config:8',
+        },
+      ]);
+      cases.push(
+        { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_UNREVIEWED=billing-config:5' },
+        { OPENGEN_PROVIDER_SECRET_BINDINGS: 'OPENGEN_BILLING_UNREVIEWED=billing-config:5' },
+        { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_TERMS_TEXT=billing-config:latest' },
+        { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_MANUAL=billing-config:0' },
+        { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_TERMS_TEXT=fixture-private-terms, clause' },
+        { OPENGEN_API_SECRET_BINDINGS: 'OPENGEN_BILLING_TERMS_TEXT=fixture-private-terms\nclause' },
+        {
+          OPENGEN_API_SECRET_BINDINGS:
+            'OPENGEN_BILLING_CHECKOUT=first:2,OPENGEN_BILLING_CHECKOUT=second:3',
+        },
+      );
+      for (const settings of cases) {
+        const result = plan(settings);
+        expect(result.status, Object.keys(settings).join(',')).toBe(2);
+        expect(result.stdout).not.toContain('gcloud');
+        expect(result.stderr).not.toContain('fixture-private-terms');
+        expect(result.stderr).not.toContain('Forbidden cloud invocation');
+      }
+    },
+  );
 
   it('accepts an explicit canonical HTTPS origin with a nondefault port without changing its authority', () => {
     const result = plan({ OPENGEN_PUBLIC_URL: 'https://self-hosted.example:8443' });
@@ -565,7 +572,7 @@ describe('review-only GCP deployment plans', () => {
       const fallback =
         name === 'OPENGEN_BILLING_MANUAL' || name === 'OPENGEN_BILLING_SANDBOX'
           ? 'false'
-          : name === 'OPENGEN_BILLING_CHECKOUT'
+          : name === 'OPENGEN_BILLING_CHECKOUT' || name === 'OPENGEN_BILLING_RECHARGE'
             ? 'paused'
             : '';
       expect(api).toContain(`${name}: \${${name}:-${fallback}}`);

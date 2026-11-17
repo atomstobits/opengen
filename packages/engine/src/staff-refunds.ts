@@ -27,6 +27,9 @@ export interface StaffRefundActor {
 }
 export const STAFF_REFUND_REQUEST_VERSION = 'staff-refund-original-v1';
 export const STAFF_REFUND_CONVERSION_VERSION = 'usd-ceil-cent-v1';
+export const STAFF_REFUND_MIN_AMOUNT_CENTS = 500;
+export const STAFF_REFUND_MAX_AMOUNT_CENTS = 999900;
+export const STAFF_REFUND_MAX_ELIGIBLE_MICROS = 9_999_000_000;
 export interface StaffRefundAllocationRequest {
   operation: 'prepare' | 'dispatch' | 'apply-success' | 'release-failed' | 'restore-failed';
   workspaceId: string;
@@ -258,7 +261,7 @@ function worksheet(input: StaffRefundWorksheet, hash: string) {
       !/^re_[A-Za-z0-9_]{1,240}$/.test(returned.refundId) ||
       returnIds.has(returned.refundId) ||
       !money(returned.amountCents) ||
-      returned.amountCents > 100000 ||
+      returned.amountCents > STAFF_REFUND_MAX_AMOUNT_CENTS ||
       !['pending', 'unknown', 'succeeded', 'failed'].includes(returned.status)
     )
       fail(
@@ -915,7 +918,11 @@ export class StaffRefundStore {
     bounded(input.reference);
     worksheet(input.worksheet, input.worksheetHash);
     const eligible = money(input.eligibleMicros);
-    if (!eligible || !['new', 'reconcile-existing'].includes(input.origin))
+    if (
+      !eligible ||
+      eligible > STAFF_REFUND_MAX_ELIGIBLE_MICROS ||
+      !['new', 'reconcile-existing'].includes(input.origin)
+    )
       fail(
         'invalid_staff_refund',
         'A positive eligible paid remainder and explicit origin are required.',

@@ -6,6 +6,9 @@ import { requireBillingBrowserRecovery } from './billing.js';
 import {
   MIN_TOPUP_CENTS,
   MAX_TOPUP_CENTS,
+  STRIPE_DOMESTIC_FEE_BPS,
+  STRIPE_INTERNATIONAL_FEE_BPS,
+  STRIPE_FIXED_FEE_CENTS,
   PaymentError,
   type CheckoutOrder,
   type CheckoutSession,
@@ -55,7 +58,8 @@ export class StripeCheckoutTransport implements PaymentTransport {
 
   async createSession(order: CheckoutOrder): Promise<CheckoutSession> {
     if (
-      order.requestVersion !== 'checkout_hosted_page_v2' ||
+      (order.requestVersion !== 'checkout_hosted_page_v2' &&
+        order.requestVersion !== 'checkout_hosted_page_fee_v3') ||
       order.apiVersion !== STRIPE_API_VERSION
     )
       throw new PaymentError(
@@ -63,6 +67,41 @@ export class StripeCheckoutTransport implements PaymentTransport {
         'This historical Checkout request requires operator review.',
         409,
       );
+    const includeFee = order.requestVersion === 'checkout_hosted_page_fee_v3';
+    if (
+      includeFee &&
+      (!Number.isSafeInteger(order.feeCents) ||
+        order.feeCents < 0 ||
+        !Number.isSafeInteger(order.totalChargeCents) ||
+        order.totalChargeCents !== order.amountCents + order.feeCents)
+    )
+      throw new PaymentError(
+        'unsupported_checkout_request',
+        'Checkout fee breakdown does not match the persisted payment order.',
+        409,
+      );
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: order.amountCents,
+          product_data: { name: 'OpenGen prepaid service credit' },
+        },
+      },
+      ...(includeFee && order.feeCents > 0
+        ? [
+            {
+              quantity: 1,
+              price_data: {
+                currency: 'usd',
+                unit_amount: order.feeCents,
+                product_data: { name: 'Payment processing fee' },
+              },
+            },
+          ]
+        : []),
+    ];
     const result = await this.stripe.checkout.sessions.create(
       {
         mode: 'payment',
@@ -73,16 +112,7 @@ export class StripeCheckoutTransport implements PaymentTransport {
         expires_at: order.expiresAt,
         integration_identifier: order.integrationIdentifier,
         adaptive_pricing: { enabled: false },
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: 'usd',
-              unit_amount: order.amountCents,
-              product_data: { name: 'OpenGen prepaid service credit' },
-            },
-          },
-        ],
+        line_items: lineItems,
         // Dynamic payment methods are the documented default. No saved-card,
         // subscription, discount or automatic-tax configuration is enabled.
       },
@@ -207,6 +237,9 @@ export async function registerPayments(
         currency: 'USD' as const,
         minAmountCents: MIN_TOPUP_CENTS,
         maxAmountCents: MAX_TOPUP_CENTS,
+        feeRateBps: STRIPE_DOMESTIC_FEE_BPS,
+        internationalFeeRateBps: STRIPE_INTERNATIONAL_FEE_BPS,
+        fixedFeeCents: STRIPE_FIXED_FEE_CENTS,
         billingHold,
         orders,
       };

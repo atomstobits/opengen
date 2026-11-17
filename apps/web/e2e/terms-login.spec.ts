@@ -86,7 +86,8 @@ for (const viewport of [
       ).toBeVisible();
       await expect(page.getByRole('note')).toContainText('Draft for review — not yet effective.');
       await expect(page.getByRole('note')).toContainText('It does not accept these drafts.');
-      await expect(page.getByText(/Terms version:.*Not effective/)).toBeVisible();
+      await expect(page.getByText('Not effective', { exact: true })).toBeVisible();
+      await expect(page.getByText(/Terms version:|hosted-terms-/)).toHaveCount(0);
       await expect(
         page.getByRole('link', { name: 'Terms of Service', exact: true }),
       ).toHaveAttribute('href', '/terms');

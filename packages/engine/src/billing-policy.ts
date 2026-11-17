@@ -118,7 +118,7 @@ export const BILLING_POLICY_DEFAULTS: Readonly<BillingPolicyValues> = Object.fre
 export const BILLING_POLICY_LIMITS = Object.freeze({
   maxThresholdMicros: 1_000_000_000_000,
   minAmountCents: 500,
-  maxAmountCents: 100000,
+  maxAmountCents: 999900,
   maxMonthlyCapCents: 10_000_000,
   maxAttemptsPerMonth: 10000,
   minCooldownSeconds: 60,
@@ -366,6 +366,53 @@ function ownerView(row: OwnerRow): BillingOwner {
     rails: parseBillingDelegationRails(row.rails),
     consentReference: row.consent_reference,
     approvalReference: row.approval_reference,
+  };
+}
+export interface BillingOwnerSummary {
+  owner: BillingOwner | null;
+  hasActiveOwner: boolean;
+  currentAuthorityVersion: number;
+}
+/** Reads both active owner status and stored authority_version (even if revoked
+ * or superseded) so self-serve establishOwner always knows expectedAuthorityVersion. */
+export async function readBillingOwnerSummaryInTransaction(
+  client: PoolClient,
+  workspaceId: string,
+  environment?: { id: string; livemode: boolean },
+): Promise<BillingOwnerSummary> {
+  const row = (
+    await client.query<OwnerRow & { active_processor_env_id: string | null }>(
+      `SELECT o.*,m.role,m.accepted_at,m.removed_at,extract(epoch FROM m.accepted_at)::text AS current_epoch,
+        p.id AS active_processor_env_id
+      FROM mr_billing_owners o
+      LEFT JOIN mr_memberships m ON m.id=o.membership_id AND m.workspace_id=o.workspace_id
+      LEFT JOIN mr_billing_processor_environments p ON p.id=o.processor_environment_id AND p.livemode=o.livemode
+      WHERE o.workspace_id=$1 FOR SHARE OF o`,
+      [workspaceId],
+    )
+  ).rows[0];
+  if (!row) return { owner: null, hasActiveOwner: false, currentAuthorityVersion: 0 };
+  const active =
+    !row.revoked_at &&
+    Boolean(row.accepted_at) &&
+    !row.removed_at &&
+    row.role === 'admin' &&
+    row.current_epoch === row.membership_epoch &&
+    Boolean(row.active_processor_env_id) &&
+    (!environment ||
+      (row.processor_environment_id === environment.id && row.livemode === environment.livemode));
+  let owner: BillingOwner | null = null;
+  if (active) {
+    try {
+      owner = ownerView(row);
+    } catch {
+      owner = null;
+    }
+  }
+  return {
+    owner,
+    hasActiveOwner: owner !== null,
+    currentAuthorityVersion: row.authority_version,
   };
 }
 /** Caller holds workspace FOR UPDATE. Missing/revoked/stale owner approval means
@@ -664,6 +711,7 @@ export class BillingPolicyStore {
           'The funding envelope changed. Review its current version.',
           409,
         );
+      const nextAuthorityVersion = (before?.authority_version ?? 0) + 1;
       const row = (
         await client.query<OwnerRow>(
           `INSERT INTO mr_billing_owners(workspace_id,membership_id,membership_epoch,authority_version,processor_environment_id,livemode,rails,consent_reference,approval_reference)
@@ -672,7 +720,7 @@ export class BillingPolicyStore {
             current.workspaceId,
             member.id,
             member.epoch,
-            (before?.authority_version ?? 0) + 1,
+            nextAuthorityVersion,
             approval.processorEnvironmentId,
             input.livemode,
             JSON.stringify(rails),
@@ -681,6 +729,12 @@ export class BillingPolicyStore {
           ],
         )
       ).rows[0]!;
+      if (before) {
+        await client.query(
+          'UPDATE mr_billing_delegations SET revoked_at=clock_timestamp(),version=version+1,updated_at=clock_timestamp() WHERE workspace_id=$1 AND revoked_at IS NULL AND owner_authority_version<$2',
+          [current.workspaceId, nextAuthorityVersion],
+        );
+      }
       const after = ownerView(row);
       current.membershipEpoch = member.epoch;
       await this.audit(

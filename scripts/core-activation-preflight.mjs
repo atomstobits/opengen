@@ -51,15 +51,17 @@ async function readSourceFile(path) {
   }
 }
 
-export async function sourceContext() {
-  const git = (args) =>
-    execFileSync('/usr/bin/git', ['-C', root, ...args], {
-      encoding: 'utf8',
-      timeout: 5000,
-      maxBuffer: 262144,
-      stdio: ['ignore', 'pipe', 'ignore'],
-      env: { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
-    }).trim();
+export async function sourceContext(options = {}) {
+  const git =
+    options.gitRunner ??
+    ((args) =>
+      execFileSync('/usr/bin/git', ['-C', root, ...args], {
+        encoding: 'utf8',
+        timeout: 5000,
+        maxBuffer: 262144,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+      }).trim());
   const loader = await readSourceFile(join(root, 'packages/engine/src/index.ts'));
   const start = loader.indexOf('const migrations = await Promise.all(');
   const end = loader.indexOf('].map(', start);
@@ -70,7 +72,7 @@ export async function sourceContext() {
     .sort();
   if (
     !equal(names, files) ||
-    names.length < 21 ||
+    names.length < 32 ||
     names.some((name, i) => name !== `${String(i + 1).padStart(3, '0')}.sql`)
   )
     throw new Error('source_migration_manifest_invalid');

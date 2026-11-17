@@ -447,7 +447,12 @@ export class AssetStore {
     const key = createInputKey(workspaceId, mediaType);
     const response = await inputDeadline((signal) =>
       this.client.send(
-        new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: mediaType }),
+        new CreateMultipartUploadCommand({
+          Bucket: this.bucket,
+          Key: key,
+          ContentType: mediaType,
+          CacheControl: 'private, no-store',
+        }),
         { abortSignal: signal },
       ),
     );

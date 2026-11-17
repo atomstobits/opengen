@@ -1,7 +1,10 @@
-import { renderWebLegalMarkdownResponse } from '../legal/publication';
-
-export const dynamic = 'force-dynamic';
-
 export function GET() {
-  return renderWebLegalMarkdownResponse('refunds');
+  return new Response(null, {
+    status: 308,
+    headers: {
+      Location: '/terms.md',
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
 }

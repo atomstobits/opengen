@@ -5,11 +5,13 @@ import { hasWorkspaceAuthority, privateWorkspaceHeaders } from '../dashboard/act
 import type { BillingPolicy } from '../../../../packages/engine/src/billing-policy';
 import type { RechargeAttempt } from '../../../../packages/engine/src/billing-recharge';
 import type { FeeSettlementStatement } from '../../../../packages/engine/src/billing-fees';
+import { previewProcessingFee } from './billing-client';
 import {
   BillingWaitError,
   draftFromPolicy,
-  finishSetupRecovery,
   exactUsdDisplay,
+  exactUsdInput,
+  finishSetupRecovery,
   hostedBillingUrl,
   policyFromDraft,
   policyRequest,
@@ -100,6 +102,7 @@ export function BillingPolicyPanel({
     />
   );
 }
+
 function PrivatePolicyPanel({
   workspaceId,
   capabilities,
@@ -255,6 +258,10 @@ function PrivatePolicyPanel({
     (state?.ownerAuthorityVersion ?? state?.policy.ownerAuthorityVersion) !== null &&
     (state?.ownerAuthorityVersion ?? state?.policy.ownerAuthorityVersion) !== undefined;
   const mandate = state?.mandate?.status === 'active' ? state.mandate.id : null;
+  const cardCountry = state?.mandate?.cardCountry ?? null;
+  const draftAmountCents = draft ? exactUsdInput(draft.amount, 2) : null;
+  const rechargePreview =
+    draftAmountCents !== null ? previewProcessingFee(draftAmountCents, cardCountry) : null;
   const rechargeEnabled = Boolean(
     mandate && state?.policy.enabled && state.policy.mandateId === mandate,
   );
@@ -338,11 +345,10 @@ function PrivatePolicyPanel({
         <div className={styles.activation}>
           <span aria-hidden="true">[ pause ]</span>
           <div>
-            <strong>Automatic charging is not active on this installation.</strong>
+            <strong>Automatic charging is paused on this installation.</strong>
             <p>
-              Settings can be reviewed here. The worker cannot dispatch automatic charges while
-              activation is disabled. The proposed 5% smart-routing fee also remains inactive;
-              accepted jobs keep their original billing policy.
+              Settings can be reviewed here. No off-session saved-card charges run while automatic
+              recharge is paused; manual top-ups and accepted-job billing remain independent.
             </p>
           </div>
         </div>
@@ -359,8 +365,8 @@ function PrivatePolicyPanel({
             with a spending boundary.
           </h3>
           <p className={styles.lead}>
-            Automatic recharge adds prepaid credit. It never resets a generation key’s spending
-            limit.
+            Automatic recharge adds prepaid credit ($5.00–$9,999.00). It never resets a generation
+            key’s spending limit.
           </p>
           {draft && state ? (
             <form
@@ -433,7 +439,7 @@ function PrivatePolicyPanel({
                     />
                   </label>
                   <label htmlFor={`${id}-amount`}>
-                    Add credit per recharge <span>USD</span>
+                    Add credit per recharge <span>USD ($5–$9,999)</span>
                     <input
                       id={`${id}-amount`}
                       value={draft.amount}
@@ -444,7 +450,7 @@ function PrivatePolicyPanel({
                     />
                   </label>
                   <label htmlFor={`${id}-monthly`}>
-                    Automatic funding cap per month <span>USD</span>
+                    Automatic credit cap per month <span>USD</span>
                     <input
                       id={`${id}-monthly`}
                       value={draft.monthlyCap}
@@ -488,6 +494,30 @@ function PrivatePolicyPanel({
                     />
                   </label>
                 </div>
+                {rechargePreview && (
+                  <dl className={styles.liveBreakdown} aria-label="Per-recharge charge breakdown">
+                    <div>
+                      <dt>Credit added</dt>
+                      <dd>{dollars(rechargePreview.creditCents)}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        Processing fee (
+                        {rechargePreview.feeRateBps === 440
+                          ? `4.4% + $0.30 · ${cardCountry} card`
+                          : cardCountry === 'US'
+                            ? '2.9% + $0.30 · US card'
+                            : '2.9% + $0.30; 4.4% + $0.30 for non-US cards'}
+                        )
+                      </dt>
+                      <dd>{dollars(rechargePreview.feeCents)}</dd>
+                    </div>
+                    <div className={styles.liveBreakdownTotal}>
+                      <dt>Total charged</dt>
+                      <dd>{dollars(rechargePreview.totalChargeCents)}</dd>
+                    </div>
+                  </dl>
+                )}
                 {draft.enabled && (
                   <label className={styles.approval}>
                     <input
@@ -497,9 +527,12 @@ function PrivatePolicyPanel({
                       required
                     />
                     <span>
-                      I understand that enabling this policy authorizes future charges to this
-                      workspace’s saved payment method within these limits. No new generation is
-                      submitted by saving it.
+                      I understand that enabling this policy authorizes future charges
+                      {rechargePreview
+                        ? ` (${dollars(rechargePreview.totalChargeCents)} total per recharge)`
+                        : ''}{' '}
+                      to this workspace’s saved payment method within these limits. No new
+                      generation is submitted by saving it.
                     </span>
                   </label>
                 )}
@@ -538,6 +571,14 @@ function PrivatePolicyPanel({
               <dt>Payment authorization</dt>
               <dd>{state?.mandate?.status ?? (mandate ? 'Active' : 'Requires setup')}</dd>
             </div>
+            {cardCountry && (
+              <div>
+                <dt>Saved card country</dt>
+                <dd>
+                  {cardCountry} ({cardCountry === 'US' ? '2.9% + $0.30' : '4.4% + $0.30'})
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Workspace policy</dt>
               <dd>{state?.policy.enabled ? 'Enabled' : 'Disabled'}</dd>
@@ -566,7 +607,7 @@ function PrivatePolicyPanel({
             <>
               {state?.terms ? (
                 <details className={styles.terms}>
-                  <summary>Payment terms · {state.terms.version}</summary>
+                  <summary>Payment terms</summary>
                   <p>{state.terms.text}</p>
                 </details>
               ) : (
@@ -722,7 +763,9 @@ function PrivatePolicyPanel({
               <thead>
                 <tr>
                   <th scope="col">Created / reference</th>
-                  <th scope="col">Funding amount</th>
+                  <th scope="col">Credit added</th>
+                  <th scope="col">Processing fee</th>
+                  <th scope="col">Total charged</th>
                   <th scope="col">Status</th>
                 </tr>
               </thead>
@@ -736,6 +779,8 @@ function PrivatePolicyPanel({
                       <code>{item.id}</code>
                     </td>
                     <td>{dollars(item.amountCents)}</td>
+                    <td>{dollars(item.feeCents ?? 0)}</td>
+                    <td>{dollars(item.totalChargeCents ?? item.amountCents)}</td>
                     <td>
                       <span
                         className={styles.recordStatus}
@@ -775,7 +820,8 @@ function PrivatePolicyPanel({
                               })
                             }
                           >
-                            Authenticate this {dollars(item.amountCents)} payment
+                            Authenticate this {dollars(item.totalChargeCents ?? item.amountCents)}{' '}
+                            payment
                           </button>
                         )}
                       {['review', 'unknown', 'requires_authentication'].includes(item.status) && (

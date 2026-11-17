@@ -1,12 +1,12 @@
 # OpenGen implementation plan
 
-Updated 2026-11-04. This is the delivery contract; a planned feature is not an implemented feature. See [STATUS.md](STATUS.md) for the current slice.
+Updated 2026-11-16. This is the delivery contract; a planned feature is not an implemented feature, and source implementation does not substitute for live deployment or provider qualification. See [STATUS.md](STATUS.md) for the current slice.
 
-The canonical generation, customer onboarding and payments workstreams are integrated in the source candidate. Their local implementation does not complete the agreed live-provider or release/deployment gates. See [PARALLEL-DELIVERY.md](PARALLEL-DELIVERY.md) and [VERIFICATION.md](VERIFICATION.md).
+The canonical generation, customer onboarding, self-serve billing (`032`), adopted legal policies and launch infrastructure workstreams are integrated in the source candidate. Their local implementation does not complete the agreed live-provider or hosted release/deployment gates. See [PARALLEL-DELIVERY.md](PARALLEL-DELIVERY.md) and [VERIFICATION.md](VERIFICATION.md).
 
 ## Current owner decisions and execution plan
 
-On November 6 the owner made hosted payment acceptance a requirement for the initial release. The first proposed payment scope is scoped manual USD Checkout, verified fulfillment and recovery. The release gate requires a dedicated hosted Stripe sandbox to pass first, followed by approval for the exact production candidate, payment terms and activation. See [the payment rollout review](billing/hosted-payment-rollout.md).
+On November 6 the owner made hosted payment acceptance a requirement for the initial release; the November 16 public self-serve launch source extends scoped Checkout with self-serve human workspace funding-owner enrollment (`POST /v1/billing/owner`), `$5`–`$9,999` USD credit purchases, upfront processing-fee gross-up (`2.9% + $0.30` domestic / `4.4% + $0.30` international saved card), saved-card setup, opt-in bounded automatic recharge and 3DS recovery. The release gate still requires hosted Stripe sandbox and live-account qualification, raw-byte webhook verification and explicit operator activation before live customer charges. See [the payment rollout review](billing/hosted-payment-rollout.md).
 
 All user generations are private to their owning workspace and authorized identities/scopes. No public generation gallery, sharing/publishing or visibility controls are planned for v1. Public catalog/company/model documentation remains discoverable; private prompts/media/receipts never become SEO content. Retention, private signed delivery and upstream provider disclosures still require explicit behavior.
 

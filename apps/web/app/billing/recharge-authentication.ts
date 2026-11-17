@@ -7,6 +7,8 @@ export interface RechargeAuthenticationResponse {
   attemptId: string;
   paymentIntentId: string;
   amountCents: number;
+  feeCents?: number;
+  totalChargeCents?: number;
   clientSecret: string;
   publishableKey: string;
 }
@@ -23,6 +25,8 @@ export interface AuthenticationAttempt {
   id: string;
   workspaceId: string;
   amountCents: number;
+  feeCents?: number;
+  totalChargeCents?: number;
   status: string;
 }
 export interface AuthenticationVersions {
@@ -51,7 +55,16 @@ export function validateRechargeAuthentication(
     result.amountCents !== attempt.amountCents ||
     !Number.isSafeInteger(result.amountCents) ||
     result.amountCents < 500 ||
-    result.amountCents > 100000 ||
+    result.amountCents > 999900 ||
+    (result.feeCents !== undefined &&
+      (!Number.isSafeInteger(result.feeCents) ||
+        result.feeCents < 0 ||
+        (attempt.feeCents !== undefined && result.feeCents !== attempt.feeCents))) ||
+    (result.totalChargeCents !== undefined &&
+      (!Number.isSafeInteger(result.totalChargeCents) ||
+        result.totalChargeCents < result.amountCents ||
+        (attempt.totalChargeCents !== undefined &&
+          result.totalChargeCents !== attempt.totalChargeCents))) ||
     typeof result.paymentIntentId !== 'string' ||
     !/^pi_[A-Za-z0-9]+$/.test(result.paymentIntentId) ||
     typeof result.clientSecret !== 'string' ||

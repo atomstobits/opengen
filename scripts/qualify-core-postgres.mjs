@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { delimiter, dirname, isAbsolute, join } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Unpaid, synthetic upgrade/restore qualification. Never targets a configured
@@ -47,6 +47,120 @@ const identifier = (value) => {
   assert.match(value, /^[a-z][a-z0-9_]*$/, 'Unexpected fixture SQL identifier.');
   return `"${value}"`;
 };
+
+export async function verifyReducedRuntimeRole(
+  db,
+  { workspaceId = 'qualification-owner', schema = 'public' } = {},
+) {
+  const quotedSchema = identifier(schema);
+  const roleFacts = (
+    await db.query(
+      'SELECT (rolsuper OR rolcreaterole) AS can_create_role FROM pg_catalog.pg_roles WHERE rolname = current_user',
+    )
+  ).rows[0];
+  assert.equal(
+    roleFacts?.can_create_role,
+    true,
+    'Fixture qualification role must be able to create an isolated non-owner runtime role.',
+  );
+  const role = `opengen_runtime_qual_${randomUUID().replaceAll('-', '')}`;
+  const quotedRole = identifier(role);
+  let created = false;
+  try {
+    await db.query(
+      `CREATE ROLE ${quotedRole} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`,
+    );
+    created = true;
+    await db.query(`GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`);
+    await db.query(
+      `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${quotedSchema} TO ${quotedRole}`,
+    );
+    await db.query(
+      `GRANT USAGE, SELECT ON SEQUENCE ${quotedSchema}.mr_ledger_posting_order_seq TO ${quotedRole}`,
+    );
+
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`SET LOCAL search_path TO ${quotedSchema}`);
+      await client.query(`SET LOCAL ROLE ${quotedRole}`);
+      const attrs = (
+        await client.query(
+          `SELECT current_user AS name, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
+           FROM pg_catalog.pg_roles WHERE rolname = current_user`,
+        )
+      ).rows[0];
+      assert.deepEqual(attrs, {
+        name: role,
+        rolsuper: false,
+        rolcreatedb: false,
+        rolcreaterole: false,
+        rolreplication: false,
+        rolbypassrls: false,
+      });
+      const seqPriv = (
+        await client.query(
+          `SELECT has_sequence_privilege(current_user, '${schema}.mr_ledger_posting_order_seq', 'USAGE') AS can_use`,
+        )
+      ).rows[0];
+      assert.equal(
+        seqPriv?.can_use,
+        true,
+        'Reduced runtime role must have 031 sequence USAGE privilege.',
+      );
+      const posted = (
+        await client.query(
+          `INSERT INTO ${quotedSchema}.mr_ledger(id, workspace_id, kind, amount_micros, available_delta_micros, reserved_delta_micros)
+           VALUES ($1, $2, 'opening', 1, 1, 0) RETURNING posting_order::bigint AS posting_order`,
+          [randomUUID(), workspaceId],
+        )
+      ).rows[0];
+      assert.ok(
+        Number(posted?.posting_order) >= 1,
+        'Reduced runtime role must obtain 031 posting_order via mr_ledger_posting_order_seq.',
+      );
+
+      for (const [savepoint, sql, expectedCode] of [
+        [
+          'sp_disable_trigger',
+          `ALTER TABLE ${quotedSchema}.mr_terms_receipts DISABLE TRIGGER mr_terms_receipts_no_update_delete`,
+          '42501',
+        ],
+        [
+          'sp_disable_all',
+          `ALTER TABLE ${quotedSchema}.mr_terms_receipts DISABLE TRIGGER ALL`,
+          '42501',
+        ],
+        ['sp_delete_receipts', `DELETE FROM ${quotedSchema}.mr_terms_receipts`, '55000'],
+      ]) {
+        await client.query(`SAVEPOINT ${savepoint}`);
+        await assert.rejects(
+          client.query(sql),
+          (err) => err?.code === expectedCode,
+          `Expected ${expectedCode} for ${savepoint}`,
+        );
+        await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      }
+      await client.query('ROLLBACK');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  } finally {
+    if (created) {
+      await db.query(
+        `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA ${quotedSchema} FROM ${quotedRole}`,
+      );
+      await db.query(
+        `REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA ${quotedSchema} FROM ${quotedRole}`,
+      );
+      await db.query(`REVOKE ALL PRIVILEGES ON SCHEMA ${quotedSchema} FROM ${quotedRole}`);
+      await db.query(`DROP ROLE ${quotedRole}`);
+    }
+  }
+}
 
 function configuration() {
   assert.equal(process.env.OPENGEN_CORE_QUALIFICATION, '1', 'Explicit fixture sentinel required.');
@@ -250,6 +364,7 @@ async function main() {
       files,
       'Every numbered migration must be registered.',
     );
+    assert.ok(rows.length >= 32, 'Expected all 001..032 migrations to be applied.');
     for (let i = 0; i < rows.length; i++) {
       assert.equal(
         rows[i].name,
@@ -626,6 +741,8 @@ async function main() {
     assert.equal(restoredHeld.outputs[0].url, held.outputs[0].url);
     assert.deepEqual(await snapshot(restoredPool, backupShape), backupSnapshot);
     checks.push('native-dump-restore-all-rows-and-restart-without-dispatch');
+    await verifyReducedRuntimeRole(restoredPool, { workspaceId, schema: 'public' });
+    checks.push('reduced-runtime-role-031-sequence-usage-and-029-trigger-guard');
     let candidate = 'archive-without-git';
     try {
       candidate = execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -667,11 +784,13 @@ async function main() {
   }
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(
-    `Core PostgreSQL qualification failed: ${error instanceof assert.AssertionError ? error.message : (error?.message ?? 'unknown failure')}`,
-  );
-  process.exitCode = 1;
+if (process.argv[1] && filename === resolve(process.argv[1])) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(
+      `Core PostgreSQL qualification failed: ${error instanceof assert.AssertionError ? error.message : (error?.message ?? 'unknown failure')}`,
+    );
+    process.exitCode = 1;
+  }
 }

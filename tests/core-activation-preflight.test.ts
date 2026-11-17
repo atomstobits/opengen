@@ -14,7 +14,7 @@ const source = {
   commit: 'a'.repeat(40),
   tree: 'b'.repeat(40),
   dirty: false,
-  migrations: Array.from({ length: 31 }, (_, i) => ({
+  migrations: Array.from({ length: 32 }, (_, i) => ({
     name: `${String(i + 1).padStart(3, '0')}.sql`,
     checksum: (i + 1).toString(16).padStart(64, '0'),
   })),
@@ -38,7 +38,7 @@ const blocked = (manifest: ReturnType<typeof exampleManifest>, code: string) => 
 };
 
 describe('offline current-core activation assertions', () => {
-  it('plans only forward 014–031 without implying hosted readiness', () => {
+  it('plans only forward 014–032 without implying hosted readiness', () => {
     const result = inspectManifest(exampleManifest(source), source);
     expect(result.result).toBe('preflight-passed');
     expect(result.migrationsToApply).toEqual(source.migrations.slice(13).map((m) => m.name));
@@ -76,7 +76,7 @@ describe('offline current-core activation assertions', () => {
       if (kind === 'extra')
         m.deployedMigrations = [
           ...source.migrations,
-          { name: '031.sql', checksum: 'f'.repeat(64) },
+          { name: '033.sql', checksum: 'f'.repeat(64) },
         ];
       if (kind === 'too-old') m.deployedMigrations = m.deployedMigrations.slice(0, 12);
       blocked(m, 'applied_migrations_immutable_contiguous_prefix');
@@ -100,6 +100,7 @@ describe('offline current-core activation assertions', () => {
         '029.sql',
         '030.sql',
         '031.sql',
+        '032.sql',
       ],
       hostedReadiness: 'not-established',
     });

@@ -15,12 +15,11 @@ export const LEGAL_BODY_SEMANTIC_FORMAT = 'opengen-legal-body-json-v1' as const;
 export const LEGAL_POLICIES_SOURCE_MODULE_PATH =
   'packages/contracts/src/legal-policies.ts' as const;
 export const LEGAL_POLICIES_SOURCE_SHA256 =
-  '530402dabe02b58d68cfe5b92f9af71da098b18bbc19824f023a1f3d5d89fc32' as const;
-export const LEGAL_POLICIES_SOURCE_GIT_BLOB = '0754e4fd1599aa37f4733ae8664429d99c10bdb2' as const;
+  '38fd6c6bc1f03d1b6b94833a23fe9aab6cb40d039dd035ec7cc3b75e60d93860' as const;
+export const LEGAL_POLICIES_SOURCE_GIT_BLOB = '72daf1a862cea29b766e8040d98bb2a5afb89d9f' as const;
 
 export const HOSTED_LEGAL_POLICY_SLUGS = [
   'terms',
-  'refunds',
   'privacy',
   'data-processing',
   'subprocessors',
@@ -56,88 +55,71 @@ export const APPROVED_HOSTED_LEGAL_POLICIES: Readonly<
 > = Object.freeze({
   terms: Object.freeze({
     slug: 'terms',
-    version: 'hosted-terms-v4-2026-11-09',
-    title: 'OpenGen Hosted Terms of Service',
+    version: 'hosted-terms-2026-11-16',
+    title: 'OpenGen Terms of Service',
     navigationLabel: 'Terms of Service',
     candidateMode: 'contract-pending-adoption',
     publicationMode: 'contract-adopted',
     executionStatus: 'not-applicable',
-    sourceMarkdownSha256: '17e9c824b1338651ae9e8570f7b6ec265b0b0d3a805d90b049aa584c70987ad5',
-    sourceMarkdownBytes: 35966,
-    approvedBodyMarkdownSha256: 'e292d4f0bdfecbe7e75ce711964a9f7bfcf8be72e7b7963adcfe4f599bc1d78e',
-    approvedBodyMarkdownBytes: 35788,
-    semanticCanonicalSha256: '73414b67d1f7a5d1dcc261ba7bf1c220c9119d2e92b139f041eec8272b1f6be2',
-    semanticCanonicalBytes: 38992,
-    publicationMarkdownSha256: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
-    publicationMarkdownBytes: 35917,
-  }),
-  refunds: Object.freeze({
-    slug: 'refunds',
-    version: 'hosted-refunds-v4-2026-11-09',
-    title: 'OpenGen Prepaid Credit and Refund Policy',
-    navigationLabel: 'Refund Policy',
-    candidateMode: 'contract-pending-adoption',
-    publicationMode: 'contract-adopted',
-    executionStatus: 'not-applicable',
-    sourceMarkdownSha256: 'b2bf4536d2fa80fbd879c72eb387cd4d1117a8da229860a72e1a24f1d15d271a',
-    sourceMarkdownBytes: 14986,
-    approvedBodyMarkdownSha256: '22a7150c037af9cdd7178bf218d7e9831091233859dfd7e4b1b93075693ac001',
-    approvedBodyMarkdownBytes: 14800,
-    semanticCanonicalSha256: '17872400d5376d7a88e00c0c3c30cfa265fe61248489047bcd4e15f1c1d76822',
-    semanticCanonicalBytes: 16314,
-    publicationMarkdownSha256: 'b7e2907ac08297cf326cf50317d2a0a63df8aaf11f4e4f5ee742e7734b7e7748',
-    publicationMarkdownBytes: 14940,
+    sourceMarkdownSha256: '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
+    sourceMarkdownBytes: 50709,
+    approvedBodyMarkdownSha256: '3b058d5c5e3e91f34fce6a220accd63f98b6b3bf40c833c78d9b2c1233f7a6ec',
+    approvedBodyMarkdownBytes: 50560,
+    semanticCanonicalSha256: '79bbcd66ace86ca0d5ff6a0767db637ae22872090b9d642928c57506e4991e67',
+    semanticCanonicalBytes: 54051,
+    publicationMarkdownSha256: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+    publicationMarkdownBytes: 50645,
   }),
   privacy: Object.freeze({
     slug: 'privacy',
-    version: 'hosted-privacy-v4-2026-11-09',
+    version: 'hosted-privacy-2026-11-16',
     title: 'OpenGen Privacy Notice',
     navigationLabel: 'Privacy Notice',
     candidateMode: 'notice-pending-publication',
     publicationMode: 'notice-published',
     executionStatus: 'not-applicable',
-    sourceMarkdownSha256: 'e2a2583ea414ac9bbc7c7dae04cca5452a3e9dbd8bb549657d8885b72bd8f0e1',
-    sourceMarkdownBytes: 27685,
-    approvedBodyMarkdownSha256: 'c2868bb70c42cd3e4819719afd4053d9299d7cb69f9ee95103b09fa18b2934eb',
-    approvedBodyMarkdownBytes: 27516,
-    semanticCanonicalSha256: '63676a6ffbaa8f2169174144ff2f06d02c278fb3bc0235820860de1c839cf027',
-    semanticCanonicalBytes: 29712,
-    publicationMarkdownSha256: '2183378dbcfc69bf00302f4a46e2d8e5ca1089a501b749459dadaf8eefd5f39a',
-    publicationMarkdownBytes: 27638,
+    sourceMarkdownSha256: '9773b22cd14275b011cd0cd45e57a0cc799a24cd2e6f54d3ad91f983ec119f2d',
+    sourceMarkdownBytes: 33878,
+    approvedBodyMarkdownSha256: 'af5322c6388733321dfa1235a6642c13a12dc1e517636be9b990a8ae44b9bc21',
+    approvedBodyMarkdownBytes: 33731,
+    semanticCanonicalSha256: '63821c3b163a53cfc815e84d46ff8589ea37c87ad27e959309a9c8ab4f7b7fa4',
+    semanticCanonicalBytes: 36014,
+    publicationMarkdownSha256: 'b4be24bb0712e9db48e3984c279a1beb722a1e9e9c6bc2db9d26443f7d77630f',
+    publicationMarkdownBytes: 33814,
   }),
   'data-processing': Object.freeze({
     slug: 'data-processing',
-    version: 'business-dpa-template-v2-2026-11-09',
+    version: 'business-dpa-template-2026-11-16',
     title: 'OpenGen Business Data Processing Addendum',
     navigationLabel: 'DPA Template',
     candidateMode: 'available-template-not-executed',
     publicationMode: 'available-template-not-executed',
     executionStatus: 'not-executed',
-    sourceMarkdownSha256: 'ba18a3780f97d3c3c25f814530c6fb14b25e9e91a9b18d6ba6de8abf24a6f164',
-    sourceMarkdownBytes: 27932,
-    approvedBodyMarkdownSha256: 'da1829e2c0643d8863d37d005ff4d64611475ac48d2daa8dfcdd254bec1f1ed8',
-    approvedBodyMarkdownBytes: 27744,
-    semanticCanonicalSha256: '5dfb803bf7c7c6c6587f758025809f0a9e88054ff95700b91c7326429ceedec7',
-    semanticCanonicalBytes: 29871,
-    publicationMarkdownSha256: '09c5f1505017f685af4bdbfb9b45116115507e2d637092dc1a016319ee722cbb',
-    publicationMarkdownBytes: 27954,
+    sourceMarkdownSha256: 'ab90e622037278051331db8c8cb2b195a0ee4b8a0303dd4b3b5bb7b54f664efe',
+    sourceMarkdownBytes: 27987,
+    approvedBodyMarkdownSha256: '40a534bb303242ac35cec2710ac1674f0c0ce16ed2354cac60d1f4b365cd1a4c',
+    approvedBodyMarkdownBytes: 27821,
+    semanticCanonicalSha256: '1ee7d6151c5d1d05da1758f984e81ff3b9cf89296c044299d485b1e8f54e9c8c',
+    semanticCanonicalBytes: 29948,
+    publicationMarkdownSha256: 'bef9d6d31c42b1aab75d99e24b2e2d6748df67b2d3292244804ab750fa9018ec',
+    publicationMarkdownBytes: 27985,
   }),
   subprocessors: Object.freeze({
     slug: 'subprocessors',
-    version: 'business-subprocessors-template-v2-2026-11-09',
+    version: 'business-subprocessors-template-2026-11-16',
     title: 'OpenGen Business Subprocessor Schedule',
     navigationLabel: 'Subprocessor Template',
     candidateMode: 'available-template-not-executed',
     publicationMode: 'available-template-not-executed',
     executionStatus: 'not-executed',
-    sourceMarkdownSha256: 'ecea806dd9ffde1d0dd112b85a5f69367ccd8d3bda72f7fec85791b715390870',
-    sourceMarkdownBytes: 8520,
+    sourceMarkdownSha256: '9b1f8030f80825dd8e932ba6a249be047892f2667792d8546ecaa93e206836b8',
+    sourceMarkdownBytes: 8498,
     approvedBodyMarkdownSha256: '75ce53bb9269b0ef41669c0877eaea9a7a7a8f68e63e154ac68864e0ea07291b',
     approvedBodyMarkdownBytes: 8335,
     semanticCanonicalSha256: '20bf2d1ad9af1eefce5595cc5002b7b307074a66ecc6a71f05ec66c560c2eeec',
     semanticCanonicalBytes: 8827,
-    publicationMarkdownSha256: 'b45965332df72ecdbba6e688af101ce3a26712a79869791cc0770a9816bf382c',
-    publicationMarkdownBytes: 8552,
+    publicationMarkdownSha256: 'beaa527bdaddd7d15c16a31b9bc148d605670e19d9a17c1c2fa29ef587c48ab0',
+    publicationMarkdownBytes: 8496,
   }),
 });
 
@@ -221,7 +203,6 @@ export function publishedLegalPolicyMarkdown(slug: HostedLegalPolicySlug): strin
   const markdown =
     [
       `# ${spec.title}`,
-      `Version: ${spec.version}`,
       `Publication and effective time: ${LEGAL_PUBLICATION_METADATA_PATH}`,
       ...(spec.publicationMode === 'available-template-not-executed'
         ? ['Availability: template only — not executed by publication.']
@@ -422,9 +403,7 @@ export function validateHostedLegalPublication(
       if (coordinatedEffectiveAt === null) {
         coordinatedEffectiveAt = normalizedEffectiveAt;
       } else if (normalizedEffectiveAt !== coordinatedEffectiveAt) {
-        throw new Error(
-          'Terms, Refunds and Privacy must share the coordinated effectiveAt timestamp.',
-        );
+        throw new Error('Terms and Privacy must share the coordinated effectiveAt timestamp.');
       }
     }
 

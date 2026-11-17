@@ -7,18 +7,22 @@ import {
   type BillingProcessorEnvironment,
 } from '../../../packages/engine/src/billing-customer.js';
 import { readBillingOwnerInTransaction } from '../../../packages/engine/src/billing-policy.js';
+import { admitInstallationExternalInTransaction } from './billing-manual.js';
 import type { BillingFixtureRuntimeOptions } from './billing-runtime.js';
 import { StripeBillingTransport } from './billing-stripe.js';
 import { createStripeClient } from './payments.js';
 
-interface BillingSandboxConfiguration {
+export interface BillingSandboxConfiguration {
   databaseUrl: string;
   publicUrl: string;
-  workspaceId: string;
+  workspaceId?: string;
   environment: BillingProcessorEnvironment;
   key: string;
   webhookSecret: string;
   checkoutWritesEnabled: boolean;
+  rechargeEnabled: boolean;
+  publishableKey?: string;
+  portalConfigurationId?: string;
 }
 
 /** Parse before any database initialization. Error messages omit runtime values. */
@@ -30,20 +34,27 @@ export function readBillingSandboxConfiguration(
   if (enabled !== 'true' || env.STRIPE_LIVEMODE !== 'false')
     throw new Error('Scoped payment qualification requires an explicit Stripe sandbox.');
   const { DATABASE_URL, OPENGEN_PUBLIC_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } = env;
-  const workspaceId = env.OPENGEN_BILLING_SANDBOX_WORKSPACE;
+  const workspaceId = env.OPENGEN_BILLING_SANDBOX_WORKSPACE || undefined;
   const checkout = env.OPENGEN_BILLING_CHECKOUT ?? 'paused';
+  const recharge = env.OPENGEN_BILLING_RECHARGE ?? 'paused';
+  const publishableKey = env.OPENGEN_BILLING_PUBLISHABLE_KEY || undefined;
+  const portalConfigurationId = env.OPENGEN_BILLING_PORTAL_CONFIGURATION || undefined;
   if (
     !DATABASE_URL ||
     !OPENGEN_PUBLIC_URL ||
-    !workspaceId ||
-    !/^[A-Za-z0-9_-]{1,80}$/.test(workspaceId) ||
+    (workspaceId !== undefined && !/^[A-Za-z0-9_-]{1,80}$/.test(workspaceId)) ||
     !STRIPE_SECRET_KEY ||
     !/^rk_test_[A-Za-z0-9]+$/.test(STRIPE_SECRET_KEY) ||
     !STRIPE_WEBHOOK_SECRET ||
     !/^whsec_[A-Za-z0-9]+$/.test(STRIPE_WEBHOOK_SECRET) ||
-    !['paused', 'open'].includes(checkout)
+    !['paused', 'open'].includes(checkout) ||
+    !['paused', 'open'].includes(recharge) ||
+    (publishableKey !== undefined && !/^pk_test_[A-Za-z0-9]+$/.test(publishableKey)) ||
+    (portalConfigurationId !== undefined && !/^bpc_[A-Za-z0-9_]+$/.test(portalConfigurationId))
   )
     throw new Error('Complete the dedicated sandbox configuration before starting billing.');
+  if (recharge === 'open' && !publishableKey)
+    throw new Error('Sandbox automatic recharge requires a test Stripe publishable key.');
   let database: URL;
   let origin: URL;
   try {
@@ -71,7 +82,7 @@ export function readBillingSandboxConfiguration(
   return {
     databaseUrl: DATABASE_URL,
     publicUrl: origin.origin,
-    workspaceId,
+    ...(workspaceId ? { workspaceId } : {}),
     environment: validatedBillingProcessorEnvironment({
       id: env.OPENGEN_BILLING_PROCESSOR_ENVIRONMENT ?? '',
       accountId: env.OPENGEN_BILLING_PROCESSOR_ACCOUNT ?? '',
@@ -80,6 +91,9 @@ export function readBillingSandboxConfiguration(
     key: STRIPE_SECRET_KEY,
     webhookSecret: STRIPE_WEBHOOK_SECRET,
     checkoutWritesEnabled: checkout === 'open',
+    rechargeEnabled: recharge === 'open',
+    ...(publishableKey ? { publishableKey } : {}),
+    ...(portalConfigurationId ? { portalConfigurationId } : {}),
   };
 }
 
@@ -93,6 +107,9 @@ export async function hostedBillingSandbox(
     enabled: true,
     processorEnvironment: config.environment,
     publicUrl: config.publicUrl,
+    ...(config.portalConfigurationId
+      ? { portalConfigurationId: config.portalConfigurationId }
+      : {}),
   });
   const limiter = new PaymentStore(pool, {
     livemode: false,
@@ -103,11 +120,18 @@ export async function hostedBillingSandbox(
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await limiter.admitExternalInTransaction(client, config.workspaceId);
-      await assertBillingProcessorEnvironmentInTransaction(client, environment);
-      const owner = await readBillingOwnerInTransaction(client, config.workspaceId);
-      if (!owner || owner.processorEnvironmentId !== environment.id || owner.livemode)
-        throw new Error('Approved sandbox funding authority is required.');
+      if (config.workspaceId !== undefined) {
+        await limiter.admitExternalInTransaction(client, config.workspaceId);
+        await assertBillingProcessorEnvironmentInTransaction(client, environment);
+        const owner = await readBillingOwnerInTransaction(client, config.workspaceId);
+        if (!owner || owner.processorEnvironmentId !== environment.id || owner.livemode)
+          throw new Error('Approved sandbox funding authority is required.');
+      } else {
+        await admitInstallationExternalInTransaction(client, limiter);
+        await assertBillingProcessorEnvironmentInTransaction(client, environment);
+        if (environment.livemode)
+          throw new Error('Sandbox processor environment cannot run in live mode.');
+      }
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -116,6 +140,7 @@ export async function hostedBillingSandbox(
       client.release();
     }
   });
+  const rechargeEnabled = config.rechargeEnabled === true;
   return {
     activation: 'sandbox',
     processorEnvironment: config.environment,
@@ -126,5 +151,10 @@ export async function hostedBillingSandbox(
     webhookVerifier: stripe.webhooks,
     webhookSecret: config.webhookSecret,
     checkoutWritesEnabled: config.checkoutWritesEnabled,
+    ...(rechargeEnabled ? { setupAvailable: true, automaticChargesEnabled: true } : {}),
+    ...(rechargeEnabled && config.portalConfigurationId ? { portalAvailable: true } : {}),
+    ...(rechargeEnabled && config.publishableKey
+      ? { recovery: { transport, publishableKey: config.publishableKey } }
+      : {}),
   };
 }

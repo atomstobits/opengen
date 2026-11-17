@@ -83,6 +83,32 @@ describe('private billing policy browser helpers', () => {
         terms: { version: 'manual-terms-v1', text: 'Prepaid non-recurring summary.' },
       },
     });
+    await expect(
+      readBillingAccess(authority, undefined, async () =>
+        Response.json({
+          ...authority,
+          capabilities: { read: false, manage: false, setup: false },
+          ownerEnrollment: {
+            eligible: true,
+            expectedAuthorityVersion: 2,
+            replaceExistingOwner: true,
+            allowsAutoRecharge: true,
+            terms: { version: 'manual-terms-v1', text: 'Prepaid non-recurring summary.' },
+          },
+        }),
+      ),
+    ).resolves.toEqual({
+      read: false,
+      manage: false,
+      setup: false,
+      ownerEnrollment: {
+        eligible: true,
+        expectedAuthorityVersion: 2,
+        replaceExistingOwner: true,
+        allowsAutoRecharge: true,
+        terms: { version: 'manual-terms-v1', text: 'Prepaid non-recurring summary.' },
+      },
+    });
     for (const invalidEnrollment of [
       { eligible: 'yes', expectedAuthorityVersion: 0, terms: { version: 'v1', text: 'text' } },
       { eligible: true, expectedAuthorityVersion: -1, terms: { version: 'v1', text: 'text' } },

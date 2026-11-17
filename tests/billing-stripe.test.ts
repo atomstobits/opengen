@@ -55,6 +55,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
         customerId: 'cus_fixture',
         paymentMethodId: 'pm_fixture',
         amountCents: 1000,
+        feeCents: 0,
+        totalChargeCents: 1000,
+        feeRateBps: 0,
         stripeIdempotencyKey: 'retry',
       }),
     ).rejects.toMatchObject({ code: 'billing_integration_disabled' });
@@ -77,6 +80,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
       id: 'legacy-fixture',
       workspaceId: 'workspace-fixture',
       amountCents: 500,
+      feeCents: 0,
+      totalChargeCents: 500,
+      feeRateBps: 0 as const,
       creditMicros: 5000000,
       currency: 'USD' as const,
       status: 'created' as const,
@@ -391,6 +397,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
       id: 'order_fixture',
       workspaceId: 'ws',
       amountCents: 1000,
+      feeCents: 0,
+      totalChargeCents: 1000,
+      feeRateBps: 0 as const,
       creditMicros: 10000000,
       currency: 'USD' as const,
       status: 'created' as const,
@@ -463,6 +472,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
       customerId: 'cus_fixture',
       paymentMethodId: 'pm_fixture',
       amountCents: 2500,
+      feeCents: 0,
+      totalChargeCents: 2500,
+      feeRateBps: 0 as const,
       stripeIdempotencyKey: 'recharge_stable',
     };
     expect(await transport.createRecharge(attempt)).toEqual(payment);
@@ -490,6 +502,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
       customerId: 'cus_fixture',
       paymentMethodId: 'pm_fixture',
       amountCents: 1000,
+      feeCents: 0,
+      totalChargeCents: 1000,
+      feeRateBps: 0 as const,
       stripeIdempotencyKey: 'stable',
     };
     vi.spyOn(sdk.paymentIntents, 'create')
@@ -605,6 +620,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
       customerId: 'cus_fixture',
       paymentMethodId: 'pm_fixture',
       amountCents: 1000,
+      feeCents: 0,
+      totalChargeCents: 1000,
+      feeRateBps: 0,
       stripeIdempotencyKey: 'same_original',
     });
     expect(result).toMatchObject({

@@ -20,6 +20,7 @@ CMD ["npm", "exec", "--workspace", "@media-router/web", "--", "next", "start", "
 
 # API and worker run the same TypeScript core; no frontend build or secret is needed.
 FROM source AS server
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 USER node
 EXPOSE 4310

@@ -111,22 +111,22 @@ async function fixture(livemode = true) {
     );
     const proof = { processorEnvironment: environment, assertProcessorEnvironment() {} };
     let session: CheckoutSession;
-    const createSession = vi.fn<PaymentTransport['createSession']>(
-      async (order) =>
-        (session = {
-          id: `cs_local_${order.id.replaceAll('-', '')}`,
-          mode: 'payment',
-          currency: 'usd',
-          amount_subtotal: order.amountCents,
-          amount_total: order.amountCents,
-          payment_status: 'unpaid',
-          status: 'open',
-          client_reference_id: order.id,
-          payment_intent: null,
-          livemode,
-          url: 'https://checkout.stripe.com/c/pay/local_fixture',
-        }),
-    );
+    const createSession = vi.fn<PaymentTransport['createSession']>(async (order) => {
+      const total = order.totalChargeCents ?? order.amountCents;
+      return (session = {
+        id: `cs_local_${order.id.replaceAll('-', '')}`,
+        mode: 'payment',
+        currency: 'usd',
+        amount_subtotal: total,
+        amount_total: total,
+        payment_status: 'unpaid',
+        status: 'open',
+        client_reference_id: order.id,
+        payment_intent: null,
+        livemode,
+        url: 'https://checkout.stripe.com/c/pay/local_fixture',
+      });
+    });
     const retrieveSession = vi.fn(async () => session);
     const unexpected = vi.fn(async () => {
       throw new Error('Unexpected synthetic processor operation.');

@@ -44,11 +44,10 @@ const directories: string[] = [];
 const sha256 = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 const versions = {
-  terms: 'hosted-terms-v4-2026-11-09',
-  refunds: 'hosted-refunds-v4-2026-11-09',
-  privacy: 'hosted-privacy-v4-2026-11-09',
-  'data-processing': 'business-dpa-template-v2-2026-11-09',
-  subprocessors: 'business-subprocessors-template-v2-2026-11-09',
+  terms: 'hosted-terms-2026-11-16',
+  privacy: 'hosted-privacy-2026-11-16',
+  'data-processing': 'business-dpa-template-2026-11-16',
+  subprocessors: 'business-subprocessors-template-2026-11-16',
 } as const;
 
 async function temporary() {
@@ -79,7 +78,7 @@ afterEach(async () => {
 });
 
 describe('deterministic hosted legal candidate packet', () => {
-  it('freezes five approved source copies, unchanged bodies, semantic bytes and publication copies without requiring git', async () => {
+  it('freezes four approved source copies, unchanged bodies, semantic bytes and publication copies without requiring git', async () => {
     const directory = await temporary();
     const sourceBefore = legalPolicies.map((policy) => legalPolicyMarkdown(policy));
     const draftBefore = currentHumanTermsPolicy();
@@ -87,7 +86,7 @@ describe('deterministic hosted legal candidate packet', () => {
       outputDirectory: join(directory, 'packet'),
     });
 
-    expect(result.fileCount).toBe(22);
+    expect(result.fileCount).toBe(18);
     expect(await listFiles(result.outputDirectory)).toEqual([...hostedLegalCandidateFiles]);
     expect(HOSTED_LEGAL_BASE).toEqual({
       policyModule: 'packages/contracts/src/legal-policies.ts',
@@ -101,8 +100,8 @@ describe('deterministic hosted legal candidate packet', () => {
       source: {
         sharedPolicyModule: {
           path: 'packages/contracts/src/legal-policies.ts',
-          gitBlob: '0754e4fd1599aa37f4733ae8664429d99c10bdb2',
-          sha256: '530402dabe02b58d68cfe5b92f9af71da098b18bbc19824f023a1f3d5d89fc32',
+          gitBlob: '72daf1a862cea29b766e8040d98bb2a5afb89d9f',
+          sha256: '38fd6c6bc1f03d1b6b94833a23fe9aab6cb40d039dd035ec7cc3b75e60d93860',
         },
       },
       authority: {
@@ -126,7 +125,7 @@ describe('deterministic hosted legal candidate packet', () => {
       status: 'pending-actual-publication',
       metadataReference: '/legal-publication.json',
     });
-    expect(result.manifest.files).toHaveLength(21);
+    expect(result.manifest.files).toHaveLength(17);
 
     for (const file of result.manifest.files) {
       const bytes = await readFile(join(result.outputDirectory, file.path));
@@ -173,7 +172,8 @@ describe('deterministic hosted legal candidate packet', () => {
       expect(publicationBodyMarkdown(policy)).toBe(body);
       expect(publishedLegalPolicyMarkdown(policy.slug)).toBe(publication);
       expect(publication.endsWith(body)).toBe(true);
-      expect(publication).toContain(`Version: ${versions[policy.slug]}`);
+      expect(publication).not.toContain('Version:');
+      expect(publication).not.toContain(versions[policy.slug]);
       expect(publication).toContain('Publication and effective time: /legal-publication.json');
 
       const document = result.manifest.policies.find((item) => item.slug === policy.slug)!;
@@ -205,7 +205,7 @@ describe('deterministic hosted legal candidate packet', () => {
       expect(document.mode).toBe(
         policy.slug === 'privacy'
           ? 'notice-pending-publication'
-          : policy.slug === 'terms' || policy.slug === 'refunds'
+          : policy.slug === 'terms'
             ? 'contract-pending-adoption'
             : 'available-template-not-executed',
       );
@@ -232,9 +232,9 @@ describe('deterministic hosted legal candidate packet', () => {
 
     const verified = await verifySharedLegalPoliciesModule(archiveCopy);
     expect(verified.moduleSha256).toBe(
-      '530402dabe02b58d68cfe5b92f9af71da098b18bbc19824f023a1f3d5d89fc32',
+      '38fd6c6bc1f03d1b6b94833a23fe9aab6cb40d039dd035ec7cc3b75e60d93860',
     );
-    expect(verified.moduleBlob).toBe('0754e4fd1599aa37f4733ae8664429d99c10bdb2');
+    expect(verified.moduleBlob).toBe('72daf1a862cea29b766e8040d98bb2a5afb89d9f');
 
     await writeFile(copiedPolicy, Buffer.concat([originalBytes, Buffer.from('\n')]));
     await expect(verifySharedLegalPoliciesModule(archiveCopy)).rejects.toThrow(
@@ -320,7 +320,7 @@ describe('deterministic hosted legal candidate packet', () => {
     expect(preview).toContain('default-src &#39;none&#39;');
     expect(preview).toContain('form-action &#39;none&#39;');
     expect(preview).not.toMatch(/<script\b|<form\b|<iframe\b|<img\b|<link\b|\son[a-z]+\s*=/i);
-    expect(preview.match(/<article\s/g)).toHaveLength(5);
+    expect(preview.match(/<article\s/g)).toHaveLength(4);
     expect(
       [...preview.matchAll(/<a\b[^>]*href="([^"]+)"/g)].every((match) => match[1]!.startsWith('#')),
     ).toBe(true);
@@ -406,7 +406,7 @@ describe('deterministic hosted legal candidate packet', () => {
     );
     expect(JSON.parse(result.stdout)).toMatchObject({
       status: 'candidate-not-published',
-      files: 22,
+      files: 18,
       publishedAt: null,
       effectiveAt: null,
     });

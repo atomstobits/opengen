@@ -41,6 +41,19 @@ async function fixture(max = 1) {
         'utf8',
       ),
     );
+    await f.pool.query(`
+      ALTER TABLE mr_billing_payment_ownership
+        DROP CONSTRAINT mr_billing_payment_ownership_amount_cents_check,
+        ADD CONSTRAINT mr_billing_payment_ownership_amount_cents_check CHECK (amount_cents BETWEEN 500 AND 999900),
+        ADD COLUMN fee_cents integer NOT NULL DEFAULT 0 CHECK (fee_cents >= 0),
+        ADD COLUMN total_charge_cents integer;
+      UPDATE mr_billing_payment_ownership SET total_charge_cents = amount_cents + fee_cents WHERE total_charge_cents IS NULL;
+      ALTER TABLE mr_billing_payment_ownership
+        ALTER COLUMN total_charge_cents SET NOT NULL,
+        ADD CONSTRAINT mr_billing_payment_ownership_total_charge_cents_check CHECK (total_charge_cents = amount_cents + fee_cents);
+      CREATE TRIGGER mr_billing_payment_ownership_total_charge_default BEFORE INSERT ON mr_billing_payment_ownership
+        FOR EACH ROW EXECUTE FUNCTION mr_billing_total_charge_default();
+    `);
   } catch (error) {
     await f.close();
     throw error;
