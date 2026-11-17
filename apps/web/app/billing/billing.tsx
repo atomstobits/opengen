@@ -166,21 +166,28 @@ export function BillingPage() {
 }
 
 /** Session-backed workspace billing. No card details or Stripe credentials enter this component. */
-type BillingWorkspace = { workspaceId: string; recoveryScope?: string };
+type BillingWorkspace = {
+  workspaceId: string;
+  recoveryScope?: string;
+  initialCapabilities?: BillingCapabilities | null;
+};
 
-export function Billing({ workspaceId, recoveryScope }: BillingWorkspace) {
+export function Billing({ workspaceId, recoveryScope, initialCapabilities }: BillingWorkspace) {
   return (
     <WorkspaceBilling
       key={JSON.stringify([workspaceId, recoveryScope])}
       workspaceId={workspaceId}
       recoveryScope={recoveryScope}
+      initialCapabilities={initialCapabilities}
     />
   );
 }
 
-function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
+function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: BillingWorkspace) {
   const legal = useLegalPresentation();
-  const [capabilities, setCapabilities] = useState<BillingCapabilities | null>();
+  const [capabilities, setCapabilities] = useState<BillingCapabilities | null | undefined>(
+    initialCapabilities,
+  );
   const [policyRefreshKey, setPolicyRefreshKey] = useState(0);
   const [accessError, setAccessError] = useState('');
   const [summary, setSummary] = useState<BillingSummary | null>(null);
@@ -210,7 +217,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
 
   useEffect(() => {
     const authority = { workspaceId, recoveryScope };
-    if (recoveryScope === undefined) return;
+    if (recoveryScope === undefined || initialCapabilities !== undefined) return;
     if (!hasWorkspaceAuthority(authority)) {
       setAccessError('Your billing access could not be verified.');
       return;
@@ -224,7 +231,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
         if (!controller.signal.aborted) setAccessError(message(cause));
       });
     return () => controller.abort();
-  }, [workspaceId, recoveryScope]);
+  }, [workspaceId, recoveryScope, initialCapabilities]);
 
   // A legacy API returns 404. A scoped runtime must explicitly permit reads before
   // this browser restores workspace-keyed payment references or looks up an order.
@@ -778,6 +785,28 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
           }}
         />
       )}
+      {capabilities?.read &&
+        recoveryScope &&
+        capabilities.ownerEnrollment?.replaceExistingOwner && (
+          <BillingOwnerEnrollmentCard
+            embedded
+            workspaceId={workspaceId}
+            recoveryScope={recoveryScope}
+            enrollment={capabilities.ownerEnrollment}
+            legal={legal}
+            onEnrolled={async () => {
+              const next = await readBillingAccess({ workspaceId, recoveryScope });
+              if (mounted.current) {
+                setCapabilities(next);
+                setPolicyRefreshKey((current) => current + 1);
+                setNotice(
+                  'Workspace funding-owner authority has been transferred to your account.',
+                );
+                await load();
+              }
+            }}
+          />
+        )}
       {capabilities?.read && recoveryScope && (
         <BillingPolicyPanel
           key={policyRefreshKey}
@@ -873,24 +902,32 @@ export function BillingOwnerEnrollmentCard({
   enrollment,
   legal,
   onEnrolled,
+  embedded = false,
 }: {
   workspaceId: string;
   recoveryScope: string;
   enrollment: BillingOwnerEnrollment;
   legal: ReturnType<typeof useLegalPresentation>;
   onEnrolled: () => Promise<void>;
+  embedded?: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const replacing = enrollment.replaceExistingOwner === true;
+  const HeadingTag = embedded ? 'h2' : 'h1';
 
   return (
-    <section className={styles.billing} aria-labelledby="billing-enrollment-title">
+    <section
+      className={embedded ? undefined : styles.billing}
+      aria-labelledby="billing-enrollment-title"
+    >
       <header className={styles.heading}>
         <div>
-          <span className={styles.eyebrow}>YOUR WORKSPACE / BILLING</span>
-          <h1 id="billing-enrollment-title">
+          <span className={styles.eyebrow}>
+            {embedded ? 'FUNDING OWNER AUTHORITY' : 'YOUR WORKSPACE / BILLING'}
+          </span>
+          <HeadingTag id="billing-enrollment-title">
             {replacing ? (
               <>
                 Become workspace
@@ -904,17 +941,19 @@ export function BillingOwnerEnrollmentCard({
                 <em>workspace credit.</em>
               </>
             )}
-          </h1>
+          </HeadingTag>
           <p>
             {replacing
               ? 'Transfer workspace funding-owner authority to your verified administrator session.'
               : 'Approve USD prepaid credit funding for image and video generation.'}
           </p>
         </div>
-        <div className={styles.workspace}>
-          <span>Paying workspace</span>
-          <strong>{workspaceId}</strong>
-        </div>
+        {!embedded && (
+          <div className={styles.workspace}>
+            <span>Paying workspace</span>
+            <strong>{workspaceId}</strong>
+          </div>
+        )}
       </header>
       {error && (
         <p className={styles.error} role="alert">

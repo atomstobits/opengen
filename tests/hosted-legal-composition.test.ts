@@ -249,13 +249,13 @@ describe('hosted legal publication validator & deterministic digests', () => {
     const expectedDigests = {
       terms: {
         version: 'hosted-terms-2026-11-16',
-        sha256: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
-        bytes: 50645,
+        sha256: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
+        bytes: 50638,
       },
       privacy: {
         version: 'hosted-privacy-2026-11-16',
-        sha256: 'b4be24bb0712e9db48e3984c279a1beb722a1e9e9c6bc2db9d26443f7d77630f',
-        bytes: 33814,
+        sha256: 'db7fa57fe9972a77a63ff7488c577624e5201b9c63d2f598962865910f17d25c',
+        bytes: 33898,
       },
       'data-processing': {
         version: 'business-dpa-template-2026-11-16',
@@ -395,7 +395,7 @@ describe('server trusted configuration reader & startup guards', () => {
     expect(defaultReader).toBe(currentHumanTermsPolicy);
     expect(defaultReader()).toEqual({
       version: 'hosted-terms-draft-2026-11-16',
-      digest: '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
+      digest: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
       status: 'draft',
       effectiveAt: null,
     });
@@ -641,7 +641,7 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
     expect(start.body).not.toContain('hosted-terms-');
     expect(start.body).not.toContain('Terms version:');
     expect(start.body).toContain(
-      '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
+      '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
     );
     expect(start.body).toContain('Continuing signs you in. It does not accept these drafts.');
 
@@ -691,7 +691,7 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
     expect(preStart.statusCode).toBe(200);
     expect(preStart.body).not.toContain('hosted-terms-');
     expect(preStart.body).toContain(
-      '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
+      '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
     );
     const preContinued = await app.inject({
       method: 'POST',
@@ -741,7 +741,7 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
     currentClock = t0Ms;
     expect(sharedReader()).toEqual({
       version: 'hosted-terms-2026-11-16',
-      digest: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+      digest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
       status: 'active',
       effectiveAt: t0Iso,
     });
@@ -783,7 +783,7 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
     expect(activeStart.body).not.toContain('hosted-terms-');
     expect(activeStart.body).not.toContain('Terms version:');
     expect(activeStart.body).toContain(
-      '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+      '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
     );
     expect(activeStart.body).toContain(`Effective: ${t0Iso}`);
     expect(activeStart.body).toContain('By continuing, you agree to the');
@@ -835,7 +835,7 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
         issuer: 'https://identity.fixture.invalid',
         subject: 'verified-composition-human',
         policyVersion: 'hosted-terms-2026-11-16',
-        policyDigest: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+        policyDigest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
       },
     ]);
   });
@@ -926,7 +926,7 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
     const termsMdRes = getTermsMd();
     expect(termsMdRes.headers.get('x-robots-tag')).toBe('noindex, nofollow');
     expect(sha256(await termsMdRes.text())).toBe(
-      '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+      '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
     );
 
     expect(legalPageMetadata('terms').robots).toMatchObject({ index: false });
@@ -980,7 +980,7 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
     )();
     expect(serverPolicySnapshot).toEqual({
       version: 'hosted-terms-2026-11-16',
-      digest: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+      digest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
       status: 'active',
       effectiveAt: '2026-11-10T12:00:00.000Z',
     });
@@ -1300,13 +1300,13 @@ describe.skipIf(!databaseUrl)(
           issuer,
           subject: `${subject}-other`,
           policyVersion: 'hosted-terms-2026-11-16',
-          policyDigest: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+          policyDigest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
         });
         await receiptStore.recordVerifiedAcceptance({
           issuer,
           subject,
           policyVersion: 'hosted-terms-draft-2026-11-16',
-          policyDigest: '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
+          policyDigest: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
         });
 
         const postNoReceiptSummary = await app.inject({
@@ -1345,7 +1345,7 @@ describe.skipIf(!databaseUrl)(
         expect(savedReceipt.rows).toEqual([
           {
             policy_version: 'hosted-terms-2026-11-16',
-            policy_digest: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
+            policy_digest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
             notice_version: 'human-terms-continue-v1',
             action: 'continue',
             method: 'oidc-verified',
@@ -1958,7 +1958,7 @@ describe.skipIf(!databaseUrl)(
           },
         });
         expect(staleReplaceAttempt.statusCode).toBe(409);
-        expect(staleReplaceAttempt.json().error.code).toBe('billing_owner_version_conflict');
+        expect(staleReplaceAttempt.json().error.code).toBe('billing_owner_conflict');
 
         // Explicit expectedAuthorityVersion replaces teamAdmin1 cleanly -> authorityVersion: 2
         const replacedByAdmin2 = await app.inject({

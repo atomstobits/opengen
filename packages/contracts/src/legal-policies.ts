@@ -304,7 +304,7 @@ export const termsPolicy = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'You must comply with all applicable export-control, trade and economic sanctions laws, including the U.S. Export Administration Regulations (EAR), sanctions administered by the U.S. Department of the Treasury Office of Foreign Assets Control (OFAC), U.S. Department of State restrictions, European Union sanctions and UK HM Treasury sanctions. You represent that you (and any organization or end user for whom you act) are not located in, organized under the laws of, or ordinarily resident in any country or territory subject to comprehensive U.S. embargoes or sanctions (including Cuba, Iran, North Korea, Syria, and comprehensively sanctioned regions of Ukraine), are not listed on the OFAC Specially Designated Nationals (SDN) List, the U.S. Entity List or Denied Persons List, or equivalent EU/UK restricted-party lists, and will not use the service for any prohibited military, proliferation or restricted end use.',
+          text: 'You must comply with all applicable export-control, trade and economic sanctions laws, including the U.S. Export Administration Regulations (EAR), sanctions administered by the U.S. Department of the Treasury Office of Foreign Assets Control (OFAC), U.S. Department of State restrictions, European Union sanctions and UK HM Treasury sanctions. You represent that you (and any organization or end user for whom you act) are not located in, organized under the laws of, or ordinarily resident in any country or territory subject to comprehensive U.S. embargoes or sanctions (including Cuba, Iran, North Korea, and comprehensively sanctioned regions of Ukraine), are not listed on the OFAC Specially Designated Nationals (SDN) List, the U.S. Entity List or Denied Persons List, or equivalent EU/UK restricted-party lists, and will not use the service for any prohibited military, proliferation or restricted end use.',
         },
         {
           type: 'paragraph',
@@ -677,7 +677,7 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'Bounded automated validation and safety checks: OpenGen uses automated schema and route checks, isolated media-container inspection (ffprobe) to verify output integrity/duration, optional C2PA Content Credentials verification where available, rate/spending guards, and abuse-prevention controls, while selected upstream providers run their own automated safety filters. Apparent child sexual exploitation and abuse material (CSAM/CSAE) is preserved as legally required and reported to NCMEC and competent authorities.',
+          text: 'Bounded automated validation and safety checks: OpenGen uses automated schema and route checks, media-container inspection (ffprobe/ffmpeg) and optional C2PA Content Credentials verification run as scrubbed-environment, time-bounded local processes (with network-isolated execution required before inspecting untrusted media), rate/spending guards, and abuse-prevention controls, while selected upstream providers run their own automated safety filters. Apparent child sexual exploitation and abuse material (CSAM/CSAE) is preserved as legally required and reported to NCMEC and competent authorities.',
         },
         {
           type: 'paragraph',

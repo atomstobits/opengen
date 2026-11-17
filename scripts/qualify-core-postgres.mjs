@@ -55,7 +55,7 @@ export async function verifyReducedRuntimeRole(
   const quotedSchema = identifier(schema);
   const roleFacts = (
     await db.query(
-      'SELECT (rolsuper OR rolcreaterole) AS can_create_role FROM pg_catalog.pg_roles WHERE rolname = current_user',
+      'SELECT rolsuper, (rolsuper OR rolcreaterole) AS can_create_role FROM pg_catalog.pg_roles WHERE rolname = current_user',
     )
   ).rows[0];
   assert.equal(
@@ -71,6 +71,9 @@ export async function verifyReducedRuntimeRole(
       `CREATE ROLE ${quotedRole} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`,
     );
     created = true;
+    if (!roleFacts.rolsuper) {
+      await db.query(`GRANT ${quotedRole} TO CURRENT_USER WITH SET TRUE`);
+    }
     await db.query(`GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`);
     await db.query(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${quotedSchema} TO ${quotedRole}`,

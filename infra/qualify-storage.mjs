@@ -129,6 +129,7 @@ export async function qualifyStorage({
   };
   const steps = evidence.steps;
   const cleanupKeys = [];
+  let mpSessionToAbort = null;
   let abortSessionToClean = null;
   let phase = 'prepare';
   try {
@@ -145,6 +146,9 @@ export async function qualifyStorage({
 
     if (checkedOrigin) {
       phase = 'cors-preflight';
+      const requiredRequestHeaders = Object.keys(prepared.headers).map((header) =>
+        header.toLowerCase(),
+      );
       const requestedHeaders = Object.keys(prepared.headers).join(', ');
       const preflight = await fetchImpl(prepared.uploadUrl, {
         method: 'OPTIONS',
@@ -158,17 +162,14 @@ export async function qualifyStorage({
       });
       const allowOrigin = preflight.headers.get('access-control-allow-origin');
       const allowMethods = parseHeaderTokens(preflight.headers.get('access-control-allow-methods'));
-      const allowedHeaders = new Set([
-        ...parseHeaderTokens(preflight.headers.get('access-control-allow-headers')),
-        ...parseHeaderTokens(preflight.headers.get('access-control-expose-headers')),
-      ]);
+      const allowHeaders = new Set(
+        parseHeaderTokens(preflight.headers.get('access-control-allow-headers')),
+      );
       if (
         !preflight.ok ||
         allowOrigin !== checkedOrigin ||
         !allowMethods.includes('put') ||
-        !allowedHeaders.has('content-type') ||
-        !allowedHeaders.has('etag') ||
-        !allowedHeaders.has(expectedConditionalHeader.toLowerCase())
+        !requiredRequestHeaders.every((header) => allowHeaders.has(header))
       )
         throw new Error('Storage CORS preflight rejected required origin, method or headers.');
       steps.corsPreflight = true;
@@ -266,17 +267,30 @@ export async function qualifyStorage({
 
     phase = 'multipart-complete';
     const mpSession = await store.initiateMultipart(workspace, 'image/png', bytes.length);
+    mpSessionToAbort = mpSession;
     cleanupKeys.push(mpSession.key);
     const signedPart = await store.signUploadPart(workspace, mpSession, 1);
     const partResponse = await fetchImpl(signedPart.uploadUrl, {
       method: 'PUT',
-      headers: signedPart.headers,
+      headers: {
+        ...signedPart.headers,
+        ...(checkedOrigin ? { Origin: checkedOrigin } : {}),
+      },
       body: bytes,
       redirect: 'error',
       signal: AbortSignal.timeout(30000),
     });
     const partEtag = partResponse.headers.get('etag');
-    if (!partResponse.ok || !partEtag)
+    const partExposedHeaders = new Set(
+      parseHeaderTokens(partResponse.headers.get('access-control-expose-headers')),
+    );
+    if (
+      !partResponse.ok ||
+      !partEtag ||
+      (checkedOrigin &&
+        (partResponse.headers.get('access-control-allow-origin') !== checkedOrigin ||
+          !partExposedHeaders.has('etag')))
+    )
       throw new Error('Multipart part upload failed or omitted ETag.');
     const listedParts = await store.resumeMultipart(workspace, mpSession);
     if (
@@ -289,6 +303,7 @@ export async function qualifyStorage({
     const mpCompleted = await store.completeMultipart(workspace, mpSession, [
       { partNumber: 1, etag: listedParts[0].etag },
     ]);
+    mpSessionToAbort = null;
     if (mpCompleted.sha256 !== evidence.sha256 || mpCompleted.size !== bytes.length)
       throw new Error('Completed multipart object facts mismatch.');
     const mpSigned = await store.sign(mpSession.key, 'image/png');
@@ -329,14 +344,15 @@ export async function qualifyStorage({
       `Storage qualification failed during ${phase}; private URLs, credentials and response payloads suppressed.`,
     );
   } finally {
-    if (abortSessionToClean) {
+    let allCleaned = true;
+    for (const sessionToAbort of [mpSessionToAbort, abortSessionToClean]) {
+      if (!sessionToAbort) continue;
       try {
-        await store.abortMultipart(workspace, abortSessionToClean);
+        await store.abortMultipart(workspace, sessionToAbort);
       } catch {
-        /* cleaned below or marked failed */
+        allCleaned = false;
       }
     }
-    let allCleaned = true;
     for (const candidateKey of cleanupKeys) {
       try {
         await store.removeUpload(workspace, candidateKey);

@@ -19,7 +19,7 @@ const policySchema = z
 export type HumanTermsPolicy = z.infer<typeof policySchema>;
 const frozenDraft = Object.freeze({
   version: 'hosted-terms-draft-2026-11-16',
-  digest: '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
+  digest: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
   status: 'draft' as const,
   effectiveAt: null,
 });

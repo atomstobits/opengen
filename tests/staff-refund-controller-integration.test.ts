@@ -390,6 +390,36 @@ describe('internal existing-refund controller gates without a database', () => {
     ).toThrow();
     expect(f.connect).not.toHaveBeenCalled();
   });
+  it('accepts originalAmountCents up to $9,999 (999900) and rejects $9,999.01 (999901)', () => {
+    const f = forbiddenPool();
+    const options = gateOptions();
+    expect(
+      () =>
+        new ExistingStaffRefundController(f.pool, {
+          ...options,
+          target: {
+            ...options.target,
+            originalAmountCents: 999_900,
+            refundAmountCents: 999_900,
+            eligibleMicros: 9_999_000_000,
+          },
+        }),
+    ).not.toThrow();
+    expect(
+      () =>
+        new ExistingStaffRefundController(f.pool, {
+          ...options,
+          target: {
+            ...options.target,
+            originalAmountCents: 999_901,
+            refundAmountCents: 999_900,
+            eligibleMicros: 9_999_000_000,
+          },
+        }),
+    ).toThrow();
+    expect(f.connect).not.toHaveBeenCalled();
+    expect(f.query).not.toHaveBeenCalled();
+  });
 });
 
 describe.skipIf(!testDatabase)(

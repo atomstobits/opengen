@@ -191,6 +191,7 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
   function legacyBucketFixture() {
     let currentBucket: Record<string, unknown> = {
       name: cfg.bucket,
+      metageneration: '1',
       location: 'US-CENTRAL1',
       storageClass: 'STANDARD',
       iamConfiguration: {
@@ -239,12 +240,18 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
         throw new Error(`Unexpected command: ${args.join(' ')}`);
       },
       async rest(method: string, url: string, body: Record<string, unknown>) {
+        const expectedMeta = String(currentBucket.metageneration ?? '');
         if (
           method === 'PATCH' &&
-          url === `https://storage.googleapis.com/storage/v1/b/${cfg.bucket}`
+          url ===
+            `https://storage.googleapis.com/storage/v1/b/${cfg.bucket}?ifMetagenerationMatch=${encodeURIComponent(expectedMeta)}`
         ) {
-          patches.push(structuredClone(body));
-          currentBucket = { ...currentBucket, ...structuredClone(body) };
+          patches.push({ url, body: structuredClone(body) });
+          currentBucket = {
+            ...currentBucket,
+            ...structuredClone(body),
+            metageneration: String(Number(expectedMeta) + 1),
+          };
           return currentBucket;
         }
         throw new Error(`Unexpected REST call: ${method} ${url}`);
@@ -324,6 +331,12 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
     const second = await reconcileBucketPolicy({ ...baseOptions, apply: true }, f.driver);
     expect(second).toMatchObject({ mode: 'applied', changed: false, mutated: false });
     expect(f.patches).toHaveLength(1);
+
+    const missingMeta = legacyBucketFixture();
+    delete missingMeta.getBucket().metageneration;
+    await expect(
+      reconcileBucketPolicy({ ...baseOptions, apply: true }, missingMeta.driver),
+    ).rejects.toThrow('bucket metageneration precondition');
   });
 
   it('refuses unrecognized custom lifecycle rules during bucket reconciliation', async () => {
@@ -374,6 +387,11 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
       endpoint: string;
       browserPutCacheControl: string;
       multipartCacheControl: string;
+      preflightAllowHeaders?: string;
+      preflightExposeHeaders?: string;
+      partExposeHeaders?: string;
+      failResumeMultipart?: boolean;
+      onState?: (state: { abortedUploadIds: string[]; remainingMultiparts: number }) => void;
     }) => {
       const dir = makeTempDir();
       const receiptPath = join(dir, 'bootstrap.json');
@@ -420,6 +438,7 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
         }
       >();
 
+      const abortedUploadIds: string[] = [];
       const mockStore = {
         async prepareUpload(workspace: string, mediaType: string, _size: number) {
           const key = `inputs/${workspace}/${randomUUID()}.png`;
@@ -491,6 +510,7 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
           };
         },
         async resumeMultipart(_workspace: string, session: { uploadId: string }) {
+          if (options.failResumeMultipart) throw new Error('Simulated resume failure');
           const mp = multiparts.get(session.uploadId);
           if (!mp) throw new Error('Unknown multipart session');
           return [...mp.parts.entries()].map(([partNumber, p]) => ({
@@ -523,6 +543,7 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
           };
         },
         async abortMultipart(_workspace: string, session: { uploadId: string }) {
+          abortedUploadIds.push(session.uploadId);
           multiparts.delete(session.uploadId);
         },
         async readInputIfExists(_workspace: string, key: string) {
@@ -555,19 +576,35 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
               'Access-Control-Allow-Origin': origin,
               'Access-Control-Allow-Methods': 'GET, HEAD, PUT',
               'Access-Control-Allow-Headers':
+                options.preflightAllowHeaders ??
                 'Content-Type, If-None-Match, x-goog-if-generation-match',
-              'Access-Control-Expose-Headers': 'Content-Type, ETag',
+              'Access-Control-Expose-Headers':
+                options.preflightExposeHeaders ?? 'Content-Type, ETag',
             },
           });
         }
 
         if (method === 'PUT' && url.searchParams.has('uploadId')) {
+          const reqHeaders = new Headers(init?.headers);
+          const origin = reqHeaders.get('origin');
           const uploadId = url.searchParams.get('uploadId')!;
           const partNumber = Number(url.searchParams.get('partNumber'));
           const body = Buffer.from(init?.body as Uint8Array);
           const etag = `"${createHash('md5').update(body).digest('hex')}"`;
           multiparts.get(uploadId)!.parts.set(partNumber, { bytes: body, etag });
-          return new Response(null, { status: 200, headers: { ETag: etag } });
+          return new Response(null, {
+            status: 200,
+            headers: {
+              ETag: etag,
+              ...(origin
+                ? {
+                    'Access-Control-Allow-Origin': origin,
+                    'Access-Control-Expose-Headers':
+                      options.partExposeHeaders ?? 'Content-Type, ETag',
+                  }
+                : {}),
+            },
+          });
         }
 
         if (method === 'PUT') {
@@ -604,16 +641,20 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
         return new Response('Forbidden', { status: 403 });
       });
 
-      const evidence = await qualifyStorage({
-        bootstrapReceipt: receiptPath,
-        output: outputPath,
-        publicOrigin: 'https://opengen.dev',
-        driver,
-        store: mockStore,
-        fetchImpl: fetchMock,
-        expiryWaitMs: 0,
-      });
-      return { evidence, objects, multiparts };
+      try {
+        const evidence = await qualifyStorage({
+          bootstrapReceipt: receiptPath,
+          output: outputPath,
+          publicOrigin: 'https://opengen.dev',
+          driver,
+          store: mockStore,
+          fetchImpl: fetchMock,
+          expiryWaitMs: 0,
+        });
+        return { evidence, objects, multiparts };
+      } finally {
+        options.onState?.({ abortedUploadIds, remainingMultiparts: multiparts.size });
+      }
     };
 
     // 1. S3 mock returning exact private, no-store on both browser PUT and multipart passes
@@ -672,6 +713,43 @@ describe('2. Pin-safe GCS bucket policy reconciliation & current-core storage qu
         multipartCacheControl: 'private, no-store',
       }),
     ).rejects.toThrow('private-cache-control');
+
+    // 5. Preflight exposing conditional header only in Access-Control-Expose-Headers (not Allow-Headers) fails closed!
+    await expect(
+      runQualificationScenario({
+        endpoint: 'https://storage.googleapis.com',
+        browserPutCacheControl: 'private, max-age=0',
+        multipartCacheControl: 'private, no-store',
+        preflightAllowHeaders: 'Content-Type',
+        preflightExposeHeaders: 'Content-Type, ETag, x-goog-if-generation-match',
+      }),
+    ).rejects.toThrow('cors-preflight');
+
+    // 6. Multipart upload response missing ETag in Access-Control-Expose-Headers fails closed!
+    await expect(
+      runQualificationScenario({
+        endpoint: 'https://storage.googleapis.com',
+        browserPutCacheControl: 'private, max-age=0',
+        multipartCacheControl: 'private, no-store',
+        partExposeHeaders: 'Content-Type',
+      }),
+    ).rejects.toThrow('multipart-complete');
+
+    // 7. Mid-flight multipart failure aborts initiated mpSession in finally!
+    let finalState: { abortedUploadIds: string[]; remainingMultiparts: number } | undefined;
+    await expect(
+      runQualificationScenario({
+        endpoint: 'https://storage.googleapis.com',
+        browserPutCacheControl: 'private, max-age=0',
+        multipartCacheControl: 'private, no-store',
+        failResumeMultipart: true,
+        onState: (state) => {
+          finalState = state;
+        },
+      }),
+    ).rejects.toThrow('multipart-complete');
+    expect(finalState?.abortedUploadIds).toHaveLength(1);
+    expect(finalState?.remainingMultiparts).toBe(0);
   });
 });
 
@@ -727,6 +805,7 @@ printf 'frame=1\nprogress=end\n'
       const delivery = await workerModule.resolveWorkerDeliveryOptions({
         OPENGEN_FFPROBE_PATH: fakeProbe,
         OPENGEN_FFMPEG_PATH: fakeFfmpeg,
+        OPENGEN_FFPROBE_NETWORK_ISOLATED: 'true',
         C2PA_TOOL_PATH: fakeProbe,
         C2PA_TOOL_NETWORK_ISOLATED: 'false',
       });
@@ -745,8 +824,27 @@ printf 'frame=1\nprogress=end\n'
       expect(inspected.decode).toEqual({ status: 'passed', coverage: 'full' });
       expect(inspected.measured).toMatchObject({ width: 1, height: 1, frameCount: 1 });
 
+      // Unset OPENGEN_FFPROBE_NETWORK_ISOLATED fails closed (networkIsolated: false)
+      const unsetIsolation = await workerModule.resolveWorkerDeliveryOptions({
+        OPENGEN_FFPROBE_PATH: fakeProbe,
+        OPENGEN_FFMPEG_PATH: fakeFfmpeg,
+      });
+      expect(unsetIsolation.inspect).toBeTypeOf('function');
+      const blockedInspection = await unsetIsolation.inspect!(png, 'image/png', {
+        workspaceId: 'ws',
+        jobId: randomUUID(),
+        attempt: 1,
+        routeId: 'r',
+        deploymentId: 'd',
+        upstreamId: 'u',
+      });
+      expect(blockedInspection.metadata).toMatchObject({
+        status: 'unavailable',
+        reason: 'network_isolation_required',
+      });
+
       const unconfigured = await workerModule.resolveWorkerDeliveryOptions({
-        OPENGEN_FFPROBE_PATH: '',
+        OPENGEN_FFPROBE_PATH: 'disabled',
       });
       expect(unconfigured.inspect).toBeUndefined();
       expect(unconfigured.provenance).toEqual({ toolPath: '', networkIsolated: false });
@@ -821,7 +919,7 @@ describe('4. Preflight 032 support, reduced runtime role check & private-file CL
       async query(sql: string) {
         executedSql.push(sql);
         if (sql.includes('can_create_role')) {
-          return { rows: [{ can_create_role: true }] };
+          return { rows: [{ rolsuper: false, can_create_role: true }] };
         }
         return { rows: [], rowCount: 0 };
       },
@@ -834,6 +932,11 @@ describe('4. Preflight 032 support, reduced runtime role check & private-file CL
       workspaceId: 'qualification-owner',
       schema: 'public',
     });
+    expect(
+      executedSql.some((s) =>
+        /^GRANT "opengen_runtime_qual_[a-f0-9]+" TO CURRENT_USER WITH SET TRUE$/.test(s),
+      ),
+    ).toBe(true);
     expect(executedSql.some((s) => s.includes('mr_ledger_posting_order_seq'))).toBe(true);
     expect(
       executedSql.some((s) =>

@@ -536,6 +536,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
       }
       if (candidate.role !== 'admin') {
         await client.query('COMMIT');
+        if (alreadyHasRead) return null;
         return {
           eligible: false,
           expectedAuthorityVersion,
@@ -673,7 +674,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
         const recoveryScope = requireBillingBrowserRecovery(principal, request.headers);
         const { read, manage, setup } = await capabilities(principal);
         const ownerEnrollment =
-          selfServeEnrollmentEnabled && (!read || automaticChargesEnabled)
+          selfServeEnrollmentEnabled && (!read || !setup || automaticChargesEnabled)
             ? await ownerEnrollmentState(principal, read)
             : null;
         return {

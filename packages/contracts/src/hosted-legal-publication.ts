@@ -15,8 +15,8 @@ export const LEGAL_BODY_SEMANTIC_FORMAT = 'opengen-legal-body-json-v1' as const;
 export const LEGAL_POLICIES_SOURCE_MODULE_PATH =
   'packages/contracts/src/legal-policies.ts' as const;
 export const LEGAL_POLICIES_SOURCE_SHA256 =
-  '38fd6c6bc1f03d1b6b94833a23fe9aab6cb40d039dd035ec7cc3b75e60d93860' as const;
-export const LEGAL_POLICIES_SOURCE_GIT_BLOB = '72daf1a862cea29b766e8040d98bb2a5afb89d9f' as const;
+  'fb027137fe1130dcceee690f068be3a3213bc9c0397f82034e6e17808072c875' as const;
+export const LEGAL_POLICIES_SOURCE_GIT_BLOB = '9761acb4ebe50ca11a4fea23f1d2e46b7e83cbce' as const;
 
 export const HOSTED_LEGAL_POLICY_SLUGS = [
   'terms',
@@ -61,14 +61,14 @@ export const APPROVED_HOSTED_LEGAL_POLICIES: Readonly<
     candidateMode: 'contract-pending-adoption',
     publicationMode: 'contract-adopted',
     executionStatus: 'not-applicable',
-    sourceMarkdownSha256: '1e555a469b1076412f76ca4cb475e4600745ad21250fc165200f7a83d5d62a10',
-    sourceMarkdownBytes: 50709,
-    approvedBodyMarkdownSha256: '3b058d5c5e3e91f34fce6a220accd63f98b6b3bf40c833c78d9b2c1233f7a6ec',
-    approvedBodyMarkdownBytes: 50560,
-    semanticCanonicalSha256: '79bbcd66ace86ca0d5ff6a0767db637ae22872090b9d642928c57506e4991e67',
-    semanticCanonicalBytes: 54051,
-    publicationMarkdownSha256: '593d5b0db5fdf9ea8cf9b1fe9feb5dfb2425d5f030b084605225c739d79de5f5',
-    publicationMarkdownBytes: 50645,
+    sourceMarkdownSha256: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
+    sourceMarkdownBytes: 50702,
+    approvedBodyMarkdownSha256: '03161e6e3d3ad88f4e7eeff1cb4a6861b293f122d337187ace105dbe4fe7e7f4',
+    approvedBodyMarkdownBytes: 50553,
+    semanticCanonicalSha256: '41a7f11dcb48d02c63cd1a4efcbecaa4759bcd4477e9904d0bfa64158377dec3',
+    semanticCanonicalBytes: 54044,
+    publicationMarkdownSha256: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
+    publicationMarkdownBytes: 50638,
   }),
   privacy: Object.freeze({
     slug: 'privacy',
@@ -78,14 +78,14 @@ export const APPROVED_HOSTED_LEGAL_POLICIES: Readonly<
     candidateMode: 'notice-pending-publication',
     publicationMode: 'notice-published',
     executionStatus: 'not-applicable',
-    sourceMarkdownSha256: '9773b22cd14275b011cd0cd45e57a0cc799a24cd2e6f54d3ad91f983ec119f2d',
-    sourceMarkdownBytes: 33878,
-    approvedBodyMarkdownSha256: 'af5322c6388733321dfa1235a6642c13a12dc1e517636be9b990a8ae44b9bc21',
-    approvedBodyMarkdownBytes: 33731,
-    semanticCanonicalSha256: '63821c3b163a53cfc815e84d46ff8589ea37c87ad27e959309a9c8ab4f7b7fa4',
-    semanticCanonicalBytes: 36014,
-    publicationMarkdownSha256: 'b4be24bb0712e9db48e3984c279a1beb722a1e9e9c6bc2db9d26443f7d77630f',
-    publicationMarkdownBytes: 33814,
+    sourceMarkdownSha256: 'bc8b2db8c7250a4f8d75661ff3479ecc32a4e4d36039a2078a0991d619fc56c1',
+    sourceMarkdownBytes: 33962,
+    approvedBodyMarkdownSha256: '56dca962ed4654213421ce4291dcb768e3ca788bd438a473e3e0d74d730c9f40',
+    approvedBodyMarkdownBytes: 33815,
+    semanticCanonicalSha256: '48fd13fc6d8be8ddded7f5ae1304dc460f5e4ba49eb4219a0f68a8f31ff8b374',
+    semanticCanonicalBytes: 36098,
+    publicationMarkdownSha256: 'db7fa57fe9972a77a63ff7488c577624e5201b9c63d2f598962865910f17d25c',
+    publicationMarkdownBytes: 33898,
   }),
   'data-processing': Object.freeze({
     slug: 'data-processing',

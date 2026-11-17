@@ -100,8 +100,8 @@ describe('deterministic hosted legal candidate packet', () => {
       source: {
         sharedPolicyModule: {
           path: 'packages/contracts/src/legal-policies.ts',
-          gitBlob: '72daf1a862cea29b766e8040d98bb2a5afb89d9f',
-          sha256: '38fd6c6bc1f03d1b6b94833a23fe9aab6cb40d039dd035ec7cc3b75e60d93860',
+          gitBlob: '9761acb4ebe50ca11a4fea23f1d2e46b7e83cbce',
+          sha256: 'fb027137fe1130dcceee690f068be3a3213bc9c0397f82034e6e17808072c875',
         },
       },
       authority: {
@@ -232,9 +232,9 @@ describe('deterministic hosted legal candidate packet', () => {
 
     const verified = await verifySharedLegalPoliciesModule(archiveCopy);
     expect(verified.moduleSha256).toBe(
-      '38fd6c6bc1f03d1b6b94833a23fe9aab6cb40d039dd035ec7cc3b75e60d93860',
+      'fb027137fe1130dcceee690f068be3a3213bc9c0397f82034e6e17808072c875',
     );
-    expect(verified.moduleBlob).toBe('72daf1a862cea29b766e8040d98bb2a5afb89d9f');
+    expect(verified.moduleBlob).toBe('9761acb4ebe50ca11a4fea23f1d2e46b7e83cbce');
 
     await writeFile(copiedPolicy, Buffer.concat([originalBytes, Buffer.from('\n')]));
     await expect(verifySharedLegalPoliciesModule(archiveCopy)).rejects.toThrow(

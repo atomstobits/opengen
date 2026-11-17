@@ -105,21 +105,29 @@ export async function resolveWorkerDeliveryOptions(
   ) {
     throw new Error('OPENGEN_FFPROBE_NETWORK_ISOLATED must be true or false when set.');
   }
+  const rawProbePath = env.OPENGEN_FFPROBE_PATH?.trim();
+  const probeDisabled =
+    rawProbePath !== undefined &&
+    ['disabled', 'false', 'none'].includes(rawProbePath.toLowerCase());
   let probePath: string | undefined;
-  if (env.OPENGEN_FFPROBE_PATH !== undefined) {
-    if (env.OPENGEN_FFPROBE_PATH !== '') {
-      probePath = await verifyTrustedWorkerBinary(env.OPENGEN_FFPROBE_PATH, true);
-    }
+  if (probeDisabled) {
+    probePath = undefined;
+  } else if (rawProbePath) {
+    probePath = await verifyTrustedWorkerBinary(rawProbePath, true);
   } else {
     probePath = await verifyTrustedWorkerBinary(defaultFfprobePath, false);
   }
 
   let decodePath: string | undefined;
   if (probePath) {
-    if (env.OPENGEN_FFMPEG_PATH !== undefined) {
-      if (env.OPENGEN_FFMPEG_PATH !== '') {
-        decodePath = await verifyTrustedWorkerBinary(env.OPENGEN_FFMPEG_PATH, true);
-      }
+    const rawDecodePath = env.OPENGEN_FFMPEG_PATH?.trim();
+    const decodeDisabled =
+      rawDecodePath !== undefined &&
+      ['disabled', 'false', 'none'].includes(rawDecodePath.toLowerCase());
+    if (decodeDisabled) {
+      decodePath = undefined;
+    } else if (rawDecodePath) {
+      decodePath = await verifyTrustedWorkerBinary(rawDecodePath, true);
     } else {
       decodePath =
         (await verifyTrustedWorkerBinary(join(dirname(probePath), 'ffmpeg'), false)) ??
@@ -127,9 +135,7 @@ export async function resolveWorkerDeliveryOptions(
     }
   }
 
-  const ffprobeNetworkIsolated = env.OPENGEN_FFPROBE_NETWORK_ISOLATED
-    ? env.OPENGEN_FFPROBE_NETWORK_ISOLATED === 'true'
-    : true;
+  const ffprobeNetworkIsolated = env.OPENGEN_FFPROBE_NETWORK_ISOLATED === 'true';
 
   // Keep absent or non-isolated c2patool truthfully unavailable/unknown unless explicitly configured and verified.
   let verifiedC2paPath: string | undefined;

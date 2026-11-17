@@ -497,10 +497,15 @@ export async function reconcileBucketPolicy(options, driver) {
     };
   }
   if (changed) {
+    ensure(
+      existing.metageneration !== undefined &&
+        /^[1-9][0-9]*$/.test(String(existing.metageneration)),
+      'bucket metageneration precondition',
+    );
     options.onProgress?.('bucket: applying pin-safe lifecycle and conditional-upload CORS policy');
     await cloud.rest(
       'PATCH',
-      `https://storage.googleapis.com/storage/v1/b/${c.bucket}`,
+      `https://storage.googleapis.com/storage/v1/b/${c.bucket}?ifMetagenerationMatch=${encodeURIComponent(String(existing.metageneration))}`,
       desiredPolicy,
     );
   }

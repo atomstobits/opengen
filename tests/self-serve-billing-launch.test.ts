@@ -49,7 +49,7 @@ async function loadBillingUiBundle() {
     stdin: {
       contents: [
         `export { LegalPresentationProvider } from './apps/web/app/legal/presentation';`,
-        `export { BillingPage, BillingOwnerEnrollmentCard } from './apps/web/app/billing/billing';`,
+        `export { Billing, BillingPage, BillingOwnerEnrollmentCard } from './apps/web/app/billing/billing';`,
         `export { BillingPolicyPanel } from './apps/web/app/billing/policy-panel';`,
       ].join(' '),
       resolveDir: process.cwd(),
@@ -84,6 +84,11 @@ async function loadBillingUiBundle() {
     LegalPresentationProvider: ComponentType<{
       presentation: ReturnType<typeof legalSurfacePresentationFromPublication>;
       children: ReactNode;
+    }>;
+    Billing: ComponentType<{
+      workspaceId: string;
+      recoveryScope?: string;
+      initialCapabilities?: BillingCapabilities | null;
     }>;
     BillingPage: ComponentType;
     BillingOwnerEnrollmentCard: ComponentType<{
@@ -1225,6 +1230,10 @@ describe('3. Bounded serial API recharge runner & Next.js fixed billing proxies'
     const slowTurnGate = new Promise<void>((resolve) => {
       releaseSlowTurn = resolve;
     });
+    let markSecondTurnStarted!: () => void;
+    const secondTurnStarted = new Promise<void>((resolve) => {
+      markSecondTurnStarted = resolve;
+    });
 
     const loop = startBillingRechargeWorker(
       async () => {
@@ -1236,6 +1245,7 @@ describe('3. Bounded serial API recharge runner & Next.js fixed billing proxies'
             throw new Error('rk_live_SHOULD_BE_REDACTED pi_123_secret_SENSITIVE');
           }
           if (calls === 2) {
+            markSecondTurnStarted();
             await slowTurnGate;
           }
         } finally {
@@ -1248,7 +1258,20 @@ describe('3. Bounded serial API recharge runner & Next.js fixed billing proxies'
       },
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 260));
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        secondTurnStarted,
+        new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error('Timed out waiting for second recharge worker turn')),
+            2_000,
+          );
+        }),
+      ]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
     expect(calls).toBe(2);
     expect(maxConcurrent).toBe(1);
     expect(errors).toEqual([{ code: 'operation_failed' }]);
@@ -1460,6 +1483,7 @@ describe('4. Frontend /billing UI, fee preview math ($5/$100/$9,999), enrollment
   it('renders clean /terms, /terms#credits-and-refunds, and /privacy links with zero version numbers', async () => {
     const {
       LegalPresentationProvider,
+      Billing,
       BillingPage,
       BillingOwnerEnrollmentCard,
       BillingPolicyPanel,
@@ -1547,6 +1571,33 @@ describe('4. Frontend /billing UI, fee preview math ($5/$100/$9,999), enrollment
     expect(adminReplaceHtml).toContain('Become workspace funding owner →');
     expect(adminReplaceHtml).toContain('<summary>Payment terms</summary>');
     expect(adminReplaceHtml).not.toContain('hosted-terms-2026-11-16');
+
+    const adminWithReadAndReplaceHtml = renderToStaticMarkup(
+      createElement(LegalPresentationProvider, {
+        presentation: publishedLegal,
+        children: createElement(Billing, {
+          workspaceId: 'ws-1',
+          recoveryScope: 'scope-1',
+          initialCapabilities: {
+            read: true,
+            manage: false,
+            setup: false,
+            ownerEnrollment: {
+              eligible: true,
+              expectedAuthorityVersion: 2,
+              allowsAutoRecharge: true,
+              replaceExistingOwner: true,
+              terms: { version: 'hosted-terms-2026-11-16', text: 'Prepaid credit terms.' },
+            },
+          },
+        }),
+      }),
+    );
+    expect(adminWithReadAndReplaceHtml).toContain('01 / ADD CREDIT');
+    expect(adminWithReadAndReplaceHtml).toContain('02 / PAYMENT HISTORY');
+    expect(adminWithReadAndReplaceHtml).toContain('01 / TRANSFER FUNDING OWNER');
+    expect(adminWithReadAndReplaceHtml).toContain('Become workspace funding owner →');
+    expect(adminWithReadAndReplaceHtml).not.toContain('hosted-terms-2026-11-16');
 
     const memberReadOnlyHtml = renderToStaticMarkup(
       createElement(BillingPolicyPanel, {
