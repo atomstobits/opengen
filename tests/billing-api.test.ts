@@ -127,8 +127,8 @@ async function fixture(override: Partial<BillingRouteOptions> = {}) {
           ],
           rowCount: 1,
         };
-      if (sql.startsWith('SELECT id,status FROM mr_billing_mandates'))
-        return { rows: [{ id: ids.mandate, status: 'active' }], rowCount: 1 };
+      if (sql.includes('FROM mr_billing_mandates'))
+        return { rows: [{ id: ids.mandate, status: 'active', card_country: 'US' }], rowCount: 1 };
       return { rows: [], rowCount: 0 };
     }),
     release: vi.fn(),
@@ -254,6 +254,9 @@ async function fixture(override: Partial<BillingRouteOptions> = {}) {
         workspaceId,
         policyVersion: 1,
         amountCents: 2500,
+        feeCents: 106,
+        totalChargeCents: 2606,
+        feeRateBps: 290,
         status: 'requires_authentication',
         admissionMonth: '2026-11-01',
         createdAt: '',

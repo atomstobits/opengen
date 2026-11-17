@@ -23,6 +23,7 @@ const addedMigrationNames = [
   '029.sql',
   '030.sql',
   '031.sql',
+  '032.sql',
 ];
 const migrationSql = (name: string) =>
   readFile(new URL('../packages/engine/migrations/' + name, import.meta.url), 'utf8');
@@ -280,6 +281,9 @@ it.skipIf(!native || !pgBin)(
         ...orderBefore,
         checkout_request_version: 'checkout_hosted_v1',
         checkout_api_version: '2026-10-28.endive',
+        fee_cents: 0,
+        fee_rate_bps: 0,
+        total_charge_cents: 500,
       });
       expect(
         (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows.slice(0, 26),

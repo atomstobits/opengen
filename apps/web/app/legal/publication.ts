@@ -25,7 +25,6 @@ const FORBIDDEN_BARE_LEGAL_ENV_KEYS = [
 
 const DRAFT_TITLES: Readonly<Record<HostedLegalPolicySlug, string>> = Object.freeze({
   terms: 'Terms of Service — review draft | OpenGen',
-  refunds: 'Prepaid credit and refunds — review draft | OpenGen',
   privacy: 'Privacy Notice — review draft | OpenGen',
   'data-processing': 'Data Processing Addendum — review draft | OpenGen',
   subprocessors: 'Subprocessor Schedule — review draft | OpenGen',
@@ -35,14 +34,9 @@ const PUBLISHED_METADATA: Readonly<
   Record<HostedLegalPolicySlug, { readonly title: string; readonly description: string }>
 > = Object.freeze({
   terms: Object.freeze({
-    title: 'OpenGen Hosted Terms of Service | OpenGen',
+    title: 'OpenGen Terms of Service | OpenGen',
     description:
-      'Hosted Terms of Service governing OpenGen account access, workspace usage, API and MCP calls at opengen.dev.',
-  }),
-  refunds: Object.freeze({
-    title: 'OpenGen Prepaid Credit and Refund Policy | OpenGen',
-    description:
-      'Prepaid USD service credit, reservation, settlement and refund policy for the hosted OpenGen service.',
+      'Terms of Service (including prepaid credit and refund terms) governing OpenGen account access, workspace usage, API and MCP calls at opengen.dev.',
   }),
   privacy: Object.freeze({
     title: 'OpenGen Privacy Notice | OpenGen',

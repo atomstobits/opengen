@@ -688,8 +688,8 @@ POST /v1/assets/complete`}
               <p>
                 {legal.mode === 'published' ? (
                   <>
-                    Hosted legal policies: <a href="/terms">Terms of Service</a>,{' '}
-                    <a href="/refunds">Prepaid Credit and Refund Policy</a> and{' '}
+                    Hosted legal policies: <a href="/terms">Terms of Service</a> (including{' '}
+                    <a href="/terms#credits-and-refunds">credit and refund terms</a>) and{' '}
                     <a href="/privacy">Privacy Notice</a>. Business templates:{' '}
                     <a href="/data-processing">Business Data Processing Addendum</a> and{' '}
                     <a href="/subprocessors">Subprocessor Schedule</a> (available templates only —
@@ -697,8 +697,8 @@ POST /v1/assets/complete`}
                   </>
                 ) : legal.mode === 'staged' ? (
                   <>
-                    Hosted legal documents: <a href="/terms">Terms of Service</a>,{' '}
-                    <a href="/refunds">Prepaid Credit and Refund Policy</a> and{' '}
+                    Hosted legal documents: <a href="/terms">Terms of Service</a> (including{' '}
+                    <a href="/terms#credits-and-refunds">credit and refund terms</a>) and{' '}
                     <a href="/privacy">Privacy Notice</a> (scheduled effective {legal.effectiveAt} —
                     not yet effective), plus available business templates{' '}
                     <a href="/data-processing">Business Data Processing Addendum</a> and{' '}
@@ -707,8 +707,8 @@ POST /v1/assets/complete`}
                   </>
                 ) : (
                   <>
-                    Legal review drafts: <a href="/terms">Terms of Service</a>,{' '}
-                    <a href="/refunds">Prepaid Credit and Refund Policy</a>,{' '}
+                    Legal review drafts: <a href="/terms">Terms of Service</a> (including{' '}
+                    <a href="/terms#credits-and-refunds">credit and refund terms</a>),{' '}
                     <a href="/privacy">Privacy Notice</a>,{' '}
                     <a href="/data-processing">Business Data Processing Addendum</a> and{' '}
                     <a href="/subprocessors">Subprocessor Schedule</a>. These proposals are not

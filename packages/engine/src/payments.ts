@@ -17,7 +17,10 @@ import {
 } from './billing-payment-ownership.js';
 
 export const MIN_TOPUP_CENTS = 500;
-export const MAX_TOPUP_CENTS = 100000;
+export const MAX_TOPUP_CENTS = 999900;
+export const STRIPE_DOMESTIC_FEE_BPS = 290;
+export const STRIPE_INTERNATIONAL_FEE_BPS = 440;
+export const STRIPE_FIXED_FEE_CENTS = 30;
 export const PAYMENT_RATE_LIMITS = Object.freeze({
   windowMs: 3600000,
   ordersPerWorkspace: 10,
@@ -40,10 +43,39 @@ export function centsToMicros(cents: number): number {
   if (!Number.isSafeInteger(cents) || cents < MIN_TOPUP_CENTS || cents > MAX_TOPUP_CENTS)
     throw new PaymentError(
       'invalid_amount',
-      'Choose a whole-cent USD amount between $5 and $1,000.',
+      'Choose a whole-cent USD amount between $5 and $9,999.',
     );
   return cents * 10000;
 }
+export interface ProcessingFeeBreakdown {
+  creditCents: number;
+  feeCents: number;
+  totalChargeCents: number;
+  feeRateBps: 0 | 290 | 440;
+}
+export function calculateProcessingFee(
+  creditCents: number,
+  cardCountry?: string | null,
+): ProcessingFeeBreakdown {
+  centsToMicros(creditCents);
+  const international =
+    typeof cardCountry === 'string' && /^[A-Z]{2}$/.test(cardCountry) && cardCountry !== 'US';
+  const feeRateBps: 290 | 440 = international
+    ? STRIPE_INTERNATIONAL_FEE_BPS
+    : STRIPE_DOMESTIC_FEE_BPS;
+  const denom = international ? 956 : 971;
+  const totalChargeCents = Math.floor(
+    ((creditCents + STRIPE_FIXED_FEE_CENTS) * 1000 + (denom - 1)) / denom,
+  );
+  const feeCents = totalChargeCents - creditCents;
+  return {
+    creditCents,
+    feeCents,
+    totalChargeCents,
+    feeRateBps,
+  };
+}
+export const computeStripeGrossUpFee = calculateProcessingFee;
 export type PaymentStatus =
   | 'created'
   | 'checkout_pending'
@@ -57,6 +89,9 @@ export interface PaymentOrder {
   id: string;
   workspaceId: string;
   amountCents: number;
+  feeCents: number;
+  totalChargeCents: number;
+  feeRateBps: 0 | 290 | 440;
   creditMicros: number;
   currency: 'USD';
   status: PaymentStatus;
@@ -65,7 +100,8 @@ export interface PaymentOrder {
   updatedAt: string;
   creditedAt: string | null;
 }
-export type CheckoutRequestVersion = 'checkout_hosted_v1' | 'checkout_hosted_page_v2';
+export type CheckoutRequestVersion =
+  'checkout_hosted_v1' | 'checkout_hosted_page_v2' | 'checkout_hosted_page_fee_v3';
 export interface CheckoutOrder extends PaymentOrder {
   requestVersion: CheckoutRequestVersion;
   apiVersion: typeof BILLING_STRIPE_API_VERSION;
@@ -112,6 +148,9 @@ interface OrderRow {
   id: string;
   workspace_id: string;
   amount_cents: number;
+  fee_cents?: number;
+  fee_rate_bps?: 0 | 290 | 440;
+  total_charge_cents?: number;
   credit_micros: string;
   status: PaymentStatus;
   checkout_url: string | null;
@@ -155,11 +194,21 @@ export function paymentIntentId(value: unknown): string | null {
     return value.id;
   return null;
 }
+function orderTotals(row: OrderRow) {
+  const feeCents = row.fee_cents ?? 0;
+  const totalChargeCents = row.total_charge_cents ?? row.amount_cents + feeCents;
+  const feeRateBps = (row.fee_rate_bps ?? 0) as 0 | 290 | 440;
+  return { feeCents, totalChargeCents, feeRateBps };
+}
 function view(row: OrderRow): PaymentOrder {
+  const { feeCents, totalChargeCents, feeRateBps } = orderTotals(row);
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     amountCents: row.amount_cents,
+    feeCents,
+    totalChargeCents,
+    feeRateBps,
     creditMicros: Number(row.credit_micros),
     currency: 'USD',
     status: row.status,
@@ -170,14 +219,15 @@ function view(row: OrderRow): PaymentOrder {
   };
 }
 function validSession(row: OrderRow, session: CheckoutSession, historical = false): boolean {
+  const expectedTotal = orderTotals(row).totalChargeCents;
   return (
     /^cs_[A-Za-z0-9_]+$/.test(session.id) &&
     session.client_reference_id === row.id &&
     session.mode === 'payment' &&
     session.currency === 'usd' &&
     session.livemode === row.livemode &&
-    session.amount_subtotal === row.amount_cents &&
-    session.amount_total === row.amount_cents &&
+    session.amount_subtotal === expectedTotal &&
+    session.amount_total === expectedTotal &&
     (!row.session_id || row.session_id === session.id) &&
     (!row.payment_intent_id ||
       (historical && session.payment_intent === null) ||
@@ -348,7 +398,8 @@ export class PaymentStore {
       if (intent) await this.assertLegacyIntentAvailable(client, row, intent);
       return row;
     }
-    if (intent)
+    if (intent) {
+      const { feeCents, totalChargeCents } = orderTotals(row);
       await claimPaymentOwnershipInTransaction(client, {
         processorEnvironmentId: environment.id,
         livemode: environment.livemode,
@@ -357,9 +408,12 @@ export class PaymentStore {
         kind: 'manual',
         localId: row.id,
         amountCents: row.amount_cents,
+        feeCents,
+        totalChargeCents,
         creditReference: canonicalFundingCreditReference('manual', row.id),
         legacySession: session,
       });
+    }
     if (!row.processor_environment_id) {
       await client.query(
         'UPDATE mr_payment_orders SET processor_environment_id=$2,processor_account_id=$3 WHERE id=$1',
@@ -630,19 +684,23 @@ export class PaymentStore {
       );
       const id = randomUUID();
       const suffix = Array.from(randomBytes(8), (n) => String.fromCharCode(97 + (n % 26))).join('');
+      const fee = calculateProcessingFee(amountCents, null);
       const result = await client.query<OrderRow>(
-        `INSERT INTO mr_payment_orders(id,workspace_id,client_key,amount_cents,credit_micros,livemode,stripe_idempotency_key,integration_identifier,checkout_request_version,checkout_api_version)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        `INSERT INTO mr_payment_orders(id,workspace_id,client_key,amount_cents,fee_cents,fee_rate_bps,total_charge_cents,credit_micros,livemode,stripe_idempotency_key,integration_identifier,checkout_request_version,checkout_api_version)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
         [
           id,
           workspaceId,
           clientKey,
           amountCents,
+          fee.feeCents,
+          fee.feeRateBps,
+          fee.totalChargeCents,
           credit,
           this.options.livemode,
           `opengen-topup-${id}`,
           `opengen_topup_${suffix}`,
-          'checkout_hosted_page_v2',
+          'checkout_hosted_page_fee_v3',
           BILLING_STRIPE_API_VERSION,
         ],
       );
@@ -725,7 +783,9 @@ export class PaymentStore {
       // sessions still use GET/reconciliation; never reinterpret an unbound key.
       if (
         !row.session_id &&
-        (row.checkout_request_version !== 'checkout_hosted_page_v2' ||
+        (!['checkout_hosted_page_v2', 'checkout_hosted_page_fee_v3'].includes(
+          row.checkout_request_version,
+        ) ||
           row.checkout_api_version !== BILLING_STRIPE_API_VERSION)
       )
         throw new PaymentError(

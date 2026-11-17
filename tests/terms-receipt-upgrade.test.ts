@@ -127,7 +127,17 @@ it.skipIf(!databaseUrl)(
         const rows: Record<string, { value: string }[]> = {};
         for (const table of priorTables) {
           const value =
-            table === 'mr_ledger' ? "(to_jsonb(t)-'posting_order')::text" : 'row_to_json(t)::text';
+            table === 'mr_ledger'
+              ? "(to_jsonb(t)-'posting_order')::text"
+              : [
+                    'mr_payment_orders',
+                    'mr_billing_recharge_attempts',
+                    'mr_billing_payment_ownership',
+                  ].includes(table)
+                ? "(to_jsonb(t)-ARRAY['fee_cents','fee_rate_bps','total_charge_cents'])::text"
+                : table === 'mr_billing_mandates'
+                  ? "(to_jsonb(t)-'card_country')::text"
+                  : 'row_to_json(t)::text';
           rows[table] = (
             await db.query<{ value: string }>(
               `SELECT ${value} AS value FROM ${identifier(table)} t
@@ -146,7 +156,7 @@ it.skipIf(!databaseUrl)(
       await engine.initialize();
       const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
       expect(journal.slice(0, 28)).toEqual(oldJournal);
-      expect(journal).toHaveLength(31);
+      expect(journal).toHaveLength(32);
       expect(journal[28]).toMatchObject({
         name: '029.sql',
         checksum: sha256(await migration('029.sql')),
@@ -155,7 +165,7 @@ it.skipIf(!databaseUrl)(
       // Journal is itself in the all-table snapshot; compare every original row while
       // separately verifying the one legitimate new journal entry above.
       after.mr_migrations = after.mr_migrations!.filter(
-        (row) => !['029.sql', '030.sql', '031.sql'].includes(JSON.parse(row.value).name),
+        (row) => !['029.sql', '030.sql', '031.sql', '032.sql'].includes(JSON.parse(row.value).name),
       );
       expect(after).toEqual(before);
       expect(
@@ -172,7 +182,7 @@ it.skipIf(!databaseUrl)(
       expect((await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows).toEqual(journal);
       const afterRestart = await snapshot();
       afterRestart.mr_migrations = afterRestart.mr_migrations!.filter(
-        (row) => !['029.sql', '030.sql', '031.sql'].includes(JSON.parse(row.value).name),
+        (row) => !['029.sql', '030.sql', '031.sql', '032.sql'].includes(JSON.parse(row.value).name),
       );
       expect(afterRestart).toEqual(before);
       expect(

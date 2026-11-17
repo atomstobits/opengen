@@ -132,6 +132,12 @@ export * from './owned-output-access.js';
 export * from './owned-assets.js';
 export * from './feedback.js';
 export * from './payments.js';
+export * from './billing-policy.js';
+export * from './billing-authority.js';
+export * from './billing-customer.js';
+export * from './billing-recharge.js';
+export * from './billing-payment-ownership.js';
+export * from './staff-refunds.js';
 export * from './vault.js';
 export * from './public-network.js';
 export * from './output.js';
@@ -567,6 +573,7 @@ export class Engine {
         '029.sql',
         '030.sql',
         '031.sql',
+        '032.sql',
       ].map((name, index) => {
         if (name !== `${String(index + 1).padStart(3, '0')}.sql`)
           throw new Error('Migration manifest must be unique and contiguous.');

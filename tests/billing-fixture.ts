@@ -25,6 +25,39 @@ export async function billingFixture(
         'utf8',
       ),
     );
+  await f.pool.query(`
+    ALTER TABLE mr_billing_policies
+      DROP CONSTRAINT mr_billing_policies_amount_cents_check,
+      ADD CONSTRAINT mr_billing_policies_amount_cents_check CHECK (amount_cents BETWEEN 500 AND 999900);
+    ALTER TABLE mr_billing_mandates
+      ADD COLUMN card_country text CHECK (card_country IS NULL OR card_country ~ '^[A-Z]{2}$');
+    ALTER TABLE mr_billing_recharge_attempts
+      DROP CONSTRAINT mr_billing_recharge_attempts_amount_cents_check,
+      DROP CONSTRAINT mr_billing_recharge_attempts_request_version_check,
+      ADD CONSTRAINT mr_billing_recharge_attempts_amount_cents_check CHECK (amount_cents BETWEEN 500 AND 999900),
+      ADD CONSTRAINT mr_billing_recharge_attempts_request_version_check
+        CHECK (request_version IN ('recharge_pi_v1','recharge_pi_fee_v2')),
+      ADD COLUMN fee_cents integer NOT NULL DEFAULT 0 CHECK (fee_cents >= 0),
+      ADD COLUMN fee_rate_bps integer NOT NULL DEFAULT 0 CHECK (fee_rate_bps IN (0, 290, 440)),
+      ADD COLUMN total_charge_cents integer;
+    UPDATE mr_billing_recharge_attempts SET total_charge_cents = amount_cents + fee_cents WHERE total_charge_cents IS NULL;
+    ALTER TABLE mr_billing_recharge_attempts
+      ALTER COLUMN total_charge_cents SET NOT NULL,
+      ADD CONSTRAINT mr_billing_recharge_attempts_total_charge_cents_check CHECK (total_charge_cents = amount_cents + fee_cents);
+    ALTER TABLE mr_billing_payment_ownership
+      DROP CONSTRAINT mr_billing_payment_ownership_amount_cents_check,
+      ADD CONSTRAINT mr_billing_payment_ownership_amount_cents_check CHECK (amount_cents BETWEEN 500 AND 999900),
+      ADD COLUMN fee_cents integer NOT NULL DEFAULT 0 CHECK (fee_cents >= 0),
+      ADD COLUMN total_charge_cents integer;
+    UPDATE mr_billing_payment_ownership SET total_charge_cents = amount_cents + fee_cents WHERE total_charge_cents IS NULL;
+    ALTER TABLE mr_billing_payment_ownership
+      ALTER COLUMN total_charge_cents SET NOT NULL,
+      ADD CONSTRAINT mr_billing_payment_ownership_total_charge_cents_check CHECK (total_charge_cents = amount_cents + fee_cents);
+    CREATE TRIGGER mr_billing_recharge_attempts_total_charge_default BEFORE INSERT ON mr_billing_recharge_attempts
+      FOR EACH ROW EXECUTE FUNCTION mr_billing_total_charge_default();
+    CREATE TRIGGER mr_billing_payment_ownership_total_charge_default BEFORE INSERT ON mr_billing_payment_ownership
+      FOR EACH ROW EXECUTE FUNCTION mr_billing_total_charge_default();
+  `);
   const processorEnvironment = {
     id: 'fixture-billing-processor',
     accountId: 'acct_fixture',
@@ -132,7 +165,7 @@ export async function billingFixture(
           customer: request.customerId,
           payment_method: request.paymentMethodId,
           currency: 'usd',
-          amount: request.amountCents,
+          amount: request.totalChargeCents ?? request.amountCents,
           amount_received: 0,
           status: 'processing',
           livemode: false,

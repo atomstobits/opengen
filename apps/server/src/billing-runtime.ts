@@ -25,6 +25,7 @@ import { BillingOperationsStore } from '../../../packages/engine/src/billing-ope
 import {
   BILLING_POLICY_DEFAULTS,
   BILLING_POLICY_LIMITS,
+  BillingPolicyError,
   BillingPolicyStore,
   readBillingOwnerInTransaction,
   type BillingDelegationRails,
@@ -41,6 +42,7 @@ import {
   requireCurrentHumanTermsInTransaction,
   verifyHumanIdentityTermsReceiptInTransaction,
 } from './billing-terms-admission.js';
+import { operationalError } from './operational-error.js';
 import type { HumanTermsPolicy } from './terms-login.js';
 import type { PaymentsOptions } from './payments.js';
 
@@ -77,7 +79,59 @@ export interface BillingOwnerEnrollmentState {
   terms: BillingTerms;
   allowsAutoRecharge?: boolean;
   upgradeToRecharge?: boolean;
+  replaceExistingOwner?: boolean;
   reason?: BillingOwnerEnrollmentReason;
+}
+
+export interface BillingRechargeWorkerLoop {
+  stop(): Promise<void>;
+}
+
+/** Bounded serial background loop for API-owned off-session recharge and recovery turns. */
+export function startBillingRechargeWorker(
+  workOnce: () => Promise<unknown>,
+  options: {
+    intervalMs?: number;
+    onError?: (error: { code: string; sqlState?: string }) => void;
+  } = {},
+): BillingRechargeWorkerLoop {
+  const intervalMs = Math.max(100, options.intervalMs ?? 15_000);
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let currentTurn: Promise<void> | undefined;
+
+  const scheduleNext = () => {
+    if (stopped) return;
+    timer = setTimeout(runTurn, intervalMs);
+    timer.unref?.();
+  };
+
+  const runTurn = () => {
+    if (stopped || currentTurn) return;
+    currentTurn = (async () => {
+      try {
+        await workOnce();
+      } catch (cause) {
+        options.onError?.(operationalError(cause));
+      } finally {
+        currentTurn = undefined;
+        scheduleNext();
+      }
+    })();
+  };
+
+  scheduleNext();
+
+  return {
+    async stop() {
+      stopped = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      if (currentTurn) await currentTurn;
+    },
+  };
 }
 
 export interface BillingFixtureRuntimeOptions {
@@ -114,6 +168,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
   const environment = validatedBillingProcessorEnvironment(options.processorEnvironment);
   const rechargeScopeApproved =
     options.activation === 'fixture' ||
+    options.activation === 'sandbox' ||
     (options.activation === 'manual' && options.liveRechargeApproved === true);
   if (
     !['fixture', 'sandbox', 'manual'].includes(options.activation) ||
@@ -147,6 +202,8 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
   const setupAvailable = options.setupAvailable === true;
   const automaticChargesEnabled = options.automaticChargesEnabled === true;
   const portalAvailable = options.portalAvailable === true;
+  const selfServeEnrollmentEnabled =
+    options.activation === 'manual' || options.activation === 'sandbox';
   const selfServeOwnerRails = automaticChargesEnabled
     ? SELF_SERVE_RECHARGE_OWNER_RAILS
     : MANUAL_SELF_SERVE_OWNER_RAILS;
@@ -225,7 +282,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
         throw authorityError('billing_access_denied', 'Current funding authority is required.');
       return current;
     },
-    ...(options.activation === 'manual'
+    ...(selfServeEnrollmentEnabled
       ? {
           approveOwner: async (client, actor, request) => {
             if (options.checkoutWritesEnabled === false)
@@ -239,7 +296,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
             await assertBillingProcessorEnvironmentInTransaction(client, environment);
             if (
               request.processorEnvironmentId !== environment.id ||
-              request.livemode !== true ||
+              request.livemode !== environment.livemode ||
               request.rails.allowsEnabled !== selfServeOwnerRails.allowsEnabled ||
               request.rails.maxThresholdMicros !== selfServeOwnerRails.maxThresholdMicros ||
               request.rails.maxAmountCents !== selfServeOwnerRails.maxAmountCents ||
@@ -254,24 +311,38 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
                   ? 'Prepaid enrollment uses the server-owned workspace funding rails.'
                   : 'Manual prepaid enrollment uses fixed non-recurring rails.',
               );
-            const activeOwner = await readBillingOwnerInTransaction(client, candidate.workspaceId);
-            const isUpgrade = Boolean(
-              activeOwner &&
-              automaticChargesEnabled &&
-              !activeOwner.rails.allowsEnabled &&
-              activeOwner.membershipId === candidate.membershipId,
-            );
-            if (activeOwner && !isUpgrade)
-              throw authorityError(
-                'billing_owner_already_active',
-                'This workspace already has an active funding owner.',
+            const storedOwner = (
+              await client.query<{ authority_version: number }>(
+                'SELECT authority_version FROM mr_billing_owners WHERE workspace_id=$1 FOR UPDATE',
+                [candidate.workspaceId],
+              )
+            ).rows[0];
+            if ((storedOwner?.authority_version ?? 0) !== request.expectedAuthorityVersion)
+              throw new BillingPolicyError(
+                'billing_owner_conflict',
+                'The funding envelope changed. Review its current version.',
                 409,
               );
-            const policy = await verifyHumanIdentityTermsReceiptInTransaction(
-              client,
-              candidate.identity,
-              options.humanTermsPolicy,
+            const activeOwner = await readBillingOwnerInTransaction(client, candidate.workspaceId);
+            const isSameOwner = Boolean(
+              activeOwner && activeOwner.membershipId === candidate.membershipId,
             );
+            const isUpgrade = Boolean(
+              isSameOwner && automaticChargesEnabled && !activeOwner!.rails.allowsEnabled,
+            );
+            if (isSameOwner && !isUpgrade)
+              throw authorityError(
+                'billing_owner_already_active',
+                'You are already the active funding owner for this workspace.',
+                409,
+              );
+            const policy = environment.livemode
+              ? await verifyHumanIdentityTermsReceiptInTransaction(
+                  client,
+                  candidate.identity,
+                  options.humanTermsPolicy,
+                )
+              : null;
             const current = await revalidatedBrowserCandidate(client, actor as Principal);
             if (
               current.role !== 'admin' ||
@@ -285,12 +356,19 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
                 'billing_access_denied',
                 'Workspace administrator authority changed; sign in again.',
               );
+            const approvalReference =
+              isUpgrade && activeOwner
+                ? activeOwner.approvalReference
+                : policy
+                  ? `self-serve-manual-v1:${current.membershipId}:${policy.version}`.slice(0, 200)
+                  : `self-serve-sandbox-v1:${current.membershipId}:${options.terms.version}`.slice(
+                      0,
+                      200,
+                    );
             return {
               principal: current,
               processorEnvironmentId: environment.id,
-              approvalReference: activeOwner
-                ? activeOwner.approvalReference
-                : `self-serve-manual-v1:${current.membershipId}:${policy.version}`.slice(0, 200),
+              approvalReference,
             };
           },
         }
@@ -431,15 +509,17 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
       ).rows[0];
       const expectedAuthorityVersion = row?.authority_version ?? 0;
       const activeOwner = await readBillingOwnerInTransaction(client, candidate.workspaceId);
+      const isSameOwner = Boolean(
+        activeOwner && activeOwner.membershipId === candidate.membershipId,
+      );
       const upgradeMeta =
-        activeOwner &&
+        isSameOwner &&
         automaticChargesEnabled &&
-        !activeOwner.rails.allowsEnabled &&
-        activeOwner.membershipId === candidate.membershipId &&
+        !activeOwner!.rails.allowsEnabled &&
         candidate.role === 'admin'
           ? { upgradeToRecharge: true as const }
           : null;
-      if (activeOwner && !upgradeMeta) {
+      if (isSameOwner && !upgradeMeta) {
         await client.query('COMMIT');
         if (alreadyHasRead) return null;
         return {
@@ -456,6 +536,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
       }
       if (candidate.role !== 'admin') {
         await client.query('COMMIT');
+        if (alreadyHasRead) return null;
         return {
           eligible: false,
           expectedAuthorityVersion,
@@ -464,45 +545,51 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
           reason: 'admin-required',
         };
       }
+      const replaceMeta =
+        activeOwner && !isSameOwner ? { replaceExistingOwner: true as const } : null;
+      const enrollmentMeta = {
+        ...modeMeta,
+        ...(upgradeMeta ?? {}),
+        ...(replaceMeta ?? {}),
+      };
       if (options.checkoutWritesEnabled === false) {
         await client.query('COMMIT');
         return {
           eligible: false,
           expectedAuthorityVersion,
           terms: options.terms,
-          ...modeMeta,
-          ...(upgradeMeta ?? {}),
+          ...enrollmentMeta,
           reason: 'checkout-paused',
         };
       }
-      try {
-        await verifyHumanIdentityTermsReceiptInTransaction(
-          client,
-          candidate.identity,
-          options.humanTermsPolicy,
-        );
-      } catch (error) {
-        if (isDenied(error)) {
-          const code = (error as { code?: string }).code;
-          await client.query('COMMIT');
-          return {
-            eligible: false,
-            expectedAuthorityVersion,
-            terms: options.terms,
-            ...modeMeta,
-            ...(upgradeMeta ?? {}),
-            reason: code === 'current_human_terms_inactive' ? 'terms-inactive' : 'terms-required',
-          };
+      if (environment.livemode) {
+        try {
+          await verifyHumanIdentityTermsReceiptInTransaction(
+            client,
+            candidate.identity,
+            options.humanTermsPolicy,
+          );
+        } catch (error) {
+          if (isDenied(error)) {
+            const code = (error as { code?: string }).code;
+            await client.query('COMMIT');
+            return {
+              eligible: false,
+              expectedAuthorityVersion,
+              terms: options.terms,
+              ...enrollmentMeta,
+              reason: code === 'current_human_terms_inactive' ? 'terms-inactive' : 'terms-required',
+            };
+          }
+          throw error;
         }
-        throw error;
       }
       await client.query('COMMIT');
       return {
         eligible: true,
         expectedAuthorityVersion,
         terms: options.terms,
-        ...modeMeta,
-        ...(upgradeMeta ?? {}),
+        ...enrollmentMeta,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -587,7 +674,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
         const recoveryScope = requireBillingBrowserRecovery(principal, request.headers);
         const { read, manage, setup } = await capabilities(principal);
         const ownerEnrollment =
-          options.activation === 'manual' && (!read || automaticChargesEnabled)
+          selfServeEnrollmentEnabled && (!read || !setup || automaticChargesEnabled)
             ? await ownerEnrollmentState(principal, read)
             : null;
         return {
@@ -597,7 +684,7 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
           ...(ownerEnrollment ? { ownerEnrollment } : {}),
         };
       });
-      if (options.activation === 'manual') {
+      if (selfServeEnrollmentEnabled) {
         const origin = new URL(publicUrl).origin;
         let ownerWindowStart = 0;
         let ownerWindowCount = 0;

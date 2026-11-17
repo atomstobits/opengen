@@ -18,6 +18,7 @@ import {
   dollarsToCents,
   finishTopUp,
   pendingTopUp,
+  previewProcessingFee,
   stripeCheckoutUrl,
   type BillingSummary,
   type PaymentOrder,
@@ -124,18 +125,20 @@ export function BillingPage() {
               {legal.mode === 'published' ? (
                 <>
                   Review the <a href="/terms">Terms of Service</a>,{' '}
-                  <a href="/refunds">Refund Policy</a> and <a href="/privacy">Privacy Notice</a>.
+                  <a href="/terms#credits-and-refunds">credit &amp; refund terms</a> and{' '}
+                  <a href="/privacy">Privacy Notice</a>.
                 </>
               ) : legal.mode === 'staged' ? (
                 <>
                   Review the <a href="/terms">Terms of Service</a>,{' '}
-                  <a href="/refunds">Refund Policy</a> and <a href="/privacy">Privacy Notice</a>.
-                  Scheduled effective {legal.effectiveAt} — not yet effective.
+                  <a href="/terms#credits-and-refunds">credit &amp; refund terms</a> and{' '}
+                  <a href="/privacy">Privacy Notice</a>. Scheduled effective {legal.effectiveAt} —
+                  not yet effective.
                 </>
               ) : (
                 <>
                   Review the <a href="/terms">Terms draft</a>,{' '}
-                  <a href="/refunds">Refund policy draft</a> and{' '}
+                  <a href="/terms#credits-and-refunds">credit &amp; refund terms</a> and{' '}
                   <a href="/privacy">Privacy draft</a>. Not yet effective.
                 </>
               )}
@@ -163,21 +166,28 @@ export function BillingPage() {
 }
 
 /** Session-backed workspace billing. No card details or Stripe credentials enter this component. */
-type BillingWorkspace = { workspaceId: string; recoveryScope?: string };
+type BillingWorkspace = {
+  workspaceId: string;
+  recoveryScope?: string;
+  initialCapabilities?: BillingCapabilities | null;
+};
 
-export function Billing({ workspaceId, recoveryScope }: BillingWorkspace) {
+export function Billing({ workspaceId, recoveryScope, initialCapabilities }: BillingWorkspace) {
   return (
     <WorkspaceBilling
       key={JSON.stringify([workspaceId, recoveryScope])}
       workspaceId={workspaceId}
       recoveryScope={recoveryScope}
+      initialCapabilities={initialCapabilities}
     />
   );
 }
 
-function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
+function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: BillingWorkspace) {
   const legal = useLegalPresentation();
-  const [capabilities, setCapabilities] = useState<BillingCapabilities | null>();
+  const [capabilities, setCapabilities] = useState<BillingCapabilities | null | undefined>(
+    initialCapabilities,
+  );
   const [policyRefreshKey, setPolicyRefreshKey] = useState(0);
   const [accessError, setAccessError] = useState('');
   const [summary, setSummary] = useState<BillingSummary | null>(null);
@@ -207,7 +217,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
 
   useEffect(() => {
     const authority = { workspaceId, recoveryScope };
-    if (recoveryScope === undefined) return;
+    if (recoveryScope === undefined || initialCapabilities !== undefined) return;
     if (!hasWorkspaceAuthority(authority)) {
       setAccessError('Your billing access could not be verified.');
       return;
@@ -221,7 +231,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
         if (!controller.signal.aborted) setAccessError(message(cause));
       });
     return () => controller.abort();
-  }, [workspaceId, recoveryScope]);
+  }, [workspaceId, recoveryScope, initialCapabilities]);
 
   // A legacy API returns 404. A scoped runtime must explicitly permit reads before
   // this browser restores workspace-keyed payment references or looks up an order.
@@ -355,6 +365,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
     summary !== null &&
     cents >= summary.minAmountCents &&
     cents <= summary.maxAmountCents;
+  const feePreview = cents !== null ? previewProcessingFee(cents, null) : null;
   const blocked =
     !canReadOrders || busy || !summary?.enabled || summary.billingHold || !!storageError;
   const newFundingDenied = summary?.newFunding?.allowed === false;
@@ -476,7 +487,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
             <span className={styles.currency}>USD</span>
           </div>
           <label className={styles.amountLabel} htmlFor="top-up-amount">
-            Choose your amount
+            Choose your credit amount
           </label>
           <div className={styles.amountInput}>
             <span aria-hidden="true">$</span>
@@ -493,7 +504,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
             />
           </div>
           <div className={styles.presets} aria-label="Suggested top-up amounts">
-            {[10, 25, 50, 100].map((value) => (
+            {[10, 25, 50, 100, 500].map((value) => (
               <button
                 key={value}
                 type="button"
@@ -515,8 +526,24 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
             {summary
               ? `${usd(summary.minAmountCents)}–${usd(summary.maxAmountCents)} per top-up.`
               : 'Loading top-up limits…'}{' '}
-            Credit is added after payment confirmation.
+            100% of your selected USD credit is added after payment confirmation.
           </p>
+          {feePreview && (
+            <dl className={styles.breakdown} aria-label="Payment breakdown">
+              <div>
+                <dt>Credit added</dt>
+                <dd>{usd(feePreview.creditCents)}</dd>
+              </div>
+              <div>
+                <dt>Processing fee (2.9% + $0.30)</dt>
+                <dd>{usd(feePreview.feeCents)}</dd>
+              </div>
+              <div className={styles.breakdownTotal}>
+                <dt>Total charged</dt>
+                <dd>{usd(feePreview.totalChargeCents)}</dd>
+              </div>
+            </dl>
+          )}
           <button
             className={styles.primary}
             type="submit"
@@ -526,25 +553,28 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
               ? 'Checking your order…'
               : recovery
                 ? 'Resume this top-up ↗'
-                : 'Continue to Stripe ↗'}
+                : feePreview
+                  ? `Continue to Stripe · ${usd(feePreview.totalChargeCents)} ↗`
+                  : 'Continue to Stripe ↗'}
           </button>
           <p className={styles.finePrint}>One-time payment · Secure hosted checkout</p>
           <p className={`${styles.finePrint} legal-review-links`}>
             {legal.mode === 'published' ? (
               <>
-                Governed by the <a href="/terms">Terms of Service</a> and{' '}
-                <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                Governed by the <a href="/terms">Terms of Service</a> (including{' '}
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
               </>
             ) : legal.mode === 'staged' ? (
               <>
                 Review the <a href="/terms">Terms of Service</a> and{' '}
-                <a href="/refunds">Refund Policy</a>. Scheduled effective {legal.effectiveAt} — not
-                yet effective.
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>. Scheduled
+                effective {legal.effectiveAt} — not yet effective.
               </>
             ) : (
               <>
                 Review the <a href="/terms">Terms draft</a> and{' '}
-                <a href="/refunds">Refund policy draft</a>. Not yet effective.
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>. Not yet
+                effective.
               </>
             )}
           </p>
@@ -557,12 +587,12 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
             to add more.
           </h2>
           <p>
-            Your top-up becomes USD service credit in this workspace. Generation costs come from
-            that balance.
+            Your top-up becomes USD service credit in this workspace, with payment processing
+            disclosed upfront and 0% model route markup.
           </p>
           <ol>
             <li>
-              <span>1</span>Choose an amount.
+              <span>1</span>Choose a credit amount ($5–$9,999).
             </li>
             <li>
               <span>2</span>Complete your payment on Stripe.
@@ -581,7 +611,11 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
           <div>
             <span className={styles.eyebrow}>CURRENT TOP-UP</span>
             <h2 id="current-top-up">
-              {usd(active?.amountCents ?? recovery!.amountCents)}{' '}
+              {usd(active?.amountCents ?? recovery!.amountCents)} credit
+              {active?.totalChargeCents !== undefined &&
+                active.totalChargeCents !== active.amountCents && (
+                  <span> · {usd(active.totalChargeCents)} total</span>
+                )}{' '}
               <span className={styles.status} data-status={active?.status}>
                 {active ? statusLabels[active.status] : 'Request awaiting confirmation'}
               </span>
@@ -661,7 +695,9 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
               <thead>
                 <tr>
                   <th scope="col">Date / reference</th>
-                  <th scope="col">Credit value</th>
+                  <th scope="col">Credit added</th>
+                  <th scope="col">Processing fee</th>
+                  <th scope="col">Total charged</th>
                   <th scope="col">Payment status</th>
                   <th scope="col">
                     <span className={styles.visuallyHidden}>Actions</span>
@@ -678,6 +714,10 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
                       <code>{order.id}</code>
                     </td>
                     <td className={styles.money}>{usd(order.amountCents)}</td>
+                    <td className={styles.moneySubtle}>{usd(order.feeCents ?? 0)}</td>
+                    <td className={styles.money}>
+                      {usd(order.totalChargeCents ?? order.amountCents)}
+                    </td>
                     <td>
                       <span className={styles.status} data-status={order.status}>
                         {statusLabels[order.status]}
@@ -745,6 +785,28 @@ function WorkspaceBilling({ workspaceId, recoveryScope }: BillingWorkspace) {
           }}
         />
       )}
+      {capabilities?.read &&
+        recoveryScope &&
+        capabilities.ownerEnrollment?.replaceExistingOwner && (
+          <BillingOwnerEnrollmentCard
+            embedded
+            workspaceId={workspaceId}
+            recoveryScope={recoveryScope}
+            enrollment={capabilities.ownerEnrollment}
+            legal={legal}
+            onEnrolled={async () => {
+              const next = await readBillingAccess({ workspaceId, recoveryScope });
+              if (mounted.current) {
+                setCapabilities(next);
+                setPolicyRefreshKey((current) => current + 1);
+                setNotice(
+                  'Workspace funding-owner authority has been transferred to your account.',
+                );
+                await load();
+              }
+            }}
+          />
+        )}
       {capabilities?.read && recoveryScope && (
         <BillingPolicyPanel
           key={policyRefreshKey}
@@ -788,6 +850,10 @@ function BillingAutoRechargeUpgradeCard({
             {error}
           </p>
         )}
+        <details className={styles.termsDisclosure}>
+          <summary>Payment terms</summary>
+          <p>{enrollment.terms.text}</p>
+        </details>
         <label className={styles.consentLabel}>
           <input
             type="checkbox"
@@ -797,7 +863,7 @@ function BillingAutoRechargeUpgradeCard({
           />
           <span>
             I authorize saved-card setup and opt-in automatic recharge rails for {workspaceId} under
-            payment summary {enrollment.terms.version}.
+            the payment terms shown above.
           </span>
         </label>
       </div>
@@ -830,39 +896,64 @@ function BillingAutoRechargeUpgradeCard({
   );
 }
 
-function BillingOwnerEnrollmentCard({
+export function BillingOwnerEnrollmentCard({
   workspaceId,
   recoveryScope,
   enrollment,
   legal,
   onEnrolled,
+  embedded = false,
 }: {
   workspaceId: string;
   recoveryScope: string;
   enrollment: BillingOwnerEnrollment;
   legal: ReturnType<typeof useLegalPresentation>;
   onEnrolled: () => Promise<void>;
+  embedded?: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const replacing = enrollment.replaceExistingOwner === true;
+  const HeadingTag = embedded ? 'h2' : 'h1';
 
   return (
-    <section className={styles.billing} aria-labelledby="billing-enrollment-title">
+    <section
+      className={embedded ? undefined : styles.billing}
+      aria-labelledby="billing-enrollment-title"
+    >
       <header className={styles.heading}>
         <div>
-          <span className={styles.eyebrow}>YOUR WORKSPACE / BILLING</span>
-          <h1 id="billing-enrollment-title">
-            Enable prepaid
-            <br />
-            <em>workspace credit.</em>
-          </h1>
-          <p>Approve manual one-time USD top-ups for image and video generation.</p>
+          <span className={styles.eyebrow}>
+            {embedded ? 'FUNDING OWNER AUTHORITY' : 'YOUR WORKSPACE / BILLING'}
+          </span>
+          <HeadingTag id="billing-enrollment-title">
+            {replacing ? (
+              <>
+                Become workspace
+                <br />
+                <em>funding owner.</em>
+              </>
+            ) : (
+              <>
+                Enable prepaid
+                <br />
+                <em>workspace credit.</em>
+              </>
+            )}
+          </HeadingTag>
+          <p>
+            {replacing
+              ? 'Transfer workspace funding-owner authority to your verified administrator session.'
+              : 'Approve USD prepaid credit funding for image and video generation.'}
+          </p>
         </div>
-        <div className={styles.workspace}>
-          <span>Paying workspace</span>
-          <strong>{workspaceId}</strong>
-        </div>
+        {!embedded && (
+          <div className={styles.workspace}>
+            <span>Paying workspace</span>
+            <strong>{workspaceId}</strong>
+          </div>
+        )}
       </header>
       {error && (
         <p className={styles.error} role="alert">
@@ -893,18 +984,22 @@ function BillingOwnerEnrollmentCard({
           }}
         >
           <div className={styles.cardTop}>
-            <span className={styles.eyebrow}>01 / ENABLE PREPAID BILLING</span>
+            <span className={styles.eyebrow}>
+              {replacing ? '01 / TRANSFER FUNDING OWNER' : '01 / ENABLE PREPAID BILLING'}
+            </span>
             <span className={styles.currency}>USD</span>
           </div>
           {enrollment.eligible ? (
             <>
               <p className={styles.enrollmentLead}>
-                {enrollment.allowsAutoRecharge
-                  ? 'Establish your administrator account as the funding owner for this workspace. Enable one-time Stripe Checkout top-ups and optional opt-in saved-card automatic recharge within your workspace limits.'
-                  : 'Establish your administrator account as the funding owner for this workspace. Manual top-ups are one-time Stripe Checkout payments; automatic recurring charges remain disabled.'}
+                {replacing
+                  ? 'Each workspace has strictly one active human funding owner. Confirming below transfers funding-owner authority to your verified administrator session and revokes prior owner delegations.'
+                  : enrollment.allowsAutoRecharge
+                    ? 'Establish your administrator account as the funding owner for this workspace. Enable one-time Stripe Checkout top-ups ($5.00–$9,999.00) and optional opt-in saved-card automatic recharge within your workspace limits.'
+                    : 'Establish your administrator account as the funding owner for this workspace. Manual top-ups ($5.00–$9,999.00) are one-time Stripe Checkout payments; automatic recurring charges remain disabled.'}
               </p>
               <details className={styles.termsDisclosure}>
-                <summary>Payment and refund summary ({enrollment.terms.version})</summary>
+                <summary>Payment terms</summary>
                 <p>{enrollment.terms.text}</p>
               </details>
               <label className={styles.consentLabel}>
@@ -918,20 +1013,26 @@ function BillingOwnerEnrollmentCard({
                   {enrollment.allowsAutoRecharge ? (
                     <>
                       I am an authorized workspace administrator and agree to enable prepaid USD
-                      billing under the <a href="/terms">Terms of Service</a> and{' '}
-                      <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                      billing under the <a href="/terms">Terms of Service</a> (including{' '}
+                      <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
                     </>
                   ) : (
                     <>
                       I am an authorized workspace administrator and agree to enable manual prepaid
-                      USD top-ups under the <a href="/terms">Terms of Service</a> and{' '}
-                      <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                      USD top-ups under the <a href="/terms">Terms of Service</a> (including{' '}
+                      <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
                     </>
                   )}
                 </span>
               </label>
               <button className={styles.primary} type="submit" disabled={!accepted || submitting}>
-                {submitting ? 'Enabling prepaid billing…' : 'Enable prepaid billing →'}
+                {submitting
+                  ? replacing
+                    ? 'Updating funding owner…'
+                    : 'Enabling prepaid billing…'
+                  : replacing
+                    ? 'Become workspace funding owner →'
+                    : 'Enable prepaid billing →'}
               </button>
               <p className={styles.finePrint}>
                 {enrollment.allowsAutoRecharge
@@ -944,14 +1045,14 @@ function BillingOwnerEnrollmentCard({
               <div className={styles.enrollmentStatus} role="status">
                 {enrollment.reason === 'admin-required' ? (
                   <p>
-                    Only a workspace administrator can enable prepaid billing for this workspace.
-                    Your existing generation balance and BYOK provider connections remain available.
+                    Only a workspace administrator can enable or manage prepaid billing for this
+                    workspace. Your existing generation balance and BYOK provider connections remain
+                    available.
                   </p>
                 ) : enrollment.reason === 'owner-already-active' ? (
                   <p>
-                    Prepaid billing is already enabled by another administrator in this workspace.
-                    Ask that funding owner to add credit, or spend from your workspace’s available
-                    generation balance.
+                    Prepaid billing is already active for this workspace. Refresh this page to load
+                    your workspace billing controls.
                   </p>
                 ) : enrollment.reason === 'terms-required' ? (
                   <p>
@@ -980,19 +1081,20 @@ function BillingOwnerEnrollmentCard({
           <p className={`${styles.finePrint} legal-review-links`}>
             {legal.mode === 'published' ? (
               <>
-                Governed by the <a href="/terms">Terms of Service</a> and{' '}
-                <a href="/refunds">Prepaid Credit and Refund Policy</a>.
+                Governed by the <a href="/terms">Terms of Service</a> (including{' '}
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
               </>
             ) : legal.mode === 'staged' ? (
               <>
                 Review the <a href="/terms">Terms of Service</a> and{' '}
-                <a href="/refunds">Refund Policy</a>. Scheduled effective {legal.effectiveAt} — not
-                yet effective.
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>. Scheduled
+                effective {legal.effectiveAt} — not yet effective.
               </>
             ) : (
               <>
                 Review the <a href="/terms">Terms draft</a> and{' '}
-                <a href="/refunds">Refund policy draft</a>. Not yet effective.
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>. Not yet
+                effective.
               </>
             )}
           </p>
@@ -1010,10 +1112,10 @@ function BillingOwnerEnrollmentCard({
           </p>
           <ol>
             <li>
-              <span>1</span>Enable manual prepaid billing as workspace admin.
+              <span>1</span>Enable prepaid billing as workspace admin.
             </li>
             <li>
-              <span>2</span>Add $5.00–$1,000.00 USD via Stripe Checkout when needed.
+              <span>2</span>Add $5.00–$9,999.00 USD via Stripe Checkout when needed.
             </li>
             <li>
               <span>3</span>Spend from your workspace balance across web, REST, MCP, or CLI.

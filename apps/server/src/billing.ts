@@ -223,8 +223,12 @@ export async function registerBillingRoutes(app: FastifyInstance, options: Billi
       // The owner may bind a newly completed setup. Delegates see only the policy's mandate.
       const active = humanMembershipId
         ? (
-            await client.query(
-              `SELECT id,status FROM mr_billing_mandates
+            await client.query<{
+              id: string;
+              status: string;
+              card_country?: string | null;
+            }>(
+              `SELECT id,status,card_country FROM mr_billing_mandates
                WHERE workspace_id=$1 AND human_membership_id=$2 AND status='active'
                  AND livemode=$3 AND owner_authority_version=$4 AND owner_consent_reference=$5
                  AND owner_membership_epoch=$6 AND processor_environment_id=$7`,
@@ -244,8 +248,12 @@ export async function registerBillingRoutes(app: FastifyInstance, options: Billi
         active ??
         (policy.mandateId
           ? (
-              await client.query(
-                'SELECT id,status FROM mr_billing_mandates WHERE workspace_id=$1 AND id=$2',
+              await client.query<{
+                id: string;
+                status: string;
+                card_country?: string | null;
+              }>(
+                'SELECT id,status,card_country FROM mr_billing_mandates WHERE workspace_id=$1 AND id=$2',
                 [p.workspaceId, policy.mandateId],
               )
             ).rows[0]
@@ -253,7 +261,9 @@ export async function registerBillingRoutes(app: FastifyInstance, options: Billi
       return {
         policy,
         ownerAuthorityVersion: proof.owner.authorityVersion,
-        mandate: row ? { id: row.id, status: row.status } : null,
+        mandate: row
+          ? { id: row.id, status: row.status, cardCountry: row.card_country ?? null }
+          : null,
       };
     });
     return {

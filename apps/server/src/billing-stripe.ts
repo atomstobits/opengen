@@ -256,7 +256,17 @@ export class StripeBillingTransport
   async retrievePaymentMethod(id: string): Promise<PaymentMethodReference> {
     this.assertProcessorEnvironment();
     const method = await this.stripe.paymentMethods.retrieve(id);
-    return { id: method.id, customer: objectId(method.customer), livemode: method.livemode };
+    const rawCountry = method.card?.country;
+    const cardCountry =
+      typeof rawCountry === 'string' && /^[A-Za-z]{2}$/.test(rawCountry)
+        ? rawCountry.toUpperCase()
+        : null;
+    return {
+      id: method.id,
+      customer: objectId(method.customer),
+      livemode: method.livemode,
+      cardCountry,
+    };
   }
   async createPortal(customerId: string): Promise<{ customerId: string; url: string }> {
     this.assertProcessorEnvironment();
@@ -386,7 +396,8 @@ export class StripeBillingTransport
   async createRecharge(attempt: RechargeAttemptRequest): Promise<RechargePayment> {
     this.assertRequestEnvironment(attempt.processorEnvironment);
     if (
-      attempt.requestVersion !== 'recharge_pi_v1' ||
+      (attempt.requestVersion !== 'recharge_pi_v1' &&
+        attempt.requestVersion !== 'recharge_pi_fee_v2') ||
       attempt.apiVersion !== BILLING_STRIPE_API_VERSION
     )
       throw new BillingCustomerError(
@@ -394,17 +405,38 @@ export class StripeBillingTransport
         'Recover this recharge with its original request version.',
         409,
       );
+    const withFee = attempt.requestVersion === 'recharge_pi_fee_v2';
+    if (
+      withFee &&
+      (!Number.isSafeInteger(attempt.feeCents) ||
+        attempt.feeCents < 0 ||
+        !Number.isSafeInteger(attempt.totalChargeCents) ||
+        attempt.totalChargeCents !== attempt.amountCents + attempt.feeCents)
+    )
+      throw new BillingCustomerError(
+        'unsupported_billing_request',
+        'Recharge fee breakdown does not match the persisted attempt.',
+        409,
+      );
+    const amount = withFee ? attempt.totalChargeCents : attempt.amountCents;
+    const metadata: Record<string, string> = withFee
+      ? {
+          opengen_recharge_reference: attempt.id,
+          opengen_credit_cents: String(attempt.amountCents),
+          opengen_fee_cents: String(attempt.feeCents),
+        }
+      : { opengen_recharge_reference: attempt.id };
     try {
       return this.recharge(
         await this.stripe.paymentIntents.create(
           {
-            amount: attempt.amountCents,
+            amount,
             currency: 'usd',
             customer: attempt.customerId,
             payment_method: attempt.paymentMethodId,
             confirm: true,
             off_session: true,
-            metadata: { opengen_recharge_reference: attempt.id },
+            metadata,
           },
           { idempotencyKey: attempt.stripeIdempotencyKey, apiVersion: attempt.apiVersion },
         ),

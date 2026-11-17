@@ -1,6 +1,7 @@
 import type Stripe from 'stripe';
-import type { Pool } from 'pg';
-import { PaymentStore, creditWorkspaceInTransaction } from '@media-router/engine';
+import type { Pool, PoolClient } from 'pg';
+import { creditWorkspaceInTransaction } from '@media-router/engine';
+import { PAYMENT_RATE_LIMITS, PaymentStore } from '../../../packages/engine/src/payments.js';
 import {
   assertBillingProcessorEnvironmentInTransaction,
   validatedBillingProcessorEnvironment,
@@ -13,10 +14,10 @@ import { StripeBillingTransport } from './billing-stripe.js';
 import { createStripeClient } from './payments.js';
 import type { HumanTermsPolicy } from './terms-login.js';
 
-interface BillingManualConfiguration {
+export interface BillingManualConfiguration {
   databaseUrl: string;
   publicUrl: string;
-  workspaceId: string;
+  workspaceId?: string;
   environment: BillingProcessorEnvironment;
   key: string;
   webhookSecret: string;
@@ -25,8 +26,34 @@ interface BillingManualConfiguration {
   rechargeEnabled: boolean;
   publishableKey?: string;
   portalConfigurationId?: string;
-  approvalReference: string;
+  approvalReference?: string;
   terms: BillingTerms;
+}
+
+export async function admitInstallationExternalInTransaction(
+  client: PoolClient,
+  limiter: PaymentStore,
+): Promise<void> {
+  await limiter.lockExternalInTransaction(client);
+  const {
+    rows: [clock],
+  } = await client.query<{ now: Date }>('SELECT clock_timestamp() AS now');
+  const {
+    rows: [limits],
+  } = await client.query<{ payment_checkout_window: string; payment_checkout_count: number }>(
+    'SELECT payment_checkout_window, payment_checkout_count FROM mr_payment_rate_limits WHERE singleton=true',
+  );
+  if (!limits || !clock) throw new Error('Installation payment admission is unavailable.');
+  const currentWindow = Math.floor(clock.now.getTime() / PAYMENT_RATE_LIMITS.windowMs);
+  const installationWindow = Math.max(Number(limits.payment_checkout_window), currentWindow);
+  const installationCount =
+    installationWindow > Number(limits.payment_checkout_window) ? 0 : limits.payment_checkout_count;
+  if (installationCount >= PAYMENT_RATE_LIMITS.checkoutPerInstallation)
+    throw new Error('Installation payment outbound rate limit reached.');
+  await client.query(
+    'UPDATE mr_payment_rate_limits SET payment_checkout_window=$1, payment_checkout_count=$2 WHERE singleton=true',
+    [installationWindow, installationCount + 1],
+  );
 }
 
 /** Validate before database initialization. Runtime secrets never appear in errors. */
@@ -50,12 +77,12 @@ export function readBillingManualConfiguration(
     throw new Error('Manual billing and sandbox activation are mutually exclusive.');
 
   const { DATABASE_URL, OPENGEN_PUBLIC_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } = env;
-  const workspaceId = env.OPENGEN_BILLING_MANUAL_WORKSPACE;
+  const workspaceId = env.OPENGEN_BILLING_MANUAL_WORKSPACE || undefined;
+  const approvalReference = env.OPENGEN_BILLING_APPROVAL_REFERENCE || undefined;
   const checkout = env.OPENGEN_BILLING_CHECKOUT ?? 'paused';
   const recharge = env.OPENGEN_BILLING_RECHARGE ?? 'paused';
   const publishableKey = env.OPENGEN_BILLING_PUBLISHABLE_KEY || undefined;
   const portalConfigurationId = env.OPENGEN_BILLING_PORTAL_CONFIGURATION || undefined;
-  const approvalReference = env.OPENGEN_BILLING_APPROVAL_REFERENCE;
   const termsVersion = env.OPENGEN_BILLING_TERMS_VERSION;
   const termsText = env.OPENGEN_BILLING_TERMS_TEXT;
   const operatorBearer = env.OPENGEN_BILLING_OPERATOR_BEARER || undefined;
@@ -72,8 +99,12 @@ export function readBillingManualConfiguration(
   if (
     !DATABASE_URL ||
     !OPENGEN_PUBLIC_URL ||
-    !workspaceId ||
-    !/^[A-Za-z0-9_-]{1,80}$/.test(workspaceId) ||
+    (workspaceId !== undefined) !== (approvalReference !== undefined) ||
+    (workspaceId !== undefined && !/^[A-Za-z0-9_-]{1,80}$/.test(workspaceId)) ||
+    (approvalReference !== undefined &&
+      (approvalReference.length > 200 ||
+        approvalReference.trim() !== approvalReference ||
+        /[\u0000-\u001f\u007f]/.test(approvalReference))) ||
     !STRIPE_SECRET_KEY ||
     !/^rk_live_[A-Za-z0-9]+$/.test(STRIPE_SECRET_KEY) ||
     !STRIPE_WEBHOOK_SECRET ||
@@ -81,11 +112,7 @@ export function readBillingManualConfiguration(
     !['paused', 'open'].includes(checkout) ||
     !['paused', 'open'].includes(recharge) ||
     (publishableKey !== undefined && !/^pk_live_[A-Za-z0-9]+$/.test(publishableKey)) ||
-    (portalConfigurationId !== undefined && !/^bpc_[A-Za-z0-9]+$/.test(portalConfigurationId)) ||
-    !approvalReference ||
-    approvalReference.length > 200 ||
-    approvalReference.trim() !== approvalReference ||
-    /[\u0000-\u001f\u007f]/.test(approvalReference) ||
+    (portalConfigurationId !== undefined && !/^bpc_[A-Za-z0-9_]+$/.test(portalConfigurationId)) ||
     !termsVersion ||
     termsVersion.length > 120 ||
     termsVersion.trim() !== termsVersion ||
@@ -126,7 +153,8 @@ export function readBillingManualConfiguration(
   return {
     databaseUrl: DATABASE_URL,
     publicUrl: origin.origin,
-    workspaceId,
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(approvalReference ? { approvalReference } : {}),
     environment: validatedBillingProcessorEnvironment({
       id: env.OPENGEN_BILLING_PROCESSOR_ENVIRONMENT ?? '',
       accountId: env.OPENGEN_BILLING_PROCESSOR_ACCOUNT ?? '',
@@ -139,12 +167,11 @@ export function readBillingManualConfiguration(
     rechargeEnabled: recharge === 'open',
     ...(publishableKey ? { publishableKey } : {}),
     ...(portalConfigurationId ? { portalConfigurationId } : {}),
-    approvalReference,
     terms: { version: termsVersion, text: termsText },
   };
 }
 
-/** Construct a scoped manual runtime after one admitted, owner-bound account proof. */
+/** Construct a scoped manual runtime after one admitted processor account proof. */
 export async function hostedBillingManual(
   pool: Pool,
   config: BillingManualConfiguration,
@@ -168,17 +195,26 @@ export async function hostedBillingManual(
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await limiter.admitExternalInTransaction(client, config.workspaceId);
-      await assertBillingProcessorEnvironmentInTransaction(client, environment);
-      const owner = await readBillingOwnerInTransaction(client, config.workspaceId);
-      if (
-        !environment.livemode ||
-        !owner ||
-        owner.processorEnvironmentId !== environment.id ||
-        owner.livemode !== true ||
-        owner.approvalReference !== config.approvalReference
-      )
-        throw new Error('Current reviewed manual funding authority is required.');
+      if (config.workspaceId !== undefined) {
+        if (!config.approvalReference)
+          throw new Error('Current reviewed manual funding authority is required.');
+        await limiter.admitExternalInTransaction(client, config.workspaceId);
+        await assertBillingProcessorEnvironmentInTransaction(client, environment);
+        const owner = await readBillingOwnerInTransaction(client, config.workspaceId);
+        if (
+          !environment.livemode ||
+          !owner ||
+          owner.processorEnvironmentId !== environment.id ||
+          owner.livemode !== true ||
+          owner.approvalReference !== config.approvalReference
+        )
+          throw new Error('Current reviewed manual funding authority is required.');
+      } else {
+        await admitInstallationExternalInTransaction(client, limiter);
+        await assertBillingProcessorEnvironmentInTransaction(client, environment);
+        if (!environment.livemode)
+          throw new Error('Live processor environment is required for manual billing.');
+      }
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');

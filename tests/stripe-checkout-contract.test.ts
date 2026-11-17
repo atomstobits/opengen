@@ -14,6 +14,9 @@ const order: CheckoutOrder = {
   id: 'fixture-order',
   workspaceId: 'fixture-workspace',
   amountCents: 500,
+  feeCents: 0,
+  totalChargeCents: 500,
+  feeRateBps: 0,
   creditMicros: 5000000,
   currency: 'USD',
   status: 'created',
@@ -164,5 +167,31 @@ describe('pinned Stripe hosted Checkout wire contract', () => {
       }),
     ).rejects.toMatchObject({ code: 'legacy_order_immutable' });
     expect(f.requests).toEqual([]);
+  });
+  it('serializes separate credit and processing fee line items for checkout_hosted_page_fee_v3', async () => {
+    const f = wireFixture();
+    await new StripeCheckoutTransport(f.sdk, publicUrl).createSession({
+      ...order,
+      amountCents: 2000,
+      feeCents: 91,
+      totalChargeCents: 2091,
+      feeRateBps: 290,
+      creditMicros: 20_000_000,
+      requestVersion: 'checkout_hosted_page_fee_v3',
+      stripeIdempotencyKey: 'fixture-new-checkout-v3',
+    });
+    expect(f.requests).toHaveLength(1);
+    const params = new URLSearchParams(f.requests[0]!.body);
+    expect(params.get('ui_mode')).toBe('hosted_page');
+    expect(params.get('line_items[0][price_data][unit_amount]')).toBe('2000');
+    expect(params.get('line_items[0][price_data][product_data][name]')).toBe(
+      'OpenGen prepaid service credit',
+    );
+    expect(params.get('line_items[1][price_data][unit_amount]')).toBe('91');
+    expect(params.get('line_items[1][price_data][product_data][name]')).toBe(
+      'Payment processing fee',
+    );
+    expect(params.get('line_items[2][price_data][unit_amount]')).toBeNull();
+    expect(params.get('client_reference_id')).toBe(order.id);
   });
 });

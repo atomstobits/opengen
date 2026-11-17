@@ -49,6 +49,30 @@ export async function paymentFixture(
   await pool.query(
     await readFile(new URL('../packages/engine/migrations/027.sql', import.meta.url), 'utf8'),
   );
+  await pool.query(`
+    ALTER TABLE mr_payment_orders
+      DROP CONSTRAINT mr_payment_orders_amount_cents_check,
+      DROP CONSTRAINT mr_payment_orders_checkout_request_version_check,
+      ADD CONSTRAINT mr_payment_orders_amount_cents_check CHECK (amount_cents BETWEEN 500 AND 999900),
+      ADD CONSTRAINT mr_payment_orders_checkout_request_version_check
+        CHECK (checkout_request_version IN ('checkout_hosted_v1','checkout_hosted_page_v2','checkout_hosted_page_fee_v3')),
+      ADD COLUMN fee_cents integer NOT NULL DEFAULT 0 CHECK (fee_cents >= 0),
+      ADD COLUMN fee_rate_bps integer NOT NULL DEFAULT 0 CHECK (fee_rate_bps IN (0, 290, 440)),
+      ADD COLUMN total_charge_cents integer;
+    UPDATE mr_payment_orders SET total_charge_cents = amount_cents + fee_cents WHERE total_charge_cents IS NULL;
+    ALTER TABLE mr_payment_orders
+      ALTER COLUMN total_charge_cents SET NOT NULL,
+      ADD CONSTRAINT mr_payment_orders_total_charge_cents_check CHECK (total_charge_cents = amount_cents + fee_cents);
+    CREATE FUNCTION mr_billing_total_charge_default() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.total_charge_cents IS NULL AND NEW.fee_cents = 0 AND NEW.amount_cents IS NOT NULL THEN
+        NEW.total_charge_cents := NEW.amount_cents;
+      END IF;
+      RETURN NEW;
+    END $$;
+    CREATE TRIGGER mr_payment_orders_total_charge_default BEFORE INSERT ON mr_payment_orders
+      FOR EACH ROW EXECUTE FUNCTION mr_billing_total_charge_default();
+  `);
   const workspace = `ws_${randomUUID()}`;
   await pool.query('INSERT INTO mr_workspaces(id,available_micros) VALUES($1,0)', [workspace]);
   const store = new PaymentStore(pool, {
@@ -61,12 +85,13 @@ export async function paymentFixture(
   const transport = {
     async createSession(order: CheckoutOrder) {
       requests.push(order);
+      const total = order.totalChargeCents ?? order.amountCents;
       session ??= {
         id: `cs_test_${randomUUID().replaceAll('-', '')}`,
         mode: 'payment',
         currency: 'usd',
-        amount_subtotal: order.amountCents,
-        amount_total: order.amountCents,
+        amount_subtotal: total,
+        amount_total: total,
         payment_status: 'unpaid',
         status: 'open',
         client_reference_id: order.id,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import type { BillingPrincipal, BillingPolicyAuthority } from './billing-policy.js';
+import type { BillingOwner, BillingPrincipal, BillingPolicyAuthority } from './billing-policy.js';
 
 export const BILLING_STRIPE_API_VERSION = '2026-10-28.endive' as const;
 export interface BillingProcessorEnvironment {
@@ -89,12 +89,15 @@ export function assertBillingProcessorTransport(
 
 export interface RechargeAttemptRequest {
   processorEnvironment: BillingProcessorEnvironment;
-  requestVersion: 'recharge_pi_v1';
+  requestVersion: 'recharge_pi_v1' | 'recharge_pi_fee_v2';
   apiVersion: typeof BILLING_STRIPE_API_VERSION;
   id: string;
   customerId: string;
   paymentMethodId: string;
   amountCents: number;
+  feeCents: number;
+  totalChargeCents: number;
+  feeRateBps: 0 | 290 | 440;
   stripeIdempotencyKey: string;
 }
 export interface RechargePayment {
@@ -171,6 +174,65 @@ export interface PaymentMethodReference {
   id: string;
   customer: string | null;
   livemode: boolean;
+  cardCountry?: string | null;
+}
+export interface BillingMandateView {
+  id: string;
+  status: 'active' | 'revoked';
+  cardCountry: string | null;
+}
+export function normalizeCardCountry(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z]{2}$/.test(value) ? value.toUpperCase() : null;
+}
+export async function activeMandateInTransaction(
+  client: Pick<PoolClient, 'query'>,
+  input: {
+    workspaceId: string;
+    owner: BillingOwner;
+    humanMembershipId?: string;
+    policyMandateId?: string | null;
+  },
+): Promise<BillingMandateView | null> {
+  const active = input.humanMembershipId
+    ? (
+        await client.query<{
+          id: string;
+          status: 'active' | 'revoked';
+          card_country?: string | null;
+        }>(
+          `SELECT * FROM mr_billing_mandates
+           WHERE workspace_id=$1 AND human_membership_id=$2 AND status='active'
+             AND livemode=$3 AND owner_authority_version=$4 AND owner_consent_reference=$5
+             AND owner_membership_epoch=$6 AND processor_environment_id=$7`,
+          [
+            input.workspaceId,
+            input.humanMembershipId,
+            input.owner.livemode,
+            input.owner.authorityVersion,
+            input.owner.consentReference,
+            input.owner.membershipEpoch,
+            input.owner.processorEnvironmentId,
+          ],
+        )
+      ).rows[0]
+    : null;
+  const row =
+    active ??
+    (input.policyMandateId
+      ? (
+          await client.query<{
+            id: string;
+            status: 'active' | 'revoked';
+            card_country?: string | null;
+          }>('SELECT * FROM mr_billing_mandates WHERE workspace_id=$1 AND id=$2', [
+            input.workspaceId,
+            input.policyMandateId,
+          ])
+        ).rows[0]
+      : null);
+  return row
+    ? { id: row.id, status: row.status, cardCountry: normalizeCardCountry(row.card_country) }
+    : null;
 }
 export interface BillingDocument {
   type: 'receipt' | 'invoice';
@@ -248,6 +310,7 @@ export interface SetupView {
   termsVersion: string;
   consentReference: string;
   mandateId: string | null;
+  cardCountry?: string | null;
 }
 interface CustomerRow {
   processor_environment_id: string;
@@ -798,7 +861,57 @@ export class BillingCustomerStore {
         )
       ).rows[0];
       if (!row) throw new BillingCustomerError('not_found', 'Payment setup not found.', 404);
-      return setupView(row);
+      if (!row.mandate_id) return setupView(row);
+      const mandate = (
+        await client.query<{ card_country?: string | null }>(
+          'SELECT * FROM mr_billing_mandates WHERE workspace_id=$1 AND id=$2',
+          [workspaceId, row.mandate_id],
+        )
+      ).rows[0];
+      return { ...setupView(row), cardCountry: normalizeCardCountry(mandate?.card_country) };
+    });
+  }
+  async getMandate(actor: CustomerActor, workspaceId: string): Promise<BillingMandateView | null> {
+    return this.tx(async (client) => {
+      await this.lock(client, workspaceId);
+      const authorization = await this.options.authorize(client, actor, 'billing:read');
+      const current = authorization.principal;
+      const owner = authorization.owner;
+      if (
+        !owner ||
+        owner.workspaceId !== workspaceId ||
+        owner.livemode !== this.processorEnvironment.livemode ||
+        owner.processorEnvironmentId !== this.processorEnvironment.id ||
+        current.workspaceId !== workspaceId ||
+        current.bootstrap ||
+        !current.scopes.includes('billing:read')
+      )
+        throw new BillingCustomerError(
+          'billing_access_denied',
+          'Billing authority is required.',
+          403,
+        );
+      let policyMandateId: string | null = null;
+      const policyTable = (
+        await client.query<{ installed: boolean }>(
+          "SELECT to_regclass('mr_billing_policies') IS NOT NULL AS installed",
+        )
+      ).rows[0]?.installed;
+      if (policyTable) {
+        policyMandateId =
+          (
+            await client.query<{ mandate_id: string | null }>(
+              'SELECT mandate_id FROM mr_billing_policies WHERE workspace_id=$1',
+              [workspaceId],
+            )
+          ).rows[0]?.mandate_id ?? null;
+      }
+      return activeMandateInTransaction(client, {
+        workspaceId,
+        owner,
+        humanMembershipId: authorization.humanMembershipId,
+        policyMandateId,
+      });
     });
   }
   /** The caller must verify the Stripe signature over the exact raw bytes first. */
@@ -1105,9 +1218,10 @@ export class BillingCustomerStore {
           [current.workspace_id, current.processor_environment_id],
         );
         const id = randomUUID();
+        const cardCountry = normalizeCardCountry(method.cardCountry);
         await client.query(
-          `INSERT INTO mr_billing_mandates(id,workspace_id,customer_id,payment_method_id,livemode,status,terms_version,terms_snapshot,consent_reference,human_membership_id,setup_id,owner_authority_version,owner_consent_reference,owner_membership_epoch,processor_environment_id,processor_account_id)
-          VALUES($1,$2,$3,$4,$5,'active',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          `INSERT INTO mr_billing_mandates(id,workspace_id,customer_id,payment_method_id,livemode,status,terms_version,terms_snapshot,consent_reference,human_membership_id,setup_id,owner_authority_version,owner_consent_reference,owner_membership_epoch,processor_environment_id,processor_account_id,card_country)
+          VALUES($1,$2,$3,$4,$5,'active',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [
             id,
             current.workspace_id,
@@ -1124,6 +1238,7 @@ export class BillingCustomerStore {
             current.owner_membership_epoch,
             current.processor_environment_id,
             current.processor_account_id,
+            cardCountry,
           ],
         );
         await client.query(

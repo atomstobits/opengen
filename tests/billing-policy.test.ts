@@ -43,7 +43,7 @@ it('keeps unconfigured policy disabled and validates exact bounded card-funding 
   expect(parseBillingPolicyValues(values())).toEqual(values());
   for (const patch of [
     { amountCents: 499 },
-    { amountCents: 100001 },
+    { amountCents: 999901 },
     { amountCents: 500.5 },
     { thresholdMicros: NaN },
     { thresholdMicros: 1e13 },
@@ -119,6 +119,11 @@ async function fixture(max = 1, approvedOwner = true) {
   await pool.query(
     await readFile(new URL('../docs/billing/policy-schema.sql', import.meta.url), 'utf8'),
   );
+  await pool.query(`
+    ALTER TABLE mr_billing_policies
+      DROP CONSTRAINT mr_billing_policies_amount_cents_check,
+      ADD CONSTRAINT mr_billing_policies_amount_cents_check CHECK (amount_cents BETWEEN 500 AND 999900);
+  `);
   const accounts = new AccountStore(pool);
   const human = await accounts.identity('https://billing-fixture.example', randomUUID());
   const owner: BillingPrincipal = {

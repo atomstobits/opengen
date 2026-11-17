@@ -12,10 +12,17 @@ export interface PaymentOwnership extends PaymentOwnershipIdentity {
   kind: FundingKind;
   localId: string;
   amountCents: number;
+  feeCents: number;
+  totalChargeCents: number;
   currency: 'USD';
   creditReference: string;
 }
-export interface PaymentOwnershipClaim extends Omit<PaymentOwnership, 'currency'> {
+export interface PaymentOwnershipClaim extends Omit<
+  PaymentOwnership,
+  'currency' | 'feeCents' | 'totalChargeCents'
+> {
+  feeCents?: number;
+  totalChargeCents?: number;
   /** Fresh Checkout GET from the server's verified processor environment. A
    * legacy local order must already carry this exact Checkout session ID. */
   legacySession?: CheckoutSession;
@@ -43,7 +50,8 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const intentPattern = /^pi_[A-Za-z0-9_]{1,240}$/;
 const environmentPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/;
 const validAmount = (amount: number) =>
-  Number.isSafeInteger(amount) && amount >= 500 && amount <= 100000;
+  Number.isSafeInteger(amount) && amount >= 500 && amount <= 999900;
+const validFee = (fee: number) => Number.isSafeInteger(fee) && fee >= 0;
 
 export function canonicalFundingCreditReference(kind: FundingKind, localId: string): string {
   return `${kind === 'manual' ? 'stripe-topup' : 'stripe-recharge'}:${localId.toLowerCase()}`;
@@ -57,6 +65,8 @@ interface BoundFunding {
   processor_environment_id: string | null;
   payment_intent_id: string | null;
   amount_cents: number;
+  fee_cents: number;
+  total_charge_cents: number;
   session_id: string | null;
 }
 interface OwnerRow {
@@ -67,20 +77,27 @@ interface OwnerRow {
   livemode: boolean;
   payment_intent_id: string;
   amount_cents: number;
+  fee_cents?: number;
+  total_charge_cents?: number;
   currency: 'USD';
   credit_reference: string;
 }
-const ownerView = (row: OwnerRow): PaymentOwnership => ({
-  processorEnvironmentId: row.processor_environment_id,
-  livemode: row.livemode,
-  paymentIntentId: row.payment_intent_id,
-  workspaceId: row.workspace_id,
-  kind: row.kind,
-  localId: row.local_id,
-  amountCents: row.amount_cents,
-  currency: row.currency,
-  creditReference: row.credit_reference,
-});
+const ownerView = (row: OwnerRow): PaymentOwnership => {
+  const feeCents = row.fee_cents ?? 0;
+  return {
+    processorEnvironmentId: row.processor_environment_id,
+    livemode: row.livemode,
+    paymentIntentId: row.payment_intent_id,
+    workspaceId: row.workspace_id,
+    kind: row.kind,
+    localId: row.local_id,
+    amountCents: row.amount_cents,
+    feeCents,
+    totalChargeCents: row.total_charge_cents ?? row.amount_cents + feeCents,
+    currency: row.currency,
+    creditReference: row.credit_reference,
+  };
+};
 
 /** Share the namespace used by legacy Checkout, recharge and risk journaling. */
 export async function lockPaymentIntentInTransaction(
@@ -116,11 +133,15 @@ async function existingOwner(client: PoolClient, identity: PaymentOwnershipIdent
 async function legacyAndCurrentBindings(client: PoolClient, identity: PaymentOwnershipIdentity) {
   return (
     await client.query<BoundFunding>(
-      `SELECT 'manual' AS kind,id,workspace_id,livemode,processor_environment_id,payment_intent_id,amount_cents,session_id
-    FROM mr_payment_orders WHERE payment_intent_id=$1 AND livemode=$2 AND (processor_environment_id=$3 OR processor_environment_id IS NULL)
+      `SELECT 'manual' AS kind,id,workspace_id,livemode,processor_environment_id,payment_intent_id,amount_cents,
+      COALESCE((to_jsonb(o)->>'fee_cents')::integer,0) AS fee_cents,
+      COALESCE((to_jsonb(o)->>'total_charge_cents')::integer,amount_cents) AS total_charge_cents,session_id
+    FROM mr_payment_orders o WHERE payment_intent_id=$1 AND livemode=$2 AND (processor_environment_id=$3 OR processor_environment_id IS NULL)
     UNION ALL
-    SELECT 'automatic' AS kind,id,workspace_id,livemode,processor_environment_id,payment_intent_id,amount_cents,NULL AS session_id
-    FROM mr_billing_recharge_attempts WHERE payment_intent_id=$1 AND livemode=$2 AND (processor_environment_id=$3 OR processor_environment_id IS NULL)`,
+    SELECT 'automatic' AS kind,id,workspace_id,livemode,processor_environment_id,payment_intent_id,amount_cents,
+      COALESCE((to_jsonb(r)->>'fee_cents')::integer,0) AS fee_cents,
+      COALESCE((to_jsonb(r)->>'total_charge_cents')::integer,amount_cents) AS total_charge_cents,NULL AS session_id
+    FROM mr_billing_recharge_attempts r WHERE payment_intent_id=$1 AND livemode=$2 AND (processor_environment_id=$3 OR processor_environment_id IS NULL)`,
       [identity.paymentIntentId, identity.livemode, identity.processorEnvironmentId],
     )
   ).rows;
@@ -134,8 +155,10 @@ async function localFunding(
   const session = owner.kind === 'manual' ? 'session_id' : 'NULL AS session_id';
   return (
     await client.query<BoundFunding>(
-      `SELECT $3::text AS kind,id,workspace_id,livemode,processor_environment_id,payment_intent_id,amount_cents,${session}
-    FROM ${table} WHERE workspace_id=$1 AND id=$2${lock ? ' FOR UPDATE' : ''}`,
+      `SELECT $3::text AS kind,id,workspace_id,livemode,processor_environment_id,payment_intent_id,amount_cents,
+      COALESCE((to_jsonb(t)->>'fee_cents')::integer,0) AS fee_cents,
+      COALESCE((to_jsonb(t)->>'total_charge_cents')::integer,amount_cents) AS total_charge_cents,${session}
+    FROM ${table} t WHERE workspace_id=$1 AND id=$2${lock ? ' FOR UPDATE' : ''}`,
       [owner.workspaceId, owner.localId, owner.kind],
     )
   ).rows[0];
@@ -148,6 +171,8 @@ function assertLocalFunding(
     !row ||
     row.livemode !== owner.livemode ||
     row.amount_cents !== owner.amountCents ||
+    row.fee_cents !== owner.feeCents ||
+    row.total_charge_cents !== owner.totalChargeCents ||
     (row.payment_intent_id !== null && row.payment_intent_id !== owner.paymentIntentId)
   )
     throw conflict();
@@ -159,7 +184,10 @@ function assertLocalFunding(
 }
 function assertBindings(
   bindings: BoundFunding[],
-  owner: Pick<PaymentOwnership, 'kind' | 'localId' | 'workspaceId' | 'amountCents'>,
+  owner: Pick<
+    PaymentOwnership,
+    'kind' | 'localId' | 'workspaceId' | 'amountCents' | 'feeCents' | 'totalChargeCents'
+  >,
 ) {
   if (
     bindings.some(
@@ -167,13 +195,18 @@ function assertBindings(
         row.kind !== owner.kind ||
         row.id !== owner.localId ||
         row.workspace_id !== owner.workspaceId ||
-        row.amount_cents !== owner.amountCents,
+        row.amount_cents !== owner.amountCents ||
+        row.fee_cents !== owner.feeCents ||
+        row.total_charge_cents !== owner.totalChargeCents,
     )
   )
     throw conflict();
 }
-function qualifiedLegacyCheckout(row: BoundFunding, input: PaymentOwnershipClaim): boolean {
-  const session = input.legacySession;
+function qualifiedLegacyCheckout(
+  row: BoundFunding,
+  owner: Omit<PaymentOwnership, 'currency'> & { legacySession?: CheckoutSession },
+): boolean {
+  const session = owner.legacySession;
   if (!session || row.kind !== 'manual' || !row.session_id) return false;
   const intent =
     typeof session.payment_intent === 'string'
@@ -185,9 +218,9 @@ function qualifiedLegacyCheckout(row: BoundFunding, input: PaymentOwnershipClaim
     session.mode === 'payment' &&
     session.livemode === row.livemode &&
     session.currency === 'usd' &&
-    session.amount_subtotal === row.amount_cents &&
-    session.amount_total === row.amount_cents &&
-    intent === input.paymentIntentId
+    session.amount_subtotal === owner.totalChargeCents &&
+    session.amount_total === owner.totalChargeCents &&
+    intent === owner.paymentIntentId
   );
 }
 
@@ -201,9 +234,14 @@ export async function claimPaymentOwnershipInTransaction(
 ): Promise<PaymentOwnership> {
   const localId = input.localId.toLowerCase();
   const creditReference = canonicalFundingCreditReference(input.kind, localId);
+  const feeCents = input.feeCents ?? 0;
+  const totalChargeCents = input.totalChargeCents ?? input.amountCents + feeCents;
   if (
     !uuid.test(localId) ||
     !validAmount(input.amountCents) ||
+    !validFee(feeCents) ||
+    !Number.isSafeInteger(totalChargeCents) ||
+    totalChargeCents !== input.amountCents + feeCents ||
     !['manual', 'automatic'].includes(input.kind) ||
     input.creditReference !== creditReference
   )
@@ -216,7 +254,7 @@ export async function claimPaymentOwnershipInTransaction(
     ).rowCount
   )
     throw conflict();
-  const owner = { ...input, localId, creditReference };
+  const owner = { ...input, localId, feeCents, totalChargeCents, creditReference };
   const row = await localFunding(client, owner, true);
   assertLocalFunding(row, owner);
   assertBindings(await legacyAndCurrentBindings(client, input), owner);
@@ -229,6 +267,8 @@ export async function claimPaymentOwnershipInTransaction(
       stored.localId !== localId ||
       stored.livemode !== owner.livemode ||
       stored.amountCents !== owner.amountCents ||
+      stored.feeCents !== owner.feeCents ||
+      stored.totalChargeCents !== owner.totalChargeCents ||
       stored.creditReference !== creditReference
     )
       throw conflict();
@@ -236,13 +276,13 @@ export async function claimPaymentOwnershipInTransaction(
   }
   if (
     row.processor_environment_id !== input.processorEnvironmentId &&
-    !(row.processor_environment_id === null && qualifiedLegacyCheckout(row, input))
+    !(row.processor_environment_id === null && qualifiedLegacyCheckout(row, owner))
   )
     throw unqualified();
   const inserted = (
     await client.query<OwnerRow>(
-      `INSERT INTO mr_billing_payment_ownership(processor_environment_id,livemode,payment_intent_id,workspace_id,kind,local_id,manual_order_id,recharge_attempt_id,amount_cents,credit_reference)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING RETURNING *`,
+      `INSERT INTO mr_billing_payment_ownership(processor_environment_id,livemode,payment_intent_id,workspace_id,kind,local_id,manual_order_id,recharge_attempt_id,amount_cents,fee_cents,total_charge_cents,credit_reference)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING RETURNING *`,
       [
         input.processorEnvironmentId,
         input.livemode,
@@ -253,6 +293,8 @@ export async function claimPaymentOwnershipInTransaction(
         input.kind === 'manual' ? localId : null,
         input.kind === 'automatic' ? localId : null,
         input.amountCents,
+        feeCents,
+        totalChargeCents,
         creditReference,
       ],
     )
@@ -283,7 +325,12 @@ export async function resolvePaymentOwnershipInTransaction(
   if (bindings.length > 1) throw conflict();
   const row = bindings[0];
   if (!row || row.processor_environment_id !== identity.processorEnvironmentId) return null;
-  if (!validAmount(row.amount_cents)) throw conflict();
+  if (
+    !validAmount(row.amount_cents) ||
+    !validFee(row.fee_cents) ||
+    row.total_charge_cents !== row.amount_cents + row.fee_cents
+  )
+    throw conflict();
   return {
     processorEnvironmentId: identity.processorEnvironmentId,
     livemode: identity.livemode,
@@ -292,6 +339,8 @@ export async function resolvePaymentOwnershipInTransaction(
     kind: row.kind,
     localId: row.id,
     amountCents: row.amount_cents,
+    feeCents: row.fee_cents,
+    totalChargeCents: row.total_charge_cents,
     currency: 'USD',
     creditReference: canonicalFundingCreditReference(row.kind, row.id),
   };

@@ -33,6 +33,9 @@ function order(): PaymentOrder {
     id: randomUUID(),
     workspaceId,
     amountCents: 2500,
+    feeCents: 0,
+    totalChargeCents: 2500,
+    feeRateBps: 0,
     creditMicros: 25_000_000,
     currency: 'USD',
     status: 'created',
@@ -170,7 +173,8 @@ describe('human billing authorization and request contracts', () => {
       billingHold: false,
       currency: 'USD',
       minAmountCents: 500,
-      maxAmountCents: 100000,
+      maxAmountCents: 999900,
+      feeRateBps: 290,
     });
     expect(store.listOrders).toHaveBeenCalledWith(workspaceId);
   });
@@ -229,7 +233,7 @@ describe('human billing authorization and request contracts', () => {
     const { app, store } = await setup();
     for (const payload of [
       { amountCents: 499 },
-      { amountCents: 100001 },
+      { amountCents: 999901 },
       { amountCents: 500.5 },
       { amountCents: '2500' },
       { amountCents: Number.MAX_SAFE_INTEGER },

@@ -183,7 +183,7 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
         workspaceId,
         currency: 'USD',
         minAmountCents: 500,
-        maxAmountCents: 100000,
+        maxAmountCents: 999900,
         billingHold: state.held,
         orders: state.summaryIncludesOrders ? [...state.orders.values()] : [],
       };
@@ -318,7 +318,7 @@ for (const viewport of [
       f.capabilities = { read: true, manage: false, setup: false };
       await page.goto('/billing');
       const panel = page.getByRole('region', { name: /Keep creating.*Keep control/ });
-      await expect(panel).toContainText('Automatic charging is not active on this installation.');
+      await expect(panel).toContainText('Automatic charging is paused on this installation.');
       await expect(panel.getByRole('checkbox', { name: /Automatic recharge/ })).toBeDisabled();
       await expect
         .poll(() => new Set(f.privateReads))
@@ -427,8 +427,8 @@ for (const viewport of [
       expect(first.persisted?.orderId).toBeNull();
       expect(f.checkouts).toEqual([]);
       await page.reload();
-      await expect(page.getByLabel('Choose your amount')).toHaveValue('25.00');
-      await expect(page.getByLabel('Choose your amount')).toBeDisabled();
+      await expect(page.getByLabel('Choose your credit amount')).toHaveValue('25.00');
+      await expect(page.getByLabel('Choose your credit amount')).toBeDisabled();
       await page.getByRole('button', { name: /Resume this top-up/ }).click();
       await expect(currentTopUp(page)).toContainText('Checking checkout');
       expect(f.creates).toHaveLength(2);
@@ -558,7 +558,7 @@ for (const viewport of [
           'Prepaid billing is enabled for this workspace. Choose an amount below to add credit.',
         ),
       ).toBeVisible();
-      await page.getByRole('button', { name: 'Continue to Stripe ↗' }).click();
+      await page.getByRole('button', { name: /Continue to Stripe/ }).click();
       await expect(page).toHaveURL(checkoutUrl);
       await expect(page.getByRole('heading', { name: 'Fixture hosted checkout' })).toBeVisible();
       expect(f.creates.length).toBe(1);

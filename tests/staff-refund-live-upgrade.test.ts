@@ -443,7 +443,17 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
       for (const table of oldTables) {
         if (!includeJournal && table === 'mr_migrations') continue;
         const value =
-          table === 'mr_ledger' ? "(to_jsonb(t)-'posting_order')::text" : 'row_to_json(t)::text';
+          table === 'mr_ledger'
+            ? "(to_jsonb(t)-'posting_order')::text"
+            : [
+                  'mr_payment_orders',
+                  'mr_billing_recharge_attempts',
+                  'mr_billing_payment_ownership',
+                ].includes(table)
+              ? "(to_jsonb(t)-ARRAY['fee_cents','fee_rate_bps','total_charge_cents'])::text"
+              : table === 'mr_billing_mandates'
+                ? "(to_jsonb(t)-'card_country')::text"
+                : 'row_to_json(t)::text';
         rows[table] = (
           await db.query(
             `SELECT ${value} AS value FROM ${identifier(isolated.schema)}.${identifier(table)} t ORDER BY ${value} COLLATE "C"`,
@@ -466,7 +476,7 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
     expect(journal.slice(0, 29)).toEqual(oldJournal);
     expect(journal.map((row) => row.name)).toEqual(
-      Array.from({ length: 31 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
+      Array.from({ length: 32 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
     );
     expect(journal[29].checksum).toBe(sha256(await sql(30)));
     for (let i = 0; i < 29; i++) {
@@ -481,7 +491,18 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     ).rows;
     const retainedConstraints = oldConstraints.filter(
       (row) =>
-        !['mr_staff_refund_cases_livemode_check', 'mr_ledger_kind_check'].includes(row.conname),
+        ![
+          'mr_staff_refund_cases_livemode_check',
+          'mr_ledger_kind_check',
+          'mr_payment_orders_amount_cents_check',
+          'mr_payment_orders_checkout_request_version_check',
+          'mr_billing_policies_amount_cents_check',
+          'mr_billing_recharge_attempts_amount_cents_check',
+          'mr_billing_recharge_attempts_request_version_check',
+          'mr_billing_payment_ownership_amount_cents_check',
+          'mr_staff_refund_cases_original_amount_cents_check',
+          'mr_staff_refund_cases_eligible_micros_check',
+        ].includes(row.conname),
     );
     const retainedNames = new Set(retainedConstraints.map((row) => row.conname));
     expect(constraints.filter((row) => retainedNames.has(row.conname))).toEqual(

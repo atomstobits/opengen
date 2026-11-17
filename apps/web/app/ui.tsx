@@ -1049,19 +1049,16 @@ export function Footer() {
         {legal.mode === 'published' ? (
           <>
             <a href="/terms">Terms of Service</a>
-            <a href="/refunds">Refund Policy</a>
             <a href="/privacy">Privacy Notice</a>
           </>
         ) : legal.mode === 'staged' ? (
           <>
             <a href="/terms">Terms (scheduled)</a>
-            <a href="/refunds">Refund Policy (scheduled)</a>
             <a href="/privacy">Privacy Notice (scheduled)</a>
           </>
         ) : (
           <>
             <a href="/terms">Terms draft</a>
-            <a href="/refunds">Refund policy draft</a>
             <a href="/privacy">Privacy draft</a>
           </>
         )}

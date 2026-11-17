@@ -18,8 +18,8 @@ const policySchema = z
   .strict();
 export type HumanTermsPolicy = z.infer<typeof policySchema>;
 const frozenDraft = Object.freeze({
-  version: 'hosted-terms-v4-draft-2026-11-09',
-  digest: '17e9c824b1338651ae9e8570f7b6ec265b0b0d3a805d90b049aa584c70987ad5',
+  version: 'hosted-terms-draft-2026-11-16',
+  digest: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
   status: 'draft' as const,
   effectiveAt: null,
 });
@@ -188,7 +188,7 @@ export function renderHumanLoginNotice(policy: HumanTermsPolicy, actionToken: st
     policy.status === 'draft'
       ? `<aside role="note"><strong>${escapeHtml(legalDraftNotice)}</strong><p>Continuing signs you in. It does not accept these drafts.</p><p>The proposed eligibility requirements include being at least 18, having legal capacity and having authority for any organization you represent.</p></aside>`
       : `<p>By continuing, you agree to the <a href="/terms">OpenGen Terms shown here</a> and confirm you meet the eligibility requirements. You must be at least 18, have legal capacity and have authority for any organization you represent.</p>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Continue to OpenGen</title><style>${css}</style></head><body><main><a href="/">OpenGen</a><h1>A clear start.</h1>${status}<p><a href="/terms">Terms of Service</a> · <a href="/privacy">Privacy Notice</a></p><p>Read our Privacy Notice for how information is handled.</p><small>Terms version: ${escapeHtml(policy.version)}${policy.effectiveAt ? ` · Effective: ${escapeHtml(policy.effectiveAt)}` : ' · Not effective'}</small><details><summary>Policy fingerprint</summary><small>SHA-256: ${policy.digest}</small></details><form method="post" action="/auth/login"><input type="hidden" name="action" value="continue"><input type="hidden" name="actionToken" value="${escapeHtml(actionToken)}"><button type="submit">Continue to sign-in</button></form><p>This signs in your account. Agent permissions, workspace spending, funding approval and any customer DPA remain separate decisions.</p><a href="/start">Back to account setup</a></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Continue to OpenGen</title><style>${css}</style></head><body><main><a href="/">OpenGen</a><h1>A clear start.</h1>${status}<p><a href="/terms">Terms of Service</a> · <a href="/privacy">Privacy Notice</a></p><p>Read our Privacy Notice for how information is handled.</p><small>${policy.effectiveAt ? `Effective: ${escapeHtml(policy.effectiveAt)}` : 'Not effective'}</small><details><summary>Policy fingerprint</summary><small>SHA-256: ${policy.digest}</small></details><form method="post" action="/auth/login"><input type="hidden" name="action" value="continue"><input type="hidden" name="actionToken" value="${escapeHtml(actionToken)}"><button type="submit">Continue to sign-in</button></form><p>This signs in your account. Agent permissions, workspace spending, funding approval and any customer DPA remain separate decisions.</p><a href="/start">Back to account setup</a></main></body></html>`;
 }
 /** A form-action 'self' policy can block an IdP redirect chain. Finish the POST
  * with a script-free page, then perform a normal navigation to the verified endpoint. */

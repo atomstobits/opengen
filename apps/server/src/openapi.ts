@@ -74,6 +74,9 @@ const billingRechargeAttempt = {
     workspaceId: string,
     policyVersion: billingVersion,
     amountCents: billingPolicyProperties.amountCents!,
+    feeCents: { type: 'integer', minimum: 0, maximum: 999900 },
+    totalChargeCents: { type: 'integer', minimum: 500, maximum: 2000000 },
+    feeRateBps: { enum: [0, 290, 440] },
     admissionMonth: { type: 'string', format: 'date' },
     status: {
       enum: [
@@ -497,8 +500,9 @@ function responseSchema(id: string): Schema {
           properties: {
             id: { type: 'string', format: 'uuid' },
             status: { enum: ['active', 'revoked'] },
+            cardCountry: { type: ['string', 'null'], pattern: '^[A-Z]{2}$' },
           },
-          required: ['id', 'status'],
+          required: ['id', 'status', 'cardCountry'],
           additionalProperties: false,
         },
         automaticRechargeAvailable: { type: 'boolean' },

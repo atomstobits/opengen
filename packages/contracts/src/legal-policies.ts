@@ -1,4 +1,4 @@
-/** Proposed copy only. Adoption and an effective date require separate review. */
+/** Shared legal policy copy. Unconfigured installs render Draft; hosted publication binds effective metadata separately. */
 export type LegalLinkPart = string | { label: string; href: string };
 
 export type LegalBlock =
@@ -8,7 +8,7 @@ export type LegalBlock =
   | { type: 'table'; columns: readonly string[]; rows: readonly (readonly string[])[] };
 
 export interface LegalPolicy {
-  slug: 'terms' | 'refunds' | 'privacy' | 'data-processing' | 'subprocessors';
+  slug: 'terms' | 'privacy' | 'data-processing' | 'subprocessors';
   navigationLabel: string;
   title: string;
   description: string;
@@ -27,9 +27,10 @@ export const legalDraftNotice =
 export const termsPolicy = {
   slug: 'terms',
   navigationLabel: 'Terms draft',
-  title: 'OpenGen Hosted Terms of Service — proposed version 4',
-  description: 'Proposed OpenGen hosted Terms of Service. Draft for review, not yet effective.',
-  reviewDate: '9 November 2026',
+  title: 'OpenGen Terms of Service',
+  description:
+    'Proposed OpenGen Terms of Service, including prepaid credit and refund terms. Draft for review, not yet effective.',
+  reviewDate: '16 November 2026',
   sections: [
     {
       id: 'section-1',
@@ -41,7 +42,7 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: "These Terms form an agreement when you affirmatively accept the identified version through an account, funding or other clearly presented acceptance process. You must be at least 18, have the capacity required by applicable law, and have authority to accept for any organization you represent. Do not accept for an organization without that authority. A workspace member's technical permission does not necessarily give that member authority to change the organization's contract.",
+          text: "These Terms form an agreement when you affirmatively accept them through an account, funding or other clearly presented acceptance process. You must be at least 18 (or the age of legal majority in your jurisdiction if higher), have the capacity required by applicable law, and have authority to accept for any organization you represent. Do not accept for an organization without that authority. A workspace member's technical permission does not necessarily give that member authority to change the organization's contract.",
         },
         {
           type: 'paragraph',
@@ -49,7 +50,7 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'For legal, privacy and rights requests, contact legal@opengen.dev. For account, generation, billing and refund support, contact support@opengen.dev.',
+          text: 'For legal, copyright, privacy and rights requests, contact legal@opengen.dev. For account, generation, billing and refund support, contact support@opengen.dev.',
         },
       ],
     },
@@ -63,11 +64,11 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'These Terms and the Prepaid Credit and Refund Policy govern the hosted service. The Privacy Notice explains our handling of information and available controls. Route-specific model licenses, provider terms and required acceptable-use policies govern use of the corresponding model or provider. Their identification does not mean OpenGen has obtained every permission on your behalf.',
+          text: 'These Terms (including the prepaid credit, funding and refund rules in sections 8 through 10) govern the hosted service across the website, API, MCP and CLI. The Privacy Notice explains our handling of personal information and available controls. Route-specific model licenses, provider terms and required acceptable-use policies govern use of the corresponding model or provider. Their identification does not mean OpenGen has obtained every permission on your behalf.',
         },
         {
           type: 'paragraph',
-          text: "Mandatory law takes priority. A separately signed agreement or data-processing agreement controls its covered subject. The credit policy controls OpenGen funding, balance and refund arithmetic. An accepted quote and job approval control that job's pricing terms and basis, whether a price is fixed or estimated, payer, spending cap and request constraints. These Terms govern the general hosted relationship; the Privacy Notice describes our data handling; applicable provider/model terms control the corresponding model use. General documentation or a later update does not silently replace an accepted request commitment. No document gives OpenGen rights it lacks upstream, reduces mandatory rights, forfeits money actually owed or restricts the published software license.",
+          text: "Mandatory law takes priority. A separately signed agreement or completed Data Processing Addendum controls its covered subject. Sections 8 through 10 of these Terms control OpenGen prepaid credit funding, processing fees, balance reservations and refund arithmetic; general contract wording elsewhere in these Terms does not remove those express refund rights. An accepted quote and job approval control that job's pricing terms and basis, whether a price is fixed or estimated, payer, spending cap and request constraints. Applicable provider and model terms control the corresponding model use. General documentation or a later update does not silently replace an accepted request commitment. No document gives OpenGen rights it lacks upstream, reduces mandatory rights, forfeits money actually owed or restricts the published software license.",
         },
         {
           type: 'paragraph',
@@ -85,11 +86,11 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'We and the relevant rights holders retain rights in the hosted interface, documentation, branding and service technology, except for rights expressly granted under a software license. You may identify an accurate integration with OpenGen, but may not imply our endorsement, use our branding deceptively or claim ownership of our marks. This does not transfer your rights in inputs or outputs to us.',
+          text: 'We and the relevant rights holders retain rights in the hosted interface, documentation, branding and service technology, except for rights expressly granted under a software license. Do not reverse-engineer, decompile or attempt to extract non-open-source hosted operational infrastructure, private configurations or provider credentials, except to the extent applicable law prohibits that restriction. You may identify an accurate integration with OpenGen, but may not imply our endorsement, use our branding deceptively or claim ownership of our marks. This does not transfer your rights in inputs or outputs to us.',
         },
         {
           type: 'paragraph',
-          text: 'Published source code and its dependencies have their own licenses. For software released under Apache License 2.0, that license governs copying, modification, redistribution and independent self-hosting. These hosted Terms do not restrict those rights, prohibit lawful forks or competing independent deployments, or make us the operator of another installation. The software license does not supply access to our hosted servers, customer data, provider accounts or trademarks. Calls from a self-hosted installation to our hosted service remain subject to the hosted agreement and issued permissions.',
+          text: 'Published source code and its dependencies have their own licenses. For software released under Apache License 2.0, that license governs copying, inspection, modification, redistribution and independent self-hosting. Nothing in these hosted Terms — including infrastructure or scraping restrictions — limits your Apache-2.0 rights in OpenGen source code, prohibits lawful forks or competing independent deployments, or makes us the operator of another installation. Conversely, the software license does not supply access to our hosted servers, customer data, provider accounts or trademarks. Calls from a self-hosted installation to our hosted service remain subject to these hosted Terms and issued permissions.',
         },
         {
           type: 'paragraph',
@@ -111,11 +112,11 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: "A workspace can authorize a person, application, CLI or AI agent to act within stated scopes and limits. Read access alone does not authorize generation. Generate access can spend the selected workspace's available balance or use an explicitly selected provider account. An agent can make an unwanted request while acting within a valid grant, so review its permissions, instructions and spending controls.",
+          text: "A workspace can authorize a person, application, CLI or AI agent to act within stated scopes and limits. Read access alone does not authorize generation. Generate access can spend the selected workspace's available balance or use an explicitly selected provider account. An agent or automated script can make rapid or unwanted requests while acting within a valid grant, so configure key/workspace budgets and review permissions carefully.",
         },
         {
           type: 'paragraph',
-          text: 'Delegation does not authorize a new credit purchase, automatic recharge or a broader grant. Only an authorized payer may approve funding. We attribute activity within a valid grant to its workspace, while preserving rights concerning unauthorized payments and our own access-control, security or billing errors. A report of compromise does not establish whether an earlier upstream task was accepted; that question still requires recovery and reconciliation.',
+          text: 'Delegation does not authorize a new credit purchase, saved-card mandate, automatic recharge enrollment or broader grant; only an authorized human payer may approve funding. However, you and your workspace are responsible for generation consumption and any owner-enabled automatic recharges (up to the workspace and key spending and monthly recharge caps you configured) triggered by your authorized delegates, runaway scripts or agent loops, or customer-held credentials compromised before you revoke the key, session or mandate in your workspace, except to the extent caused by an OpenGen security, access-control or billing defect. A report of compromise does not establish whether an earlier upstream task was accepted; that question still requires recovery and reconciliation.',
         },
       ],
     },
@@ -133,7 +134,7 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'Review the applicable model license, provider terms and required use policies before selecting a route. For your own provider key, your provider account and direct billing terms also apply. Ensure your authorized members and end users receive and comply with the applicable restrictions. A catalog listing or payment grants no rights that the relevant rights holder has not granted.',
+          text: 'Review the applicable model license, provider terms and required use policies before selecting a route. For your own provider key (BYOK), your provider account and direct billing terms also apply. Ensure your authorized members and end users receive and comply with the applicable restrictions. A catalog listing or payment grants no rights that the relevant rights holder has not granted.',
         },
         {
           type: 'paragraph',
@@ -147,7 +148,7 @@ export const termsPolicy = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'You keep the rights you hold in prompts, references and other submitted material. Obtain the permissions required for processing and intended use, including copyright, privacy, publicity, likeness and voice permissions. Public availability alone does not establish those permissions. Do not submit material you are not entitled to delegate for the requested processing.',
+          text: 'You keep the rights you hold in prompts, references and other submitted material. Obtain the permissions required for processing and intended use, including copyright, trademark, privacy, publicity, likeness and voice permissions. Public availability alone does not establish those permissions. Do not submit material you are not entitled to delegate for the requested processing.',
         },
         {
           type: 'paragraph',
@@ -202,78 +203,118 @@ export const termsPolicy = {
       ],
     },
     {
-      id: 'section-8',
-      title: '8. Prices, prepaid credit and manual funding',
+      id: 'credits-and-refunds',
+      title: '8. Prepaid credit, saved cards, automatic recharge and processing fees',
       blocks: [
         {
           type: 'paragraph',
-          text: "Managed usage draws on the selected workspace's USD prepaid balance under the Prepaid Credit and Refund Policy. Direct provider billing through your own key is separate. We disclose the applicable price basis, fees, taxes and reservation or budget information before the corresponding approval. A quote is an estimate unless expressly offered as a fixed price. Any separate fee or customer overrun rule requires disclosure before authorization.",
+          text: "Managed usage draws on the selected workspace's USD prepaid service balance. One dollar of purchased balance provides one dollar toward authorized OpenGen charges; it is not a bank deposit, e-money account or investment, earns no interest, and cannot be transferred between workspaces or resold. Direct provider billing through your own connected key (BYOK) is separate and bypasses OpenGen generation charges. The same accepted pricing, reservation, cancellation and settlement rules apply across the website, REST API, MCP and CLI. Model generation routes carry a 0% OpenGen markup over the route's stated rate unless a separate generation fee is expressly disclosed and accepted before authorization.",
         },
         {
           type: 'paragraph',
-          text: 'A reservation temporarily reduces available credit; it is not a final usage charge or cash refund. Unknown acceptance or cost requires reconciliation. An error, cancellation request, expired upstream URL or recovered delivery does not by itself prove zero provider cost or a settled charge. Preserve the job ID and resume the original task rather than blindly authorize another paid generation.',
+          text: 'Workspace billing requires explicit enrollment by an authenticated human workspace administrator (one active human funding owner per workspace at a time). An enrolled human funding owner may purchase $5.00 to $9,999.00 in USD prepaid service credit per human-approved one-time Stripe Hosted Checkout top-up or opt-in saved-card automatic recharge. To ensure 100% of the requested USD credit principal is added to the workspace balance, an upfront payment processing fee is added on top of the credit amount: a 2.9% + $0.30 gross-up on Hosted Checkout and US-issued saved cards (computed in integer cents as ceil((credit + $0.30) / 0.971) - credit), and a 4.4% + $0.30 gross-up on non-US saved cards used for automatic recharge (computed in integer cents as ceil((credit + $0.30) / 0.956) - credit). Exact USD credit added, processing fee and rate, any applicable tax, and total payment are shown before you confirm.',
         },
         {
           type: 'paragraph',
-          text: "Funding requires the authorized payer's approval of that purchase. Saving a payment method, granting Generate access or exhausting a balance does not authorize another card charge, subscription or automatic recharge. The current credit policy, not a generic permission in these Terms, governs unused purchased-credit refunds and any promotional conditions.",
+          text: 'The active human funding owner may save a card through Stripe Setup and separately opt into bounded automatic recharge by configuring a balance threshold, recharge credit amount ($5.00 to $9,999.00), monthly recharge cap, cooldown and attempt/failure limits. Saving a payment method without enabling automatic recharge, granting an agent or key Generate access, or exhausting a workspace balance alone never authorizes an automatic card charge or subscription. When a card issuer requires customer authentication (such as 3D Secure) for an off-session recharge attempt, new automatic charges pause until the funding owner completes authentication recovery or updates the card. Automatic recharge and saved-card mandates may be disabled or revoked at any time to stop future charges, while any payment instruction already submitted to Stripe finishes reconciliation. Available payment methods are those shown in Stripe Checkout or Setup (no cryptocurrency or unlisted methods). Usable credit equal to the requested credit principal is added once after verified paid confirmation; browser redirects or pending intents are not proof of funding.',
         },
         {
           type: 'paragraph',
-          text: 'Reservation release and cash refund are separate operations. Released available credit can subsequently be refunded with the corresponding balance adjustment; it cannot also remain available to spend or be refunded twice. Suspension, a claim under these Terms or a liability limit below does not forfeit a valid unused balance or replace reconciliation with an invented zero cost.',
+          text: 'A quote is an estimate unless expressly fixed; price and availability are rechecked at admission, and an admitted job retains its accepted rate snapshot rather than being silently repriced. A reservation sets aside balance temporarily and is not a final debit or cash refund. For managed calls, the final OpenGen customer charge cannot exceed the accepted reservation or a stricter accepted request cap; OpenGen absorbs supplier overruns above that ceiling rather than silently debiting extra balance or charging your card. Unknown upstream acceptance or cost stays reserved until reconciled; preserve the job ID and resume the original task rather than blindly submitting a replacement paid generation.',
+        },
+        {
+          type: 'paragraph',
+          text: 'OpenGen makes no promise of free, referral or promotional credit. If we offer an identified noncash grant, its stated terms govern; it is non-transferable, cannot offset taxes, and is not cash-refundable unless law requires otherwise. For manual refund accounting, staff reconstruct funding and usage chronologically from payment, job and ledger records: noncash credit available at admission is consumed first, followed by paid credit oldest-purchase-first, while released reservations restore their original funding character and purchase date.',
         },
       ],
     },
     {
       id: 'section-9',
-      title: '9. Acceptable use and applications for end users',
+      title: '9. Refunds, sub-cent rounding, aged holds and credit expiry',
       blocks: [
         {
           type: 'paragraph',
-          text: "Do not use OpenGen to break the law or another person's rights. Prohibited activity includes child sexual exploitation, nonconsensual intimate imagery, fraud, harmful impersonation, unlawful threats or harassment, malware, unauthorized system access, abusive unsolicited messaging and infringement of intellectual-property or privacy rights.",
+          text: 'Ordinary 24-hour voluntary refund window: You may request return of the unused paid remainder within 24 hours after successful payment confirmation for a purchase or recharge by emailing support@opengen.dev with your workspace and order or payment reference (never send full card numbers, passwords or API secrets). Partial generation usage does not disqualify the remaining unused balance, and a timely request stays timely during staff verification and accepted-cost reconciliation; stop spending balance you want returned. The separately disclosed upfront payment processing fee covers payment-network processing and is nonrefundable on ordinary voluntary unused-credit refunds. Voluntary refunds therefore return up to 100% of the unused paid credit principal (creditCents), excluding consumed amounts, prior returns, noncash grants and genuinely unresolved accepted-work exposure, with no additional OpenGen refund-processing fee.',
         },
         {
           type: 'paragraph',
-          text: "Do not obtain another workspace's data, use credentials you are not entitled to use, evade spending or access controls, conceal unauthorized automated traffic or bypass provider safety, eligibility or rate restrictions. Do not put secrets in prompts, public feedback or support messages. Connected keys must be credentials you may lawfully delegate, not stolen accounts or unauthorized access for resale.",
+          text: 'Fractions of a cent, destination and timing: Usage settles in integer millionths of a US dollar ($0.000001), whereas cash refunds settle in cents. Any positive refundable paid remainder is rounded up to the next cent, capped at the remaining refundable credit principal (creditCents) of the original payment, with OpenGen bearing the sub-cent rounding difference (for example, $4.993456 eligible paid credit produces a $5.00 refund when at least $5.00 principal remains). Reservation release restores workspace spending capacity and is distinct from a cash refund; refunded balance is removed once so the same amount cannot be spent or returned twice. Eligible refunds are returned to the original payment method after verifying payer and workspace authority (or a verified lawful alternative if the original route cannot process the return). Operational staff targets are acknowledgement within one business day, decision or information request within five business days, and processor initiation within two business days after reconciliation; card issuers commonly post returns within five to ten business days.',
         },
         {
           type: 'paragraph',
-          text: 'Do not attack or deliberately overload the hosted service, scan or probe its security without authorization, escape an execution boundary or use its infrastructure to reach unrelated destinations. Ordinary use of documented APIs, MCP and CLI within issued limits is permitted. These restrictions do not prohibit authorized security research or testing your own lawful independent deployment under its software license.',
+          text: "Failed, cancelled and aged unresolved jobs: Work rejected before upstream acceptance with no incurred charge releases its reservation without usage billing; accepted upstream work can remain billable after failure, cancellation request or delivery retry according to route terms and billing evidence. Disliking a creative output alone is not a technical service defect, while OpenGen billing errors or failures to meet an express technical commitment retain appropriate credit or refund remedies regardless of an upstream supplier's own refund policy. An acceptance or cost question unresolved for 24 hours enters manual billing review (first explanation target within two business days and weekly updates). By day 30, the billing owner makes a documented decision either settling on reliable evidence within the customer limit or providing an OpenGen-funded adjustment or return while preserving genuinely unknown supplier-cost records.",
         },
         {
           type: 'paragraph',
-          text: "For a suspected vulnerability, stop before accessing other people's data or causing further disruption and report it privately to support@opengen.dev or an available repository private-security channel. Share the minimum information needed to investigate, without live credentials or unnecessary private media. Coordinate testing and disclosure responsibly; reporting alone does not authorize further access. This paragraph creates no bounty, guaranteed remediation deadline or indefinite restriction on lawful protected disclosure.",
-        },
-        {
-          type: 'paragraph',
-          text: 'If you build an application for others, give them accurate notice of the applicable route restrictions, obtain the permissions required for their inputs, and use reasonable controls to prevent prohibited use.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Do not present generated output as human-created where that would mislead people or violate applicable law or provider requirements.',
-        },
-        {
-          type: 'paragraph',
-          text: 'You may build applications and agent workflows within the permissions you hold. That does not override an upstream restriction or add restrictions to the published source license. Do not claim endorsement or an official relationship you do not have. OpenGen may investigate reports and restrict activity under section 13; a prohibition is not a promise that every violation will be detected before processing.',
+          text: "Closure refunds and possible future expiry: Voluntary workspace closure, OpenGen termination without cause, closure after declining a material Terms change, or permanent discontinuation of the paid service entitles you to reconciliation and return of your unused paid credit principal even after the 24-hour voluntary window (targeting processor initiation within 30 calendar days, subject to earlier legal deadlines). Unauthorized or duplicate charges, missing funding after confirmed payment, billing errors and mandatory statutory rights likewise remain unaffected by the 24-hour window. There is no automatic paid-credit expiry at launch. OpenGen reserves a discretionary right, where lawful, to expire unused paid credit no earlier than 365 days after purchase only after giving at least 30 calendar days' direct advance notice identifying the amount and date and allowing you either to use the credit or request cash return of the unused paid remainder before expiry.",
         },
       ],
     },
     {
       id: 'section-10',
-      title: '10. Export, sanctions and territorial restrictions',
+      title: '10. Taxes, chargebacks and EEA/UK statutory withdrawal',
       blocks: [
         {
           type: 'paragraph',
-          text: 'Use the service only where and as permitted by applicable export-control, sanctions and other trade laws. Do not use it for a person, entity, destination or purpose to which providing the service is prohibited. Do not misrepresent relevant eligibility or use a proxy, alternate account or intermediary to evade an applicable legal or provider/model geographic or entity restriction.',
+          text: "Funding and refund principal are denominated in USD; your bank's currency conversion rate or card foreign-exchange fee is separate and outside OpenGen's control. Stated prices, generation rates and credit amounts exclude applicable sales, use, value-added (VAT), goods-and-services (GST), gross-receipts or similar indirect transaction taxes, duties or government charges. You are responsible for applicable transaction taxes disclosed before payment confirmation (excluding taxes based on OpenGen's net income), and all payments must be made free of customer tax withholding or deduction. Promotional or noncash credits cannot be applied toward taxes. Any legally required tax adjustment on a refund follows the actual transaction and applicable tax law.",
         },
         {
           type: 'paragraph',
-          text: "Provider availability can be narrower than the locations in which OpenGen's website is accessible. A listed endpoint region does not make a restricted model available to every person there. We may request information reasonably needed to confirm eligibility or pause new activity when law or a provider requires it. Restrictions can differ by route.",
+          text: 'Contact support@opengen.dev promptly about any suspected unauthorized, duplicate or erroneous charge; seeking support never waives a lawful card-network dispute, statutory withdrawal right or consumer remedy. However, initiating an improper, fraudulent or bad-faith chargeback or payment reversal on a valid purchase or already-consumed balance places workspace spending and funding into immediate review hold, revokes active saved-card mandates and automatic recharge, and entitles OpenGen to offset established reversed amounts against remaining workspace credit while accepted jobs complete recovery and settlement.',
+        },
+        {
+          type: 'paragraph',
+          text: 'Where EEA or UK consumer withdrawal law applies to your online purchase, you ordinarily have 14 days from concluding the contract to withdraw without giving a reason, subject to applicable statutory rules and exceptions. Send a clear withdrawal statement to support@opengen.dev before the 14-day period expires, identifying the purchase and contact details; no special form is required, and the 24-hour voluntary refund window never shortens statutory rights. For a valid statutory withdrawal, we reimburse amounts required by law without undue delay and ordinarily within 14 days of your notice using the original payment method (unless you expressly agree otherwise), with no reimbursement fee. Any proportional deduction for service begun at your express request or loss of withdrawal rights for digital content supplied during the withdrawal period applies only where the legally required pre-contract information, express request, consent, acknowledgement and confirmation conditions were actually satisfied; sign-in, purchasing credit or granting general agent access does not by itself waive statutory withdrawal rights.',
         },
       ],
     },
     {
       id: 'section-11',
-      title: '11. API changes, previews and compatibility',
+      title: '11. Acceptable use, AI safety, provenance and end-user applications',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Zero-tolerance child safety: Never use OpenGen to generate, upload, solicit, process or distribute child sexual exploitation and abuse material (CSAM/CSAE), child grooming or sextortion, or any sexualized depiction of a minor. OpenGen immediately suspends and terminates offending accounts, preserves required evidence, and reports apparent CSAM/CSAE to the National Center for Missing & Exploited Children (NCMEC) and competent law-enforcement authorities.',
+        },
+        {
+          type: 'paragraph',
+          text: "Prohibited harmful, deceptive and biometric uses: Do not use OpenGen to break the law or violate another person's rights. Prohibited conduct includes nonconsensual intimate imagery (NCII); unauthorized voice cloning or photorealistic likeness/deepfake generation of a real person without required consent or lawful authority; deceptive impersonation in elections, government or civic processes, financial fraud or defamation; real-time biometric identification, facial-recognition database building or unlawful biometric surveillance; self-harm encouragement or instruction; chemical, biological, radiological or nuclear (CBRN) weapons or dangerous materials; malware, cyberattacks or abusive unsolicited messaging; and infringement of copyright, trademark, publicity or privacy rights.",
+        },
+        {
+          type: 'paragraph',
+          text: 'Content provenance, C2PA credentials and safety watermarks: Do not strip, remove, alter, obscure or spoof C2PA Content Credentials, cryptographic provenance manifests, invisible or visible AI safety watermarks (such as SynthID or provider provenance signals), or proprietary notices embedded in or attached to generated media where present or required by applicable law or upstream model terms. Do not misrepresent synthetic media as authentic human-captured footage or recordings where doing so would deceive people or violate law or provider policies.',
+        },
+        {
+          type: 'paragraph',
+          text: "Platform integrity, scraping and upstream model restrictions: Do not access another workspace's data, use stolen or unauthorized credentials, evade spending, rate or eligibility limits, create multiple accounts to circumvent restrictions or abuse promotional credits, or run unauthorized automated scraping or bulk harvesting against non-API hosted web pages. Do not attempt to extract upstream model weights or architectures, or use outputs from a hosted model route to train, distill or fine-tune a competing machine-learning model where prohibited by that model's license or serving provider's terms. Do not put secrets in prompts, public feedback or support messages. Ordinary use of documented REST APIs, MCP, CLI, /llms.txt and public .md discovery documents within issued limits — as well as exercising Apache-2.0 rights in OpenGen's open-source code — is expressly permitted.",
+        },
+        {
+          type: 'paragraph',
+          text: "Vulnerability reporting: Do not attack or deliberately overload the hosted service, probe its security without authorization or escape an execution boundary. If you discover a suspected security vulnerability, stop before accessing another user's data or causing disruption and report it privately to support@opengen.dev (or an available repository private-security channel) with minimal reproduction details and no live secrets or unnecessary private media. Responsible reporting creates no cash bounty, guaranteed remediation SLA or indefinite restriction on lawful protected disclosure.",
+        },
+        {
+          type: 'paragraph',
+          text: 'Applications serving end users: If you build an application or workflow for end users using OpenGen, you must enforce an 18+ minimum age requirement (including any age-gating or age verification required by applicable law), provide accurate notice of applicable route and provenance restrictions, obtain necessary rights and consents for end-user inputs, and maintain reasonable abuse-prevention controls. Building an application grants no endorsement by OpenGen and overrides no upstream model restriction. OpenGen may investigate suspected violations and restrict activity under section 15.',
+        },
+      ],
+    },
+    {
+      id: 'section-12',
+      title: '12. Export controls, sanctions and territorial restrictions',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'You must comply with all applicable export-control, trade and economic sanctions laws, including the U.S. Export Administration Regulations (EAR), sanctions administered by the U.S. Department of the Treasury Office of Foreign Assets Control (OFAC), U.S. Department of State restrictions, European Union sanctions and UK HM Treasury sanctions. You represent that you (and any organization or end user for whom you act) are not located in, organized under the laws of, or ordinarily resident in any country or territory subject to comprehensive U.S. embargoes or sanctions (including Cuba, Iran, North Korea, and comprehensively sanctioned regions of Ukraine), are not listed on the OFAC Specially Designated Nationals (SDN) List, the U.S. Entity List or Denied Persons List, or equivalent EU/UK restricted-party lists, and will not use the service for any prohibited military, proliferation or restricted end use.',
+        },
+        {
+          type: 'paragraph',
+          text: "Do not misrepresent eligibility or use a VPN, proxy, alternate account or intermediary to evade legal, model-author or serving-provider geographic or entity restrictions. Upstream provider availability can be narrower than locations where OpenGen's website loads, and a listed API endpoint region does not make a restricted model lawful for every person there. We may request reasonable eligibility confirmation or pause affected activity when law or an upstream provider requires it.",
+        },
+      ],
+    },
+    {
+      id: 'section-13',
+      title: '13. API changes, previews and compatibility',
       blocks: [
         {
           type: 'paragraph',
@@ -294,30 +335,30 @@ export const termsPolicy = {
       ],
     },
     {
-      id: 'section-12',
-      title: '12. Rights, infringement and safety reports',
+      id: 'section-14',
+      title: '14. Copyright (DMCA), likeness and safety reports',
       blocks: [
         {
           type: 'paragraph',
-          text: 'Send intellectual-property, privacy, likeness or unlawful-content reports to legal@opengen.dev. Identify the right or safety issue, the affected work or person, the relevant OpenGen job/asset or other location, your contact information and why you are entitled to report it. Explain the basis of the claim and provide supporting information in good faith. Private material can be identified privately; do not publish a bearer link, API secret or unnecessary sensitive media to make a report.',
+          text: 'Send copyright, trademark, privacy, likeness/voice or unlawful-content complaints to legal@opengen.dev (or by mail to Copyright Agent, ATOMSTOBITS LABS INC., 201 Folsom St, San Francisco, CA 94105, United States). Private workspace material can be referenced by job or asset identifier; never publish a bearer media link, API secret or unnecessary sensitive media to submit a report.',
         },
         {
           type: 'paragraph',
-          text: 'We may request information needed to verify and act on a report. We can restrict access, preserve necessary evidence, contact the relevant account holder and remove or disable material where justified or required by law. We will limit disclosure of private information to what is necessary for the lawful process and applicable handling. A plausible urgent safety issue can require action before a full investigation finishes.',
+          text: 'DMCA Takedown Notices (17 U.S.C. § 512(c)(3)): If you are a copyright owner or authorized agent reporting alleged copyright infringement on OpenGen-hosted storage, your written notice to our Copyright Agent must include: (1) a physical or electronic signature of a person authorized to act on behalf of the owner of an exclusive copyright right allegedly infringed; (2) identification of the copyrighted work claimed to have been infringed (or a representative list if multiple works are covered); (3) identification of the material claimed to be infringing or to be the subject of infringing activity and information reasonably sufficient to permit OpenGen to locate it (such as the specific OpenGen job/asset identifier or URL); (4) your name, mailing address, telephone number and email address; (5) a statement that you have a good-faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent or the law; and (6) a statement that the information in the notification is accurate, and under penalty of perjury, that you are authorized to act on behalf of the owner of an exclusive right that is allegedly infringed.',
         },
         {
           type: 'paragraph',
-          text: 'If your content or access was restricted by mistake, contact legal@opengen.dev with the affected identifier, an explanation and relevant evidence. We will review the challenge and any required response process. We do not promise restoration while a legal prohibition remains or merely because someone supplies a claimed license. Formal notices and counter-notices may require additional elements under applicable law.',
+          text: 'DMCA Counter-Notices (17 U.S.C. § 512(g)(3)): If your material was removed or disabled due to a copyright notice and you believe in good faith it was removed by mistake or misidentification, you may send a written counter-notice to legal@opengen.dev containing: (1) your physical or electronic signature; (2) identification of the material removed or disabled and the location where it appeared before removal; (3) a statement under penalty of perjury that you have a good-faith belief the material was removed or disabled as a result of mistake or misidentification; and (4) your name, physical address, telephone number and email address, together with a statement that you consent to the jurisdiction of the Federal District Court for the judicial district in which your address is located (or, if your address is outside the United States, the U.S. District Court for the District of Delaware or the Northern District of California) and that you will accept service of process from the person who provided the original notification or their agent.',
         },
         {
           type: 'paragraph',
-          text: 'Repeated substantiated infringement or serious/repeated rights abuse can lead to termination under section 13. Deliberately false or abusive reports also violate these Terms. Where a formal statutory procedure applies, we will handle notices, challenges and required responses under that procedure.',
+          text: 'Action on reports and repeat infringers: We may request verification details, restrict access, preserve required evidence, notify the affected account holder where lawful, and remove or disable material where justified or required by law (urgent safety issues may require immediate action). We do not promise restoration while an independent legal or safety prohibition applies. OpenGen terminates accounts of repeat copyright infringers in appropriate circumstances under section 15. Knowingly materially misrepresenting that material is infringing, or was removed by mistake or misidentification, violates these Terms and may result in statutory liability under 17 U.S.C. § 512(f).',
         },
       ],
     },
     {
-      id: 'section-13',
-      title: '13. Suspension, termination and effects',
+      id: 'section-15',
+      title: '15. Suspension, termination and effects',
       blocks: [
         {
           type: 'paragraph',
@@ -337,13 +378,13 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'Unused purchased credit and refunds remain governed by the credit policy and mandatory rights; closure or breach is not automatic forfeiture. If we end the relationship without cause or withdraw the paid service so that you cannot reasonably use your remaining purchased balance, we will return the unused paid remainder after accepted-cost reconciliation even if the voluntary refund-request window has closed. Media and records are handled under the Privacy Notice, with necessary legal and recovery limits. Notice/cure periods do not delay a refund or other remedy that must be provided sooner.',
+          text: 'Unused purchased credit and refunds remain governed by sections 8 through 10 and mandatory legal rights; closure or breach does not declare all paid funds automatically confiscated, though we may lawfully offset established amounts owed during fraud, breach or chargeback review. If we end the relationship without cause or withdraw the paid service so that you cannot reasonably use your remaining purchased balance, we will return the unused paid remainder after accepted-cost reconciliation even if the 24-hour voluntary refund window has closed. Media and records are handled under the Privacy Notice, with necessary legal and recovery limits. Notice/cure periods do not delay a refund or other remedy that must be provided sooner.',
         },
       ],
     },
     {
-      id: 'section-14',
-      title: '14. Service warranties and output review',
+      id: 'section-16',
+      title: '16. Service warranties, force majeure and output review',
       blocks: [
         {
           type: 'paragraph',
@@ -368,8 +409,8 @@ export const termsPolicy = {
       ],
     },
     {
-      id: 'section-15',
-      title: '15. Liability limits and preserved remedies',
+      id: 'section-17',
+      title: '17. Liability limits and preserved remedies',
       blocks: [
         {
           type: 'paragraph',
@@ -385,17 +426,17 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'These limits do not reduce money refunds, restoration of unused purchased credit, release/correction of improper holds or debits, or other financial amounts actually owed under the credit policy or applicable law. They do not turn unresolved cost into a final debit or permit us to keep money we must return. The credit policy still determines the financial correction; damages for a separate claim are a different question.',
+          text: 'These limits do not reduce money refunds, restoration of unused purchased credit, release/correction of improper holds or debits, or other financial amounts actually owed under sections 8 through 10 or applicable law. They do not turn unresolved cost into a final debit or permit us to keep money we must return. Sections 8 through 10 still determine the financial correction; damages for a separate claim are a different question.',
         },
       ],
     },
     {
-      id: 'section-16',
-      title: '16. Bounded third-party claim responsibility',
+      id: 'section-18',
+      title: '18. Bounded third-party claim responsibility',
       blocks: [
         {
           type: 'paragraph',
-          text: 'If you use OpenGen in business, you will reimburse us for reasonable amounts finally awarded to a third party, or agreed in a settlement approved as below, to the extent a claim is caused by content you lacked the necessary rights to submit or your unlawful use or material breach of sections 6, 9 or 10. This includes reasonable defense costs for that claim. It does not cover a claim merely because your account or output appears in it.',
+          text: 'If you use OpenGen in business, you will reimburse us for reasonable amounts finally awarded to a third party, or agreed in a settlement approved as below, to the extent a claim is caused by content you lacked the necessary rights to submit or your unlawful use or material breach of sections 6, 11 or 12. This includes reasonable defense costs for that claim. It does not cover a claim merely because your account or output appears in it.',
         },
         {
           type: 'paragraph',
@@ -408,8 +449,8 @@ export const termsPolicy = {
       ],
     },
     {
-      id: 'section-17',
-      title: '17. Disputes, governing law and courts',
+      id: 'section-19',
+      title: '19. Disputes, governing law and courts',
       blocks: [
         {
           type: 'paragraph',
@@ -437,30 +478,30 @@ export const termsPolicy = {
       ],
     },
     {
-      id: 'section-18',
-      title: '18. Electronic notices and Terms changes',
+      id: 'section-20',
+      title: '20. Electronic communications (E-SIGN) and Terms changes',
       blocks: [
         {
           type: 'paragraph',
-          text: 'We may send service and contract notices to the verified account/workspace contact, through the service or by another agreed lawful channel. Keep relevant contacts current. Electronic notice may satisfy a writing requirement where law permits; sending to an invalid address does not excuse a notice requirement that law imposes on us. Send legal notices to legal@opengen.dev unless a specific legal process requires another method. Marketing choices are separate from necessary account, security and payment communications.',
+          text: 'By creating an account, approving funding or accepting these Terms electronically, you consent to receive agreements, disclosures, receipts, billing statements and legal or operational notices electronically (via your verified account email or in-product notices) and agree that electronic acceptance and electronic records satisfy legal writing and signature requirements to the fullest extent permitted by the U.S. Electronic Signatures in Global and National Commerce Act (E-SIGN) and similar applicable laws. Keep your account contact details current; sending to an outdated address does not excuse a notice duty that law independently imposes on us. Send formal legal notices to legal@opengen.dev (or our San Francisco mailing address) unless a specific legal process requires another method. Optional marketing communications are separate from required account, security and billing notices.',
         },
         {
           type: 'paragraph',
-          text: "The adopted Terms will identify their version and effective date, and we will make the current text available. For a material change reducing rights or increasing obligations, we will give at least 30 days' advance notice by an appropriate account or in-product channel. A law-driven or urgent security/abuse change may take effect sooner only to the extent necessary, with notice as soon as reasonably possible and legally permitted. Minor corrections or changes solely benefiting users may take effect when published.",
+          text: "Adopted Terms state their effective date, and we make the current text available at opengen.dev/terms. For a material change reducing rights or increasing obligations, we will give at least 30 days' advance notice by an appropriate account or in-product channel. A law-driven or urgent security/abuse change may take effect sooner only to the extent necessary, with notice as soon as reasonably possible and legally permitted. Minor corrections or changes solely benefiting users may take effect when published.",
         },
         {
           type: 'paragraph',
-          text: 'Changes apply prospectively. They do not retroactively authorize a new charge, broader content use, a different paid request or forfeiture of an existing refund right. Continued future use after clear notice and the effective date can indicate acceptance only where legally permitted; where fresh affirmative agreement is required, we will obtain it before the affected activity. If you decline a material change and close because you cannot continue under the prior terms, we will return your unused purchased remainder after accepted-cost reconciliation even if the voluntary refund-request window has closed. Accrued rights and recovery of existing work remain. The prior version continues to govern an earlier accepted request or dispute to the extent applicable.',
+          text: 'Changes apply prospectively. They do not retroactively authorize a new charge, broader content use, a different paid request or forfeiture of an existing refund right. Continued future use after clear notice and the effective date can indicate acceptance only where legally permitted; where fresh affirmative agreement is required, we will obtain it before the affected activity. If you decline a material change and close because you cannot continue under the prior terms, we will return your unused purchased remainder after accepted-cost reconciliation even if the voluntary refund-request window has closed. Accrued rights and recovery of existing work remain. Earlier terms continue to govern a previously accepted request or accrued dispute to the extent applicable.',
         },
       ],
     },
     {
-      id: 'section-19',
-      title: '19. General contract provisions',
+      id: 'section-21',
+      title: '21. General contract provisions and U.S. Government rights',
       blocks: [
         {
           type: 'paragraph',
-          text: "These Terms, the credit policy and other documents expressly incorporated within their stated scope are the agreement for the hosted service, subject to section 2's priority rules. They do not erase a separately signed agreement, an accepted request commitment, accrued rights or the published software licenses. An amendment outside the stated update process must be agreed by authorized representatives.",
+          text: "These Terms and any other documents expressly incorporated within their stated scope form the entire agreement for the hosted service, subject to section 2's priority rules. They do not erase a separately signed agreement, an accepted request commitment, accrued rights or the published software licenses. An amendment outside the stated update process must be agreed in writing by authorized representatives.",
         },
         {
           type: 'paragraph',
@@ -468,7 +509,7 @@ export const termsPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'If a provision is unenforceable, it is limited only as necessary and the remaining agreement continues where lawful. Not enforcing a provision once does not waive later enforcement. Section titles do not alter meaning. No unrelated third party receives rights under this agreement merely because it is mentioned; any expressly agreed third-party rights must be identified in the applicable agreement.',
+          text: 'If a provision is unenforceable, it is limited only as necessary and the remaining agreement continues where lawful. Not enforcing a provision once does not waive later enforcement. Section titles do not alter meaning. No unrelated third party receives rights under this agreement merely because it is mentioned; any expressly agreed third-party rights must be identified in the applicable agreement. For U.S. Government end users acquiring access to the hosted service, the hosted service and documentation are “commercial computer software” and “commercial computer software documentation” provided strictly with the commercial rights and restrictions in these Terms in accordance with FAR 12.212 and DFARS 227.7202, without restricting Apache-2.0 open-source rights in published source code.',
         },
         {
           type: 'paragraph',
@@ -477,12 +518,12 @@ export const termsPolicy = {
       ],
     },
     {
-      id: 'section-20',
-      title: '20. Contact',
+      id: 'section-22',
+      title: '22. Contact',
       blocks: [
         {
           type: 'paragraph',
-          text: "OpenGen's operator is ATOMSTOBITS LABS INC., a Delaware corporation in the United States. Contact legal@opengen.dev for legal notices, privacy/rights requests and content complaints. Contact support@opengen.dev for accounts, generation, billing, refunds and service support. Include relevant identifiers and a concise explanation; do not send passwords, API secrets, private tokens or complete payment details.",
+          text: "OpenGen's operator is ATOMSTOBITS LABS INC., a Delaware corporation in the United States. Contact legal@opengen.dev for legal notices, DMCA copyright notices, privacy/rights requests and content complaints. Contact support@opengen.dev for accounts, generation, billing, refunds and service support. Include relevant identifiers and a concise explanation; do not send passwords, API secrets, private tokens or complete payment details.",
         },
         {
           type: 'paragraph',
@@ -493,239 +534,12 @@ export const termsPolicy = {
   ],
 } satisfies LegalPolicy;
 
-export const refundsPolicy = {
-  slug: 'refunds',
-  navigationLabel: 'Refund policy draft',
-  title: 'OpenGen Prepaid Credit and Refund Policy — V4 proposed draft',
-  description:
-    'Proposed OpenGen prepaid-credit and refund policy. Draft for review, not yet effective.',
-  reviewDate: '9 November 2026',
-  sections: [
-    {
-      id: 'section-1',
-      title: '1. Scope and priority',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: "This policy covers the hosted OpenGen service operated by ATOMSTOBITS LABS INC. and forms part of its Terms of Service. It controls the specific funding, accounting and refund matters below; general Terms language does not remove these express refund rights. Mandatory legal rights take priority. The Privacy Notice governs personal-data handling. A quote sets that job's price basis and limits; it does not override this policy or authorize another card charge.",
-        },
-        {
-          type: 'paragraph',
-          text: 'Purchased credit is USD service prepayment of the paying workspace. One dollar of purchased balance provides one dollar toward authorized OpenGen charges. It is not a bank deposit or investment, earns no interest and cannot be transferred or resold through OpenGen. Cash returns follow this policy and law.',
-        },
-        {
-          type: 'paragraph',
-          text: 'The same accepted pricing, reservation, cancellation and settlement rules apply to generations submitted through the website, API, MCP or CLI. An interface does not itself make a paid request free or authorize another purchase. Any genuinely different offer must state its scope before you accept it.',
-        },
-      ],
-    },
-    {
-      id: 'section-2',
-      title: '2. Manual purchases and fees',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'The initial purchase flow is a human-approved USD top-up of $5 to $1,000. We show the credit amount, total payment and any applicable fee or tax before payment. The initial separate OpenGen purchase fee and refund-processing fee are $0. A future separately implemented purchase fee must be clearly accepted at checkout; it may be nonrefundable only as disclosed and legally permitted. A processor charging OpenGen a fee does not itself authorize a refund deduction.',
-        },
-        {
-          type: 'paragraph',
-          text: 'This policy activates no subscriptions, auto-top-ups or promotional program. Saving a payment method, giving an agent Generate access or exhausting balance does not authorize another charge. Available payment methods are those actually shown at checkout; this policy does not add cryptocurrency or other methods.',
-        },
-        {
-          type: 'paragraph',
-          text: 'We add usable credit once after verified paid confirmation. A checkout redirect or pending payment instruction is not proof of funding. Keep the original order ID if credit is missing; ask us to check that payment before paying again.',
-        },
-      ],
-    },
-    {
-      id: 'section-3',
-      title: '3. Quotes, reservations and customer limits',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'Check the exact model, regional route, inputs, resolution, duration, output count, payer, price basis and disclosed fees. Image/video rates can depend on configuration. A quote is an estimate unless expressly fixed; price and availability are rechecked at admission. An admitted job retains its accepted terms rather than being silently repriced later.',
-        },
-        {
-          type: 'paragraph',
-          text: "A reservation sets aside balance for a job; it is not a final debit or refund. For managed calls, the final OpenGen customer charge cannot exceed the accepted reservation or a stricter accepted request cap. OpenGen bears a supplier overrun above that customer limit; it does not silently debit more balance or charge your card. This does not cap a provider's direct charges when you use your own provider account/key.",
-        },
-        {
-          type: 'paragraph',
-          text: 'Any OpenGen generation fee must be separately shown and accepted. General Terms do not activate a source-only fee feature or contradict an advertised zero-markup route. Unknown acceptance/cost stays unresolved until reviewed; successful delivery, list price and an error response do not establish the final supplier bill. Do not submit a replacement merely because an existing job is slow or uncertain.',
-        },
-      ],
-    },
-    {
-      id: 'section-4',
-      title: '4. Paid balance, noncash grants and allocation',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'The initial service makes no promise of free, referral or promotional credit. If we issue an identified noncash grant, its offer states its conditions. It is not purchased money and is not cash-refundable unless law requires otherwise. Correcting a paid billing error preserves its paid character rather than converting a refund into a promotion.',
-        },
-        {
-          type: 'paragraph',
-          text: 'For manual refund calculations, staff reconstruct funding and usage chronologically from original payment, job and ledger records. Noncash credit available when work was admitted is applied first; paid credit is then applied oldest purchase first. A later grant does not retroactively replace earlier paid consumption. Accepted reservations retain their allocation until settled/released; release restores the same funding character and purchase date. Prior cash returns count once.',
-        },
-        {
-          type: 'paragraph',
-          text: 'This is a support-accounting rule, not a claim of automated credit buckets or purchase-lot counters. We investigate uncertain origins rather than assuming the amount is paid refundable money or free credit. An undisputed paid remainder can be returned separately from genuinely unresolved accepted work.',
-        },
-      ],
-    },
-    {
-      id: 'section-5',
-      title: '5. Ordinary voluntary refund window',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'Request the unused paid remainder within 24 hours of successful payment confirmation for the purchase. This does not start when an unpaid checkout opens. A timely request remains timely while staff verifies it or accepted costs are resolved. Partial use does not disqualify the entire purchase. Spending you authorize before the refund amount is secured reduces its unused remainder; stop using balance you want returned.',
-        },
-        {
-          type: 'paragraph',
-          text: 'The calculation excludes consumed amounts, prior refunds/returns, noncash grants and genuinely unresolved accepted-work exposure. It cannot exceed the original unreturned paid principal. We explain it. Missing funding, unauthorized/duplicate charges, service defects, closure and mandatory rights are separate review grounds; the voluntary window does not extinguish them.',
-        },
-        {
-          type: 'paragraph',
-          text: 'No new OpenGen refund deduction applies. Only an actual separately disclosed nonrefundable purchase fee could be excluded; that fee is currently zero. Any required adjustment of tax actually collected is separate, not a service fee.',
-        },
-      ],
-    },
-    {
-      id: 'section-6',
-      title: '6. Fractions of a cent and refund destination',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'Usage uses integer millionths of a US dollar; cash refunds use cents. A positive refundable paid remainder is rounded up to a cent, limited by the remaining refundable principal of its original payment. OpenGen bears the sub-cent difference. We remove only the corresponding eligible paid credit and record that difference separately, rather than erase it as a fee or debit unrelated credit. There is no extra OpenGen minimum refund-request amount.',
-        },
-        {
-          type: 'paragraph',
-          text: "For example, $4.993456 eligible credit can produce a $5.00 cash refund if that original payment has at least $5.00 still returnable. Records show the exact credit removed and OpenGen's $0.006544 rounding cost. The same amount cannot be recovered twice through cash, bank reversal, restored credit or another support case.",
-        },
-        {
-          type: 'paragraph',
-          text: 'We normally refund the original method and verify the original payer/workspace authority. If that route cannot process an eligible return, support arranges a verified lawful alternative where needed. This does not promise that Stripe can redirect a refund to any card/bank or that all methods support identical partial refunds.',
-        },
-      ],
-    },
-    {
-      id: 'section-7',
-      title: '7. Manual handling and timing',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'Email support@opengen.dev with your account/workspace, order or payment reference, requested amount and brief reason. Staff can help identify a purchase if you lack its ID. Do not send full card/bank details, passwords, API keys, tokens or unnecessary private generation content. Generation permission is not permission to send money to a different recipient.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Our proposed initial staff targets are acknowledgement within one business day, a decision or specific information request within five business days, and processor initiation within two business days after approval and reconciliation of the amount being returned. These are manual targets, not refund automation or a bank-arrival guarantee. Earlier legal deadlines control. Staff delay does not make a timely request late.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Before returning cash, staff secures the amount against reuse, preserves accepted-job liabilities, and records processor/refund and ledger references. Requested, approved, processor-pending, initiated and bank-received are different states. A failed refund is investigated, not marked completed or used to clear every hold automatically.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Card returns commonly appear within five to ten business days after processor initiation; some are faster or appear as reversals, and method/bank delays can be longer. We provide the applicable estimate and available tracing reference. Contact support after ten business days or the stated method-specific estimate if it has not arrived. Use legal@opengen.dev to escalate unresolved handling/rights complaints.',
-        },
-      ],
-    },
-    {
-      id: 'section-8',
-      title: '8. Aged unresolved charges',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'An acceptance/cost question unresolved for 24 hours enters manual billing review. We target a first explanation within two business days, billing-owner escalation at seven calendar days, and at least weekly updates. The explanation identifies the amount, issue, evidence sought and next review date; an unexplained indefinite hold is not the policy.',
-        },
-        {
-          type: 'paragraph',
-          text: 'By day 30, the billing owner must make a documented resolution decision: settle on reliable evidence within the customer limit, or provide an OpenGen-funded adjustment/return while preserving any genuinely unknown supplier-cost record. We do not invent zero upstream cost to release money. Continued restriction needs a specific legal/payment-network/fraud reason or credible ongoing accepted-work evidence, a limited amount and a next review date. Undisputed unreserved paid funds are not withheld simply because another item needs review. These are proposed manual obligations, not automatic time-based ledger rewrites.',
-        },
-      ],
-    },
-    {
-      id: 'section-9',
-      title: '9. Failure, cancellation and delivery remedies',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'Work rejected before upstream acceptance with no incurred charge is not usage-billed; its applicable unused reservation is released. Accepted processing can remain billable after failure, attempted cancellation or delivery trouble. Accepted route terms and billing evidence determine the charge, not “failed” alone.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Cancellation is not guaranteed after acceptance and does not establish a refund. Where recoverable, we resume the same job or retained delivery rather than create another paid generation without authority. Reservation release restores spending capacity; it is not cash back.',
-        },
-        {
-          type: 'paragraph',
-          text: "Report a billing error or failure to meet an accepted technical commitment. Remedies can include corrected delivery, a paid-credit adjustment or money back as appropriate under the facts and applicable rights. A supplier's no-refund rule does not eliminate OpenGen's own responsibilities. Disliking a creative result alone does not establish that the promised technical service failed.",
-        },
-      ],
-    },
-    {
-      id: 'section-10',
-      title: '10. Closure and service discontinuation',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'Voluntary workspace closure, OpenGen closure without cause or permanent discontinuation of the paid service triggers reconciliation/return of unused paid balance, including outside the ordinary window. Our target is processor initiation within 30 calendar days of closure, subject to earlier legal deadlines and the specific unresolved amounts reviewed under section 8. Closure is not automatic paid-balance forfeiture; noncash grants do not become cash.',
-        },
-        {
-          type: 'paragraph',
-          text: 'For fraud, breach or payment-reversal review we may restrict new spending and lawfully offset established amounts owed, but do not declare all paid funds confiscated merely by closing an account. We explain retained/returned amounts where permitted. Export needed content first; necessary financial records follow the Privacy Notice and law.',
-        },
-      ],
-    },
-    {
-      id: 'section-11',
-      title: '11. Possible future expiry',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: "There is no automatic paid-credit expiry schedule at launch. For credit sold under an adopted version of this policy, OpenGen reserves a discretionary right, where lawful, to expire unused paid credit no earlier than 365 days after purchase. We give at least 30 calendar days' direct advance notice, identify the affected amount/date, and allow use or a request to return its unused paid remainder before expiry. That return is an exception to the ordinary window.",
-        },
-        {
-          type: 'paragraph',
-          text: 'Exercise requires reliable paid-credit attribution and an audited adjustment. Unresolved reserved funds are not silently expired; if a hold prevented use/return during notice, we give a fresh opportunity after resolution. Mandatory legal exceptions and genuinely existing express no-expiry promises prevail. No automatic expiry is enabled at launch; any later exercise of this right must follow the notice, attribution and legal safeguards above.',
-        },
-      ],
-    },
-    {
-      id: 'section-12',
-      title: '12. Taxes, currency, statutory withdrawal and disputes',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: "Funding/refund principal is in USD. A bank's conversion rate or separate card/FX charge can change its local-currency display; we do not impose or promise to reverse a bank's own fee. OpenGen tax/fees must be identified before approval; this policy neither enables tax automation nor authorizes an undisclosed debit. Required tax corrections use the actual transaction and law.",
-        },
-        {
-          type: 'paragraph',
-          text: 'Refunds, reversals, unauthorized payments or disputes can put new managed and own-key spending into review. Accepted jobs still need their original recovery/settlement; historical entries remain. We check processor/bank returns to avoid duplicate recovery. A failed refund or closed dispute does not automatically resolve every hold. For your own provider key, the provider receives its direct payment; OpenGen does not promise returns on its behalf.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Tell us promptly about unauthorized or duplicate payments. Support does not require surrendering a lawful bank dispute, withdrawal, defective-service or other mandatory right. If immediate performance requires a separate legally required request/acknowledgement, obtain it clearly; login or a general agent grant does not supply it.',
-        },
-        {
-          type: 'paragraph',
-          text: 'Where EEA or UK consumer withdrawal law applies to your online purchase, you ordinarily have 14 days from concluding the contract to withdraw without giving a reason, subject to the applicable rules and exceptions. Send a clear statement of your decision to support@opengen.dev before the period ends, identifying the purchase and contact details; no special form or legal wording is required. The ordinary 24-hour voluntary window does not shorten this right or any longer period that law provides, including where required information was missing.',
-        },
-        {
-          type: 'paragraph',
-          text: 'For a valid statutory withdrawal, we make the reimbursement required by law without undue delay and ordinarily within 14 days after receiving your withdrawal notice, using the original payment method unless you expressly agree to another lawful method, with no reimbursement fee. We explain any lawful deduction or exception. A service begun at your express request and digital content supplied during the withdrawal period have different legal conditions; any proportional charge or loss of the right depends on the actual applicable information, request, consent, acknowledgement, performance and confirmation requirements. Purchasing credit, first use, login or agent access does not automatically satisfy them. We do not rely on an uncollected acknowledgement or treat every delivered generation as extinguishing all withdrawal rights.',
-        },
-      ],
-    },
-  ],
-} satisfies LegalPolicy;
-
 export const privacyPolicy = {
   slug: 'privacy',
   navigationLabel: 'Privacy draft',
-  title: 'OpenGen Privacy Notice — proposed version 4',
+  title: 'OpenGen Privacy Notice',
   description: 'Proposed OpenGen Privacy Notice. Draft for review, not yet effective.',
-  reviewDate: '9 November 2026',
+  reviewDate: '16 November 2026',
   sections: [
     {
       id: 'section-1',
@@ -737,7 +551,7 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'Contact legal@opengen.dev for privacy questions, rights requests, complaints and legal notices. Contact support@opengen.dev for account, generation, billing, refund and other service support. You do not need an OpenGen account to raise a privacy concern.',
+          text: 'Contact legal@opengen.dev for privacy questions, rights requests, appeals, complaints and legal notices. Contact support@opengen.dev for account, generation, billing, refund and other service support. You do not need an OpenGen account to raise a privacy concern.',
         },
         {
           type: 'paragraph',
@@ -755,7 +569,7 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'We determine how information is used for our own account administration, access controls, security, support, billing and legal obligations. Depending on applicable law, we act as a controller or business for that handling.',
+          text: 'We determine how information is used for our own account administration, access controls, security, support, billing and legal obligations. Depending on applicable law (including the EEA/UK General Data Protection Regulation and U.S. state privacy statutes), we act as a data controller or business for that handling.',
         },
         {
           type: 'paragraph',
@@ -769,7 +583,7 @@ export const privacyPolicy = {
     },
     {
       id: 'section-3',
-      title: '3. Information and sources',
+      title: '3. Information, sources and California Notice at Collection',
       blocks: [
         {
           type: 'table',
@@ -781,7 +595,7 @@ export const privacyPolicy = {
             ],
             [
               'Terms acceptance evidence',
-              'For an adopted, effective Terms version after validated Continue and verified sign-in: identity-provider issuer and account subject, Terms version and content fingerprint, fixed notice version/action/verification method, and database timestamp. This documents the identified Terms and action associated with the verified account; draft-policy sign-in creates no such receipt. The receipt adds no separate email, IP-address or device data, prompts, media or tokens.',
+              'For adopted, effective Terms after validated Continue and verified sign-in: identity-provider issuer and account subject, server-selected Terms snapshot identifier and content fingerprint, fixed notice/action/verification method, and database timestamp. This documents the identified Terms and action associated with the verified account; draft-policy sign-in creates no such receipt. The receipt adds no separate email, IP-address or device data, prompts, media or tokens.',
             ],
             [
               'Generation content',
@@ -797,7 +611,7 @@ export const privacyPolicy = {
             ],
             [
               'Payments',
-              'Workspace/order/payment identifiers, amount, currency, reconciliation, refund and dispute status from the payer or Stripe; accounting records created by the service',
+              'Workspace funding-owner/authority records, order and recharge-attempt identifiers, credit principal, processing fee and total charge amounts, currency, minimized Stripe customer/mandate/setup/payment identifiers, saved card two-letter ISO country code (used solely to determine domestic 2.9% + $0.30 vs international 4.4% + $0.30 processing fee rates — never full card numbers or CVC), off-session recharge attempt/authentication-recovery status, and reconciliation, refund and dispute status; accounting records created by the service',
             ],
             [
               'Browser and operations',
@@ -815,47 +629,55 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
+          text: 'California Notice at Collection (CCPA/CPRA): In the preceding 12 months and at collection, the categories above correspond to California Civil Code § 1798.140 statutory categories: (A) Identifiers (account subject, email, IP address, workspace/request IDs); (B) California Customer Records and payment linkage (billing-owner authority, orders, recharge attempts, processing fees, saved-card ISO-2 country code); (D) Commercial information (quotes, prepaid credit purchases, usage ledger and generation history); (F) Internet or other electronic network activity information (functional cookies and registered API/MCP route interactions); (H) Audio, electronic, visual or similar information (prompts, reference images/video/audio and generated outputs); and (L) Sensitive personal information (account authentication credentials/tokens, and any user-submitted media depicting a human face or voice processed on your instructions). Purposes of collection and use are detailed in section 4, disclosures to service providers and customer-selected providers in section 6, and retention criteria in section 8. OpenGen does not “sell” or “share” personal information (including of minors under 16) for cross-context behavioral advertising. Under Cal. Civ. Code § 1798.121, OpenGen uses and discloses Sensitive Personal Information solely to perform the services reasonably expected by an average user, ensure security and integrity, prevent fraud/abuse, and comply with legal obligations — never to infer characteristics about individuals.',
+        },
+        {
+          type: 'paragraph',
           text: 'Some information is necessary for a requested feature: verified identity for account access, required model inputs for generation, a destination for an authorized webhook, and payment information for a credit purchase. Without it, that feature may not work. Optional labels, support context and model parameters need not be supplied unless the workflow requires them. Do not submit unnecessary sensitive information, complete payment details or passwords. Use designated connection controls for provider secrets.',
         },
         {
           type: 'paragraph',
-          text: 'Stripe handles payment entry. Our normal payment journal stores minimized transaction linkage/status, rather than complete card/bank credentials or raw payment webhook bodies. Stripe separately handles information required for its payment, fraud-prevention and legal functions.',
+          text: 'Stripe handles payment and saved-card entry. Our payment journal stores minimized customer, setup, mandate and transaction linkage/status plus the saved card two-letter ISO country code for processing-fee calculation, never full card numbers, CVC, bank credentials or raw payment webhook bodies. Stripe separately handles information required for its payment, authentication, fraud-prevention and legal functions.',
         },
       ],
     },
     {
       id: 'section-4',
-      title: '4. Purposes and legal bases',
+      title: '4. Purposes, automated checks and legal bases',
       blocks: [
         {
           type: 'paragraph',
-          text: 'We use information for the purposes below. Where a law requires a legal basis, it depends on the information, relationship and activity. Service use is not blanket consent to every purpose.',
+          text: 'We use information for the purposes below. Where EEA, UK or Swiss data-protection law requires a legal basis under GDPR Article 6, the applicable basis depends on the information, relationship and activity; service use is not blanket consent to every purpose.',
         },
         {
           type: 'table',
-          columns: ['Purpose', 'Basis where applicable'],
+          columns: ['Purpose', 'Basis where applicable (including EEA/UK GDPR Art. 6)'],
           rows: [
             [
               'Authenticate, manage a workspace, and provide requested generation, recovery and delivery',
-              "Performance of a contract with you where necessary for that contract; legitimate interests in operating an authorized organizational service where appropriate for people who are not parties to that contract, subject to required balancing; the customer's documented instructions where we act as its processor",
+              "Performance of a contract with you (Art. 6(1)(b)) where necessary for that contract; legitimate interests in operating an authorized organizational service (Art. 6(1)(f)) for organizational users who are not individual contracting parties, subject to balancing; the customer's documented instructions where we act as its processor",
             ],
             [
               'Record prices/usage, prevent duplicate paid work, reconcile costs/payments and provide support',
-              'Contract where applicable; our legitimate interests in reliable service and accurate records, subject to the balancing required by law',
+              'Performance of a contract (Art. 6(1)(b)) where applicable; legitimate interests in reliable service and accurate accounting records (Art. 6(1)(f)), subject to required balancing',
             ],
             [
-              'Enforce access, detect misuse, investigate incidents and protect users/systems/rights',
-              'Our legitimate interests in security and fraud prevention, and specific legal obligations where applicable',
+              'Enforce access, run bounded media/safety validation, detect misuse, investigate incidents and protect users/systems/rights',
+              'Legitimate interests in security, abuse prevention and network integrity (Art. 6(1)(f)), and compliance with legal obligations (Art. 6(1)(c)) where applicable',
             ],
             [
-              'Keep required financial records, comply with binding process and address legal claims',
-              'Relevant legal obligations; establishing, exercising or defending claims where applicable',
+              'Keep required financial records, report unlawful CSAM/CSAE where mandated, comply with binding process and address legal claims',
+              'Compliance with legal obligations (Art. 6(1)(c)); establishing, exercising or defending legal claims where applicable',
             ],
             [
               'Carry out a genuinely optional use for which we request consent',
-              'Consent for that stated use, which may be withdrawn without changing the lawfulness of prior handling',
+              'Consent for that stated use (Art. 6(1)(a)), which may be withdrawn at any time without affecting prior lawful processing',
             ],
           ],
+        },
+        {
+          type: 'paragraph',
+          text: 'Bounded automated validation and safety checks: OpenGen uses automated schema and route checks, media-container inspection (ffprobe/ffmpeg) and optional C2PA Content Credentials verification run as scrubbed-environment, time-bounded local processes (with network-isolated execution required before inspecting untrusted media), rate/spending guards, and abuse-prevention controls, while selected upstream providers run their own automated safety filters. Apparent child sexual exploitation and abuse material (CSAM/CSAE) is preserved as legally required and reported to NCMEC and competent authorities.',
         },
         {
           type: 'paragraph',
@@ -869,11 +691,15 @@ export const privacyPolicy = {
     },
     {
       id: 'section-5',
-      title: '5. Private workspaces, clients and delivery',
+      title: '5. Private workspaces, BYOK vs managed routes, clients and delivery',
       blocks: [
         {
           type: 'paragraph',
           text: 'Generations are private to the owning workspace and authorized identities/scopes. Authorized members, API keys and agent grants can access information allowed by their permissions. Team privacy is not creator-only privacy. Administrators can manage access and inspect activity available to their role. Necessary operational processing by OpenGen and its service providers still occurs.',
+        },
+        {
+          type: 'paragraph',
+          text: "Managed vs Bring Your Own Key (BYOK) routes: When a generation runs on an OpenGen-managed route, OpenGen transmits the necessary prompt, reference media and parameters to the selected regional model deployment using OpenGen's upstream provider account, subject to that route's disclosed provider terms and data handling. When a generation explicitly uses your workspace's own connected provider credential (BYOK), OpenGen decrypts that stored credential server-side solely to submit your request and recover the same accepted task (never returning your raw secret to browsers or agents), and the selected provider processes the request directly under your own account and direct agreement/privacy relationship with that provider.",
         },
         {
           type: 'paragraph',
@@ -963,7 +789,7 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'We may disclose relevant information when legally required or reasonably necessary for security/fraud investigations, rights protection or legal claims. Disclosure remains tied to that purpose. These operational disclosures do not authorize sale or unrelated advertising use of private generation content.',
+          text: 'We may disclose relevant information when legally required or reasonably necessary for security/fraud investigations, mandatory child-safety reporting, rights protection or legal claims. Disclosure remains tied to that purpose. These operational disclosures do not authorize sale or unrelated advertising use of private generation content.',
         },
         {
           type: 'paragraph',
@@ -981,7 +807,7 @@ export const privacyPolicy = {
     },
     {
       id: 'section-7',
-      title: '7. Cookies and browser storage',
+      title: '7. Cookies, browser storage and Global Privacy Control',
       blocks: [
         {
           type: 'paragraph',
@@ -1010,13 +836,13 @@ export const privacyPolicy = {
             ],
             [
               'Local storage',
-              'Payment-order recovery, certain completed comparison identifiers and a random cross-tab session-change signal; persists until the application clears the record or you clear site data',
+              'Workspace-scoped payment-order recovery and saved-card setup-recovery keys (cleared once an authenticated read confirms a terminal order or setup status), certain completed comparison identifiers and a random cross-tab session-change signal; persists until the application clears the record or you clear site data',
             ],
           ],
         },
         {
           type: 'paragraph',
-          text: 'Authentication cookies are HttpOnly, SameSite=Lax and Secure on HTTPS. Payment recovery is limited to workspace/order/amount and duplicate-prevention identifiers, not card details, provider keys or checkout links. Its record is cleared after an authenticated read confirms the relevant terminal order state. Browser records/checkout returns do not themselves prove payment or generation acceptance.',
+          text: 'Authentication cookies are HttpOnly, SameSite=Lax and Secure on HTTPS. Browser payment and saved-card setup recovery in local storage is limited to workspace-scoped order, setup, amount and duplicate-prevention identifiers — never card numbers, CVC, provider keys or checkout links — and is cleared once an authenticated read confirms a terminal order or setup status. Scoped 3D Secure confirmation secrets used during card authentication recovery remain in memory only and are never written to browser storage or application logs. Browser records or Stripe redirects do not themselves prove payment, mandate activation or generation acceptance.',
         },
         {
           type: 'paragraph',
@@ -1024,7 +850,7 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'Hosting, edge, sign-in and payment services can also handle technical information or use their own functional/security technologies for the requested interaction. This inventory is not a promise that linked third-party pages are cookie-free or infrastructure keeps no logs. It does not authorize unrelated advertising, session replay or model training. If we introduce optional processing requiring a choice or consent, we will provide the relevant information and controls before it begins where required. Contact legal@opengen.dev about cookie/storage or other choices. Applicable opt-out rights or legally recognized browser signals are not waived by service use.',
+          text: 'Global Privacy Control (GPC) and universal opt-out signals: OpenGen honors the Global Privacy Control (GPC) browser signal and other legally recognized universal opt-out preference signals without requiring an account or identity verification; in addition, OpenGen does not sell personal information, share it for cross-context behavioral advertising or run targeted advertising trackers for any visitor. Hosting, edge, sign-in and payment services can handle technical information or use their own functional/security technologies for the requested interaction; this inventory is not a promise that linked third-party pages are cookie-free or infrastructure keeps no logs. If we ever introduce optional processing requiring a choice or consent, we will provide the relevant information and controls before it begins. Contact legal@opengen.dev about cookie/storage or privacy choices.',
         },
       ],
     },
@@ -1050,7 +876,7 @@ export const privacyPolicy = {
             ],
             [
               'Terms acceptance receipts',
-              'Evidence of the identified agreement and related legal claims or required preservation, retained only while necessary for the justified purpose. Ordinary application operations preserve the original receipt without automatic expiry; sign-out, account closure and media cleanup do not automatically erase it. Correction/deletion requests require review, and any record retained for a justified exception remains limited to that purpose. A scoped operator retention/disposition record and reviewed procedure are required before acceptance recording is activated; this draft sets no uniform deadline.',
+              'Evidence of the identified agreement and related legal claims or required preservation, retained only while necessary for the justified purpose. Ordinary application operations preserve the original receipt without automatic expiry; sign-out, account closure and media cleanup do not automatically erase it. Correction/deletion requests require review, and any record retained for a justified exception remains limited to that purpose. Disposition follows our reviewed database-owner procedure and scoped operator retention record rather than a single automatic expiry timer.',
             ],
             [
               'Jobs, attempts, delivery, lineage, usage and duplicate-prevention records',
@@ -1090,15 +916,15 @@ export const privacyPolicy = {
     },
     {
       id: 'section-9',
-      title: '9. International processing',
+      title: '9. International data transfers',
       blocks: [
         {
           type: 'paragraph',
-          text: 'OpenGen is operated from the United States. Infrastructure, providers, routes and authorized clients may process/access information elsewhere. An endpoint region does not establish every inference, storage, support, account, security or payment location. Unknown regions are not a residency guarantee.',
+          text: 'OpenGen is operated from the United States. Infrastructure, serving model providers, regional routes and authorized clients may process or access information in the United States and other countries. An API endpoint region does not establish every inference, storage, support, account, security or payment location, and unknown upstream regions are not a residency guarantee.',
         },
         {
           type: 'paragraph',
-          text: 'Where law requires transfer safeguards, the relevant processing must have an applicable arrangement, such as a lawful adequacy basis or appropriate contractual safeguards, as the actual circumstances require. We do not claim every route has executed Standard Contractual Clauses, a certification, EU-only processing or identical protections. Service use is not consent to waive required safeguards.',
+          text: 'Where EEA, UK, Swiss or other applicable law requires cross-border transfer safeguards (such as under GDPR Chapter V, Articles 45–46), the covered transfer must rely on an applicable mechanism — such as an adequacy decision (including a third-party vendor’s verified certification under the EU-U.S. Data Privacy Framework, UK Extension or Swiss-U.S. DPF where applicable to that vendor; OpenGen itself does not claim DPF certification), European Commission Standard Contractual Clauses (SCCs), the UK International Data Transfer Agreement (IDTA) or Addendum, or Swiss FDPIC adaptations, together with required supplementary measures. We do not claim every catalogued model route has executed SCCs, EU-only residency or identical protections, and service use is not consent to waive mandatory transfer safeguards.',
         },
         {
           type: 'paragraph',
@@ -1108,19 +934,19 @@ export const privacyPolicy = {
     },
     {
       id: 'section-10',
-      title: '10. Rights, requests, appeals and complaints',
+      title: '10. U.S. state, EEA/UK/Swiss and global privacy rights, appeals and complaints',
       blocks: [
         {
           type: 'paragraph',
-          text: 'Depending on the law, our role and the information, rights may include know/access/copy, correction, deletion, restriction, portability, objection, withdrawal of optional consent, limits on sensitive-data use and opt-outs from sale, sharing or targeted advertising where those activities/rights apply. Protections concerning solely automated decisions with legal or similarly significant effects may also apply. Rights and exceptions differ by jurisdiction.',
+          text: 'Depending on applicable law — including comprehensive U.S. state privacy statutes (such as California CCPA/CPRA, Virginia VCDPA, Colorado CPA, Connecticut CTDPA, Texas TDPSA, Oregon OCPA, Delaware DPDPA, New Jersey, Montana and similar state laws) as well as EEA GDPR, UK GDPR, the Swiss FADP and other applicable privacy laws — you may have rights to confirm processing, know/access categories and specific pieces of personal information, correct inaccuracies, request deletion, obtain a portable copy, restrict or object to processing, withdraw optional consent, limit use/disclosure of sensitive personal information, and opt out of sale, sharing, targeted advertising or profiling in furtherance of decisions that produce legal or similarly significant effects. Rights and statutory exceptions vary by jurisdiction and role.',
         },
         {
           type: 'paragraph',
-          text: 'Write to legal@opengen.dev, describing the action and enough context to locate the information. You may write if someone else uploaded information about you, you lack a job ID, or you have no account. We may proportionately verify identity, authority and the records concerned; do not send passwords, API keys or complete payment details. An authorized representative may contact us with legally required authority. Depending on the request, we may need your confirmation; verification is not permission to collect unrelated information.',
+          text: 'Write to legal@opengen.dev, describing the action and enough context to locate the information. You may write if someone else uploaded information about you, you lack a job ID, or you have no account. We may proportionately verify identity, authority and the records concerned; do not send passwords, API keys or complete payment details. An authorized agent or representative may submit a request with legally required proof of authority (and direct consumer confirmation where permitted by law); verification is never used to collect unrelated personal data.',
         },
         {
           type: 'paragraph',
-          text: "We will not require identity verification for an opt-out that applicable law requires us to honor without it, or require an account to exercise such a choice. We honor legally required browser preference signals where applicable; the absence of a relevant sale or advertising activity does not authorize introducing it without the required information and choices. Where California's direct-marketing disclosure right applies, residents may request the relevant information about disclosures to third parties for their own direct-marketing purposes through legal@opengen.dev.",
+          text: "We will not require identity verification for an opt-out (including Global Privacy Control signals) that applicable law requires us to honor without verification, or require you to create an account to exercise privacy rights. Where California's “Shine the Light” law (Cal. Civ. Code § 1798.83) applies, California residents may contact legal@opengen.dev regarding third-party direct-marketing disclosures (OpenGen does not disclose personal information to third parties for their own direct-marketing purposes).",
         },
         {
           type: 'paragraph',
@@ -1128,25 +954,25 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'We respond within the applicable deadline. Under the EU GDPR, the usual period is one month from receipt, with up to two additional months where legally permitted/necessary and notice/reasons within the first month. For California know/delete/correct requests governed by the CCPA, the usual period is 45 calendar days, with a further 45 days where permitted and required notice. Other requests/jurisdictions can have different or shorter periods and verification/extension rules. These examples do not assert every law applies to every user or activity.',
+          text: 'We respond within the applicable statutory deadline: under the EEA/UK GDPR, ordinarily one month from receipt (extendable by up to two additional months where legally permitted with notice within the first month); under California, Virginia, Colorado, Connecticut, Texas and similar U.S. state privacy laws, ordinarily within 45 calendar days (extendable by up to 45 additional days where permitted with prior notice and explanation). Shorter statutory deadlines control where applicable.',
         },
         {
           type: 'paragraph',
-          text: "To request review, reply to a decision or email legal@opengen.dev with “Privacy appeal” and your reason. We will review it and provide the explanation/outcome required by applicable law. You may complain to a competent regulator or seek a remedy without completing an internal appeal where law permits. Depending on location, this can include an EEA data protection authority, the UK Information Commissioner's Office, the Swiss Federal Data Protection and Information Commissioner or a relevant US state authority. We can help identify the channel. No OpenGen contract removes a mandatory complaint/remedy right.",
+          text: "Appeals and regulator complaints: To appeal a refusal or partial decision, reply to our response or email legal@opengen.dev with “Privacy appeal” and your reason. We review appeals and provide a written decision and explanation within the applicable statutory appeal period (for example, within 45 to 60 days under applicable U.S. state privacy laws). If an appeal is denied or unresolved, U.S. residents may contact their state Attorney General (or the California Privacy Protection Agency), and EEA, UK or Swiss individuals may lodge a complaint at any time with their local EEA supervisory authority, the UK Information Commissioner's Office (ICO) or the Swiss Federal Data Protection and Information Commissioner (FDPIC). No OpenGen contract waives a mandatory complaint or judicial remedy.",
         },
       ],
     },
     {
       id: 'section-11',
-      title: "11. Children and other people's information",
+      title: "11. Children's privacy (18+, COPPA under-13 and GDPR under-16)",
       blocks: [
         {
           type: 'paragraph',
-          text: "Accounts and direct use are intended for people aged 18 or older. We do not invite children to open accounts. This eligibility rule does not claim collection of identity documents or automated verification of every visitor's age.",
+          text: "OpenGen accounts and direct service use are strictly limited to adults aged 18 or older (or the age of legal majority in your jurisdiction). OpenGen is not directed to children, and we do not knowingly collect, solicit or maintain personal information from children under 13 (as protected by the U.S. Children's Online Privacy Protection Act, COPPA) or from minors under 16 (or the applicable digital-consent age between 13 and 16 under EEA/UK data-protection laws). If we learn that a person under 18 — including any child under 13 or 16 — has created an account or submitted personal information directly, we promptly disable the account and delete that personal information, subject only to minimal retention strictly required by law or mandatory child-safety reporting. This eligibility rule does not claim routine collection of government ID documents from every adult visitor.",
         },
         {
           type: 'paragraph',
-          text: "An adult's upload depicting a child is separate from a child holding an account. The uploader needs required rights/authority and must meet applicable child-privacy/safety and model/provider restrictions. Do not submit unlawful, exploitative or prohibited material. A parent, guardian or concerned person may report an underage account or child's information to legal@opengen.dev without an account. We will assess it, restrict activity where appropriate and take legally required removal/other action, subject to necessary legal/security preservation.",
+          text: "An adult's authorized workflow upload depicting a minor is distinct from a minor holding an account: the adult or developer must hold all required parental/guardian permissions, comply with applicable child-privacy and model/provider rules, enforce 18+ age-gating on any downstream application, and never submit unlawful, exploitative or prohibited material. Parents, guardians or any concerned person may report an underage account or a child's personal information to legal@opengen.dev without needing an OpenGen account.",
         },
       ],
     },
@@ -1156,7 +982,7 @@ export const privacyPolicy = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Content may reveal health, identity, beliefs or other sensitive matters and identify people by face/voice. A recognizable image or recording is not automatically a biometric identifier used for unique identification; purpose and processing matter. This notice does not authorize a new identity-verification, biometric-identification or sensitive-data use.',
+          text: 'Content may reveal health, identity, beliefs or other sensitive matters and identify people by face or voice. A recognizable image or recording is not automatically a biometric identifier or template used to uniquely identify a person; purpose and processing matter. OpenGen does not extract or store persistent facial-recognition or voiceprint templates to identify individuals, and this notice authorizes no biometric-identification or unrelated sensitive-data use.',
         },
         {
           type: 'paragraph',
@@ -1164,7 +990,7 @@ export const privacyPolicy = {
         },
         {
           type: 'paragraph',
-          text: "Generation, validation, routing and access controls involve automation. Creative generation is not itself a determination of legal rights or eligibility. Contact legal@opengen.dev about an automated restriction, consequential decision or information about you for review and applicable information/intervention rights. We do not claim every upstream model's internals are known or that no automated security decision can affect access.",
+          text: 'Generation, media validation, routing and access controls involve automation, but creative media generation is not used by OpenGen for automated profiling or solely automated decisions producing legal or similarly significant effects on individuals. Contact legal@opengen.dev about any automated security/abuse restriction or personal data concern for human review and applicable intervention rights.',
         },
       ],
     },
@@ -1188,11 +1014,11 @@ export const privacyPolicy = {
     },
     {
       id: 'section-14',
-      title: '14. Changes and contact',
+      title: '14. Updates and contact',
       blocks: [
         {
           type: 'paragraph',
-          text: 'An adopted notice will state its version/effective date. We will explain material changes and provide notice or choices where required before affected new processing. An update is not permission for unrelated use of existing private generations or waiver of mandatory rights.',
+          text: 'This notice states its effective date at the top of the page. We will explain material changes and provide advance notice or choices where required by law before affected new processing begins. An update is not permission for unrelated use of existing private generations or a waiver of mandatory rights.',
         },
         {
           type: 'paragraph',
@@ -1206,10 +1032,10 @@ export const privacyPolicy = {
 export const dataProcessingPolicy = {
   slug: 'data-processing',
   navigationLabel: 'DPA draft',
-  title: 'OpenGen Business Data Processing Addendum — proposed version 2',
+  title: 'OpenGen Business Data Processing Addendum',
   description:
-    'Proposed OpenGen business data processing addendum. Draft only; not executed or automatically incorporated.',
-  reviewDate: '9 November 2026',
+    'Proposed OpenGen business data processing addendum. Template only; not executed or automatically incorporated.',
+  reviewDate: '16 November 2026',
   sections: [
     {
       id: 'section-1',
@@ -1335,7 +1161,7 @@ export const dataProcessingPolicy = {
         },
         {
           type: 'paragraph',
-          text: 'The parties will work in good faith on a suitable alternative, configuration or protection. OpenGen will not begin the objected-to new processing while the objection remains unresolved. If no compliant arrangement is reasonably available, either party may end the affected part of the service, with return/deletion and unused-paid-balance consequences under this Addendum and the credit policy. No new unapproved paid generation is authorized to repair the situation.',
+          text: 'The parties will work in good faith on a suitable alternative, configuration or protection. OpenGen will not begin the objected-to new processing while the objection remains unresolved. If no compliant arrangement is reasonably available, either party may end the affected part of the service, with return/deletion and unused-paid-balance consequences under this Addendum and the credit and refund provisions of the Terms of Service. No new unapproved paid generation is authorized to repair the situation.',
         },
         {
           type: 'paragraph',
@@ -1455,7 +1281,7 @@ export const dataProcessingPolicy = {
         },
         {
           type: 'paragraph',
-          text: "This Addendum controls a conflict concerning its instructed processing; mandatory law and an applicable overriding transfer instrument take priority. The credit policy continues to control funding/refund arithmetic, and the Privacy Notice separately describes OpenGen's own controller activities. Nothing here forfeits owed credit/refunds or expands the source-code license restrictions.",
+          text: "This Addendum controls a conflict concerning its instructed processing; mandatory law and an applicable overriding transfer instrument take priority. The credit and refund provisions of the Terms of Service continue to control funding/refund arithmetic, and the Privacy Notice separately describes OpenGen's own controller activities. Nothing here forfeits owed credit/refunds or expands the source-code license restrictions.",
         },
         {
           type: 'paragraph',
@@ -1633,10 +1459,10 @@ export const dataProcessingPolicy = {
 export const subprocessorsPolicy = {
   slug: 'subprocessors',
   navigationLabel: 'Subprocessors draft',
-  title: 'OpenGen Business Subprocessor Schedule — proposed version 2',
+  title: 'OpenGen Business Subprocessor Schedule',
   description:
-    'Proposed OpenGen business subprocessor schedule. Draft only; not executed supplier authorization.',
-  reviewDate: '9 November 2026',
+    'Proposed OpenGen business subprocessor schedule. Template only; not executed supplier authorization.',
+  reviewDate: '16 November 2026',
   sections: [
     {
       id: 'section-1',
@@ -1802,7 +1628,6 @@ export const subprocessorsPolicy = {
 
 export const legalPolicies: readonly LegalPolicy[] = [
   termsPolicy,
-  refundsPolicy,
   privacyPolicy,
   dataProcessingPolicy,
   subprocessorsPolicy,

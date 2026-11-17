@@ -53,6 +53,13 @@ describe('scoped production manual billing configuration', () => {
       readBillingManualConfiguration({ ...configured, OPENGEN_BILLING_CHECKOUT: 'open' })
         ?.checkoutWritesEnabled,
     ).toBe(true);
+    const multiTenant = readBillingManualConfiguration({
+      ...configured,
+      OPENGEN_BILLING_MANUAL_WORKSPACE: undefined,
+      OPENGEN_BILLING_APPROVAL_REFERENCE: undefined,
+    })!;
+    expect(multiTenant.workspaceId).toBeUndefined();
+    expect(multiTenant.approvalReference).toBeUndefined();
   });
 
   it('refuses a legacy live fallback without the explicit reviewed binding', () => {

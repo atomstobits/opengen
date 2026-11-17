@@ -26,7 +26,6 @@ import {
   legalPolicies,
   legalPolicyMarkdown,
   privacyPolicy,
-  refundsPolicy,
   subprocessorsPolicy,
   termsPolicy,
 } from '@media-router/contracts/legal-policies';
@@ -91,7 +90,6 @@ await buildEsbuild({
       `export { McpConsent } from './apps/web/app/oauth/consent/consent';`,
       `export { default as DocsPage } from './apps/web/app/docs/page';`,
       `export { generateMetadata as generateTermsMetadata } from './apps/web/app/terms/page';`,
-      `export { generateMetadata as generateRefundsMetadata } from './apps/web/app/refunds/page';`,
       `export { generateMetadata as generatePrivacyMetadata } from './apps/web/app/privacy/page';`,
       `export { generateMetadata as generateDpaMetadata } from './apps/web/app/data-processing/page';`,
       `export { generateMetadata as generateSubprocessorsMetadata } from './apps/web/app/subprocessors/page';`,
@@ -117,7 +115,6 @@ const {
   McpConsent,
   DocsPage,
   generateTermsMetadata,
-  generateRefundsMetadata,
   generatePrivacyMetadata,
   generateDpaMetadata,
   generateSubprocessorsMetadata,
@@ -130,7 +127,6 @@ const {
   McpConsent: typeof import('../apps/web/app/oauth/consent/consent').McpConsent;
   DocsPage: typeof import('../apps/web/app/docs/page').default;
   generateTermsMetadata: typeof import('../apps/web/app/terms/page').generateMetadata;
-  generateRefundsMetadata: typeof import('../apps/web/app/refunds/page').generateMetadata;
   generatePrivacyMetadata: typeof import('../apps/web/app/privacy/page').generateMetadata;
   generateDpaMetadata: typeof import('../apps/web/app/data-processing/page').generateMetadata;
   generateSubprocessorsMetadata: typeof import('../apps/web/app/subprocessors/page').generateMetadata;
@@ -249,32 +245,27 @@ afterEach(async () => {
 });
 
 describe('hosted legal publication validator & deterministic digests', () => {
-  it('produces exact approved publication Markdown bytes and SHA-256 digests for all five policies', () => {
+  it('produces exact approved publication Markdown bytes and SHA-256 digests for all four policies without version numbers', () => {
     const expectedDigests = {
       terms: {
-        version: 'hosted-terms-v4-2026-11-09',
-        sha256: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
-        bytes: 35917,
-      },
-      refunds: {
-        version: 'hosted-refunds-v4-2026-11-09',
-        sha256: 'b7e2907ac08297cf326cf50317d2a0a63df8aaf11f4e4f5ee742e7734b7e7748',
-        bytes: 14940,
+        version: 'hosted-terms-2026-11-16',
+        sha256: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
+        bytes: 50638,
       },
       privacy: {
-        version: 'hosted-privacy-v4-2026-11-09',
-        sha256: '2183378dbcfc69bf00302f4a46e2d8e5ca1089a501b749459dadaf8eefd5f39a',
-        bytes: 27638,
+        version: 'hosted-privacy-2026-11-16',
+        sha256: 'db7fa57fe9972a77a63ff7488c577624e5201b9c63d2f598962865910f17d25c',
+        bytes: 33898,
       },
       'data-processing': {
-        version: 'business-dpa-template-v2-2026-11-09',
-        sha256: '09c5f1505017f685af4bdbfb9b45116115507e2d637092dc1a016319ee722cbb',
-        bytes: 27954,
+        version: 'business-dpa-template-2026-11-16',
+        sha256: 'bef9d6d31c42b1aab75d99e24b2e2d6748df67b2d3292244804ab750fa9018ec',
+        bytes: 27985,
       },
       subprocessors: {
-        version: 'business-subprocessors-template-v2-2026-11-09',
-        sha256: 'b45965332df72ecdbba6e688af101ce3a26712a79869791cc0770a9816bf382c',
-        bytes: 8552,
+        version: 'business-subprocessors-template-2026-11-16',
+        sha256: 'beaa527bdaddd7d15c16a31b9bc148d605670e19d9a17c1c2fa29ef587c48ab0',
+        bytes: 8496,
       },
     } as const;
 
@@ -286,6 +277,8 @@ describe('hosted legal publication validator & deterministic digests', () => {
       const markdown = publishedLegalPolicyMarkdown(slug);
       expect(sha256(markdown), slug).toBe(expectedDigests[slug].sha256);
       expect(Buffer.byteLength(markdown, 'utf8'), slug).toBe(expectedDigests[slug].bytes);
+      expect(markdown).not.toContain('Version:');
+      expect(markdown).not.toContain(expectedDigests[slug].version);
 
       const entry = record.policies.find((item) => item.slug === slug)!;
       expect(entry.version).toBe(expectedDigests[slug].version);
@@ -326,7 +319,7 @@ describe('hosted legal publication validator & deterministic digests', () => {
 
     // Partial or reordered policy sets
     expect(() =>
-      validateHostedLegalPublication({ ...base, policies: base.policies.slice(0, 4) }),
+      validateHostedLegalPublication({ ...base, policies: base.policies.slice(0, 3) }),
     ).toThrow();
     expect(() =>
       validateHostedLegalPublication({
@@ -365,7 +358,6 @@ describe('hosted legal publication validator & deterministic digests', () => {
       const copy = structuredClone(base);
       copy.policies[0].effectiveAt = badTimestamp;
       copy.policies[1].effectiveAt = badTimestamp;
-      copy.policies[2].effectiveAt = badTimestamp;
       expect(() => validateHostedLegalPublication(copy)).toThrow();
     }
     {
@@ -380,7 +372,7 @@ describe('hosted legal publication validator & deterministic digests', () => {
     }
 
     // Attempting to execute DPA or subprocessors by publication
-    for (const templateIndex of [3, 4]) {
+    for (const templateIndex of [2, 3]) {
       const withEffective = structuredClone(base);
       withEffective.policies[templateIndex].effectiveAt = '2026-11-10T12:00:00.000Z';
       expect(() => validateHostedLegalPublication(withEffective)).toThrow();
@@ -402,8 +394,8 @@ describe('server trusted configuration reader & startup guards', () => {
     const defaultReader = createHostedHumanTermsPolicyReader(undefined);
     expect(defaultReader).toBe(currentHumanTermsPolicy);
     expect(defaultReader()).toEqual({
-      version: 'hosted-terms-v4-draft-2026-11-09',
-      digest: '17e9c824b1338651ae9e8570f7b6ec265b0b0d3a805d90b049aa584c70987ad5',
+      version: 'hosted-terms-draft-2026-11-16',
+      digest: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
       status: 'draft',
       effectiveAt: null,
     });
@@ -646,9 +638,10 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
     const { app, receipts } = await authApp();
     const start = await app.inject({ url: '/auth/login' });
     expect(start.statusCode).toBe(200);
-    expect(start.body).toContain('hosted-terms-v4-draft-2026-11-09');
+    expect(start.body).not.toContain('hosted-terms-');
+    expect(start.body).not.toContain('Terms version:');
     expect(start.body).toContain(
-      '17e9c824b1338651ae9e8570f7b6ec265b0b0d3a805d90b049aa584c70987ad5',
+      '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
     );
     expect(start.body).toContain('Continuing signs you in. It does not accept these drafts.');
 
@@ -690,13 +683,16 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
 
     // 1. Before T0: reader returns Draft; full sign-in succeeds without writing a receipt
     expect(sharedReader()).toMatchObject({
-      version: 'hosted-terms-v4-draft-2026-11-09',
+      version: 'hosted-terms-draft-2026-11-16',
       status: 'draft',
       effectiveAt: null,
     });
     const preStart = await app.inject({ url: '/auth/login' });
     expect(preStart.statusCode).toBe(200);
-    expect(preStart.body).toContain('hosted-terms-v4-draft-2026-11-09');
+    expect(preStart.body).not.toContain('hosted-terms-');
+    expect(preStart.body).toContain(
+      '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
+    );
     const preContinued = await app.inject({
       method: 'POST',
       url: '/auth/login',
@@ -744,8 +740,8 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
     // Advance clock to exact T0
     currentClock = t0Ms;
     expect(sharedReader()).toEqual({
-      version: 'hosted-terms-v4-2026-11-09',
-      digest: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+      version: 'hosted-terms-2026-11-16',
+      digest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
       status: 'active',
       effectiveAt: t0Iso,
     });
@@ -784,9 +780,10 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
       headers: { cookie: `og_mcp_consent=${pendingConsentId}` },
     });
     expect(activeStart.statusCode).toBe(200);
-    expect(activeStart.body).toContain('hosted-terms-v4-2026-11-09');
+    expect(activeStart.body).not.toContain('hosted-terms-');
+    expect(activeStart.body).not.toContain('Terms version:');
     expect(activeStart.body).toContain(
-      '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+      '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
     );
     expect(activeStart.body).toContain(`Effective: ${t0Iso}`);
     expect(activeStart.body).toContain('By continuing, you agree to the');
@@ -837,8 +834,8 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
       {
         issuer: 'https://identity.fixture.invalid',
         subject: 'verified-composition-human',
-        policyVersion: 'hosted-terms-v4-2026-11-09',
-        policyDigest: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+        policyVersion: 'hosted-terms-2026-11-16',
+        policyDigest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
       },
     ]);
   });
@@ -847,7 +844,6 @@ describe('ordinary buildApp human login & T0 effectiveAt boundary', () => {
 describe('web legal routes, /legal-publication.json, HTML rendering & UI surface labels', () => {
   const mdRoutes = {
     terms: getTermsMd,
-    refunds: getRefundsMd,
     privacy: getPrivacyMd,
     'data-processing': getDataProcessingMd,
     subprocessors: getSubprocessorsMd,
@@ -855,7 +851,6 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
 
   const metadataGenerators = {
     terms: generateTermsMetadata,
-    refunds: generateRefundsMetadata,
     privacy: generatePrivacyMetadata,
     'data-processing': generateDpaMetadata,
     subprocessors: generateSubprocessorsMetadata,
@@ -863,15 +858,18 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
 
   const policiesBySlug = {
     terms: termsPolicy,
-    refunds: refundsPolicy,
     privacy: privacyPolicy,
     'data-processing': dataProcessingPolicy,
     subprocessors: subprocessorsPolicy,
   } as const;
 
-  it('preserves 100% default Draft web routes, 404 manifest and Draft UI labels when unconfigured', async () => {
+  it('preserves 100% default Draft web routes, 404 manifest, /refunds.md 308 redirect and Draft UI labels when unconfigured', async () => {
     vi.stubEnv('OPENGEN_PUBLIC_URL', canonicalOrigin);
     expect(readWebLegalPublication()).toBeNull();
+
+    const refundsMdRes = getRefundsMd();
+    expect(refundsMdRes.status).toBe(308);
+    expect(refundsMdRes.headers.get('location')).toBe('/terms.md');
 
     const manifestRes = getLegalPublicationJson();
     expect(manifestRes.status).toBe(404);
@@ -928,7 +926,7 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
     const termsMdRes = getTermsMd();
     expect(termsMdRes.headers.get('x-robots-tag')).toBe('noindex, nofollow');
     expect(sha256(await termsMdRes.text())).toBe(
-      '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+      '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
     );
 
     expect(legalPageMetadata('terms').robots).toMatchObject({ index: false });
@@ -981,8 +979,8 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
       Date.parse('2026-11-10T12:00:00.000Z'),
     )();
     expect(serverPolicySnapshot).toEqual({
-      version: 'hosted-terms-v4-2026-11-09',
-      digest: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+      version: 'hosted-terms-2026-11-16',
+      digest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
       status: 'active',
       effectiveAt: '2026-11-10T12:00:00.000Z',
     });
@@ -1003,6 +1001,8 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
       expect(sha256(mdText), slug).toBe(
         APPROVED_HOSTED_LEGAL_POLICIES[slug].publicationMarkdownSha256,
       );
+      expect(mdText).not.toContain('Version:');
+      expect(mdText).not.toContain(manifestEntry.version);
 
       if (slug === 'terms') {
         expect(sha256(mdText)).toBe(serverPolicySnapshot.digest);
@@ -1021,7 +1021,8 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
       );
       expect(html).not.toContain('LEGAL / REVIEW DRAFT');
       expect(html).not.toContain('Terms draft');
-      expect(html).toContain(manifestEntry.version);
+      expect(html).not.toContain(manifestEntry.version);
+      expect(html).not.toContain('Version:');
       expect(html).toContain(manifestEntry.publicationMarkdownSha256);
       expect(html).toContain('Published: 2026-11-10T12:00:00.000Z');
 
@@ -1048,8 +1049,8 @@ describe('web legal routes, /legal-publication.json, HTML rendering & UI surface
       }),
     );
     expect(footerHtml).toContain('Terms of Service');
-    expect(footerHtml).toContain('Refund Policy');
     expect(footerHtml).toContain('Privacy Notice');
+    expect(footerHtml).not.toContain('Refund Policy');
     expect(footerHtml).not.toContain('draft');
 
     const billingHtml = renderToStaticMarkup(
@@ -1105,7 +1106,7 @@ describe.skipIf(!databaseUrl)(
       maxFailureLimit: 3,
     };
 
-    it('wires one shared hosted reader across auth and hostedBillingManual, gates live funding on the exact 9a1916bf... receipt, and preserves existing order recovery', async () => {
+    it('wires one shared hosted reader across auth and hostedBillingManual, gates live funding on the exact 593d5b0d... receipt, and preserves existing order recovery', async () => {
       const isolated = await isolatedEngineDatabase(databaseUrl!, 'hosted_legal_e2e');
       const engine = isolated.bind(
         createEngine({
@@ -1158,12 +1159,17 @@ describe.skipIf(!databaseUrl)(
           .spyOn(stripe.checkout.sessions, 'create')
           .mockImplementation((async (params: Stripe.Checkout.SessionCreateParams) => {
             const id = `cs_live_${String(params.client_reference_id).replaceAll('-', '')}`;
+            const total = (params.line_items ?? []).reduce(
+              (sum, item) =>
+                sum + Number(item.price_data?.unit_amount ?? 0) * Number(item.quantity ?? 1),
+              0,
+            );
             return {
               id,
               mode: 'payment',
               currency: 'usd',
-              amount_subtotal: 2500,
-              amount_total: 2500,
+              amount_subtotal: total,
+              amount_total: total,
               payment_status: 'unpaid',
               status: 'open',
               client_reference_id: String(params.client_reference_id),
@@ -1293,14 +1299,14 @@ describe.skipIf(!databaseUrl)(
         await receiptStore.recordVerifiedAcceptance({
           issuer,
           subject: `${subject}-other`,
-          policyVersion: 'hosted-terms-v4-2026-11-09',
-          policyDigest: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+          policyVersion: 'hosted-terms-2026-11-16',
+          policyDigest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
         });
         await receiptStore.recordVerifiedAcceptance({
           issuer,
           subject,
-          policyVersion: 'hosted-terms-v4-draft-2026-11-09',
-          policyDigest: '17e9c824b1338651ae9e8570f7b6ec265b0b0d3a805d90b049aa584c70987ad5',
+          policyVersion: 'hosted-terms-draft-2026-11-16',
+          policyDigest: '06b1b9849544e2158b43e1fa79daa29e082a0bd0e41505ef38425f06fb142c6c',
         });
 
         const postNoReceiptSummary = await app.inject({
@@ -1329,17 +1335,17 @@ describe.skipIf(!databaseUrl)(
         ).toBe(0);
         expect(checkoutCreate).not.toHaveBeenCalled();
 
-        // Phase 3: Complete verified Continue + OIDC callback after T0 — writes exact 9a1916bf... receipt & admits live funding!
+        // Phase 3: Complete verified Continue + OIDC callback after T0 — writes exact 593d5b0d... receipt & admits live funding!
         const activeSession = await completeBrowserSignIn();
         const savedReceipt = await engine.pool.query(
           `SELECT policy_version, policy_digest, notice_version, action, method
            FROM mr_terms_receipts WHERE issuer=$1 AND subject=$2 AND policy_version=$3`,
-          [issuer, subject, 'hosted-terms-v4-2026-11-09'],
+          [issuer, subject, 'hosted-terms-2026-11-16'],
         );
         expect(savedReceipt.rows).toEqual([
           {
-            policy_version: 'hosted-terms-v4-2026-11-09',
-            policy_digest: '9a1916bf8f6fbdb4764dd809621df053ef4f9686435de76d5e3f8c0b7380e998',
+            policy_version: 'hosted-terms-2026-11-16',
+            policy_digest: '84a1966196c7d241484bfd9e0abe2b5afc2095b024abe330a527ca628b8c57b0',
             notice_version: 'human-terms-continue-v1',
             action: 'continue',
             method: 'oidc-verified',
@@ -1390,8 +1396,8 @@ describe.skipIf(!databaseUrl)(
               id: sessionId,
               mode: 'payment',
               currency: 'usd',
-              amount_subtotal: 2500,
-              amount_total: 2500,
+              amount_subtotal: 2606,
+              amount_total: 2606,
               payment_status: 'unpaid',
               status: 'open',
               client_reference_id: orderId,
@@ -1517,19 +1523,26 @@ describe.skipIf(!databaseUrl)(
         } as Stripe.Response<Stripe.Account>);
         const checkoutCreate = vi
           .spyOn(stripe.checkout.sessions, 'create')
-          .mockImplementation((async (params: Stripe.Checkout.SessionCreateParams) => ({
-            id: `cs_live_${String(params.client_reference_id).replaceAll('-', '')}`,
-            mode: 'payment',
-            currency: 'usd',
-            amount_subtotal: Number(params.line_items?.[0]?.price_data?.unit_amount ?? 2500),
-            amount_total: Number(params.line_items?.[0]?.price_data?.unit_amount ?? 2500),
-            payment_status: 'unpaid',
-            status: 'open',
-            client_reference_id: String(params.client_reference_id),
-            payment_intent: null,
-            livemode: true,
-            url: 'https://checkout.stripe.com/c/pay/external_user_live_fixture',
-          })) as never);
+          .mockImplementation((async (params: Stripe.Checkout.SessionCreateParams) => {
+            const total = (params.line_items ?? []).reduce(
+              (sum, item) =>
+                sum + Number(item.price_data?.unit_amount ?? 0) * Number(item.quantity ?? 1),
+              0,
+            );
+            return {
+              id: `cs_live_${String(params.client_reference_id).replaceAll('-', '')}`,
+              mode: 'payment',
+              currency: 'usd',
+              amount_subtotal: total,
+              amount_total: total,
+              payment_status: 'unpaid',
+              status: 'open',
+              client_reference_id: String(params.client_reference_id),
+              payment_intent: null,
+              livemode: true,
+              url: 'https://checkout.stripe.com/c/pay/external_user_live_fixture',
+            };
+          }) as never);
 
         const t0Iso = '2026-11-10T15:00:00.000Z';
         const t0Ms = Date.parse(t0Iso);
@@ -1817,7 +1830,7 @@ describe.skipIf(!databaseUrl)(
         expect(ownerRow).toMatchObject({
           livemode: true,
           processor_environment_id: environment.id,
-          rails: { allowsEnabled: false, maxAmountCents: 100_000, maxMonthlyCapCents: 100_000 },
+          rails: { allowsEnabled: false, maxAmountCents: 999_900, maxMonthlyCapCents: 999_900 },
         });
         expect(ownerRow.approval_reference).toContain('self-serve-manual-v1:');
 
@@ -1929,11 +1942,26 @@ describe.skipIf(!databaseUrl)(
           headers: teamAdmin2.headers,
         });
         expect(secondAdminAccess.json().ownerEnrollment).toMatchObject({
-          eligible: false,
+          eligible: true,
           expectedAuthorityVersion: 1,
-          reason: 'owner-already-active',
+          replaceExistingOwner: true,
         });
-        const hijackAttempt = await app.inject({
+        // Stale expectedAuthorityVersion fails closed with 409 conflict
+        const staleReplaceAttempt = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...teamAdmin2.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 0,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(staleReplaceAttempt.statusCode).toBe(409);
+        expect(staleReplaceAttempt.json().error.code).toBe('billing_owner_conflict');
+
+        // Explicit expectedAuthorityVersion replaces teamAdmin1 cleanly -> authorityVersion: 2
+        const replacedByAdmin2 = await app.inject({
           method: 'POST',
           url: '/v1/billing/owner',
           headers: { ...teamAdmin2.headers, origin: canonicalOrigin },
@@ -1943,8 +1971,28 @@ describe.skipIf(!databaseUrl)(
             acceptedTerms: true,
           },
         });
-        expect(hijackAttempt.statusCode).toBe(409);
-        expect(hijackAttempt.json().error.code).toBe('billing_owner_already_active');
+        expect(replacedByAdmin2.statusCode, replacedByAdmin2.body).toBe(200);
+        expect(replacedByAdmin2.json()).toEqual({
+          workspaceId: teamId,
+          authorityVersion: 2,
+        });
+
+        // teamAdmin1 reclaims ownership cleanly -> authorityVersion: 3
+        const reclaimedByAdmin1 = await app.inject({
+          method: 'POST',
+          url: '/v1/billing/owner',
+          headers: { ...teamAdmin1.headers, origin: canonicalOrigin },
+          payload: {
+            expectedAuthorityVersion: 2,
+            termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
+            acceptedTerms: true,
+          },
+        });
+        expect(reclaimedByAdmin1.statusCode, reclaimedByAdmin1.body).toBe(200);
+        expect(reclaimedByAdmin1.json()).toEqual({
+          workspaceId: teamId,
+          authorityVersion: 3,
+        });
 
         // 6. Auto-recharge activation: existing manual owner upgrades while preserving approval_reference, new user enrolls with allowsEnabled: true, and operator /v1/operator/billing/work ticks cleanly!
         const operatorBearer = 'synthetic-live-recharge-operator-bearer-token-2026';
@@ -2003,7 +2051,7 @@ describe.skipIf(!databaseUrl)(
             capabilities: { read: true, manage: true, setup: true },
             ownerEnrollment: {
               eligible: true,
-              expectedAuthorityVersion: 1,
+              expectedAuthorityVersion: 3,
               allowsAutoRecharge: true,
               upgradeToRecharge: true,
             },
@@ -2014,7 +2062,7 @@ describe.skipIf(!databaseUrl)(
             url: '/v1/billing/owner',
             headers: { ...teamAdmin1.headers, origin: canonicalOrigin },
             payload: {
-              expectedAuthorityVersion: 1,
+              expectedAuthorityVersion: 3,
               termsVersion: 'hosted-manual-prepaid-v1-2026-11-11',
               acceptedTerms: true,
             },
@@ -2022,7 +2070,7 @@ describe.skipIf(!databaseUrl)(
           expect(upgraded.statusCode, upgraded.body).toBe(200);
           expect(upgraded.json()).toEqual({
             workspaceId: teamId,
-            authorityVersion: 2,
+            authorityVersion: 4,
           });
           const upgradedRow = (
             await engine.pool.query(
@@ -2049,7 +2097,7 @@ describe.skipIf(!databaseUrl)(
             automaticRechargeAvailable: true,
             portalAvailable: true,
             recoveryAvailable: true,
-            ownerAuthorityVersion: 2,
+            ownerAuthorityVersion: 4,
           });
 
           // New external user enrolls directly with allowsEnabled: true

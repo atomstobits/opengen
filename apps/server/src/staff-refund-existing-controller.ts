@@ -5,6 +5,7 @@ import {
   type BillingProcessorEnvironment,
   type BillingProcessorTransport,
 } from '../../../packages/engine/src/billing-customer.js';
+import { MAX_TOPUP_CENTS, MIN_TOPUP_CENTS } from '../../../packages/engine/src/payments.js';
 import type {
   StaffRefundPaymentBinding,
   VerifiedStaffRefundEvidence,
@@ -154,8 +155,8 @@ export class ExistingStaffRefundController {
       typeof target.refundId !== 'string' ||
       !/^re_[A-Za-z0-9_]{1,240}$/.test(target.refundId) ||
       !Number.isSafeInteger(target.originalAmountCents) ||
-      target.originalAmountCents < 500 ||
-      target.originalAmountCents > 100000 ||
+      target.originalAmountCents < MIN_TOPUP_CENTS ||
+      target.originalAmountCents > MAX_TOPUP_CENTS ||
       !Number.isSafeInteger(target.refundAmountCents) ||
       target.refundAmountCents < 1 ||
       target.refundAmountCents > target.originalAmountCents ||

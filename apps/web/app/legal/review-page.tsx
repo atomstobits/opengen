@@ -149,7 +149,7 @@ export function LegalReviewPage({
         <span className="eyebrow">{eyebrow}</span>
         <h1>{record.title}</h1>
         <p className="docs-intro">
-          Version: {record.version} · Published: {resolvedPublication.publishedAt} ·{' '}
+          Published: {resolvedPublication.publishedAt} ·{' '}
           {isTemplate
             ? 'Availability: template only — not executed by publication'
             : isEffective
@@ -170,7 +170,8 @@ export function LegalReviewPage({
             </p>
           ) : null}
           <p>
-            Markdown SHA-256: <code>{record.publicationMarkdownSha256}</code> · Versioned metadata:{' '}
+            Markdown SHA-256: <code>{record.publicationMarkdownSha256}</code> · Publication
+            metadata:{' '}
             <a href={LEGAL_PUBLICATION_METADATA_PATH}>{LEGAL_PUBLICATION_METADATA_PATH}</a>
           </p>
         </aside>

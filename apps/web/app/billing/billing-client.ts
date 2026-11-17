@@ -2,6 +2,9 @@ export type PaymentOrder = {
   id: string;
   workspaceId: string;
   amountCents: number;
+  feeCents?: number;
+  totalChargeCents?: number;
+  feeRateBps?: 0 | 290 | 440;
   creditMicros: number;
   currency: 'USD';
   status:
@@ -25,8 +28,18 @@ export type BillingSummary = {
   currency: 'USD';
   minAmountCents: number;
   maxAmountCents: number;
+  feeRateBps?: number;
+  internationalFeeRateBps?: number;
+  fixedFeeCents?: number;
   billingHold: boolean;
   orders: PaymentOrder[];
+};
+export type ProcessingFeePreview = {
+  creditCents: number;
+  feeCents: number;
+  totalChargeCents: number;
+  feeRateBps: 290 | 440;
+  fixedFeeCents: 30;
 };
 export type PendingTopUp = {
   version: 1;
@@ -38,6 +51,24 @@ export type PendingTopUp = {
 type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem' | 'removeItem'>;
 const orderId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const recoveryKey = (workspaceId: string) => `opengen.billing.v1:${workspaceId}`;
+
+/** Pure integer gross-up fee preview matching server/engine calculation. */
+export function previewProcessingFee(
+  creditCents: number,
+  cardCountry?: string | null,
+): ProcessingFeePreview | null {
+  if (!Number.isSafeInteger(creditCents) || creditCents < 500 || creditCents > 999900) return null;
+  const normalized =
+    typeof cardCountry === 'string' && /^[A-Za-z]{2}$/.test(cardCountry)
+      ? cardCountry.toUpperCase()
+      : null;
+  const international = normalized !== null && normalized !== 'US';
+  const feeRateBps = international ? 440 : 290;
+  const denom = international ? 956 : 971;
+  const totalChargeCents = Math.floor(((creditCents + 30) * 1000 + (denom - 1)) / denom);
+  const feeCents = totalChargeCents - creditCents;
+  return { creditCents, feeCents, totalChargeCents, feeRateBps, fixedFeeCents: 30 };
+}
 
 /** Stores only order recovery data. Credentials remain in the HttpOnly session cookie. */
 export function pendingTopUp(storage: Storage, workspaceId: string): PendingTopUp | null {

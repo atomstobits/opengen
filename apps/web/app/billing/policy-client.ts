@@ -16,6 +16,7 @@ export interface BillingOwnerEnrollment {
   terms: { version: string; text: string };
   allowsAutoRecharge?: boolean;
   upgradeToRecharge?: boolean;
+  replaceExistingOwner?: boolean;
   reason?: BillingOwnerEnrollmentReason;
 }
 export interface BillingCapabilities {
@@ -33,7 +34,7 @@ export interface BillingPolicyState {
   recoveryAvailable: boolean;
   ownerAuthorityVersion: number | null;
   terms: { version: string; text: string } | null;
-  mandate: { id: string; status: string } | null;
+  mandate: { id: string; status: string; cardCountry?: string | null } | null;
 }
 export class BillingWaitError extends Error {
   constructor(public readonly retryAfterSeconds: number) {
@@ -73,6 +74,7 @@ function parseOwnerEnrollment(value: unknown): BillingOwnerEnrollment | undefine
     !raw.terms.text ||
     (raw.allowsAutoRecharge !== undefined && typeof raw.allowsAutoRecharge !== 'boolean') ||
     (raw.upgradeToRecharge !== undefined && typeof raw.upgradeToRecharge !== 'boolean') ||
+    (raw.replaceExistingOwner !== undefined && typeof raw.replaceExistingOwner !== 'boolean') ||
     (raw.reason !== undefined &&
       !enrollmentReasons.includes(raw.reason as BillingOwnerEnrollmentReason))
   )
@@ -83,6 +85,9 @@ function parseOwnerEnrollment(value: unknown): BillingOwnerEnrollment | undefine
     terms: { version: raw.terms.version, text: raw.terms.text },
     ...(raw.allowsAutoRecharge !== undefined ? { allowsAutoRecharge: raw.allowsAutoRecharge } : {}),
     ...(raw.upgradeToRecharge !== undefined ? { upgradeToRecharge: raw.upgradeToRecharge } : {}),
+    ...(raw.replaceExistingOwner !== undefined
+      ? { replaceExistingOwner: raw.replaceExistingOwner }
+      : {}),
     ...(raw.reason ? { reason: raw.reason } : {}),
   };
 }
@@ -255,6 +260,8 @@ export function policyFromDraft(draft: PolicyDraft, mandateId: string | null): B
     failureLimit === null
   )
     throw new Error('Use whole cents for recharge amounts and whole numbers for frequency limits.');
+  if (amountCents < 500 || amountCents > 999900)
+    throw new Error('Choose an automatic recharge credit amount between $5.00 and $9,999.00.');
   if (draft.enabled && !mandateId)
     throw new Error('Complete administrator payment setup before enabling automatic recharge.');
   return {

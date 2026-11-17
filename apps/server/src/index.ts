@@ -8,6 +8,7 @@ import { buildApp } from './app.js';
 import { paymentConfiguration } from './payment-config.js';
 import { hostedBillingSandbox, readBillingSandboxConfiguration } from './billing-sandbox.js';
 import { hostedBillingManual, readBillingManualConfiguration } from './billing-manual.js';
+import { startBillingRechargeWorker } from './billing-runtime.js';
 import {
   createHostedHumanTermsPolicyReader,
   readHostedLegalPublicationConfiguration,
@@ -80,24 +81,18 @@ const app = await buildApp({
   workspaceId: process.env.MR_WORKSPACE_ID,
   logger: true,
 });
-let rechargeWorking = false;
-const rechargeInterval =
-  billingRuntime?.automaticChargesEnabled && workBillingOnce
-    ? setInterval(() => {
-        if (rechargeWorking) return;
-        rechargeWorking = true;
-        void workBillingOnce!()
-          .catch((error) => {
-            app.log.error({ err: error }, 'Background billing recharge tick failed');
-          })
-          .finally(() => {
-            rechargeWorking = false;
-          });
-      }, 15_000)
+const rechargeLoop =
+  billingRuntime && workBillingOnce
+    ? startBillingRechargeWorker(() => workBillingOnce!(), {
+        intervalMs: 15_000,
+        onError: (err) => app.log.error({ err }, 'Background billing recharge tick failed'),
+      })
     : undefined;
-rechargeInterval?.unref();
+let shuttingDown = false;
 const shutdown = async () => {
-  if (rechargeInterval) clearInterval(rechargeInterval);
+  if (shuttingDown) return;
+  shuttingDown = true;
+  await rechargeLoop?.stop();
   await app.close();
   await engine?.close();
   process.exit(0);

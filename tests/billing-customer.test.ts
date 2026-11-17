@@ -27,6 +27,9 @@ async function fixture() {
   await f.pool.query(
     await readFile(new URL('../docs/billing/customer-schema.sql', import.meta.url), 'utf8'),
   );
+  await f.pool.query(
+    `ALTER TABLE mr_billing_mandates ADD COLUMN card_country text CHECK (card_country IS NULL OR card_country ~ '^[A-Z]{2}$')`,
+  );
   const registerEnvironment = async (environment: BillingProcessorEnvironment) => {
     const client = await f.pool.connect();
     try {
