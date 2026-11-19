@@ -19,6 +19,17 @@ The API source was `ba739da` and the worker source was `5bd5cd1`. This source up
 
 Current Qwen Singapore source pricing is recorded in [the pricing audit](PRICING-AUDIT.md#singapore-qwen-text-to-image-qualification--november-6-2026). The hosted Qwen quotes still had unknown prices before that source change was deployed. The earlier local xAI upstream success and manual retrieval still lack current-host gateway delivery proof; a November 6 read of the original deferred result returned HTTP 404. Restricted fal output retrieval still lacks hosted evidence. Hosted C2PA remains unavailable, separately from the passing isolated synthetic verifier CI.
 
+## Hosted post-cutover smoke evidence — November 19, 2026
+
+On **2026-11-19 UTC**, a bounded paid smoke pass completed on `https://opengen.dev` (active Cloud Run API and worker revisions using rotated v2 OpenAI and Runway provider secret bindings, with v1 disabled) within a `$5.00` USD cap (`$0.00597` USD settled + `$0.471` USD pending hold = `$0.47697` USD total) using a temporary scoped key that was revoked immediately afterward.
+
+| Exact route                             | Tested operation & config                   | Gateway / ledger outcome                                                                                                                  |
+| --------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `openai-undisclosed/openai-gpt-image-2` | `text-to-image` (`1K`, `low`, `1:1`, `png`) | `succeeded`, `available`, `1024x1024` PNG (`773,559` bytes, SHA-256 verified), settled `5,970` micro-USD (`$0.00597`)                     |
+| `runway-undisclosed/kling-kling-4.0`    | `text-to-video` (`720p`, `3s`, `16:9`)      | `succeeded`, `available`, MP4 (`1,254,354` bytes, `ftyp` + SHA-256 verified), `39` Runway credits used; `471,000` micro-USD hold retained |
+
+Both outputs passed `upstreamId: null` and stripped `storageKey` projection checks, `Cache-Control: private, no-store`, signed URL refresh (`HTTP 200`), and `HTTP 403` rejection for unsigned and tampered `X-Amz-Signature` requests. The Runway ledger hold (`$0.471` USD) remains intentionally un-reconciled pending operator reconciliation between promo (`$0.008`/credit) and list credit pricing. Worker C2PA provenance (`unavailable`) and decode inspection (`unknown`) remain pending on the hosted worker; aside from these two November 19 smoke configurations and the earlier November 6 `alibaba/ap-southeast-1/wan-3.0*` (`480p`, `2s`) hosted configurations above, all other catalog routes, providers, operations, resolutions and durations remain unverified.
+
 ## Implemented protocols
 
 | Exact catalog series/variants                         | Implemented protocol                                 | Current constraints                                                                                                                                                                                            |
@@ -74,6 +85,6 @@ The catalog also includes a separate **fal US-hosted Seedance 2.0** deployment. 
 - **Qwen outside Singapore:** regional model availability needs qualification. In particular, fal's “Qwen Image 3” name alone does not establish equivalence to Alibaba's separately named `qwen-image-3.0-pro`. The published Qwen base weights do not establish an API offering for the base checkpoint.
 - **Runway Seedance and direct Kling:** the qualified Kling 4 integration is Runway's explicit API. Additional routes need independently checked request schemas, pricing, account access and smoke evidence.
 - **Regional verification:** public endpoint/model documentation does not establish actual access on a user's account, per-request inference location, or storage residency. US-hosted fal access remains account-enabled and comparison-only.
-- **Live validation:** the hosted Wan configurations above have dated generation and private-delivery evidence. Other route/configuration coverage still requires bounded real account smoke tests. Fixtures do not establish generation quality, reliability or billing accuracy.
+- **Live validation:** only the hosted Wan configurations (November 6, 2026) and the two post-cutover smoke configurations above (November 19, 2026) have dated hosted generation and private-delivery evidence. All other route/configuration coverage remains unverified/pending and requires bounded real account smoke tests. Fixtures do not establish generation quality, reliability or billing accuracy.
 
 No adapter sends blind retries after an ambiguous paid submission. Upstream failure messages/bodies are redacted. Missing usage or tariffs leaves billing pending reconciliation. Generation completion is distinct from settlement and durable output retention.
