@@ -24,6 +24,7 @@ const addedMigrationNames = [
   '030.sql',
   '031.sql',
   '032.sql',
+  '033.sql',
 ];
 const migrationSql = (name: string) =>
   readFile(new URL('../packages/engine/migrations/' + name, import.meta.url), 'utf8');

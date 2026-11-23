@@ -53,6 +53,7 @@ import { registerMcp } from './mcp.js';
 import { registerMcpAuthorization } from './mcp-authorization.js';
 import { registerCompatibility } from './compatibility.js';
 import { registerOperator, ledgerQuerySchema } from './operator.js';
+import { registerPendingEmailCredits } from './pending-email-credits.js';
 import type { Job } from '@media-router/contracts';
 import type { Reconciliation } from '@media-router/engine';
 import { openApiDocument } from './openapi.js';
@@ -502,6 +503,11 @@ export async function buildApp(options: AppOptions = {}) {
     return { data, nextCursor: data.length === query.limit ? data.at(-1)!.id : null };
   });
   await registerOperator(app, { engine: options.engine, authenticate });
+  await registerPendingEmailCredits(app, {
+    store: options.engine?.pendingEmailCredits,
+    defaultIssuer: (options.env ?? process.env).OIDC_ISSUER?.trim(),
+    authenticate,
+  });
   await registerEvents(app, { events: options.engine?.events, authenticate });
   await registerCompatibility(app, { authenticate, requireEngine, parseInput });
   await registerMcp(app, {

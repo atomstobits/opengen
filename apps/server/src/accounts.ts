@@ -20,6 +20,7 @@ import { z } from 'zod';
 import {
   keyScopes,
   notificationEmailIdentityFromVerifiedOidcClaims,
+  pendingEmailCreditIdentityFromVerifiedOidcClaims,
   AccountGovernanceStore,
   RoutingPolicyStore,
   revalidateGovernanceAuthority,
@@ -29,6 +30,7 @@ import {
   type AssetStore,
   type McpOAuthStore,
   type NotificationEmailStore,
+  type PendingEmailCreditStore,
 } from '@media-router/engine';
 import { catalog } from '@media-router/catalog';
 import { routingSchema } from './validation.js';
@@ -44,6 +46,7 @@ export interface AccountsEngine {
   accounts?: AccountStore;
   mcpOAuth?: McpOAuthStore;
   notificationEmail?: NotificationEmailStore;
+  pendingEmailCredits?: PendingEmailCreditStore;
   storage?: AssetStore;
   ensureWorkspace?(id: string, balance?: number): Promise<unknown>;
   creditWorkspace?(id: string, amount: number, reference: string): Promise<unknown>;
@@ -542,6 +545,16 @@ export async function registerAccounts(
           policyVersion: policy.version,
           policyDigest: policy.digest,
         });
+      // Claim any operator-queued email credits strictly after openid-client verified
+      // signature, nonce, issuer and boolean email_verified === true.
+      if (options.engine?.pendingEmailCredits) {
+        const verifiedCreditEmail = pendingEmailCreditIdentityFromVerifiedOidcClaims(claims);
+        if (verifiedCreditEmail)
+          await options.engine.pendingEmailCredits.claimForVerifiedIdentity(
+            principal.workspaceId,
+            verifiedCreditEmail,
+          );
+      }
       const session = await store().createSession(principal);
       // Recheck after asynchronous account/receipt/session work, before any MCP return or cookie issuance.
       await validateHumanLoginIntent(transaction.continueIntent, request, loginContext);
