@@ -4,6 +4,7 @@ import {
   type NotificationEmailConfiguration,
   type NotificationEmailTransport,
 } from './notification-email.js';
+import { PendingEmailCreditStore } from './pending-email-credits.js';
 import { AttemptCredentialStore, type AttemptCredentialScope } from './attempt-credentials.js';
 import {
   DeliveryStore,
@@ -128,6 +129,7 @@ export * from './events.js';
 export * from './activity.js';
 export * from './notifications.js';
 export * from './notification-email.js';
+export * from './pending-email-credits.js';
 export * from './owned-output-access.js';
 export * from './owned-assets.js';
 export * from './feedback.js';
@@ -389,6 +391,7 @@ export class Engine {
   readonly activity: ActivityStore;
   readonly notifications: NotificationStore;
   readonly notificationEmail: NotificationEmailStore;
+  readonly pendingEmailCredits: PendingEmailCreditStore;
   readonly ownedOutputAccess: OwnedOutputAccess;
   readonly ownedAssets?: OwnedAssetService;
   readonly feedback: FeedbackStore;
@@ -478,6 +481,7 @@ export class Engine {
       vaultKey: options.vaultKey ?? process.env.MR_VAULT_KEY,
     });
     this.accounts = new AccountStore(this.pool, options.vaultKey ?? process.env.MR_VAULT_KEY);
+    this.pendingEmailCredits = new PendingEmailCreditStore(this.pool, creditWorkspaceInTransaction);
     this.mcpOAuth = new McpOAuthStore(this.pool, this.accounts, {
       issuer: options.publicUrl ?? process.env.OPENGEN_PUBLIC_URL ?? 'http://localhost:4320',
     });
@@ -574,6 +578,7 @@ export class Engine {
         '030.sql',
         '031.sql',
         '032.sql',
+        '033.sql',
       ].map((name, index) => {
         if (name !== `${String(index + 1).padStart(3, '0')}.sql`)
           throw new Error('Migration manifest must be unique and contiguous.');
@@ -1303,6 +1308,12 @@ export class Engine {
     amountMicros: number,
     reference: string,
   ): Promise<Balance> {
+    if (reference.startsWith('pending-email-credit:'))
+      throw new EngineError(
+        'invalid_credit',
+        'Reference prefix pending-email-credit: is reserved for pending email credits.',
+        400,
+      );
     await this.transaction((client) =>
       creditWorkspaceInTransaction(client, workspaceId, amountMicros, reference),
     );

@@ -14,7 +14,7 @@ const source = {
   commit: 'a'.repeat(40),
   tree: 'b'.repeat(40),
   dirty: false,
-  migrations: Array.from({ length: 32 }, (_, i) => ({
+  migrations: Array.from({ length: 33 }, (_, i) => ({
     name: `${String(i + 1).padStart(3, '0')}.sql`,
     checksum: (i + 1).toString(16).padStart(64, '0'),
   })),
@@ -76,7 +76,7 @@ describe('offline current-core activation assertions', () => {
       if (kind === 'extra')
         m.deployedMigrations = [
           ...source.migrations,
-          { name: '033.sql', checksum: 'f'.repeat(64) },
+          { name: '034.sql', checksum: 'f'.repeat(64) },
         ];
       if (kind === 'too-old') m.deployedMigrations = m.deployedMigrations.slice(0, 12);
       blocked(m, 'applied_migrations_immutable_contiguous_prefix');
@@ -101,6 +101,7 @@ describe('offline current-core activation assertions', () => {
         '030.sql',
         '031.sql',
         '032.sql',
+        '033.sql',
       ],
       hostedReadiness: 'not-established',
     });

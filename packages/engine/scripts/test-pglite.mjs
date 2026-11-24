@@ -83,6 +83,7 @@ try {
             'tests/payment-rate-limits.test.ts',
             'tests/payment-concurrency.test.ts',
             'tests/launch-billing-032.test.ts',
+            'tests/pending-email-credits.test.ts',
           ]),
     ],
     {

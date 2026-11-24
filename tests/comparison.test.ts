@@ -98,6 +98,7 @@ describe.skipIf(!databaseUrl)('Private comparison admission and recovery', () =>
       '030.sql',
       '031.sql',
       '032.sql',
+      '033.sql',
     ]);
     const serializerMigration = before.find((row) => row.name === '027.sql');
     expect(serializerMigration).toBeDefined();
