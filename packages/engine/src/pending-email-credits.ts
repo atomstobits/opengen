@@ -77,14 +77,33 @@ export function normalizePendingCreditEmail(value: unknown): string | null {
     domain.includes('..')
   )
     return null;
+  const labels = domain.split('.');
+  if (
+    labels.length < 2 ||
+    labels.some((label) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))
+  )
+    return null;
   return trimmed.toLowerCase();
 }
 
 export function validatePendingCreditIssuer(value: unknown): string | null {
-  if (!readable(value, 500) || value.trim() !== value) return null;
+  if (
+    !readable(value, 500) ||
+    value.trim() !== value ||
+    !value.startsWith('https://') ||
+    /[?#\s\\]/.test(value)
+  )
+    return null;
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash)
+    if (
+      url.protocol !== 'https:' ||
+      !url.hostname ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    )
       return null;
     return value;
   } catch {
@@ -173,11 +192,11 @@ export class PendingEmailCreditStore {
     if (
       !readable(input.reference, 200) ||
       input.reference.trim() !== input.reference ||
-      /^stripe-(?:topup|recharge):/.test(input.reference)
+      /^(?:stripe-(?:topup|recharge)|pending-email-credit):/.test(input.reference)
     )
       throw error(
         'invalid_reference',
-        'A trimmed non-empty reference (not starting with stripe-topup: or stripe-recharge:) is required.',
+        'A trimmed non-empty reference (not starting with stripe-topup:, stripe-recharge:, or pending-email-credit:) is required.',
         400,
       );
     let note: string | null = null;
@@ -328,6 +347,17 @@ export class PendingEmailCreditStore {
 
       const claimed: PendingEmailCredit[] = [];
       for (const row of claimable) {
+        const ledgerReference = `pending-email-credit:${row.id}`;
+        const existingLedger = await client.query(
+          'SELECT id FROM mr_ledger WHERE workspace_id=$1 AND reference=$2',
+          [workspaceId, ledgerReference],
+        );
+        if (existingLedger.rowCount)
+          throw error(
+            'pending_credit_ledger_conflict',
+            'Reserved pending-email-credit ledger reference already exists.',
+            409,
+          );
         const updated = (
           await client.query<PendingEmailCreditRow>(
             `UPDATE mr_pending_email_credits
@@ -340,16 +370,15 @@ export class PendingEmailCreditStore {
         if (!updated) continue;
         // Ledger reference uses pending-email-credit:<uuid> so it is globally unique
         // and classified as noncash operator credit (never stripe-topup:/stripe-recharge:).
-        // Omit raw email PII from mr_ledger.details.
+        // Omit raw email and free-form operator reference from customer-readable mr_ledger.details.
         await this.creditInTransaction(
           client,
           workspaceId,
           Number(updated.amount_micros),
-          `pending-email-credit:${updated.id}`,
+          ledgerReference,
           {
             source: 'pending-email-credit',
             pendingCreditId: updated.id,
-            operatorReference: updated.reference,
           },
         );
         claimed.push(formatRow(updated));

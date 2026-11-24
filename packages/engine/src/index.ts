@@ -1308,6 +1308,12 @@ export class Engine {
     amountMicros: number,
     reference: string,
   ): Promise<Balance> {
+    if (reference.startsWith('pending-email-credit:'))
+      throw new EngineError(
+        'invalid_credit',
+        'Reference prefix pending-email-credit: is reserved for pending email credits.',
+        400,
+      );
     await this.transaction((client) =>
       creditWorkspaceInTransaction(client, workspaceId, amountMicros, reference),
     );

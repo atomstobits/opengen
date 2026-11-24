@@ -546,14 +546,23 @@ export async function registerAccounts(
           policyDigest: policy.digest,
         });
       // Claim any operator-queued email credits strictly after openid-client verified
-      // signature, nonce, issuer and boolean email_verified === true.
+      // signature, nonce, issuer and boolean email_verified === true. A failed claim
+      // rolls back its transaction and leaves credits unclaimed without blocking sign-in.
       if (options.engine?.pendingEmailCredits) {
         const verifiedCreditEmail = pendingEmailCreditIdentityFromVerifiedOidcClaims(claims);
-        if (verifiedCreditEmail)
-          await options.engine.pendingEmailCredits.claimForVerifiedIdentity(
-            principal.workspaceId,
-            verifiedCreditEmail,
-          );
+        if (verifiedCreditEmail) {
+          try {
+            await options.engine.pendingEmailCredits.claimForVerifiedIdentity(
+              principal.workspaceId,
+              verifiedCreditEmail,
+            );
+          } catch (err) {
+            request.log.error(
+              { err, workspaceId: principal.workspaceId },
+              'Pending email credit claim failed; continuing sign-in with credits unclaimed.',
+            );
+          }
+        }
       }
       const session = await store().createSession(principal);
       // Recheck after asynchronous account/receipt/session work, before any MCP return or cookie issuance.

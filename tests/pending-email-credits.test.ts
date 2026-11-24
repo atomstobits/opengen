@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createEngine,
   keyScopes,
+  normalizePendingCreditEmail,
   pendingEmailCreditIdentityFromVerifiedOidcClaims,
+  validatePendingCreditIssuer,
   type VerifiedPendingEmailCreditIdentity,
 } from '@media-router/engine';
 import { buildApp } from '../apps/server/src/app';
@@ -125,6 +127,20 @@ describe('verified OIDC email claim extraction for pending credits', () => {
         email_verified: true,
       }),
     ).toBeNull();
+    // Malformed domain labels (leading/trailing hyphen) and raw URL repairs/empty delimiters.
+    expect(normalizePendingCreditEmail('invitee@example.-org')).toBeNull();
+    expect(normalizePendingCreditEmail('invitee@-example.org')).toBeNull();
+    expect(normalizePendingCreditEmail('invitee@exam-.org')).toBeNull();
+    expect(normalizePendingCreditEmail('Invitee.User@Sub-1.Example.INVALID')).toBe(
+      'invitee.user@sub-1.example.invalid',
+    );
+    expect(validatePendingCreditIssuer('https:idp.example')).toBeNull();
+    expect(validatePendingCreditIssuer('https://idp.example?')).toBeNull();
+    expect(validatePendingCreditIssuer('https://idp.example#')).toBeNull();
+    expect(validatePendingCreditIssuer('https://idp.example\\path')).toBeNull();
+    expect(validatePendingCreditIssuer('https://accounts.google.com')).toBe(
+      'https://accounts.google.com',
+    );
   });
 });
 
@@ -193,7 +209,7 @@ describe.skipIf(!databaseUrl)('database-backed pending email credits', () => {
         }),
       ).rejects.toMatchObject({ code: 'pending_credit_conflict', statusCode: 409 });
 
-      // Reserved Stripe ledger prefixes are rejected.
+      // Reserved Stripe and pending-email-credit ledger prefixes are rejected.
       await expect(
         engine.pendingEmailCredits.enqueue({
           issuer,
@@ -202,9 +218,35 @@ describe.skipIf(!databaseUrl)('database-backed pending email credits', () => {
           reference: `stripe-topup:${randomUUID()}`,
         }),
       ).rejects.toMatchObject({ code: 'invalid_reference', statusCode: 400 });
+      await expect(
+        engine.pendingEmailCredits.enqueue({
+          issuer,
+          email,
+          amountMicros: 1_000_000,
+          reference: `pending-email-credit:${randomUUID()}`,
+        }),
+      ).rejects.toMatchObject({ code: 'invalid_reference', statusCode: 400 });
+
+      // Malformed issuer/domain labels fail cleanly with 400 instead of DB constraint errors.
+      await expect(
+        engine.pendingEmailCredits.enqueue({
+          issuer: 'https:idp.example',
+          email,
+          amountMicros: 1_000_000,
+          reference: `bad-issuer-${randomUUID()}`,
+        }),
+      ).rejects.toMatchObject({ code: 'invalid_issuer', statusCode: 400 });
+      await expect(
+        engine.pendingEmailCredits.enqueue({
+          issuer,
+          email: 'invitee@example.-org',
+          amountMicros: 1_000_000,
+          reference: `bad-email-${randomUUID()}`,
+        }),
+      ).rejects.toMatchObject({ code: 'invalid_email', statusCode: 400 });
 
       // Second grant for the same email, one revoked grant, and one for another issuer.
-      await engine.pendingEmailCredits.enqueue({
+      const second = await engine.pendingEmailCredits.enqueue({
         issuer,
         email,
         amountMicros: 25_000_000,
@@ -253,6 +295,15 @@ describe.skipIf(!databaseUrl)('database-backed pending email credits', () => {
         engine.pendingEmailCredits.claimForVerifiedIdentity(otherWorkspace, verified),
       ).rejects.toMatchObject({ code: 'pending_credit_identity_mismatch', statusCode: 403 });
 
+      // Direct operator credit rejects the reserved pending-email-credit: prefix.
+      await expect(
+        engine.creditWorkspace(
+          principal.workspaceId,
+          100_000_000,
+          `pending-email-credit:${first.credit.id}`,
+        ),
+      ).rejects.toMatchObject({ code: 'invalid_credit', statusCode: 400 });
+
       // Concurrent claims credit exactly once ($100 + $25 = $125, skipping revoked & other issuer).
       const [claimA, claimB] = await Promise.all([
         engine.pendingEmailCredits.claimForVerifiedIdentity(principal.workspaceId, verified),
@@ -265,25 +316,63 @@ describe.skipIf(!databaseUrl)('database-backed pending email credits', () => {
         currency: 'USD',
       });
 
-      // Ledger omits raw email PII and uses noncash pending-email-credit:<id> reference.
+      // Ledger omits raw email and operator reference, and uses noncash pending-email-credit:<id>.
       const ledgerRows = (
-        await engine.pool.query(
-          'SELECT kind,amount_micros,reference,details FROM mr_ledger WHERE workspace_id=$1 ORDER BY created_at ASC',
-          [principal.workspaceId],
-        )
+        await engine.pool.query<{
+          kind: string;
+          amount_micros: string;
+          reference: string;
+          details: Record<string, unknown>;
+        }>('SELECT kind,amount_micros,reference,details FROM mr_ledger WHERE workspace_id=$1', [
+          principal.workspaceId,
+        ])
       ).rows;
       expect(ledgerRows).toHaveLength(2);
-      expect(ledgerRows[0]).toMatchObject({
+      const firstLedger = ledgerRows.find(
+        (row) => row.reference === `pending-email-credit:${first.credit.id}`,
+      );
+      const secondLedger = ledgerRows.find(
+        (row) => row.reference === `pending-email-credit:${second.credit.id}`,
+      );
+      expect(firstLedger).toEqual({
         kind: 'credit',
         amount_micros: '100000000',
         reference: `pending-email-credit:${first.credit.id}`,
         details: {
           source: 'pending-email-credit',
           pendingCreditId: first.credit.id,
-          operatorReference: ref1,
+        },
+      });
+      expect(secondLedger).toEqual({
+        kind: 'credit',
+        amount_micros: '25000000',
+        reference: `pending-email-credit:${second.credit.id}`,
+        details: {
+          source: 'pending-email-credit',
+          pendingCreditId: second.credit.id,
         },
       });
       expect(JSON.stringify(ledgerRows)).not.toContain(email);
+      expect(JSON.stringify(ledgerRows)).not.toContain(ref1);
+
+      // A pre-existing colliding ledger row rolls back instead of marking a pending grant claimed.
+      const colliding = await engine.pendingEmailCredits.enqueue({
+        issuer,
+        email,
+        amountMicros: 5_000_000,
+        reference: `colliding-${randomUUID()}`,
+      });
+      await engine.pool.query(
+        `INSERT INTO mr_ledger(id,workspace_id,kind,amount_micros,available_delta_micros,reserved_delta_micros,reference,details)
+         VALUES($1,$2,'credit',5000000,5000000,0,$3,'{}'::jsonb)`,
+        [randomUUID(), principal.workspaceId, `pending-email-credit:${colliding.credit.id}`],
+      );
+      await expect(
+        engine.pendingEmailCredits.claimForVerifiedIdentity(principal.workspaceId, verified),
+      ).rejects.toMatchObject({ code: 'pending_credit_ledger_conflict', statusCode: 409 });
+      const stillColliding = await engine.pendingEmailCredits.list({ email, status: 'pending' });
+      expect(stillColliding.some((row) => row.id === colliding.credit.id)).toBe(true);
+      await engine.pendingEmailCredits.revoke(colliding.credit.id);
 
       // Already-claimed credit cannot be revoked.
       await expect(engine.pendingEmailCredits.revoke(first.credit.id)).rejects.toMatchObject({
@@ -511,6 +600,44 @@ describe.skipIf(!databaseUrl)('database-backed pending email credits', () => {
           })
         ).statusCode,
       ).toBe(409);
+
+      // 5. A failed claim (e.g., workspace balance overflow) rolls back cleanly and does not block sign-in.
+      const overflowEmail = `overflow-${randomUUID()}@example.invalid`;
+      const overflowSub = `google-sub-${randomUUID()}`;
+      const overflowPrincipal = await engine.accounts.identity(
+        'https://accounts.google.com',
+        overflowSub,
+      );
+      await engine.pool.query('UPDATE mr_workspaces SET available_micros=$2 WHERE id=$1', [
+        overflowPrincipal.workspaceId,
+        Number.MAX_SAFE_INTEGER,
+      ]);
+      const overflowGrant = await app.inject({
+        method: 'POST',
+        url: '/v1/operator/pending-email-credits',
+        headers: { authorization: `Bearer ${apiToken}` },
+        payload: {
+          email: overflowEmail,
+          amountMicros: 1_000_000,
+          reference: `overflow-${randomUUID()}`,
+        },
+      });
+      expect(overflowGrant.statusCode).toBe(201);
+      oidcFixture.claims = {
+        iss: 'https://accounts.google.com',
+        sub: overflowSub,
+        email: overflowEmail,
+        email_verified: true,
+      };
+      const overflowSession = await signInWithOidc();
+      expect(overflowSession).toContain('og_session=');
+      const stillUnclaimed = await app.inject({
+        method: 'GET',
+        url: `/v1/operator/pending-email-credits?email=${encodeURIComponent(overflowEmail)}&status=pending`,
+        headers: { authorization: `Bearer ${apiToken}` },
+      });
+      expect(stillUnclaimed.statusCode).toBe(200);
+      expect(stillUnclaimed.json().data).toHaveLength(1);
     } finally {
       await engine.close();
     }
