@@ -879,16 +879,16 @@ Primary references: [API](https://help.aliyun.com/en/model-studio/wan3-video-gen
 
 Both model IDs are explicitly present in the API reference, which also lists all six regional hosts. This establishes documentation, not actual account availability. The API, key and workspace must belong to the same region. Body/input semantics are shared; each exact model/region has its own JSON profile.
 
-| Region    | Regional host prefix                             |
-| --------- | ------------------------------------------------ |
-| Beijing   | `{WorkspaceId}.cn-beijing.maas.aliyuncs.com`     |
-| Singapore | `{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com` |
-| Tokyo     | `{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com` |
-| Frankfurt | `{WorkspaceId}.eu-central-1.maas.aliyuncs.com`   |
-| Virginia  | `{WorkspaceId}.us-east-1.maas.aliyuncs.com`      |
-| Hong Kong | `{WorkspaceId}.cn-hongkong.maas.aliyuncs.com`    |
+| Region    | Regional workspace endpoint env var |
+| --------- | ----------------------------------- |
+| Beijing   | `ALIBABA_CN_BEIJING_ENDPOINT`       |
+| Singapore | `ALIBABA_AP_SOUTHEAST_1_ENDPOINT`   |
+| Tokyo     | `ALIBABA_AP_NORTHEAST_1_ENDPOINT`   |
+| Frankfurt | `ALIBABA_EU_CENTRAL_1_ENDPOINT`     |
+| Virginia  | `ALIBABA_US_EAST_1_ENDPOINT`        |
+| Hong Kong | `ALIBABA_CN_HONGKONG_ENDPOINT`      |
 
-Append `/api/v1/services/aigc/video-generation/video-synthesis`. Required headers are Bearer authorization, JSON Content-Type and `X-DashScope-Async: enable`.
+Append `/services/aigc/video-generation/video-synthesis` to the configured regional workspace base URL (for example, the `/api/v1` base URL from your regional Model Studio workspace). Required headers are Bearer authorization, JSON Content-Type and `X-DashScope-Async: enable`.
 
 | Provider field             | Type            | Required | Default       | Enum / formal bounds                                                                                        | Class            |
 | -------------------------- | --------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------- | ---------------- |

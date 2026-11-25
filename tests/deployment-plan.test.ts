@@ -578,5 +578,18 @@ describe('review-only GCP deployment plans', () => {
       expect(api).toContain(`${name}: \${${name}:-${fallback}}`);
       for (const role of [shared, worker, web]) expect(role).not.toContain(name);
     }
+    expect(shared).toContain('ALIBABA_ENDPOINT: ${ALIBABA_ENDPOINT:-}');
+    expect(shared).toContain(
+      'ALIBABA_AP_SOUTHEAST_1_ENDPOINT: ${ALIBABA_AP_SOUTHEAST_1_ENDPOINT:-}',
+    );
+    expect(shared).not.toContain('WORKSPACE_ID');
+    expect(web).not.toContain('ALIBABA_');
+    const alibabaPlan = plan({
+      OPENGEN_PROVIDER_SECRET_BINDINGS:
+        'ALIBABA_AP_SOUTHEAST_1_API_KEY=alibaba-sg-key:2,ALIBABA_AP_SOUTHEAST_1_ENDPOINT=alibaba-sg-endpoint:2,MR_VAULT_KEY=vault-master:3',
+    });
+    expect(alibabaPlan.status).toBe(0);
+    for (const line of alibabaPlan.stdout.split('\n').filter((item) => item.startsWith('gcloud ')))
+      expect(line).toContain('ALIBABA_AP_SOUTHEAST_1_ENDPOINT=alibaba-sg-endpoint:2');
   });
 });

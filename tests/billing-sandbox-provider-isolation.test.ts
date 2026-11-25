@@ -71,12 +71,7 @@ async function fixture() {
   const response = { timeout: false, unknown: false };
   const request = vi.fn<typeof fetch>(async (target, options) => {
     const url = new URL(String(target));
-    if (
-      ![
-        'fixture-managed.ap-southeast-1.maas.aliyuncs.com',
-        'fixture-byok.ap-southeast-1.maas.aliyuncs.com',
-      ].includes(url.hostname)
-    )
+    if (!['fixture-managed.example.invalid', 'fixture-byok.example.invalid'].includes(url.hostname))
       throw new Error('Unexpected synthetic provider destination.');
     if (options?.method === 'POST') {
       if (response.timeout) throw new TypeError('Synthetic submission timeout.');
@@ -95,10 +90,11 @@ async function fixture() {
     providerEnv: {
       NODE_ENV: 'test',
       ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-managed-not-a-provider-credential',
-      ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'fixture-managed',
+      ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://fixture-managed.example.invalid/api/v1',
       XAI_API_KEY: 'fixture-xai-not-a-provider-credential',
       BYTEPLUS_API_KEY: 'fixture-byteplus-not-a-provider-credential',
     },
+    providerFetch: request,
     storage: privateStorageFixture(),
     pollIntervalMs: 0,
   };
@@ -113,7 +109,7 @@ async function fixture() {
   await enabled.ensureWorkspace(workspaceId, 10_000_000);
   await enabled.accounts.putConnection(workspaceId, deploymentId, {
     apiKey: 'fixture-byok-not-a-provider-credential',
-    workspaceId: 'fixture-byok',
+    endpoint: 'https://fixture-byok.example.invalid/api/v1',
   });
   const owner: Principal = { workspaceId, scopes: ['read', 'generate'], bootstrap: true };
   return {

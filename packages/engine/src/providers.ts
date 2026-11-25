@@ -1,5 +1,6 @@
 import type { CaptureProviderOutputs } from './adapter-output.js';
 import { createAlibabaAdapter, type ProviderAdapter } from './adapters.js';
+import type { PublicResolver } from './public-network.js';
 import { createBytePlusAdapter } from './byteplus.js';
 import { createFalAdapter } from './fal.js';
 import {
@@ -39,7 +40,7 @@ export { openAIImageSize, type StoreProviderImage, type StoreProviderOutput } fr
 
 /** One public Alibaba adapter ID, with explicit Wan-video and Qwen-image protocol branches. */
 export function createAlibabaMediaAdapter(
-  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch } = {},
+  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; resolve?: PublicResolver } = {},
 ): ProviderAdapter {
   const wan = createAlibabaAdapter(options);
   const qwen = createQwenImageAdapter(options);
@@ -128,6 +129,7 @@ export function createDefaultAdapters(
   options: {
     env?: NodeJS.ProcessEnv;
     fetch?: typeof fetch;
+    resolve?: PublicResolver;
     storeOutput?: StoreProviderImage;
     captureOutputs?: CaptureProviderOutputs;
   } = {},

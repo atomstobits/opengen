@@ -5,7 +5,11 @@ import {
   type NotificationEmailTransport,
 } from './notification-email.js';
 import { PendingEmailCreditStore } from './pending-email-credits.js';
-import { AttemptCredentialStore, type AttemptCredentialScope } from './attempt-credentials.js';
+import {
+  AttemptCredentialStore,
+  connectionEnvironment,
+  type AttemptCredentialScope,
+} from './attempt-credentials.js';
 import {
   DeliveryStore,
   deliveryDatabase,
@@ -202,6 +206,8 @@ export interface EngineOptions {
   delivery?: Pick<DeliveryOptions, 'download' | 'inspect' | 'provenance' | 'maxAttempts'>;
   /** Trusted transport injection for deterministic, unpaid input fixtures. */
   inputDownloader?: typeof downloadInput;
+  /** Trusted transport injection for deterministic, unpaid provider fixtures. */
+  providerFetch?: typeof fetch;
   statusPoolSize?: number;
   notificationEmail?: NotificationEmailConfiguration;
   notificationEmailTransport?: NotificationEmailTransport;
@@ -402,6 +408,7 @@ export class Engine {
   private readonly executionScope: ExecutionScope;
   private readonly vaultKey?: string;
   private readonly providerEnv: NodeJS.ProcessEnv;
+  private readonly providerFetch?: typeof fetch;
   private readonly quoteRequest: NonNullable<EngineOptions['quote']>;
   private readonly customQuote: boolean;
   private readonly fixtureBillingPolicy?: FeePolicy;
@@ -498,6 +505,7 @@ export class Engine {
       : undefined;
     this.vaultKey = options.vaultKey ?? process.env.MR_VAULT_KEY;
     this.providerEnv = { ...(options.providerEnv ?? process.env) };
+    this.providerFetch = options.providerFetch;
     this.injectedAdapters = options.adapters !== undefined;
     this.attemptCredentials = new AttemptCredentialStore(this.pool, {
       vaultKey: this.vaultKey,
@@ -517,6 +525,7 @@ export class Engine {
       options.adapters ??
       createDefaultAdapters({
         env: this.providerEnv,
+        fetch: this.providerFetch,
         storeOutput: this.storage ? (input) => this.storage!.putOutput(input) : undefined,
         captureOutputs: this.captureProviderOutputs,
       });
@@ -772,6 +781,7 @@ export class Engine {
       ? this.adapters
       : createDefaultAdapters({
           env: credential.env,
+          fetch: this.providerFetch,
           captureOutputs,
           storeOutput: this.storage ? (input) => this.storage!.putOutput(input) : undefined,
         });
@@ -789,6 +799,7 @@ export class Engine {
       ? this.adapters
       : createDefaultAdapters({
           env: credential.env,
+          fetch: this.providerFetch,
           captureOutputs: this.captureProviderOutputs,
           storeOutput: this.storage ? (input) => this.storage!.putOutput(input) : undefined,
         });
@@ -1400,15 +1411,10 @@ export class Engine {
     if (billing !== 'byok') return this.adapters;
     const connection = await this.accounts.getConnection(workspaceId, deployment.id);
     if (!connection) return [];
-    const env = { ...process.env };
-    if (deployment.credentialEnv) env[deployment.credentialEnv] = connection.apiKey;
-    if (deployment.providerId === 'alibaba') {
-      const prefix = `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}`;
-      env[`${prefix}_API_KEY`] = connection.apiKey;
-      env[`${prefix}_WORKSPACE_ID`] = connection.workspaceId;
-    }
+    const env = connectionEnvironment(deployment, connection);
     return createDefaultAdapters({
       env,
+      fetch: this.providerFetch,
       captureOutputs: this.captureProviderOutputs,
       storeOutput: this.storage ? (input) => this.storage!.putOutput(input) : undefined,
     });

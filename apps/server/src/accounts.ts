@@ -19,12 +19,15 @@ import * as oidc from 'openid-client';
 import { z } from 'zod';
 import {
   keyScopes,
+  normalizeAlibabaEndpoint,
+  resolvePublicTarget,
   notificationEmailIdentityFromVerifiedOidcClaims,
   pendingEmailCreditIdentityFromVerifiedOidcClaims,
   AccountGovernanceStore,
   RoutingPolicyStore,
   revalidateGovernanceAuthority,
   type Principal,
+  type PublicResolver,
   type KeyScope,
   type AccountStore,
   type AssetStore,
@@ -64,6 +67,8 @@ export async function registerAccounts(
     workspaceId?: string;
     publicUrl?: string;
     env?: NodeJS.ProcessEnv;
+    /** Optional DNS resolver seam for tests validating BYOK provider endpoints. */
+    resolvePublicEndpoint?: PublicResolver;
     /** Internal fixture seam; hosted policy adoption is not enabled by environment flags. */
     humanTermsPolicy?: () => HumanTermsPolicy;
   },
@@ -416,18 +421,37 @@ export async function registerAccounts(
       const input = z
         .object({
           apiKey: z.string().min(1).max(2000),
-          workspaceId: z
-            .string()
-            .regex(/^[a-zA-Z0-9-]+$/)
-            .optional(),
+          endpoint: z.string().min(1).max(2048).optional(),
         })
         .strict()
         .parse(request.body);
-      if (deployment.providerId === 'alibaba' && !input.workspaceId)
-        throw Object.assign(new Error('Alibaba requires a regional workspace ID.'), {
-          statusCode: 400,
+      if (deployment.endpointEnv) {
+        const endpoint = normalizeAlibabaEndpoint(input.endpoint);
+        if (!endpoint)
+          throw Object.assign(
+            new Error(
+              'This deployment requires a valid public HTTPS regional workspace endpoint URL.',
+            ),
+            { statusCode: 400 },
+          );
+        await resolvePublicTarget(endpoint, options.resolvePublicEndpoint, {
+          label: 'Provider endpoint',
+          allowIpLiteral: false,
         });
-      await store().putConnection(p.workspaceId, deployment.id, input);
+        await store().putConnection(p.workspaceId, deployment.id, {
+          apiKey: input.apiKey,
+          endpoint,
+        });
+      } else {
+        if (input.endpoint !== undefined)
+          throw Object.assign(
+            new Error(
+              'This deployment uses a fixed provider endpoint and does not accept a custom endpoint URL.',
+            ),
+            { statusCode: 400 },
+          );
+        await store().putConnection(p.workspaceId, deployment.id, { apiKey: input.apiKey });
+      }
       return { deploymentId: deployment.id, configured: true };
     },
   );

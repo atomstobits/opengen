@@ -1472,7 +1472,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "mainland-china"
       },
-      "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_CN_BEIJING_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1493,7 +1493,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "international"
       },
-      "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1514,7 +1514,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1535,7 +1535,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_EU_CENTRAL_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1556,7 +1556,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_US_EAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1577,7 +1577,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_CN_HONGKONG_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1598,7 +1598,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "mainland-china"
       },
-      "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_CN_BEIJING_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1619,7 +1619,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "international"
       },
-      "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1640,7 +1640,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1661,7 +1661,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_EU_CENTRAL_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1682,7 +1682,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_US_EAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1703,7 +1703,7 @@
         "availability": "documented-model-card-and-api-url; account access not live-tested",
         "inferenceScope": "global"
       },
-      "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpoint": "${ALIBABA_CN_HONGKONG_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "evidenceStatus": "CurrentAlibabaWanadapterexecutesT2Vandsinglefirstframe only; other documented modesrequirecanonicalextensions.",
       "fieldCount": 14,
       "sources": [
@@ -1736,7 +1736,7 @@
       "modelIds": ["kling/kling-4.0"],
       "operations": ["text-or-keyframe-video"],
       "region": null,
-      "endpoint": "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run",
+      "endpoint": "${CLOUDFLARE_AI_ENDPOINT}",
       "evidenceStatus": "Discovered additionalprovider; no adapterimplementationclaimed.",
       "fieldCount": 8,
       "sources": ["https://developers.cloudflare.com/ai/models/klingai/kling-v4/"],
@@ -2512,7 +2512,7 @@
       ],
       "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
       "region": null,
-      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+      "endpoint": "POST ${ALIBABA_<REGION>_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
       "evidenceStatus": "documented",
       "fieldCount": 12,
       "sources": [
@@ -2532,7 +2532,7 @@
       ],
       "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
       "region": null,
-      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "endpoint": "POST ${ALIBABA_<REGION>_ENDPOINT}/services/aigc/multimodal-generation/generation",
       "evidenceStatus": "documented",
       "fieldCount": 16,
       "sources": [
@@ -2551,7 +2551,7 @@
       ],
       "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
       "region": null,
-      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+      "endpoint": "POST ${ALIBABA_<REGION>_ENDPOINT}/services/aigc/image-generation/generation",
       "evidenceStatus": "documented",
       "fieldCount": 16,
       "sources": [

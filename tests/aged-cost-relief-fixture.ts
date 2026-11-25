@@ -279,7 +279,7 @@ export async function agedCostReliefFixture(
           catalog.routes.find((route) => route.id === agedReliefRoute)!.deploymentId,
           {
             apiKey: 'synthetic-aged-cost-byok',
-            workspaceId: 'synthetic-aged-cost-provider-workspace',
+            endpoint: 'https://synthetic-aged-cost-provider.example.invalid/api/v1',
           },
         );
       const job = await engine.submit({

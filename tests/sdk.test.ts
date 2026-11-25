@@ -334,7 +334,7 @@ describe('OpenGen SDK request and recovery contract', () => {
     await sdk.call('connections.put', {
       deploymentId: 'alibaba/ap-southeast-1',
       apiKey: 'private-provider-fixture',
-      workspaceId: 'regional-account',
+      endpoint: 'https://regional-account.example.invalid/api/v1',
     });
     expect(seen[0]?.url).toBe(
       'https://gateway.example/opengen/v1/connections/alibaba%2Fap-southeast-1',
@@ -342,7 +342,7 @@ describe('OpenGen SDK request and recovery contract', () => {
     expect(seen[0]?.headers.get('authorization')).toBe('Bearer fixture-key');
     expect(seen[0]?.body).toEqual({
       apiKey: 'private-provider-fixture',
-      workspaceId: 'regional-account',
+      endpoint: 'https://regional-account.example.invalid/api/v1',
     });
     expect(() => Reflect.apply(sdk.call, sdk, ['https://untrusted.example', {}])).toThrow(
       'registered operation',

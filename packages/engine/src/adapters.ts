@@ -6,6 +6,11 @@ import type {
   Route,
 } from '@media-router/contracts';
 import { isIP } from 'node:net';
+import {
+  createPublicPinnedFetch,
+  PublicTargetRejectedError,
+  type PublicResolver,
+} from './public-network.js';
 import type { AssetRef, GenerationArguments, ReferenceType } from '@media-router/contracts';
 import {
   assetUrl,
@@ -128,22 +133,65 @@ function regionalPrefix(region: string): string {
   return `ALIBABA_${region.toUpperCase().replaceAll('-', '_')}`;
 }
 
+export function normalizeAlibabaEndpoint(value: string | undefined): string | null {
+  if (
+    typeof value !== 'string' ||
+    !value ||
+    value.length > 2048 ||
+    /[\u0000-\u001f\u007f\s]/.test(value) ||
+    /%(?:2e|2f|5c)/i.test(value)
+  )
+    return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const labels = host.split('.');
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (url.port && url.port !== '443') ||
+    !host ||
+    isIP(host) ||
+    labels.length < 2 ||
+    !/^[a-z]/.test(labels.at(-1)!) ||
+    labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) ||
+    host === 'localhost' ||
+    /\.(?:localhost|local|internal)$/.test(host)
+  )
+    return null;
+  const rawPath = value.slice(value.indexOf('://') + 3).replace(/^[^/]*/, '');
+  if (
+    rawPath.includes('//') ||
+    /(?:^|\/)\.\.?(?:\/|$)/.test(rawPath) ||
+    url.pathname.includes('//')
+  )
+    return null;
+  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+}
+
 export function alibabaCredentials(
   deployment: Deployment,
   env: NodeJS.ProcessEnv = process.env,
-): { apiKey: string; workspaceId: string } | null {
+): { apiKey: string; endpoint: string } | null {
   const prefix = regionalPrefix(deployment.endpointRegion);
   const apiKey =
     (deployment.credentialEnv ? env[deployment.credentialEnv] : undefined) ||
     env[`${prefix}_API_KEY`];
-  const workspaceId = env[`${prefix}_WORKSPACE_ID`];
-  if (apiKey && workspaceId && /^[a-zA-Z0-9-]+$/.test(workspaceId)) return { apiKey, workspaceId };
+  const endpoint = normalizeAlibabaEndpoint(
+    (deployment.endpointEnv ? env[deployment.endpointEnv] : undefined) || env[`${prefix}_ENDPOINT`],
+  );
+  if (apiKey && endpoint) return { apiKey, endpoint };
   if (env.ALIBABA_REGION !== deployment.endpointRegion) return null;
   const sharedKey = env.DASHSCOPE_API_KEY;
-  const sharedWorkspace = env.ALIBABA_WORKSPACE_ID;
-  return sharedKey && sharedWorkspace && /^[a-zA-Z0-9-]+$/.test(sharedWorkspace)
-    ? { apiKey: sharedKey, workspaceId: sharedWorkspace }
-    : null;
+  const sharedEndpoint = normalizeAlibabaEndpoint(env.ALIBABA_ENDPOINT);
+  return sharedKey && sharedEndpoint ? { apiKey: sharedKey, endpoint: sharedEndpoint } : null;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -171,10 +219,10 @@ export function isPublicHttpsAssetUrl(value: string): boolean {
 }
 
 export function createAlibabaAdapter(
-  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch } = {},
+  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; resolve?: PublicResolver } = {},
 ): ProviderAdapter {
   const env = options.env ?? process.env;
-  const request = options.fetch ?? fetch;
+  const request = options.fetch ?? createPublicPinnedFetch({ resolve: options.resolve });
   const supportedOperations: Operation[] = [
     'text-to-video',
     'image-to-video',
@@ -265,12 +313,12 @@ export function createAlibabaAdapter(
     const value = alibabaCredentials(context.deployment, env);
     if (!value)
       throw new SubmissionRejected(
-        `Configure credentials for Alibaba ${context.deployment.endpointRegion}.`,
+        `Configure credentials and workspace endpoint for Alibaba ${context.deployment.endpointRegion}.`,
       );
-    // The host is reconstructed from fixed deployment metadata, not accepted from a generation request.
+    // The workspace endpoint comes from explicit server/connection configuration, never a generation request.
     return {
       ...value,
-      base: `https://${value.workspaceId}.${context.deployment.endpointRegion}.maas.aliyuncs.com/api/v1`,
+      base: value.endpoint,
     };
   }
   return {
@@ -326,7 +374,8 @@ export function createAlibabaAdapter(
           }),
           signal: AbortSignal.timeout(30_000),
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof PublicTargetRejectedError) throw new SubmissionRejected(error.message);
         throw new SubmissionUnknown();
       }
       if (response.status >= 400 && response.status < 500 && response.status !== 408) {

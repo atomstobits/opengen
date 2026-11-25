@@ -11,6 +11,7 @@ import {
   type ProviderAdapter,
 } from './adapters.js';
 import { pollProviderJson, providerObject, submitProviderJson } from './provider-http.js';
+import { createPublicPinnedFetch, type PublicResolver } from './public-network.js';
 
 const models = new Set(['qwen-image-2.1-turbo', 'qwen-image-2.1-pro', 'qwen-image-3.0-pro']);
 export const isQwenImageModel = (model: string) => models.has(model);
@@ -41,10 +42,10 @@ const alibabaRegions = new Set([
 
 /** All six Alibaba Cloud Model Studio regions document Qwen Image 2.1 Turbo/Pro and 3.0 Pro via regional workspace MaAS endpoints. */
 export function createQwenImageAdapter(
-  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch } = {},
+  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; resolve?: PublicResolver } = {},
 ): ProviderAdapter {
   const env = options.env ?? process.env;
-  const request = options.fetch ?? fetch;
+  const request = options.fetch ?? createPublicPinnedFetch({ resolve: options.resolve });
   const fields: (keyof GenerationArguments)[] = [
     'prompt',
     'negativePrompt',
@@ -110,10 +111,10 @@ export function createQwenImageAdapter(
     const credentials = alibabaCredentials(context.deployment, env);
     if (!credentials)
       throw new SubmissionRejected(
-        `Configure matching Alibaba ${context.deployment.endpointRegion} credentials and workspace.`,
+        `Configure matching Alibaba ${context.deployment.endpointRegion} credentials and workspace endpoint.`,
       );
     return {
-      base: `https://${credentials.workspaceId}.${context.deployment.endpointRegion}.maas.aliyuncs.com/api/v1`,
+      base: credentials.endpoint,
       headers: { Authorization: `Bearer ${credentials.apiKey}` },
     };
   }

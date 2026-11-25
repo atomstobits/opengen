@@ -55,6 +55,7 @@ export interface Deployment {
   storageRegions: string[] | null;
   endpointTemplate: string | null;
   credentialEnv: string | null;
+  endpointEnv?: string | null;
   source: Source;
 }
 export interface Model {

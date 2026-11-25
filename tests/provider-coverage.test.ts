@@ -875,11 +875,11 @@ describe('Alibaba Qwen exact model and region protocol (no network)', () => {
     const adapter = createAlibabaMediaAdapter({
       env: {
         ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture',
-        ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'workspace',
+        ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://workspace.example.invalid/api/v1/',
       },
       fetch: async (url, init) => {
         expect(String(url)).toBe(
-          'https://workspace.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation',
+          'https://workspace.example.invalid/api/v1/services/aigc/image-generation/generation',
         );
         expect(new Headers(init?.headers).get('X-DashScope-Async')).toBe('enable');
         expect(JSON.parse(String(init?.body))).toMatchObject({
@@ -928,7 +928,7 @@ describe('Alibaba Qwen exact model and region protocol (no network)', () => {
     const adapter = createQwenImageAdapter({
       env: {
         ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture',
-        ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'workspace',
+        ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://workspace.example.invalid/api/v1',
       },
       fetch: async () =>
         Response.json({

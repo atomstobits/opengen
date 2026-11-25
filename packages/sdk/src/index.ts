@@ -209,7 +209,7 @@ export interface OperationInputs {
   'policies.list': Empty;
   'policies.create': { name: string; policy: RoutingPolicy; maxCostMicros?: number };
   'connections.list': Empty;
-  'connections.put': { deploymentId: string; apiKey: string; workspaceId?: string };
+  'connections.put': { deploymentId: string; apiKey: string; endpoint?: string };
   'connections.delete': { deploymentId: string };
   'webhooks.list': Empty;
   'webhooks.create': { name: string; url: string; eventTypes: string[] };
