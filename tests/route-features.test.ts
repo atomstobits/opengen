@@ -431,10 +431,23 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
         conflictingDraft.routing,
       ),
     ).toEqual({ preference: 'cost' });
+
+    // Retains global providerIds when a matching modelProviderExceptions entry permits the chosen provider.
+    const exceptionRouting = {
+      providerIds: ['byteplus'],
+      modelProviderExceptions: [{ modelId: seedanceModel.id, providerIds: ['fal'] }],
+      deploymentIds: ['byteplus-modelark-ap-southeast-1'],
+    };
+    expect(
+      clearConflictingRoutingFilters(seedanceModel, falI2v, catalog.deployments, exceptionRouting),
+    ).toEqual({
+      providerIds: ['byteplus'],
+      modelProviderExceptions: [{ modelId: seedanceModel.id, providerIds: ['fal'] }],
+    });
   });
 
   it('closes RouteFeature OpenAPI schema against unspecified properties', () => {
-    const doc = openApiDocument('https://opengen.example') as {
+    const doc = openApiDocument() as {
       components: { schemas: { RouteFeature: { additionalProperties?: boolean } } };
     };
     expect(doc.components.schemas.RouteFeature.additionalProperties).toBe(false);
@@ -658,5 +671,63 @@ describe('cheapest route highlight per model variant', () => {
         'video-edit',
       ),
     ).toBe(true);
+
+    // Same prices with mixed qualification (qualified T2V vs non-approximate published I2V) stay separated so usesPublishedEstimates remains true.
+    const mixedA: Route = {
+      ...baseA,
+      operations: ['text-to-video', 'image-to-video'],
+      resolutions: ['720p'],
+      rates: [
+        {
+          operation: 'text-to-video',
+          resolution: '720p',
+          unit: 'output-second',
+          usdMicros: 100_000,
+        },
+      ],
+      publishedPricing: {
+        summary: 'Published $0.10/sec',
+        source: baseA.pricingSource,
+        conditions: ['Published list rate.'],
+        outputRates: [
+          {
+            operation: 'image-to-video',
+            resolution: '720p',
+            unit: 'output-second',
+            usdMicros: 100_000,
+          },
+        ],
+      },
+    };
+    const mixedB: Route = {
+      ...baseB,
+      operations: ['text-to-video', 'image-to-video'],
+      resolutions: ['720p'],
+      rates: [
+        {
+          operation: 'text-to-video',
+          resolution: '720p',
+          unit: 'output-second',
+          usdMicros: 200_000,
+        },
+      ],
+      publishedPricing: {
+        summary: 'Published $0.20/sec',
+        source: baseB.pricingSource,
+        conditions: ['Published list rate.'],
+        outputRates: [
+          {
+            operation: 'image-to-video',
+            resolution: '720p',
+            unit: 'output-second',
+            usdMicros: 200_000,
+          },
+        ],
+      },
+    };
+    const mixedHighlights = computeCheapestRouteHighlights([mixedA, mixedB], model, catalog);
+    const mixedWinner = mixedHighlights.get(mixedA.id)!;
+    expect(mixedWinner.comparisons).toHaveLength(2);
+    expect(mixedWinner.usesPublishedEstimates).toBe(true);
   });
 });

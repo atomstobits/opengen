@@ -490,17 +490,20 @@ function ProviderPrice({
   const rate = resolved?.rate;
   const qualifiedRate = resolved?.qualified;
   const source = resolved?.source ?? published?.source ?? route.pricingSource;
-  const pricedOperations =
+  const samePriceOperations =
     !selectedOperation && rate?.operation && route.operations.length > 1
       ? sortOperations(route.operations).filter((operation) =>
           (qualifiedRate ? route.rates : (published?.outputRates ?? [])).some(
-            (entry) => matches(entry) && (!entry.operation || entry.operation === operation),
+            (entry) =>
+              matches(entry) &&
+              entry.usdMicros === rate.usdMicros &&
+              (!entry.operation || entry.operation === operation),
           ),
         )
       : [];
   const operationScopeNote =
-    pricedOperations.length > 0 && pricedOperations.length < route.operations.length
-      ? `Applies to: ${pricedOperations.map(operationLabel).join(', ')}. Other operations may have different or unqualified pricing.`
+    !selectedOperation && rate?.operation && route.operations.length > 1
+      ? `Applies to: ${(samePriceOperations.length ? samePriceOperations : [rate.operation]).map(operationLabel).join(', ')}. Other operations may have different or unqualified pricing.`
       : null;
   const conditions = Array.from(
     new Set([

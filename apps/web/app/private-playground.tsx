@@ -428,7 +428,13 @@ export function Playground({
           ...(switched.routeId ? { routeId: switched.routeId } : {}),
           routing: { ...withoutRoute.routing, fallback: false },
         };
-        setNotice(restoredNotice ? `${switched.notice} ${restoredNotice}` : switched.notice);
+        setNotice(
+          switched.notice
+            ? restoredNotice
+              ? `${switched.notice} ${restoredNotice}`
+              : switched.notice
+            : restoredNotice,
+        );
       }
     } else if (!explicit) {
       setNotice(restoredNotice);
@@ -859,16 +865,16 @@ export function Playground({
                   const available = routes.filter((route) => route.operations.includes(operation));
                   const resolution = resolveOperationRouteSwitch(routes, routeId, operation);
                   let switchNotice = '';
-                  let switchedLabel: string | undefined;
-                  if (resolution.outcome === 'switched-sibling' && resolution.switchedRoute) {
-                    const switchedIdentity = routeIdentity(
-                      catalog,
-                      resolution.switchedRoute,
-                      operation,
-                      routes,
-                    );
-                    switchedLabel = switchedIdentity.label;
-                    switchNotice = `Switched pinned route to ${switchedIdentity.label} on the same deployment for ${names[operation]}. Review pricing and get a fresh quote.`;
+                  const targetRoute =
+                    resolution.switchedRoute ??
+                    (resolution.routeId
+                      ? routes.find((entry) => entry.id === resolution.routeId)
+                      : undefined);
+                  const targetLabel = targetRoute
+                    ? routeIdentity(catalog, targetRoute, operation, routes).label
+                    : undefined;
+                  if (resolution.outcome === 'switched-sibling' && targetLabel) {
+                    switchNotice = `Switched pinned route to ${targetLabel} on the same deployment for ${names[operation]}. Review pricing and get a fresh quote.`;
                   } else if (resolution.outcome === 'ambiguous-sibling') {
                     switchNotice = `Multiple routes on this deployment support ${names[operation]}. Pinned route reset to Automatic routing — choose the specific feature route before quoting.`;
                   } else if (resolution.outcome === 'cleared-unsupported') {
@@ -887,11 +893,10 @@ export function Playground({
                     routing: nextRouting,
                   };
                   const hasRoutingConflict = Boolean(
-                    resolution.outcome === 'switched-sibling' &&
-                    resolution.switchedRoute &&
+                    targetRoute &&
                     siblingRouteRoutingConflict(
                       model,
-                      resolution.switchedRoute,
+                      targetRoute,
                       catalog.deployments,
                       nextDraftBase,
                     ),
@@ -909,23 +914,23 @@ export function Playground({
                     },
                     true,
                   );
-                  if (switchNotice) {
+                  if (resolution.outcome !== 'none') {
                     pendingRouteSwitch.current = {
                       operation,
                       routeId: resolution.routeId,
-                      ...(switchedLabel ? { label: switchedLabel } : {}),
+                      ...(targetLabel ? { label: targetLabel } : {}),
                       notice: switchNotice,
                     };
-                    if (hasRoutingConflict && resolution.switchedRoute && switchedLabel) {
+                    if (hasRoutingConflict && targetRoute && targetLabel) {
                       setPendingSiblingConflict({
-                        routeId: resolution.switchedRoute.id,
-                        label: switchedLabel,
+                        routeId: targetRoute.id,
+                        label: targetLabel,
                         operation,
                       });
                       setNotice(
-                        `Your current routing filters exclude ${switchedLabel} for ${names[operation]}. Choose whether to switch to ${switchedLabel} or keep your routing filters.`,
+                        `Your current routing filters exclude ${targetLabel} for ${names[operation]}. Choose whether to switch to ${targetLabel} or keep your routing filters.`,
                       );
-                    } else {
+                    } else if (switchNotice) {
                       setNotice(switchNotice);
                     }
                   }

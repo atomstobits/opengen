@@ -170,8 +170,6 @@ export function clearConflictingRoutingFilters(
   if (deployment) {
     if (next.deploymentIds && !next.deploymentIds.includes(deployment.id))
       delete next.deploymentIds;
-    if (next.providerIds && !next.providerIds.includes(deployment.providerId))
-      delete next.providerIds;
     if (next.modelProviderExceptions) {
       const exception = next.modelProviderExceptions.find((item) => item.modelId === model.id);
       if (exception && !exception.providerIds.includes(deployment.providerId)) {
@@ -180,6 +178,11 @@ export function clearConflictingRoutingFilters(
         else delete next.modelProviderExceptions;
       }
     }
+    const effectiveProviders =
+      next.modelProviderExceptions?.find((item) => item.modelId === model.id)?.providerIds ??
+      next.providerIds;
+    if (effectiveProviders && !effectiveProviders.includes(deployment.providerId))
+      delete next.providerIds;
     if (next.authorOnly && !model.authorProviderIds.includes(deployment.providerId))
       delete next.authorOnly;
     if (next.endpointRegions && !next.endpointRegions.includes(deployment.endpointRegion))

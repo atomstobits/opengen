@@ -258,8 +258,10 @@ export function computeCheapestRouteHighlights(
         entry.quality ?? '',
         entry.cheapestMicros,
         entry.cheapestApproximate,
+        entry.cheapestQualified,
         entry.mostExpensiveMicros,
         entry.mostExpensiveApproximate,
+        entry.mostExpensiveQualified,
         entry.mostExpensiveRouteIds,
         entry.tiedCheapestCount,
       ]);
