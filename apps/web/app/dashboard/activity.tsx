@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { readApiJson } from './api-response';
 import {
   activityFilterFields,
   activityIdentity,
@@ -68,13 +69,20 @@ function ActivityRecords({ workspaceId, recoveryScope, onSelectJob }: PrivateAct
       headers: privateWorkspaceHeaders({ workspaceId, recoveryScope }),
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error('Activity could not be loaded. Try refreshing.');
-        const body = await response.json();
-        if (!controller.signal.aborted) setPage(body.data ?? body);
+        const next = await readApiJson<ActivityPage>(
+          response,
+          'Activity could not be loaded. Try refreshing.',
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) setPage(next);
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
-          setError(cause instanceof Error ? cause.message : 'Activity could not be loaded.');
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : 'Activity could not be loaded. Try refreshing.',
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

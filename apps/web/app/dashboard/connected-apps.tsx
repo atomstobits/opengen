@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { ApiResponseError, readApiJson } from './api-response';
 import { hasWorkspaceAuthority, privateWorkspaceHeaders } from './activity-view';
 import { notifyBrowserSessionChanged } from '../gateway-access';
 type Grant = {
@@ -68,20 +69,29 @@ function AppAuthorizations({
       headers: privateWorkspaceHeaders({ workspaceId, recoveryScope }),
     })
       .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) {
-          if (response.status === 409 && data.error?.code === 'browser_authority_changed')
-            notifyBrowserSessionChanged();
-          throw new Error('Connected apps could not be loaded. Try refreshing.');
-        }
+        const next = await readApiJson<Grant[]>(
+          response,
+          'Connected apps could not be loaded. Try refreshing.',
+          {
+            signal: controller.signal,
+            onError: ({ status, code }) => {
+              if (status === 409 && code === 'browser_authority_changed')
+                notifyBrowserSessionChanged();
+            },
+          },
+        );
         if (!controller.signal.aborted) {
-          setGrants(data.data ?? data);
+          setGrants(next);
           setError('');
         }
       })
-      .catch(() => {
+      .catch((cause) => {
         if (!controller.signal.aborted)
-          setError('Connected apps could not be loaded. Try refreshing.');
+          setError(
+            cause instanceof ApiResponseError
+              ? cause.message
+              : 'Connected apps could not be loaded. Try refreshing.',
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -104,17 +114,27 @@ function AppAuthorizations({
       });
       controller.signal.throwIfAborted();
       if (!active.current) return;
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        if (response.status === 409 && body.error?.code === 'browser_authority_changed')
-          notifyBrowserSessionChanged();
-        throw new Error('Authorization could not be revoked. Please try again.');
-      }
+      await readApiJson<unknown>(
+        response,
+        'Authorization could not be revoked. Please try again.',
+        {
+          signal: controller.signal,
+          onError: ({ status, code }) => {
+            if (active.current && status === 409 && code === 'browser_authority_changed')
+              notifyBrowserSessionChanged();
+          },
+        },
+      );
+      if (!active.current) return;
       setNotice('App authorization revoked. Connect again from the app if you need access later.');
       setRefresh((value) => value + 1);
-    } catch {
+    } catch (cause) {
       if (active.current && !controller.signal.aborted)
-        setError('Authorization could not be revoked. Please try again.');
+        setError(
+          cause instanceof ApiResponseError
+            ? cause.message
+            : 'Authorization could not be revoked. Please try again.',
+        );
     } finally {
       mutation.current = null;
       if (active.current) setBusy('');

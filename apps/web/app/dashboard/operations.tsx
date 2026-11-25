@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from '../ui';
+import { readApiJson } from './api-response';
 import {
   moneyMicros,
   privateWorkspaceHeaders,
@@ -77,6 +78,7 @@ async function requestForWorkspace<T>(
   signal: AbortSignal,
   method = 'GET',
   input?: unknown,
+  fallback = 'The request could not be completed.',
 ): Promise<T> {
   const response = await fetch(path, {
     method,
@@ -88,19 +90,18 @@ async function requestForWorkspace<T>(
     },
     ...(input === undefined ? {} : { body: JSON.stringify(input) }),
   });
-  const body = await response.json();
-  if (!response.ok)
-    throw new Error(
-      typeof body.error === 'string'
-        ? body.error
-        : (body.error?.message ?? 'The request could not be completed.'),
-    );
-  return body.data ?? body;
+  return readApiJson<T>(response, fallback, { signal });
 }
 function useOperationRequest({ workspaceId, recoveryScope }: PrivateWorkspaceAuthority) {
   return useCallback(
-    async <T,>(path: string, signal: AbortSignal, method = 'GET', input?: unknown): Promise<T> =>
-      requestForWorkspace<T>({ workspaceId, recoveryScope }, path, signal, method, input),
+    async <T,>(
+      path: string,
+      signal: AbortSignal,
+      method = 'GET',
+      input?: unknown,
+      fallback = 'The request could not be completed.',
+    ): Promise<T> =>
+      requestForWorkspace<T>({ workspaceId, recoveryScope }, path, signal, method, input, fallback),
     [workspaceId, recoveryScope],
   );
 }
@@ -269,8 +270,20 @@ function Webhooks({ authority }: { authority: PrivateWorkspaceAuthority }) {
     const controller = new AbortController();
     setLoading(true);
     Promise.all([
-      request<Subscription[]>('/api/webhooks', controller.signal),
-      request<Delivery[]>('/api/webhook-deliveries', controller.signal),
+      request<Subscription[]>(
+        '/api/webhooks',
+        controller.signal,
+        'GET',
+        undefined,
+        'Webhooks could not be loaded.',
+      ),
+      request<Delivery[]>(
+        '/api/webhook-deliveries',
+        controller.signal,
+        'GET',
+        undefined,
+        'Webhooks could not be loaded.',
+      ),
     ])
       .then(([nextSubscriptions, nextDeliveries]) => {
         if (!controller.signal.aborted) {
@@ -563,8 +576,20 @@ function Alerts({ authority }: { authority: PrivateWorkspaceAuthority }) {
     const controller = new AbortController();
     setLoading(true);
     Promise.all([
-      request<AlertSettings>('/api/alerts/settings', controller.signal),
-      request<Alert[]>('/api/alerts', controller.signal),
+      request<AlertSettings>(
+        '/api/alerts/settings',
+        controller.signal,
+        'GET',
+        undefined,
+        'Alerts could not be loaded.',
+      ),
+      request<Alert[]>(
+        '/api/alerts',
+        controller.signal,
+        'GET',
+        undefined,
+        'Alerts could not be loaded.',
+      ),
     ])
       .then(([nextSettings, nextAlerts]) => {
         if (!controller.signal.aborted) {
@@ -770,8 +795,17 @@ function Notifications({ authority }: { authority: PrivateWorkspaceAuthority }) 
       request<{ items: Notification[]; nextCursor: string | null }>(
         `/api/notifications?limit=25${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
         controller.signal,
+        'GET',
+        undefined,
+        'Notifications could not be loaded.',
       ),
-      request<Preferences>('/api/notifications/preferences', controller.signal),
+      request<Preferences>(
+        '/api/notifications/preferences',
+        controller.signal,
+        'GET',
+        undefined,
+        'Notifications could not be loaded.',
+      ),
     ])
       .then(([page, nextPreferences]) => {
         if (!controller.signal.aborted) {

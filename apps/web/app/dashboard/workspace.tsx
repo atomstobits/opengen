@@ -8,6 +8,7 @@ import { GatewayAccess, type BrowserSession } from '../gateway-access';
 import { FirstSteps } from '../onboarding/journey';
 import { WorkspaceSettings } from './settings';
 import { PrivateActivity } from './activity';
+import { readApiJson } from './api-response';
 import { hasWorkspaceAuthority, privateWorkspaceHeaders } from './activity-view';
 import { WorkspaceOperations } from './operations';
 import { ConnectedApps } from './connected-apps';
@@ -145,14 +146,9 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
         cache: 'no-store',
         headers: privateWorkspaceHeaders(privateIdentity),
       });
-      const body = await response.json();
-      if (!response.ok)
-        throw new Error(
-          typeof body.error === 'string'
-            ? body.error
-            : (body.error?.message ?? 'Workspace could not be loaded.'),
-        );
-      return body.data ?? body;
+      return readApiJson<T>(response, 'Workspace could not be loaded.', {
+        signal: controller.signal,
+      });
     }
     Promise.all([
       load<{ items: unknown[] }>('/api/activity?limit=1'),
@@ -161,9 +157,9 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
     ])
       .then(([nextJobs, nextBalance, nextLedger]) => {
         if (controller.signal.aborted) return;
-        setHasGenerations(nextJobs.items.length > 0);
+        setHasGenerations(Array.isArray(nextJobs.items) && nextJobs.items.length > 0);
         setBalance(nextBalance);
-        setLedger(nextLedger);
+        setLedger(Array.isArray(nextLedger) ? nextLedger : []);
         setLoadedWorkspaceId(authority);
       })
       .catch((cause) => {
@@ -184,12 +180,11 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
       signal: controller.signal,
       cache: 'no-store',
     })
-      .then(async (response) => {
-        const value = await response.json();
-        if (!response.ok)
-          throw new Error(value.error?.message ?? 'Generation could not be loaded.');
-        return (value.data ?? value) as Job;
-      })
+      .then((response) =>
+        readApiJson<Job>(response, 'Generation could not be loaded.', {
+          signal: controller.signal,
+        }),
+      )
       .then((job) => {
         if (!controller.signal.aborted) setSelected({ authority, job });
       })

@@ -4,6 +4,7 @@ import { notifyBrowserSessionChanged } from '../gateway-access';
 import { useEffect, useRef, useState } from 'react';
 import { WorkspaceSettings } from './settings';
 import { CopyButton } from '../ui';
+import { readApiJson } from './api-response';
 import {
   hasWorkspaceAuthority,
   privateWorkspaceHeaders,
@@ -45,18 +46,12 @@ async function requestForAuthority<T>(
     },
     ...(input === undefined ? {} : { body: JSON.stringify(input) }),
   });
-  const body = await response.json();
-  signal?.throwIfAborted();
-  if (!response.ok) {
-    if (response.status === 409 && body.error?.code === 'browser_authority_changed')
-      notifyBrowserSessionChanged();
-    throw new Error(
-      typeof body.error === 'string'
-        ? body.error
-        : (body.error?.message ?? 'Workspace settings could not be loaded.'),
-    );
-  }
-  return body.data ?? body;
+  return readApiJson<T>(response, 'Workspace settings could not be loaded.', {
+    signal,
+    onError: ({ status, code }) => {
+      if (status === 409 && code === 'browser_authority_changed') notifyBrowserSessionChanged();
+    },
+  });
 }
 
 interface AdministrationProps {
@@ -114,11 +109,18 @@ function Administration({ includeSettings = true, expectedAuthority }: Administr
       ...(expectedAuthority ? { headers: privateWorkspaceHeaders(expectedAuthority) } : {}),
     })
       .then(async (response) => {
-        const body = await response.json();
-        const current = (body.data ?? body) as Session;
+        const current = await readApiJson<Session>(
+          response,
+          'Verify the current workspace before managing team settings.',
+          {
+            signal: controller.signal,
+            onError: () => {
+              if (!controller.signal.aborted && active.current) notifyBrowserSessionChanged();
+            },
+          },
+        );
         if (controller.signal.aborted || !active.current) return;
         if (
-          !response.ok ||
           current.authenticated !== true ||
           !hasWorkspaceAuthority(current) ||
           !Array.isArray(current.scopes)
