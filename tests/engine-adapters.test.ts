@@ -496,6 +496,38 @@ describe('BytePlus synchronous image adapter (no live calls)', () => {
         redirect: 'error',
       }),
     ).rejects.toThrow(/redirects/i);
+
+    const statusFetch = (statusCode: number) =>
+      createPublicPinnedFetch({
+        resolve: async () => [{ address: '93.184.216.34', family: 4 }],
+        httpsRequest: ((
+          _url: URL,
+          _options: Record<string, unknown>,
+          cb: (res: IncomingMessage) => void,
+        ) => {
+          const req = new EventEmitter() as ClientRequest;
+          req.end = (() => {
+            const res = new EventEmitter() as IncomingMessage;
+            res.statusCode = statusCode;
+            res.headers = {};
+            res.destroy = () => res;
+            cb(res);
+            res.emit('end');
+            return req;
+          }) as ClientRequest['end'];
+          return req;
+        }) as unknown as typeof httpsRequestType,
+      });
+    const resetContent = await statusFetch(205)(
+      'https://fixture-workspace.example.invalid/api/v1/tasks/1',
+      { redirect: 'error' },
+    );
+    expect(resetContent.status).toBe(205);
+    await expect(
+      statusFetch(600)('https://fixture-workspace.example.invalid/api/v1/tasks/1', {
+        redirect: 'error',
+      }),
+    ).rejects.toThrow(/unsupported HTTP status/i);
   });
   it('blocks private, loopback, metadata and mixed DNS targets before opening sockets on Wan and Qwen adapters', async () => {
     const blockedAnswers = [

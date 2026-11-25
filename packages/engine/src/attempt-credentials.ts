@@ -92,7 +92,6 @@ function deriveLegacyAlibabaEndpoint(
   deployment: Deployment,
   workspaceId: string,
   runtimeEnv: NodeJS.ProcessEnv,
-  byokConnection?: Record<string, string> | null,
 ): string | null {
   if (!dnsLabelPattern.test(workspaceId)) return null;
   const region = deployment.endpointRegion.toLowerCase();
@@ -144,29 +143,19 @@ function deriveLegacyAlibabaEndpoint(
     if (recovered) return recovered;
   }
 
-  // 4. For legacy BYOK snapshots, allow an updated BYOK connection only when its endpoint host
-  // starts with the exact same frozen workspace and region labels (never swapping accounts).
-  const byokEndpoint = normalizeAlibabaEndpoint(byokConnection?.endpoint);
-  if (byokEndpoint) {
-    const parsed = new URL(byokEndpoint);
-    if (parsed.hostname.toLowerCase().startsWith(`${ws}.${region}.`)) {
-      return byokEndpoint;
-    }
-  }
-
   return null;
 }
 
 /**
  * Upgrade-only recovery for previously frozen Alibaba attempt snapshots that persisted
  * ALIBABA_<REGION>_WORKSPACE_ID (or shared ALIBABA_WORKSPACE_ID) before endpoint env vars.
- * Never used for new admissions, which still require an explicit endpoint URL.
+ * Only trusted operator runtime configuration (never mutable customer connections) may supply
+ * the legacy origin suffix, and new admissions still strictly require an explicit endpoint URL.
  */
 export function recoverLegacyAlibabaSnapshotEnv(
   deployment: Deployment,
   frozenEnv: NodeJS.ProcessEnv,
   runtimeEnv: NodeJS.ProcessEnv,
-  byokConnection?: Record<string, string> | null,
 ): NodeJS.ProcessEnv {
   if (deployment.providerId !== 'alibaba') return frozenEnv;
   if (alibabaCredentials(deployment, frozenEnv) !== null) return frozenEnv;
@@ -176,12 +165,7 @@ export function recoverLegacyAlibabaSnapshotEnv(
     frozenEnv[`${prefix}_API_KEY`];
   const regionalWorkspace = frozenEnv[`${prefix}_WORKSPACE_ID`];
   if (regionalKey && regionalWorkspace) {
-    const endpoint = deriveLegacyAlibabaEndpoint(
-      deployment,
-      regionalWorkspace,
-      runtimeEnv,
-      byokConnection,
-    );
+    const endpoint = deriveLegacyAlibabaEndpoint(deployment, regionalWorkspace, runtimeEnv);
     if (!endpoint) return frozenEnv;
     return {
       ...frozenEnv,
@@ -198,7 +182,6 @@ export function recoverLegacyAlibabaSnapshotEnv(
       deployment,
       frozenEnv.ALIBABA_WORKSPACE_ID,
       runtimeEnv,
-      byokConnection,
     );
     if (!endpoint) return frozenEnv;
     return {
@@ -333,48 +316,14 @@ export class AttemptCredentialStore {
       ).rows[0]?.identity ?? null
     );
   }
-  private async readStoredEnv(
-    scope: AttemptCredentialScope,
-    row: CredentialRow,
-  ): Promise<NodeJS.ProcessEnv> {
+  private readStoredEnv(scope: AttemptCredentialScope, row: CredentialRow): NodeJS.ProcessEnv {
     if (!row.ciphertext) throw denied();
     const frozenEnv = openVault<NodeJS.ProcessEnv>(
       row.ciphertext,
       this.options.vaultKey,
       this.context(scope),
     );
-    if (
-      scope.deployment.providerId !== 'alibaba' ||
-      alibabaCredentials(scope.deployment, frozenEnv) !== null
-    ) {
-      return frozenEnv;
-    }
-    let byokConnection: Record<string, string> | null = null;
-    if (row.kind === 'byok') {
-      const current = (
-        await this.pool.query<{ ciphertext: string }>(
-          'SELECT ciphertext FROM mr_connections WHERE workspace_id=$1 AND deployment_id=$2',
-          [scope.workspaceId, scope.deployment.id],
-        )
-      ).rows[0];
-      if (current?.ciphertext) {
-        try {
-          byokConnection = openVault<Record<string, string>>(
-            current.ciphertext,
-            this.options.vaultKey,
-            `${scope.workspaceId}:${scope.deployment.id}`,
-          );
-        } catch {
-          byokConnection = null;
-        }
-      }
-    }
-    return recoverLegacyAlibabaSnapshotEnv(
-      scope.deployment,
-      frozenEnv,
-      this.options.env,
-      byokConnection,
-    );
+    return recoverLegacyAlibabaSnapshotEnv(scope.deployment, frozenEnv, this.options.env);
   }
   /** Original admitted credentials for an eligible fallback before its attempt exists. */
   async readAdmission(
@@ -399,7 +348,7 @@ export class AttemptCredentialStore {
     return {
       identity: row.identity,
       kind: row.kind,
-      env: await this.readStoredEnv(scope, row),
+      env: this.readStoredEnv(scope, row),
     };
   }
   async read(scope: AttemptCredentialScope): Promise<{
@@ -426,7 +375,7 @@ export class AttemptCredentialStore {
     return {
       identity: row.identity,
       kind: row.kind,
-      env: await this.readStoredEnv(scope, row),
+      env: this.readStoredEnv(scope, row),
     };
   }
 }

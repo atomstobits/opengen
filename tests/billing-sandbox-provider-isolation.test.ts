@@ -94,6 +94,7 @@ async function fixture() {
       XAI_API_KEY: 'fixture-xai-not-a-provider-credential',
       BYTEPLUS_API_KEY: 'fixture-byteplus-not-a-provider-credential',
     },
+    providerFetch: request,
     storage: privateStorageFixture(),
     pollIntervalMs: 0,
   };

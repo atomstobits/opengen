@@ -65,6 +65,11 @@ describe.skipIf(!databaseUrl)('managed and BYOK credential ownership', () => {
         databaseUrl: isolated.databaseUrl,
         vaultKey: 'ab'.repeat(32),
         adapters: [operator],
+        providerFetch:
+          providerFetch ??
+          (async () => {
+            throw new Error('Network disabled in ownership regression.');
+          }),
         pollIntervalMs: 0,
         // This is a synthetic byte transport, not an upstream media request.
         delivery: { download: async () => privateInputBytesFixture('video/mp4').bytes },

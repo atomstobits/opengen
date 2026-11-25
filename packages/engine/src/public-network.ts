@@ -247,13 +247,22 @@ export function createPublicPinnedFetch(options: PublicPinnedFetchOptions = {}):
           });
           response.once('error', reject);
           response.once('end', () => {
-            const responseBody = status === 204 || status === 304 ? null : Buffer.concat(chunks);
-            resolve(
-              new Response(responseBody, {
-                status,
-                headers: toWebHeaders(response.headers),
-              }),
-            );
+            try {
+              if (status < 200 || status > 599) {
+                reject(new Error(`Provider returned unsupported HTTP status (${status}).`));
+                return;
+              }
+              const responseBody =
+                status === 204 || status === 205 || status === 304 ? null : Buffer.concat(chunks);
+              resolve(
+                new Response(responseBody, {
+                  status,
+                  headers: toWebHeaders(response.headers),
+                }),
+              );
+            } catch (error) {
+              reject(error);
+            }
           });
         },
       );

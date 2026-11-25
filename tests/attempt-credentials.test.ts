@@ -284,7 +284,8 @@ it('recovers previously frozen pre-upgrade Alibaba workspace snapshots without l
     endpoint: 'https://old-managed-ws.ap-southeast-1.regional-api.example/api/v1',
   });
 
-  // 5. BYOK-only deployment without managed Alibaba env recovers only when updated connection matches the frozen workspace.
+  // 5. BYOK-only deployment without operator endpoint/template never trusts mutable mr_connections
+  // (preventing a replacement connection from redirecting a frozen API key to an unrelated domain).
   const byokJobId = randomUUID();
   await query('INSERT INTO mr_jobs VALUES($1,$2)', [byokJobId, 'byok-tenant']);
   await query('INSERT INTO mr_attempts VALUES($1,1)', [byokJobId]);
@@ -304,55 +305,47 @@ it('recovers previously frozen pre-upgrade Alibaba workspace snapshots without l
     usDeployment.id,
     byokIdentity,
   ]);
-  const byokOnlyStore = new AttemptCredentialStore(pool, {
-    vaultKey,
-    env: {} as NodeJS.ProcessEnv,
-    injected: false,
-  });
   await query('INSERT INTO mr_connections VALUES($1,$2,$3)', [
     'byok-tenant',
     usDeployment.id,
     sealVault(
       {
         apiKey: 'different-rotated-key',
-        endpoint: 'https://other-ws.us-east-1.custom.example/api/v1',
+        endpoint: 'https://customer-us-ws.us-east-1.attacker.example/api/v1',
       },
       vaultKey,
       `byok-tenant:${usDeployment.id}`,
     ),
   ]);
-  const mismatched = await byokOnlyStore.read({
+  const byokOnlyStore = new AttemptCredentialStore(pool, {
+    vaultKey,
+    env: {} as NodeJS.ProcessEnv,
+    injected: false,
+  });
+  const unconfigured = await byokOnlyStore.read({
     workspaceId: 'byok-tenant',
     jobId: byokJobId,
     attempt: 1,
     deployment: usDeployment,
     billing: 'byok',
   });
-  expect(alibabaCredentials(usDeployment, mismatched.env)).toBeNull();
-  await query(
-    'UPDATE mr_connections SET ciphertext=$3 WHERE workspace_id=$1 AND deployment_id=$2',
-    [
-      'byok-tenant',
-      usDeployment.id,
-      sealVault(
-        {
-          apiKey: 'different-rotated-key',
-          endpoint: 'https://customer-us-ws.us-east-1.custom.example/api/v1',
-        },
-        vaultKey,
-        `byok-tenant:${usDeployment.id}`,
-      ),
-    ],
-  );
-  const matched = await byokOnlyStore.read({
+  expect(alibabaCredentials(usDeployment, unconfigured.env)).toBeNull();
+  const operatorTemplateStore = new AttemptCredentialStore(pool, {
+    vaultKey,
+    env: {
+      ALIBABA_LEGACY_ENDPOINT_TEMPLATE: 'https://{workspaceId}.{region}.legacy.example/api/v1',
+    } as NodeJS.ProcessEnv,
+    injected: false,
+  });
+  const recoveredViaOperatorTemplate = await operatorTemplateStore.read({
     workspaceId: 'byok-tenant',
     jobId: byokJobId,
     attempt: 1,
     deployment: usDeployment,
     billing: 'byok',
   });
-  expect(alibabaCredentials(usDeployment, matched.env)).toEqual({
+  expect(alibabaCredentials(usDeployment, recoveredViaOperatorTemplate.env)).toEqual({
     apiKey: 'frozen-us-byok-key',
-    endpoint: 'https://customer-us-ws.us-east-1.custom.example/api/v1',
+    endpoint: 'https://customer-us-ws.us-east-1.legacy.example/api/v1',
   });
 });
