@@ -5,6 +5,7 @@ import {
   canonicalModelId,
   containsPrivatePaste,
   feedbackInputSchema,
+  resolveCatalogRoute,
   type FeedbackInput,
 } from '@media-router/contracts';
 
@@ -27,9 +28,7 @@ export class FeedbackStore {
         'feedback_model_not_found',
         'Link an existing model ID; describe a requested model in the sanitized summary.',
       );
-    const route = input.routeId
-      ? catalog.routes.find((route) => route.id === input.routeId)
-      : undefined;
+    const route = input.routeId ? resolveCatalogRoute(catalog, input.routeId)?.route : undefined;
     if (input.routeId && (!route || (modelId && route.modelId !== modelId)))
       throw failure('feedback_route_not_found', 'The route must exist and match the linked model.');
     if (input.jobId) {
@@ -41,9 +40,11 @@ export class FeedbackStore {
         )
       ).rows[0];
       if (!job) throw failure('feedback_job_not_found', 'Owned job not found.', 404);
+      const jobCanonicalRouteId =
+        resolveCatalogRoute(catalog, job.route_snapshot.id)?.route.id ?? job.route_snapshot.id;
       if (
         (modelId && job.route_snapshot.modelId !== modelId) ||
-        (route && job.route_snapshot.id !== route.id)
+        (route && jobCanonicalRouteId !== route.id)
       )
         throw failure(
           'feedback_reference_mismatch',
@@ -79,7 +80,7 @@ export class FeedbackStore {
           input.category,
           input.summary,
           modelId ?? null,
-          input.routeId ?? null,
+          route?.id ?? null,
           input.jobId ?? null,
         ],
       );

@@ -13,6 +13,7 @@ import {
   type ModelDefinition,
 } from './generation-models';
 import { canonicalModelId } from './model-identity';
+import { routeDurationsForOperation, routeResolutionsForOperation } from './route-features';
 export * from './generation-assets';
 export type * from './generation-types';
 
@@ -956,17 +957,19 @@ export function validateRouteInput(request: GenerationRequest, route: Route): Ge
       message: 'This regional route does not advertise the operation.',
     });
   const args = request.input;
-  if (args.resolution && !route.resolutions.includes(args.resolution))
+  const allowedResolutions = routeResolutionsForOperation(route, request.operation);
+  if (args.resolution && !allowedResolutions.includes(args.resolution))
     issues.push({
       code: 'unsupported_resolution',
       field: 'input.resolution',
       message: 'The route does not support the requested resolution.',
       received: args.resolution,
-      limit: route.resolutions.join(','),
+      limit: allowedResolutions.join(','),
     });
   const falMax = request.modelId === 'minimax/h3-max' && route.adapter === 'fal';
   const falH3 = request.modelId === 'minimax/h3' && route.adapter === 'fal';
-  if (typeof args.duration === 'number' && !falMax && !route.durations.includes(args.duration))
+  const allowedDurations = routeDurationsForOperation(route, request.operation);
+  if (typeof args.duration === 'number' && !falMax && !allowedDurations.includes(args.duration))
     issues.push({
       code: 'unsupported_duration',
       field: 'input.duration',

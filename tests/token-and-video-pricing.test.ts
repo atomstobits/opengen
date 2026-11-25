@@ -20,7 +20,7 @@ describe('fal H3 Max and xAI Grok Imagine Video 1.5 scoped text-to-video tariffs
     ['768p', 400_000],
     ['1080p', 800_000],
   ] as const)('quotes fal H3 Max five-second text-to-video at %s', (resolution, expected) => {
-    const routeId = 'fal-undisclosed/fal-h3-max';
+    const routeId = 'fal-undisclosed/minimax-h3-max';
     const result = quote(
       {
         modelId: 'minimax/h3-max',
@@ -34,6 +34,20 @@ describe('fal H3 Max and xAI Grok Imagine Video 1.5 scoped text-to-video tariffs
     expect(result.selectedRouteId).toBe(routeId);
     expect(result.reservationMicros).toBe(expected);
     expect(result.candidates[0]!.notices.join(' ')).toContain('0.7 seconds longer');
+
+    // Legacy alias resolves to the unified route and produces the same quote.
+    const aliasResult = quote(
+      {
+        modelId: 'minimax/h3-max',
+        routeId: 'fal-undisclosed/fal-h3-max',
+        operation: 'text-to-video',
+        input: { prompt: 'A paper lantern drifting.', duration: 5, resolution },
+        routing: { fallback: false },
+      },
+      { executableRouteIds: ['fal-undisclosed/fal-h3-max'] },
+    );
+    expect(aliasResult.selectedRouteId).toBe(routeId);
+    expect(aliasResult.reservationMicros).toBe(expected);
 
     const expanded = quote(
       {
@@ -136,11 +150,13 @@ describe('fal H3 Max and xAI Grok Imagine Video 1.5 scoped text-to-video tariffs
 
   it('registers conservative smoke cases for fal H3 Max and xAI Video 1.5 / Lite', () => {
     const smoke = catalogSmokeCases(catalog);
-    expect(smoke.find((entry) => entry.routeId === 'fal-undisclosed/fal-h3-max')).toMatchObject({
-      state: 'ready',
-      estimateMicros: 250_000,
-      reserveMicros: 500_000,
-    });
+    expect(smoke.find((entry) => entry.routeId === 'fal-undisclosed/minimax-h3-max')).toMatchObject(
+      {
+        state: 'ready',
+        estimateMicros: 250_000,
+        reserveMicros: 500_000,
+      },
+    );
     expect(
       smoke.find((entry) => entry.routeId === 'xai-undisclosed/xai-grok-imagine-video-1.5'),
     ).toMatchObject({

@@ -1,5 +1,14 @@
 import { groupRoutesByProvider } from '@media-router/catalog';
-import type { Catalog, GenerateInput, Model, Operation, Route } from '@media-router/contracts';
+import {
+  resolveCatalogRoute,
+  routeDurationsForOperation,
+  routeResolutionsForOperation,
+  type Catalog,
+  type GenerateInput,
+  type Model,
+  type Operation,
+  type Route,
+} from '@media-router/contracts';
 import {
   generationArgumentSchema,
   routingSchema,
@@ -22,11 +31,13 @@ export function initialPlaygroundRequest(
     (model.modality === 'image' ? 'text-to-image' : 'text-to-video')) as Operation;
   const definition = getGenerationDefinition(model.id, operation);
   const input = { ...definition?.defaults };
+  const pinnedResolutions = pinned ? routeResolutionsForOperation(pinned, operation) : [];
+  const pinnedDurations = pinned ? routeDurationsForOperation(pinned, operation) : [];
   // Choose a documented initial configuration only before the user edits anything.
-  if (pinned && input.resolution && !pinned.resolutions.includes(input.resolution))
-    input.resolution = pinned.resolutions[0];
-  if (pinned && typeof input.duration === 'number' && !pinned.durations.includes(input.duration))
-    input.duration = pinned.durations[0];
+  if (pinned && input.resolution && !pinnedResolutions.includes(input.resolution))
+    input.resolution = pinnedResolutions[0];
+  if (pinned && typeof input.duration === 'number' && !pinnedDurations.includes(input.duration))
+    input.duration = pinnedDurations[0];
   return {
     modelId: model.id,
     operation,
@@ -134,13 +145,20 @@ export function validatePlaygroundRequest(
   if (request.maxCostMicros !== undefined && request.maxCostMicros <= 0)
     throw new Error('Enter a positive spending limit or omit it for BYOK.');
   if (request.routeId) {
-    const route = catalog.routes.find((item) => item.id === request.routeId);
-    if (!route) throw new Error('The selected exact regional route is not in this catalog.');
-    const issues = validateRouteInput(request, route);
+    const resolved = resolveCatalogRoute(catalog, request.routeId);
+    if (!resolved) throw new Error('The selected exact regional route is not in this catalog.');
+    if (resolved.alias?.operation && resolved.alias.operation !== request.operation) {
+      throw new Error(
+        `operation: Route alias ${resolved.alias.id} is bound to ${resolved.alias.operation} and cannot execute ${request.operation}.`,
+      );
+    }
+    const route = resolved.route;
+    const issues = validateRouteInput({ ...request, routeId: route.id }, route);
     if (issues.length)
       throw new Error(issues.map((issue) => `${issue.field}: ${issue.message}`).join('; '));
     if (request.routing?.fallback)
       throw new Error('A pinned regional route cannot enable provider fallback.');
+    return { ...request, routeId: route.id };
   }
   return request;
 }

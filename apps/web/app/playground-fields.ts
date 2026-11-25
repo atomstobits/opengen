@@ -1,4 +1,10 @@
-import type { GenerationArguments, Operation, Route } from '@media-router/contracts';
+import {
+  routeDurationsForOperation,
+  routeResolutionsForOperation,
+  type GenerationArguments,
+  type Operation,
+  type Route,
+} from '@media-router/contracts';
 import {
   generationArgumentSchema,
   getGenerationDefinition,
@@ -39,6 +45,8 @@ export function getPlaygroundFields(modelId: string, operation: Operation, route
   const required = new Set(schema.required as string[]);
   const properties = schema.properties as Record<ArgumentName, FieldSchema>;
   const caps = definition.capabilities;
+  const routeResolutions = route ? routeResolutionsForOperation(route, operation) : undefined;
+  const routeDurations = route ? routeDurationsForOperation(route, operation) : undefined;
   return Object.entries(properties).map(([key, schema]): PlaygroundField => {
     const name = key as ArgumentName;
     const field: PlaygroundField = {
@@ -52,7 +60,7 @@ export function getPlaygroundFields(modelId: string, operation: Operation, route
     };
     if (name === 'resolution')
       field.choices = caps.resolutions.filter(
-        (value) => !route || route.resolutions.includes(value),
+        (value) => !routeResolutions || routeResolutions.includes(value),
       );
     if (name === 'aspectRatio') field.choices = caps.aspectRatios;
     if (name === 'quality' && caps.quality) field.choices = caps.quality;
@@ -71,9 +79,9 @@ export function getPlaygroundFields(modelId: string, operation: Operation, route
       field.maximum = caps.duration.maximum;
       // fal H3 Max accepts the documented continuous range; its route duration list is not exhaustive.
       const falMax = modelId === 'minimax/h3-max' && route?.adapter === 'fal';
-      if (route && !falMax)
+      if (routeDurations && !falMax)
         field.choices = [
-          ...route.durations.filter(
+          ...routeDurations.filter(
             (value) => value >= caps.duration!.minimum && value <= caps.duration!.maximum,
           ),
           ...(caps.duration.auto ? ['auto'] : []),

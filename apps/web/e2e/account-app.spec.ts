@@ -46,7 +46,7 @@ const studioJobs: Record<string, Job> = {
       operation: 'text-to-video',
       input: { prompt: 'A red kite in the guest studio.' },
     },
-    routeId: 'fal-undisclosed/fal-h3-max',
+    routeId: 'fal-undisclosed/minimax-h3-max',
     deploymentId: 'fal-undisclosed',
     upstreamId: null,
     outputs: [],

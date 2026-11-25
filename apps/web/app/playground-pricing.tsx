@@ -1,7 +1,19 @@
 'use client';
 
 import { getPublishedRate } from '@media-router/catalog';
-import type { Catalog, GenerateInput, Job, Model, Quote, Route } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  routeDurationsForOperation,
+  routePricingSourceForOperation,
+  routePublishedPricingForOperation,
+  routeResolutionsForOperation,
+  type Catalog,
+  type GenerateInput,
+  type Job,
+  type Model,
+  type Quote,
+  type Route,
+} from '@media-router/contracts';
 import { Icon } from './ui';
 import { routeIdentity } from './route-identity';
 export { routeIdentity };
@@ -42,15 +54,17 @@ function routeDefaultQuality(
 function routeSupportsDraft(route: Route, modelId: string, draft: GenerateInput): boolean {
   if (!route.operations.includes(draft.operation)) return false;
   const args = draft.input;
+  const allowedResolutions = routeResolutionsForOperation(route, draft.operation);
   if (
     args.resolution &&
-    !route.resolutions.some((res) => res.toLowerCase() === args.resolution!.toLowerCase())
+    !allowedResolutions.some((res) => res.toLowerCase() === args.resolution!.toLowerCase())
   ) {
     return false;
   }
   const falMax = modelId === 'minimax/h3-max' && route.adapter === 'fal';
   const falH3 = modelId === 'minimax/h3' && route.adapter === 'fal';
-  if (typeof args.duration === 'number' && !falMax && !route.durations.includes(args.duration)) {
+  const allowedDurations = routeDurationsForOperation(route, draft.operation);
+  if (typeof args.duration === 'number' && !falMax && !allowedDurations.includes(args.duration)) {
     return false;
   }
   if (route.adapter === 'minimax' && modelId === 'minimax/h3-max' && args.keyframes?.length) {
@@ -94,11 +108,12 @@ function findPlaygroundRate(
   | undefined {
   if (!routeSupportsDraft(route, model.id, draft)) return undefined;
   const args = draft.input;
+  const upstream = resolveRouteUpstreamModelId(route, draft.operation);
   const extraInputs = Boolean(
     args.references?.length ||
     (args.sourceVideo &&
-      route.upstreamModelId !== 'blackforestlabs/flux-3/edit-video' &&
-      route.upstreamModelId !== 'x-ai/grok-imagine-video/video-to-video') ||
+      upstream !== 'blackforestlabs/flux-3/edit-video' &&
+      upstream !== 'x-ai/grok-imagine-video/video-to-video') ||
     args.mask ||
     args.elements?.length ||
     args.keyframes?.length ||
@@ -114,9 +129,9 @@ function findPlaygroundRate(
         (model.id === 'minimax/h3' || model.id === 'minimax/h3-max')));
   const paidExpansion =
     (route.adapter === 'minimax' &&
-      !route.upstreamModelId.startsWith('MiniMax-H3-Image') &&
+      !upstream.startsWith('MiniMax-H3-Image') &&
       args.promptExpansion !== undefined &&
-      (route.upstreamModelId !== 'MiniMax-H3-Max' ||
+      (upstream !== 'MiniMax-H3-Max' ||
         ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||
     ((model.id.startsWith('minimax/h3') ||
       model.id === 'fal/h3-max-turbo' ||
@@ -142,8 +157,8 @@ function findPlaygroundRate(
   }
   const targetQuality = args.quality ?? routeDefaultQuality(route, model.id, draft.operation);
   const grokLowOnly =
-    route.upstreamModelId === 'grok-imagine-image-2.0' ||
-    route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image';
+    upstream === 'grok-imagine-image-2.0' ||
+    upstream === 'xai/grok-imagine-image/v2.0/text-to-image';
   const qualified =
     args.duration !== 'auto' &&
     (!grokLowOnly ||
@@ -167,9 +182,8 @@ function findPlaygroundRate(
     return undefined;
   }
   const unit = model.modality === 'image' ? 'image' : 'output-second';
-  const allRates = (route.publishedPricing?.outputRates ?? []).filter(
-    (entry) => entry.unit === unit,
-  );
+  const publishedPricing = routePublishedPricingForOperation(route, draft.operation);
+  const allRates = (publishedPricing?.outputRates ?? []).filter((entry) => entry.unit === unit);
   const hasQualityTiers = allRates.some((entry) => entry.quality !== undefined);
   const rates = hasQualityTiers
     ? targetQuality
@@ -215,10 +229,9 @@ function PublishedRate({
 }) {
   const resolved = findPlaygroundRate(route, model, draft);
   const rate = resolved?.rate;
-  const tariff = route.publishedPricing;
-  const source = resolved?.qualified
-    ? route.pricingSource
-    : (tariff?.source ?? route.pricingSource);
+  const tariff = routePublishedPricingForOperation(route, draft.operation);
+  const pricingSource = routePricingSourceForOperation(route, draft.operation);
+  const source = resolved?.qualified ? pricingSource : (tariff?.source ?? pricingSource);
   return (
     <div className={styles.rate}>
       {rate ? (
@@ -306,11 +319,13 @@ export function PlaygroundPricing({
   const displayIdentity =
     displayRoute && routeIdentity(catalog, displayRoute, draft.operation, routes);
   const resolvedRates = priceRoutes.map((route) => findPlaygroundRate(route, model, draft));
-  const sources = priceRoutes.map((route, index) =>
-    resolvedRates[index]?.qualified
-      ? route.pricingSource.url
-      : (route.publishedPricing?.source.url ?? route.pricingSource.url),
-  );
+  const sources = priceRoutes.map((route, index) => {
+    const pricingSource = routePricingSourceForOperation(route, draft.operation);
+    const published = routePublishedPricingForOperation(route, draft.operation);
+    return resolvedRates[index]?.qualified
+      ? pricingSource.url
+      : (published?.source.url ?? pricingSource.url);
+  });
   const priceSource = sources.every((url) => url === sources[0]) ? sources[0] : undefined;
   const unit = resolvedRates[0]?.rate.unit;
   const quality = resolvedRates[0]?.quality;

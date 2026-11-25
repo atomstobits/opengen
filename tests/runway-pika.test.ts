@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { catalog } from '@media-router/catalog';
-import type { GenerateInput, GenerationArguments, Route } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  type GenerateInput,
+  type GenerationArguments,
+} from '@media-router/contracts';
 import { createRunwayAdapter } from '../packages/engine/src/runway.js';
 import { createPikaAdapter } from '../packages/engine/src/pika.js';
 import {
@@ -18,7 +22,7 @@ function context(
   const { operation = 'text-to-video', previousJobId, ...args } = input;
   const route = catalog.routes.find(
     (item) =>
-      item.upstreamModelId ===
+      resolveRouteUpstreamModelId(item, 'text-to-video') ===
       (provider === 'runway' ? 'kling_4' : 'pika/pika-h3-flex/text-to-video'),
   )!;
   const deployment = catalog.deployments.find((item) => item.id === route.deploymentId)!;
@@ -173,8 +177,10 @@ describe('Pika H3 Flex protocol', () => {
         asset: { url },
       })),
     });
-    ctx.route = { ...ctx.route, upstreamModelId: 'pika/pika-h3-flex/reference-to-video' } as Route;
     await adapter.submit(ctx);
+    expect(request.mock.calls[0]![0]).toBe(
+      'https://api.dev.pika.art/v1/media/pika/pika-h3-flex/reference-to-video',
+    );
     expect(JSON.parse(request.mock.calls[0]![1]!.body as string).references).toEqual([
       { type: 'image', url: 'https://assets.example/a.png' },
       { type: 'image', url: 'https://assets.example/b.png' },

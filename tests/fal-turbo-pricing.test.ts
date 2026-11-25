@@ -69,16 +69,16 @@ describe('fal H3 Max Turbo scoped standard tariff', () => {
       expect(result.candidates[0]!.estimatedCostMicros).toBeNull();
     }
     const route = catalog.routes.find((value) => value.id === routeId)!;
-    expect(route.operations).toEqual(['text-to-video']);
+    expect(route.operations).toEqual(['text-to-video', 'image-to-video', 'reference-to-video']);
     expect(route.rates.every((rate) => rate.operation === 'text-to-video')).toBe(true);
   });
   it('preserves the separate Max variant and keeps Turbo rates distinct from fal Max', () => {
     expect(getModel('fal/h3-max-turbo')!.id).toBe('fal/h3-max-turbo');
     expect(getModel('fal/h3-max')!.id).toBe('minimax/h3-max');
     const maxRoutes = catalog.routes.filter((route) => route.modelId === 'minimax/h3-max');
-    expect(maxRoutes).toHaveLength(5);
-    expect(catalog.routes.filter((route) => route.modelId === 'fal/h3-max-turbo')).toHaveLength(3);
-    const falMax = maxRoutes.find((route) => route.id === 'fal-undisclosed/fal-h3-max')!;
+    expect(maxRoutes).toHaveLength(3);
+    expect(catalog.routes.filter((route) => route.modelId === 'fal/h3-max-turbo')).toHaveLength(1);
+    const falMax = maxRoutes.find((route) => route.id === 'fal-undisclosed/minimax-h3-max')!;
     expect(falMax.rates.map((rate) => rate.usdMicros)).toEqual([50_000, 80_000, 160_000]);
     expect(falMax.pricingSource.url).toBe('https://fal.ai/models/minimax/h3-max/text-to-video');
     expect(

@@ -20,6 +20,8 @@ import {
   operationLabel,
   operationLabels,
   routeFeatureDiscriminator,
+  routePublishedPricingForOperation,
+  routeResolutionsForOperation,
   sortOperations,
   variantHasFeatureDistinctions,
   type Catalog,
@@ -434,8 +436,14 @@ export function PercentileControl({
   );
 }
 
-function ProviderTariff({ route }: { route: Route }) {
-  const published = route.publishedPricing;
+function ProviderTariff({
+  route,
+  selectedOperation,
+}: {
+  route: Route;
+  selectedOperation?: Operation;
+}) {
+  const published = routePublishedPricingForOperation(route, selectedOperation);
   if (!published) return null;
   const source = published.source;
   const conditions = Array.from(
@@ -481,7 +489,9 @@ function ProviderPrice({
   cheapestHighlight?: CheapestRouteHighlight;
 }) {
   const unit = modality === 'video' ? 'output-second' : 'image';
-  const published = route.publishedPricing;
+  const effectiveOperation =
+    selectedOperation ?? (route.operations.length === 1 ? route.operations[0] : undefined);
+  const published = routePublishedPricingForOperation(route, effectiveOperation);
   const resolved = resolveDisplayedRouteRate(route, resolution, modality, selectedOperation);
   const isCheapest = isDisplayedRateCheapest(cheapestHighlight, resolved, selectedOperation);
   const rate = resolved?.rate;
@@ -851,7 +861,8 @@ export function ProviderTable({
                   : null;
               const providerTooltip = [statusTooltip, regionTooltip].filter(Boolean).join(' ');
               const providerTooltipId = `${providerTooltipPrefix}-${route.id}`;
-              const resolutions = route.resolutions.length ? route.resolutions : [''];
+              const opResolutions = routeResolutionsForOperation(route, activeOperation);
+              const resolutions = opResolutions.length ? opResolutions : [''];
               const hasResolutionRate = resolutions.some(
                 (resolution) =>
                   resolveDisplayedRouteRate(route, resolution, model.modality, activeOperation) !=
@@ -1061,8 +1072,9 @@ export function ProviderTable({
                         }
                       />
                     )}
-                    {!hasResolutionRate && route.publishedPricing ? (
-                      <ProviderTariff route={route} />
+                    {!hasResolutionRate &&
+                    routePublishedPricingForOperation(route, activeOperation) ? (
+                      <ProviderTariff route={route} selectedOperation={activeOperation} />
                     ) : (
                       resolutions.map((resolution) => (
                         <ProviderPrice

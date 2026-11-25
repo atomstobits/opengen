@@ -12,6 +12,7 @@ import {
   getModelRoutes,
   getSeriesDetail,
   getSeriesForModel,
+  resolveRoute,
   searchCatalog,
   catalogSearchFiltersSchema,
 } from '@media-router/catalog';
@@ -280,12 +281,14 @@ export async function registerMcp(app: FastifyInstance, context: Context) {
               generationProfiles: generationProfiles(model.id),
             })),
           });
-        const route = catalog.routes.find((item) => item.id === id);
+        const resolvedRoute = resolveRoute(id);
+        const route = resolvedRoute?.route;
         const deployment = catalog.deployments.find((item) => item.id === id);
         return result(
           route
             ? {
                 route,
+                ...(resolvedRoute?.alias ? { resolvedFromAlias: resolvedRoute.alias } : {}),
                 generationProfiles: generationProfiles(route.modelId).filter((profile) =>
                   route.operations.includes(profile.operation),
                 ),

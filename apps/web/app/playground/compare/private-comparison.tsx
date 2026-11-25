@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getGenerationDefinition } from '@media-router/contracts/generation';
-import type {
-  Catalog,
-  ComparisonChildQuote,
-  ComparisonJob,
-  ComparisonRun,
-  ComparisonSummary,
-  Job,
-  Route,
+import {
+  routePricingSourceForOperation,
+  type Catalog,
+  type ComparisonChildQuote,
+  type ComparisonJob,
+  type ComparisonRun,
+  type ComparisonSummary,
+  type Job,
+  type Route,
 } from '@media-router/contracts';
 import { GatewayAccess, type BrowserSession } from '../../gateway-access';
 import { playgroundHref } from '../../links';
@@ -739,7 +740,10 @@ function RouteRate({ choice }: { choice: Choice }) {
           ? `Listed ${usd(choice.rate.usdMicros)} per ${choice.resolution} image`
           : 'Published rate unavailable'}
         {' · '}
-        <a className="text-link" href={choice.route.pricingSource.url}>
+        <a
+          className="text-link"
+          href={routePricingSourceForOperation(choice.route, 'text-to-image').url}
+        >
           Price source
         </a>
       </p>

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { catalog } from '@media-router/catalog';
-import type { GenerateInput, GenerationArguments } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  type GenerateInput,
+  type GenerationArguments,
+} from '@media-router/contracts';
 import type { AdapterContext, ProviderAdapter } from '../packages/engine/src/adapters.js';
 import { createAlibabaAdapter, SubmissionRejected } from '../packages/engine/src/adapters.js';
 import { createBytePlusAdapter } from '../packages/engine/src/byteplus.js';
@@ -18,7 +22,9 @@ function context(
   operation: GenerateInput['operation'],
 ): AdapterContext {
   const route = catalog.routes.find(
-    (route) => route.upstreamModelId === upstreamModelId && route.adapter === adapter,
+    (route) =>
+      resolveRouteUpstreamModelId(route, operation) === upstreamModelId &&
+      route.adapter === adapter,
   )!;
   if (!route) throw new Error(`Missing qualified route ${adapter}/${upstreamModelId}`);
   const deployment = catalog.deployments.find(

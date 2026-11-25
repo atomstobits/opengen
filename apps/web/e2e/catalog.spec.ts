@@ -48,7 +48,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await card(page, 'alibaba/wan-3.0').getByRole('link', { name: 'Wan 3.0', exact: true }).click();
   await expect(page).toHaveURL(/\/alibaba\/wan-3\.0$/);
   const standard = page.locator('[data-testid="series-variant"][data-model-id="alibaba/wan-3.0"]');
-  await expect(standard.locator('.route-table tbody tr')).toHaveCount(14);
+  await expect(standard.locator('.route-table tbody tr')).toHaveCount(10);
   for (const region of [
     'Beijing, China',
     'Singapore',

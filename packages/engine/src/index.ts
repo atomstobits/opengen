@@ -60,20 +60,21 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Pool, type PoolClient } from 'pg';
 import { catalog as defaultCatalog, quote as defaultQuote } from '@media-router/catalog';
-import type {
-  Catalog,
-  ComparisonChildQuote,
-  ComparisonJob,
-  ComparisonQuote,
-  ComparisonRun,
-  ComparisonSummary,
-  Deployment,
-  GenerateInput,
-  Job,
-  JobStatus,
-  Quote,
-  Route,
-  RouteMetrics,
+import {
+  resolveCatalogRoute,
+  type Catalog,
+  type ComparisonChildQuote,
+  type ComparisonJob,
+  type ComparisonQuote,
+  type ComparisonRun,
+  type ComparisonSummary,
+  type Deployment,
+  type GenerateInput,
+  type Job,
+  type JobStatus,
+  type Quote,
+  type Route,
+  type RouteMetrics,
 } from '@media-router/contracts';
 import {
   createAlibabaAdapter,
@@ -1334,8 +1335,9 @@ export class Engine {
   private normalizeInput(input: GenerateInput): GenerateInput {
     // Custom catalogs supply their own quote/validation contract, including synthetic test models.
     if (this.customQuote) return input;
+    let parsed: GenerateInput;
     try {
-      return parseGenerationRequest(input);
+      parsed = parseGenerationRequest(input);
     } catch (error) {
       throw new EngineError(
         'invalid_generation_input',
@@ -1343,6 +1345,20 @@ export class Engine {
         422,
       );
     }
+    if (parsed.routeId) {
+      const resolved = resolveCatalogRoute(this.catalog, parsed.routeId);
+      if (resolved?.alias) {
+        if (resolved.alias.operation && resolved.alias.operation !== parsed.operation) {
+          throw new EngineError(
+            'unsupported_operation',
+            `Route alias ${resolved.alias.id} is bound to ${resolved.alias.operation} and cannot execute ${parsed.operation}.`,
+            422,
+          );
+        }
+        return { ...parsed, routeId: resolved.route.id };
+      }
+    }
+    return parsed;
   }
 
   getExecutableRouteIds(
@@ -1521,12 +1537,14 @@ export class Engine {
           'invalid_continuation',
           'This model does not support an owned Omni continuation.',
         );
-      if (input.routeId && input.routeId !== previous.routeId)
+      const previousRouteId =
+        resolveCatalogRoute(this.catalog, previous.routeId)?.route.id ?? previous.routeId;
+      if (input.routeId && input.routeId !== previousRouteId)
         throw new EngineError(
           'continuation_route_mismatch',
           'Continue on the original deployment; cross-provider continuation is not supported.',
         );
-      input = { ...input, routeId: previous.routeId };
+      input = { ...input, routeId: previousRouteId };
     }
     const args = await mapGenerationAssets(input.input, async (asset, role) => {
       if ('url' in asset && asset.url) {
@@ -2072,9 +2090,13 @@ export class Engine {
     routeIds: [string, string],
   ): Promise<ComparisonRun> {
     this.assertProviderExecutionEnabled();
-    const [first, second] = routeIds.map((id) =>
-      this.catalog.routes.find((route) => route.id === id && route.status !== 'retired'),
-    );
+    const [first, second] = routeIds.map((id) => {
+      const resolved = resolveCatalogRoute(this.catalog, id);
+      if (!resolved || resolved.route.status === 'retired') return undefined;
+      if (resolved.alias?.operation && resolved.alias.operation !== 'text-to-image')
+        return undefined;
+      return resolved.route;
+    });
     if (
       !first ||
       !second ||

@@ -1,4 +1,88 @@
-import type { Operation, Route } from './index';
+import type { Catalog, Operation, Route, RouteAlias, RoutePublishedPricing, Source } from './index';
+
+/** Resolves the concrete upstream endpoint/model ID for a route and operation. */
+export function resolveRouteUpstreamModelId(
+  route: Pick<Route, 'upstreamModelId' | 'upstreamEndpoints'>,
+  operation?: Operation,
+): string {
+  return (operation ? route.upstreamEndpoints?.[operation] : undefined) ?? route.upstreamModelId;
+}
+
+/** Returns every distinct upstream endpoint/model ID backed by a route. */
+export function routeUpstreamModelIds(
+  route: Pick<Route, 'upstreamModelId' | 'upstreamEndpoints'>,
+): string[] {
+  const endpoints = route.upstreamEndpoints
+    ? Object.values(route.upstreamEndpoints).filter((value): value is string => Boolean(value))
+    : [];
+  return endpoints.length ? [...new Set(endpoints)] : [route.upstreamModelId];
+}
+
+/** Returns the supported output resolutions for a route under an optional operation lens. */
+export function routeResolutionsForOperation(
+  route: Pick<Route, 'resolutions' | 'operationCapabilities'>,
+  operation?: Operation,
+): string[] {
+  const override = operation ? route.operationCapabilities?.[operation]?.resolutions : undefined;
+  return override ?? route.resolutions;
+}
+
+/** Returns the supported output durations for a route under an optional operation lens. */
+export function routeDurationsForOperation(
+  route: Pick<Route, 'durations' | 'operationCapabilities'>,
+  operation?: Operation,
+): number[] {
+  const override = operation ? route.operationCapabilities?.[operation]?.durations : undefined;
+  return override ?? route.durations;
+}
+
+/** Returns the pricing evidence source for a route under an optional operation lens. */
+export function routePricingSourceForOperation(
+  route: Pick<Route, 'pricingSource' | 'operationCapabilities'>,
+  operation?: Operation,
+): Source {
+  return (
+    (operation ? route.operationCapabilities?.[operation]?.pricingSource : undefined) ??
+    route.pricingSource
+  );
+}
+
+/** Returns the provider documentation source for a route under an optional operation lens. */
+export function routeSourceForOperation(
+  route: Pick<Route, 'source' | 'operationCapabilities'>,
+  operation?: Operation,
+): Source {
+  return (operation ? route.operationCapabilities?.[operation]?.source : undefined) ?? route.source;
+}
+
+/** Returns the published tariff metadata for a route under an optional operation lens. */
+export function routePublishedPricingForOperation(
+  route: Pick<Route, 'publishedPricing' | 'operationCapabilities'>,
+  operation?: Operation,
+): RoutePublishedPricing | undefined {
+  return (
+    (operation ? route.operationCapabilities?.[operation]?.publishedPricing : undefined) ??
+    route.publishedPricing
+  );
+}
+
+export interface ResolvedCatalogRoute {
+  route: Route;
+  alias?: RouteAlias;
+}
+
+/** Resolves a canonical route ID or a registered RouteAlias against a catalog snapshot. */
+export function resolveCatalogRoute(
+  catalog: Pick<Catalog, 'routes' | 'routeAliases'>,
+  id: string,
+): ResolvedCatalogRoute | undefined {
+  const direct = catalog.routes.find((route) => route.id === id);
+  if (direct) return { route: direct };
+  const alias = catalog.routeAliases?.find((entry) => entry.id === id);
+  if (!alias) return undefined;
+  const target = catalog.routes.find((route) => route.id === alias.routeId);
+  return target ? { route: target, alias } : undefined;
+}
 
 export const operationLabels: Record<Operation, string> = {
   'text-to-image': 'Text to image',

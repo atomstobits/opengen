@@ -1,4 +1,8 @@
-import type { GenerationArguments } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  routeUpstreamModelIds,
+  type GenerationArguments,
+} from '@media-router/contracts';
 import {
   isPublicHttpsAssetUrl,
   adapterInputIssue,
@@ -55,10 +59,8 @@ export function createPikaAdapter(
     'promptExpansion',
   ];
   function preflight({ input, route, deployment }: Omit<AdapterContext, 'jobId'>): string | null {
-    if (
-      deployment.providerId !== 'pika' ||
-      endpoints.get(route.upstreamModelId) !== input.operation
-    )
+    const upstream = resolveRouteUpstreamModelId(route, input.operation);
+    if (deployment.providerId !== 'pika' || endpoints.get(upstream) !== input.operation)
       return 'Unsupported Pika H3 Flex route or operation.';
     if (!resolutions.has((input.input.resolution ?? '').toLowerCase()))
       return 'Unsupported H3 Flex resolution.';
@@ -126,16 +128,17 @@ export function createPikaAdapter(
     isConfigured: (route, deployment) =>
       route.adapter === 'pika' &&
       deployment.providerId === 'pika' &&
-      endpoints.has(route.upstreamModelId) &&
+      routeUpstreamModelIds(route).some((upstream) => endpoints.has(upstream)) &&
       Boolean(env.PIKA_API_KEY),
     async submit(context) {
       const issue = preflight(context);
       if (issue) throw new SubmissionRejected(issue);
       const { input, route } = context;
+      const upstream = resolveRouteUpstreamModelId(route, input.operation);
       const body = await submitProviderJson(
         request,
         'Pika',
-        `https://api.dev.pika.art/v1/media/${route.upstreamModelId}`,
+        `https://api.dev.pika.art/v1/media/${upstream}`,
         { ...auth(), 'Idempotency-Key': context.jobId },
         {
           prompt: input.input.prompt,

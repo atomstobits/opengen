@@ -1,13 +1,27 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { catalog, getModel, getRoute, quote, validateCatalog } from '@media-router/catalog';
+import {
+  canonicalRouteId,
+  catalog,
+  getModel,
+  getRoute,
+  getRouteAlias,
+  quote,
+  resolveRoute,
+  validateCatalog,
+} from '@media-router/catalog';
 import {
   describeRouteFeatures,
+  resolveRouteUpstreamModelId,
+  routeDurationsForOperation,
   routeFeatureDiscriminator,
   routeFeatureSignature,
+  routePublishedPricingForOperation,
+  routeResolutionsForOperation,
   variantHasFeatureDistinctions,
   type GenerateInput,
   type Route,
 } from '@media-router/contracts';
+import { validateRouteInput } from '@media-router/contracts/generation';
 import {
   publishedPricingFor,
   scopePublishedPricing,
@@ -26,7 +40,11 @@ import {
   clearConflictingRoutingFilters,
   resolveOperationRouteSwitch,
   siblingRouteRoutingConflict,
+  validatePlaygroundRequest,
 } from '../apps/web/app/playground-request';
+import { createFalAdapter } from '../packages/engine/src/fal.js';
+import { runCommand } from '../apps/cli/src/index';
+import { OpenGen } from '@media-router/sdk';
 import { playgroundHref } from '../apps/web/app/links';
 
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
@@ -34,8 +52,8 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-describe('route feature identity and catalog invariants', () => {
-  it('distinguishes feature-split deployments while keeping uniform regional variants quiet', () => {
+describe('unified official-standard routes, RouteAlias, and catalog invariants', () => {
+  it('unifies every (modelId, deploymentId) into one canonical route while keeping operation distinctions clear', () => {
     const qwenTurboRoutes = catalog.routes.filter(
       (route) => route.modelId === 'qwen/image-2.1-turbo',
     );
@@ -48,27 +66,79 @@ describe('route feature identity and catalog invariants', () => {
     const seedanceRoutes = catalog.routes.filter(
       (route) => route.modelId === 'bytedance/seedance-2.5',
     );
+    expect(seedanceRoutes).toHaveLength(5);
+    expect(new Set(seedanceRoutes.map((route) => route.deploymentId)).size).toBe(5);
     expect(variantHasFeatureDistinctions(seedanceRoutes)).toBe(true);
-    const falI2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
+
+    const falSeedance = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
     const byteplus = getRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5')!;
-    expect(routeFeatureDiscriminator(falI2v, seedanceRoutes, 'image-to-video')).toBe(
-      'Image to video',
+    expect(falSeedance.operations).toEqual([
+      'text-to-video',
+      'image-to-video',
+      'reference-to-video',
+    ]);
+    expect(falSeedance.upstreamEndpoints).toEqual({
+      'text-to-video': 'bytedance/seedance-2.5/text-to-video',
+      'image-to-video': 'bytedance/seedance-2.5/image-to-video',
+      'reference-to-video': 'bytedance/seedance-2.5/reference-to-video',
+    });
+    expect(resolveRouteUpstreamModelId(falSeedance, 'image-to-video')).toBe(
+      'bytedance/seedance-2.5/image-to-video',
     );
+    expect(routeFeatureDiscriminator(falSeedance, seedanceRoutes, 'image-to-video')).toBeNull();
     expect(routeFeatureDiscriminator(byteplus, seedanceRoutes, 'image-to-video')).toBeNull();
     expect(routeFeatureDiscriminator(byteplus, seedanceRoutes, 'video-edit')).toBe(
       'Text to video, Image to video, Reference to video',
     );
 
     const pikaRoutes = catalog.routes.filter((route) => route.modelId === 'pika/h3-flex');
-    expect(variantHasFeatureDistinctions(pikaRoutes)).toBe(true);
-    expect(pikaRoutes.map((route) => routeIdentity(catalog, route).label)).toEqual([
-      'Pika · Text to video',
-      'Pika · Image to video',
-      'Pika · Reference to video',
+    expect(pikaRoutes).toHaveLength(1);
+    expect(pikaRoutes[0]?.id).toBe('pika-undisclosed/pika-h3-flex');
+    expect(pikaRoutes[0]?.operations).toEqual([
+      'text-to-video',
+      'image-to-video',
+      'reference-to-video',
     ]);
+    expect(routeIdentity(catalog, pikaRoutes[0]!).label).toBe('Pika');
   });
 
-  it('supports explicit sub-operation Route.feature metadata and enforces sibling uniqueness', () => {
+  it('registers dedicated RouteAlias entries and resolves legacy split route IDs safely', () => {
+    expect(catalog.routeAliases?.length).toBeGreaterThan(100);
+    expect(getRouteAlias('fal-undisclosed/bytedance/seedance-2.5/image-to-video')).toEqual({
+      id: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+      routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+      operation: 'image-to-video',
+    });
+    expect(canonicalRouteId('fal-undisclosed/bytedance/seedance-2.5/image-to-video')).toBe(
+      'fal-undisclosed/bytedance-seedance-2.5',
+    );
+    expect(resolveRoute('fal-undisclosed/fal-h3-max')).toMatchObject({
+      route: { id: 'fal-undisclosed/minimax-h3-max', modelId: 'minimax/h3-max' },
+      alias: {
+        id: 'fal-undisclosed/fal-h3-max',
+        routeId: 'fal-undisclosed/minimax-h3-max',
+        operation: 'text-to-video',
+      },
+    });
+    expect(resolveRoute('pika-undisclosed/pika-h3-flex-reference-to-video')).toMatchObject({
+      route: { id: 'pika-undisclosed/pika-h3-flex' },
+      alias: {
+        id: 'pika-undisclosed/pika-h3-flex-reference-to-video',
+        routeId: 'pika-undisclosed/pika-h3-flex',
+        operation: 'reference-to-video',
+      },
+    });
+    expect(resolveRoute('replicate-undisclosed/xai-grok-imagine-video-extension')).toMatchObject({
+      route: { id: 'replicate-undisclosed/xai-grok-imagine-video' },
+      alias: {
+        id: 'replicate-undisclosed/xai-grok-imagine-video-extension',
+        routeId: 'replicate-undisclosed/xai-grok-imagine-video',
+        operation: 'video-extend',
+      },
+    });
+  });
+
+  it('enforces one active canonical route per (modelId, deploymentId) and validates RouteAlias invariants', () => {
     const base = getRoute('replicate-undisclosed/bytedance-seedream-5.0-pro')!;
     const baseIndex = catalog.routes.indexOf(base);
     const layerRoute: Route = {
@@ -81,12 +151,6 @@ describe('route feature identity and catalog invariants', () => {
         label: 'Layer decomposition',
         summary: 'Separates an edited scene into transparent layers.',
       },
-    };
-    const duplicateSameOp: Route = {
-      ...base,
-      id: 'replicate-undisclosed/bytedance-seedream-5.0-pro/duplicate',
-      upstreamModelId: 'bytedance/seedream-5-pro:dup',
-      operations: ['text-to-image', 'image-edit'],
     };
 
     expect(describeRouteFeatures(layerRoute)).toMatchObject({
@@ -106,40 +170,49 @@ describe('route feature identity and catalog invariants', () => {
 
     catalog.routes.splice(baseIndex + 1, 0, layerRoute);
     try {
-      expect(validateCatalog()).toEqual([]);
-      catalog.routes.splice(baseIndex + 2, 0, duplicateSameOp);
       expect(validateCatalog()).toContain(
-        `Ambiguous sibling routes for ${base.modelId} on ${base.deploymentId}: ${base.id} and ${duplicateSameOp.id} share the same operations and feature`,
+        `Duplicate active routes for ${base.modelId} on ${base.deploymentId}: ${base.id} and ${layerRoute.id} must be unified into one canonical route`,
       );
     } finally {
-      const duplicateIndex = catalog.routes.indexOf(duplicateSameOp);
-      if (duplicateIndex !== -1) catalog.routes.splice(duplicateIndex, 1);
       const layerIndex = catalog.routes.indexOf(layerRoute);
       if (layerIndex !== -1) catalog.routes.splice(layerIndex, 1);
     }
+
+    const badAlias = {
+      id: base.id,
+      routeId: base.id,
+    };
+    catalog.routeAliases!.push(badAlias);
+    try {
+      expect(validateCatalog()).toContain(
+        `Route alias collides with canonical route ID ${base.id}`,
+      );
+    } finally {
+      catalog.routeAliases!.pop();
+    }
   });
 
-  it('validates route feature fields and rejects unsupported operations in rates and published pricing', () => {
-    const falI2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
-    const originalFeature = falI2v.feature;
-    const originalPublished = falI2v.publishedPricing;
-    const originalRates = falI2v.rates;
+  it('validates route feature fields and rejects unsupported operations in rates, published pricing, and operationCapabilities', () => {
+    const falSeedance = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    const originalFeature = falSeedance.feature;
+    const originalPublished = falSeedance.publishedPricing;
+    const originalRates = falSeedance.rates;
     try {
-      falI2v.feature = { id: 'Bad Slug!', label: '  ' };
-      expect(validateCatalog()).toContain(`Invalid route feature metadata for ${falI2v.id}`);
-      falI2v.feature = originalFeature;
+      falSeedance.feature = { id: 'Bad Slug!', label: '  ' };
+      expect(validateCatalog()).toContain(`Invalid route feature metadata for ${falSeedance.id}`);
+      falSeedance.feature = originalFeature;
 
-      falI2v.rates = [
-        { operation: 'text-to-video', resolution: '720p', unit: 'output-second', usdMicros: 1000 },
+      falSeedance.rates = [
+        { operation: 'video-edit', resolution: '720p', unit: 'output-second', usdMicros: 1000 },
       ];
-      expect(validateCatalog()).toContain(`Rate lists unsupported operation for ${falI2v.id}`);
-      falI2v.rates = originalRates;
+      expect(validateCatalog()).toContain(`Rate lists unsupported operation for ${falSeedance.id}`);
+      falSeedance.rates = originalRates;
 
-      falI2v.publishedPricing = {
+      falSeedance.publishedPricing = {
         ...originalPublished!,
         outputRates: [
           {
-            operation: 'text-to-video',
+            operation: 'video-edit',
             resolution: '720p',
             unit: 'output-second',
             usdMicros: 473_000,
@@ -148,34 +221,70 @@ describe('route feature identity and catalog invariants', () => {
         ],
       };
       expect(validateCatalog()).toContain(
-        `Published tariff output rate lists unsupported operation for ${falI2v.id}`,
+        `Published tariff output rate lists unsupported operation for ${falSeedance.id}`,
       );
     } finally {
-      falI2v.feature = originalFeature;
-      falI2v.publishedPricing = originalPublished;
-      falI2v.rates = originalRates;
+      falSeedance.feature = originalFeature;
+      falSeedance.publishedPricing = originalPublished;
+      falSeedance.rates = originalRates;
     }
   });
 
-  it('scopes published outputRates to supported route operations without bleeding across siblings', () => {
-    const falT2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/text-to-video')!;
-    const falI2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
+  it('preserves truthful per-operation capabilities, tariffs, and rates on unified routes', () => {
+    const falGrok = getRoute('fal-undisclosed/xai-grok-imagine-video-1.5')!;
+    expect(routeResolutionsForOperation(falGrok, 'text-to-video')).toEqual([
+      '480p',
+      '720p',
+      '1080p',
+    ]);
+    expect(routeResolutionsForOperation(falGrok, 'reference-to-video')).toEqual(['480p', '720p']);
+    expect(routeDurationsForOperation(falGrok, 'reference-to-video')).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    ]);
+    const grokIssues = validateRouteInput(
+      {
+        modelId: 'xai/grok-imagine-video-1.5',
+        operation: 'reference-to-video',
+        input: {
+          prompt: 'Ref clip',
+          references: [{ type: 'image', asset: { url: 'https://example.com/a.png' } }],
+          resolution: '1080p',
+          duration: 12,
+        },
+      },
+      falGrok,
+    );
+    expect(grokIssues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining(['unsupported_resolution', 'unsupported_duration']),
+    );
 
-    // Operation-agnostic published rates remain intact and preserve object identity.
-    expect(falT2v.publishedPricing?.outputRates?.length).toBeGreaterThan(0);
+    const pikaFlex = getRoute('pika-undisclosed/pika-h3-flex')!;
+    expect(routePublishedPricingForOperation(pikaFlex, 'text-to-video')?.summary).toContain(
+      '$0.01',
+    );
+    expect(routePublishedPricingForOperation(pikaFlex, 'reference-to-video')?.summary).toContain(
+      '$0.03',
+    );
+
+    const falFlux = getRoute('fal-undisclosed/bfl-flux-3-video')!;
+    expect(routeResolutionsForOperation(falFlux, 'video-edit')).toEqual([]);
+    expect(routeDurationsForOperation(falFlux, 'video-edit')).toEqual([]);
+    expect(routePublishedPricingForOperation(falFlux, 'video-edit')?.summary).toContain('$0.03');
+
+    // Operation-scoped outputRates are stripped when applied to an incompatible operation list.
+    const falSeedance = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    expect(falSeedance.publishedPricing?.outputRates?.length).toBeGreaterThan(0);
     expect(
       publishedPricingFor({
-        id: falI2v.id,
-        deploymentId: falI2v.deploymentId,
-        modelId: falI2v.modelId,
-        upstreamModelId: falI2v.upstreamModelId,
-        operations: falI2v.operations,
+        id: falSeedance.id,
+        deploymentId: falSeedance.deploymentId,
+        modelId: falSeedance.modelId,
+        upstreamModelId: falSeedance.upstreamModelId,
+        operations: falSeedance.operations,
       }),
-    ).toBe(falI2v.publishedPricing);
-
-    // Operation-scoped outputRates are stripped when applied to an incompatible sibling route.
+    ).toStrictEqual(falSeedance.publishedPricing);
     const t2vOnlyTariff: NonNullable<Route['publishedPricing']> = {
-      ...falT2v.publishedPricing!,
+      ...falSeedance.publishedPricing!,
       outputRates: [
         {
           operation: 'text-to-video',
@@ -195,7 +304,7 @@ describe('route feature identity and catalog invariants', () => {
 });
 
 describe('feature-aware quoting and REST/local discovery', () => {
-  it('suppresses irrelevant sibling-operation routes on automatic quotes while keeping pinned diagnostics', () => {
+  it('quotes unified routes cleanly and rejects mismatched legacy RouteAlias operations', () => {
     const i2vRequest: GenerateInput = {
       modelId: 'bytedance/seedance-2.5',
       operation: 'image-to-video',
@@ -212,16 +321,39 @@ describe('feature-aware quoting and REST/local discovery', () => {
     );
     expect(falCandidates).toHaveLength(1);
     expect(falCandidates[0]).toMatchObject({
-      routeId: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
-      operations: ['image-to-video'],
+      routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+      operations: ['text-to-video', 'image-to-video', 'reference-to-video'],
     });
     const pikaCandidates = autoQuote.candidates.filter(
       (candidate) => candidate.providerId === 'pika',
     );
     expect(pikaCandidates).toHaveLength(1);
     expect(pikaCandidates[0]).toMatchObject({
-      routeId: 'pika-undisclosed/bytedance/seedance-2.5/image-to-video',
-      operations: ['image-to-video'],
+      routeId: 'pika-undisclosed/bytedance-seedance-2.5',
+      operations: ['text-to-video', 'image-to-video', 'reference-to-video'],
+    });
+
+    // Legacy matching RouteAlias resolves to canonical route.
+    const pinnedAliasMatch = quote({
+      ...i2vRequest,
+      routeId: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+    });
+    expect(pinnedAliasMatch.candidates).toHaveLength(1);
+    expect(pinnedAliasMatch.candidates[0]).toMatchObject({
+      routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+      issues: [],
+    });
+
+    // Legacy mismatched RouteAlias is rejected safely with unsupported_operation.
+    const pinnedMismatch = quote({
+      ...i2vRequest,
+      routeId: 'fal-undisclosed/bytedance/seedance-2.5/text-to-video',
+    });
+    expect(pinnedMismatch.candidates).toHaveLength(1);
+    expect(pinnedMismatch.candidates[0]).toMatchObject({
+      routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+      executable: false,
+      issues: expect.arrayContaining([expect.objectContaining({ code: 'unsupported_operation' })]),
     });
 
     const h3R2vQuote = quote({
@@ -238,8 +370,8 @@ describe('feature-aware quoting and REST/local discovery', () => {
       h3R2vQuote.candidates
         .filter((candidate) => candidate.providerId === 'fal')
         .map((c) => c.routeId),
-    ).toEqual(['fal-undisclosed/minimax/h3-max/reference-to-video']);
-    // Runway has no reference-to-video route on minimax/h3-max, so its exclusion remains transparent.
+    ).toEqual(['fal-undisclosed/minimax-h3-max']);
+    // Runway has no reference-to-video support on minimax/h3-max, so its exclusion remains transparent.
     expect(
       h3R2vQuote.candidates.find((candidate) => candidate.providerId === 'runway'),
     ).toMatchObject({
@@ -259,20 +391,8 @@ describe('feature-aware quoting and REST/local discovery', () => {
       },
     });
     expect(pikaR2v.candidates.map((candidate) => candidate.routeId)).toEqual([
-      'pika-undisclosed/pika-h3-flex-reference-to-video',
+      'pika-undisclosed/pika-h3-flex',
     ]);
-
-    const pinnedMismatch = quote({
-      ...i2vRequest,
-      routeId: 'fal-undisclosed/bytedance/seedance-2.5/text-to-video',
-    });
-    expect(pinnedMismatch.candidates).toHaveLength(1);
-    expect(pinnedMismatch.candidates[0]).toMatchObject({
-      routeId: 'fal-undisclosed/bytedance/seedance-2.5/text-to-video',
-      operations: ['text-to-video'],
-      executable: false,
-      issues: expect.arrayContaining([expect.objectContaining({ code: 'unsupported_operation' })]),
-    });
   });
 
   it('filters /v1/routes by operation identically over REST and local fallback', async () => {
@@ -290,19 +410,24 @@ describe('feature-aware quoting and REST/local discovery', () => {
     expect(fallback.status).toBe(200);
     expect(await fallback.json()).toEqual(rest.json());
 
+    const fullCatalog = (await app.inject({ url: '/v1/catalog' })).json();
+    expect(Array.isArray(fullCatalog.routeAliases)).toBe(true);
+    expect(fullCatalog.routeAliases.length).toBeGreaterThan(100);
+
     const invalidPath = '/v1/routes?operation=not-an-operation';
     expect((await app.inject({ url: invalidPath })).statusCode).toBe(400);
     expect(localCatalog(new Request(`https://opengen.example${invalidPath}`))!.status).toBe(400);
   });
 });
 
-describe('UI grouping, SSR table markup, and Playground sibling switching', () => {
-  it('groups same-deployment split routes contiguously in canonical operation order with Official first', () => {
+describe('UI grouping, SSR table markup, and Playground operation switching', () => {
+  it('groups synthetic same-deployment routes contiguously with Official first', () => {
     const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
-    const r2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/reference-to-video')!;
     const byteplus = getRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5')!;
-    const t2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/text-to-video')!;
-    const i2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
+    const falBase = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    const t2v: Route = { ...falBase, id: 'fal-t2v', operations: ['text-to-video'] };
+    const i2v: Route = { ...falBase, id: 'fal-i2v', operations: ['image-to-video'] };
+    const r2v: Route = { ...falBase, id: 'fal-r2v', operations: ['reference-to-video'] };
 
     const rows = buildProviderRouteRows([r2v, byteplus, t2v, i2v], deployments, ['byteplus']);
     expect(
@@ -330,7 +455,7 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
     });
   });
 
-  it('builds distinct feature-aware route identities and Playground deep links', () => {
+  it('builds clean provider identities and Playground deep links for unified routes', () => {
     const qwen = getRoute('alibaba-model-studio-ap-southeast-1/qwen-image-2.1-turbo')!;
     expect(routeIdentity(catalog, qwen, 'image-edit')).toMatchObject({
       label: 'Alibaba Cloud · Model Studio',
@@ -338,22 +463,22 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
       region: 'Singapore',
     });
 
-    const falI2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
-    expect(routeIdentity(catalog, falI2v, 'image-to-video')).toMatchObject({
-      label: 'fal · Image to video',
-      feature: 'Image to video',
+    const falSeedance = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    expect(routeIdentity(catalog, falSeedance, 'image-to-video')).toMatchObject({
+      label: 'fal',
+      feature: null,
       region: 'Not disclosed',
     });
-    expect(playgroundHref(falI2v.modelId, falI2v.id, 'image-to-video')).toBe(
-      '/playground?model=bytedance%2Fseedance-2.5&operation=image-to-video&route=fal-undisclosed%2Fbytedance%2Fseedance-2.5%2Fimage-to-video',
+    expect(playgroundHref(falSeedance.modelId, falSeedance.id, 'image-to-video')).toBe(
+      '/playground?model=bytedance%2Fseedance-2.5&operation=image-to-video&route=fal-undisclosed%2Fbytedance-seedance-2.5',
     );
   });
 
-  it('resolves Playground operation switches cleanly across kept, unique sibling, ambiguous, and unsupported deployments', () => {
+  it('keeps unified routes pinned across supported operations and clears on unsupported operations', () => {
     const seedanceRoutes = catalog.routes.filter(
       (route) => route.modelId === 'bytedance/seedance-2.5',
     );
-    // Unified route keeps pin
+    // Unified BytePlus and fal routes keep their pin across T2V/I2V/R2V.
     expect(
       resolveOperationRouteSwitch(
         seedanceRoutes,
@@ -364,16 +489,15 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
       routeId: 'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
       outcome: 'kept',
     });
-    // Feature-split deployment switches cleanly to unique same-deployment sibling
     expect(
       resolveOperationRouteSwitch(
         seedanceRoutes,
-        'fal-undisclosed/bytedance/seedance-2.5/text-to-video',
+        'fal-undisclosed/bytedance-seedance-2.5',
         'image-to-video',
       ),
-    ).toMatchObject({
-      routeId: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
-      outcome: 'switched-sibling',
+    ).toEqual({
+      routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+      outcome: 'kept',
     });
     // Deployment without target operation clears pin explicitly
     expect(
@@ -384,19 +508,23 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
       ),
     ).toEqual({ outcome: 'cleared-unsupported' });
 
-    // Multiple sub-operation sibling routes on the same deployment stay ambiguous and reset to Automatic
-    const falT2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/text-to-video')!;
-    const falI2v = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
+    // Synthetic sibling routes still resolve unique/ambiguous cases safely.
+    const falBase = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    const falT2v: Route = { ...falBase, id: 'fal-t2v', operations: ['text-to-video'] };
+    const falI2v: Route = { ...falBase, id: 'fal-i2v', operations: ['image-to-video'] };
     const extraI2v: Route = {
       ...falI2v,
-      id: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video/draft',
+      id: 'fal-i2v-draft',
       feature: { id: 'draft', label: 'Draft preview' },
     };
+    expect(
+      resolveOperationRouteSwitch([falT2v, falI2v], falT2v.id, 'image-to-video'),
+    ).toMatchObject({ routeId: falI2v.id, outcome: 'switched-sibling' });
     expect(
       resolveOperationRouteSwitch([falT2v, falI2v, extraI2v], falT2v.id, 'image-to-video'),
     ).toEqual({ outcome: 'ambiguous-sibling' });
 
-    // Detects saved routing conflicts before applying a sibling pin and clears only conflicting filters.
+    // Detects saved routing conflicts before applying a pin and clears only conflicting filters.
     const seedanceModel = getModel('bytedance/seedance-2.5')!;
     const compatibleDraft: GenerateInput = {
       modelId: seedanceModel.id,
@@ -405,7 +533,7 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
       routing: { providerIds: ['fal'], preference: 'cost', fallback: false },
     };
     expect(
-      siblingRouteRoutingConflict(seedanceModel, falI2v, catalog.deployments, compatibleDraft),
+      siblingRouteRoutingConflict(seedanceModel, falBase, catalog.deployments, compatibleDraft),
     ).toBe(false);
 
     const conflictingDraft: GenerateInput = {
@@ -421,12 +549,12 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
       },
     };
     expect(
-      siblingRouteRoutingConflict(seedanceModel, falI2v, catalog.deployments, conflictingDraft),
+      siblingRouteRoutingConflict(seedanceModel, falBase, catalog.deployments, conflictingDraft),
     ).toBe(true);
     expect(
       clearConflictingRoutingFilters(
         seedanceModel,
-        falI2v,
+        falBase,
         catalog.deployments,
         conflictingDraft.routing,
       ),
@@ -439,18 +567,24 @@ describe('UI grouping, SSR table markup, and Playground sibling switching', () =
       deploymentIds: ['byteplus-modelark-ap-southeast-1'],
     };
     expect(
-      clearConflictingRoutingFilters(seedanceModel, falI2v, catalog.deployments, exceptionRouting),
+      clearConflictingRoutingFilters(seedanceModel, falBase, catalog.deployments, exceptionRouting),
     ).toEqual({
       providerIds: ['byteplus'],
       modelProviderExceptions: [{ modelId: seedanceModel.id, providerIds: ['fal'] }],
     });
   });
 
-  it('closes RouteFeature OpenAPI schema against unspecified properties', () => {
+  it('closes RouteFeature and RouteAlias OpenAPI schemas against unspecified properties', () => {
     const doc = openApiDocument() as {
-      components: { schemas: { RouteFeature: { additionalProperties?: boolean } } };
+      components: {
+        schemas: {
+          RouteAlias: { additionalProperties?: boolean };
+          RouteFeature: { additionalProperties?: boolean };
+        };
+      };
     };
     expect(doc.components.schemas.RouteFeature.additionalProperties).toBe(false);
+    expect(doc.components.schemas.RouteAlias.additionalProperties).toBe(false);
   });
 });
 
@@ -475,10 +609,10 @@ describe('cheapest route highlight per model variant', () => {
     });
     expect(replicate.comparisons[0]).toMatchObject({
       resolution: '480p',
-      operations: ['text-to-video'],
+      operations: ['text-to-video', 'image-to-video', 'reference-to-video'],
       cheapestMicros: 102_800,
       mostExpensiveMicros: 220_500,
-      mostExpensiveLabels: ['fal · Text to video'],
+      mostExpensiveLabels: ['fal'],
       percentOff: 53,
     });
 
@@ -493,10 +627,10 @@ describe('cheapest route highlight per model variant', () => {
     });
     expect(byteplus.comparisons[0]).toMatchObject({
       resolution: '720p',
-      operations: ['text-to-video'],
+      operations: ['text-to-video', 'image-to-video', 'reference-to-video'],
       cheapestMicros: 231_000,
       mostExpensiveMicros: 473_000,
-      mostExpensiveLabels: ['fal · Text to video'],
+      mostExpensiveLabels: ['fal'],
       percentOff: 51,
     });
 
@@ -510,7 +644,7 @@ describe('cheapest route highlight per model variant', () => {
     ).toMatchObject({
       resolution: '720p',
       operations: ['image-to-video'],
-      mostExpensiveLabels: ['fal · Image to video'],
+      mostExpensiveLabels: ['fal'],
       percentOff: 51,
     });
 
@@ -546,12 +680,8 @@ describe('cheapest route highlight per model variant', () => {
       catalog,
       'text-to-video',
     );
-    expect([...wanT2vHighlights.keys()]).toEqual([
-      'pika-undisclosed/alibaba/wan3.0-video/text-to-video',
-    ]);
-    expect(
-      wanT2vHighlights.get('pika-undisclosed/alibaba/wan3.0-video/text-to-video'),
-    ).toMatchObject({
+    expect([...wanT2vHighlights.keys()]).toEqual(['pika-undisclosed/alibaba-wan-3.0']);
+    expect(wanT2vHighlights.get('pika-undisclosed/alibaba-wan-3.0')).toMatchObject({
       savingsLabel: '35% off',
       maxPercentOff: 35,
       minPercentOff: 35,
@@ -576,7 +706,7 @@ describe('cheapest route highlight per model variant', () => {
     const flare = getModel('openai/gpt-image-2.5-flare')!;
     const flareRoutes = catalog.routes.filter((route) => route.modelId === flare.id);
     const flareT2i = computeCheapestRouteHighlights(flareRoutes, flare, catalog, 'text-to-image');
-    const pikaFlare = flareT2i.get('pika-undisclosed/openai/gpt-image-2.5-flare/text-to-image')!;
+    const pikaFlare = flareT2i.get('pika-undisclosed/openai-gpt-image-2.5-flare')!;
     expect(pikaFlare).toMatchObject({
       savingsLabel: 'Up to 73% off',
       maxPercentOff: 73,
@@ -729,5 +859,115 @@ describe('cheapest route highlight per model variant', () => {
     const mixedWinner = mixedHighlights.get(mixedA.id)!;
     expect(mixedWinner.comparisons).toHaveLength(2);
     expect(mixedWinner.usesPublishedEstimates).toBe(true);
+  });
+
+  it('dispatches multiple operations on one unified fal Route to distinct provider endpoints', async () => {
+    const route = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    const deployment = catalog.deployments.find((item) => item.id === route.deploymentId)!;
+    const urls: string[] = [];
+    const adapter = createFalAdapter({
+      env: { FAL_KEY: 'fixture-key' },
+      fetch: async (url) => {
+        urls.push(String(url));
+        return Response.json({ request_id: 'task-1' });
+      },
+    });
+    const baseContext = {
+      jobId: '00000000-0000-4000-8000-000000000099',
+      workspaceId: 'workspace-fixture',
+      route,
+      deployment,
+    };
+    await adapter.submit({
+      ...baseContext,
+      input: {
+        modelId: 'bytedance/seedance-2.5',
+        operation: 'text-to-video',
+        input: { prompt: 'Ocean waves.', resolution: '720p', duration: 5, aspectRatio: '16:9' },
+      },
+    });
+    await adapter.submit({
+      ...baseContext,
+      input: {
+        modelId: 'bytedance/seedance-2.5',
+        operation: 'image-to-video',
+        input: {
+          prompt: 'Ocean waves.',
+          firstFrame: { url: 'https://assets.example.com/first.png' },
+          resolution: '720p',
+          duration: 5,
+          aspectRatio: 'source',
+        },
+      },
+    });
+    await adapter.submit({
+      ...baseContext,
+      input: {
+        modelId: 'bytedance/seedance-2.5',
+        operation: 'reference-to-video',
+        input: {
+          prompt: 'Ocean waves.',
+          references: [{ type: 'image', asset: { url: 'https://assets.example.com/ref.png' } }],
+          resolution: '720p',
+          duration: 5,
+          aspectRatio: '16:9',
+        },
+      },
+    });
+    expect(urls).toEqual([
+      'https://queue.fal.run/bytedance/seedance-2.5/text-to-video',
+      'https://queue.fal.run/bytedance/seedance-2.5/image-to-video',
+      'https://queue.fal.run/bytedance/seedance-2.5/reference-to-video',
+    ]);
+  });
+
+  it('normalizes legacy RouteAlias IDs in Playground validation and CLI catalog lookup', async () => {
+    const normalized = validatePlaygroundRequest(
+      {
+        modelId: 'bytedance/seedance-2.5',
+        operation: 'image-to-video',
+        routeId: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+        billing: 'byok',
+        input: {
+          prompt: 'A quiet harbor.',
+          firstFrame: { url: 'https://assets.example.com/first.png' },
+          resolution: '720p',
+          duration: 5,
+        },
+      },
+      catalog,
+      'bytedance/seedance-2.5',
+    );
+    expect(normalized.routeId).toBe('fal-undisclosed/bytedance-seedance-2.5');
+    expect(() =>
+      validatePlaygroundRequest(
+        {
+          modelId: 'bytedance/seedance-2.5',
+          operation: 'text-to-video',
+          routeId: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+          billing: 'byok',
+          input: {
+            prompt: 'A quiet harbor.',
+            resolution: '720p',
+            duration: 5,
+          },
+        },
+        catalog,
+        'bytedance/seedance-2.5',
+      ),
+    ).toThrow(/is bound to image-to-video and cannot execute text-to-video/);
+
+    const client = new OpenGen({
+      baseUrl: 'https://gateway.example',
+      fetch: async (url) => localCatalog(new Request(String(url)))!,
+    });
+    const cliEntry = await runCommand(
+      ['catalog', 'get', 'fal-undisclosed/bytedance/seedance-2.5/image-to-video'],
+      { client, env: { NODE_ENV: 'test' } },
+    );
+    expect(cliEntry).toMatchObject({
+      id: 'fal-undisclosed/bytedance-seedance-2.5',
+      modelId: 'bytedance/seedance-2.5',
+    });
   });
 });

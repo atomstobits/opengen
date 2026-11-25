@@ -36,7 +36,7 @@ describe('source-backed catalog', () => {
     expect(getModel('fal/h3-max-turbo')?.id).toBe('fal/h3-max-turbo');
     expect(getModel('pika/h3-flex')?.familyId).toBe('minimax-h3');
     const routes = catalog.routes.filter((route) => route.modelId === max?.id);
-    expect(routes).toHaveLength(5);
+    expect(routes).toHaveLength(3);
     expect(routes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -46,9 +46,14 @@ describe('source-backed catalog', () => {
           providerModelName: 'MiniMax H3 Max',
         }),
         expect.objectContaining({
-          id: 'fal-undisclosed/fal-h3-max',
+          id: 'fal-undisclosed/minimax-h3-max',
           deploymentId: 'fal-undisclosed',
-          upstreamModelId: 'minimax/h3-max/text-to-video',
+          upstreamModelId: 'minimax/h3-max',
+          upstreamEndpoints: {
+            'text-to-video': 'minimax/h3-max/text-to-video',
+            'image-to-video': 'minimax/h3-max/image-to-video',
+            'reference-to-video': 'minimax/h3-max/reference-to-video',
+          },
           providerModelName: 'H3 Max',
         }),
         expect.objectContaining({
@@ -58,7 +63,7 @@ describe('source-backed catalog', () => {
       ]),
     );
     expect(catalog.models).toHaveLength(49);
-    expect(catalog.routes).toHaveLength(255);
+    expect(catalog.routes).toHaveLength(164);
   });
   it('resolves Omni Flash as a search alias without creating duplicate live releases', () => {
     expect(searchCatalog('Gemini Omni Flash').map((model) => model.id)).toEqual([
@@ -92,7 +97,7 @@ describe('source-backed catalog', () => {
     }
   });
   it('keeps raw route records canonical even when lookup accepts legacy aliases', () => {
-    const route = catalog.routes.find((item) => item.id === 'fal-undisclosed/fal-h3-max')!;
+    const route = catalog.routes.find((item) => item.id === 'fal-undisclosed/minimax-h3-max')!;
     const canonical = route.modelId;
     try {
       route.modelId = 'fal/h3-max';
@@ -160,7 +165,7 @@ describe('source-backed catalog', () => {
       const alibabaRoutes = routes.filter((route) => route.adapter === 'alibaba');
       expect(alibabaRoutes).toHaveLength(6);
       expect(new Set(alibabaRoutes.map((route) => route.deploymentId)).size).toBe(6);
-      expect(routes).toHaveLength(14);
+      expect(routes).toHaveLength(10);
       expect(new Set(routes.map((route) => route.deploymentId))).toEqual(
         new Set([
           ...alibabaRoutes.map((route) => route.deploymentId),
@@ -245,7 +250,7 @@ describe('regional quote selection', () => {
       billing: 'byok',
     };
     const options = {
-      executableRouteIds: ['minimax-undisclosed/minimax-h3-max', 'fal-undisclosed/fal-h3-max'],
+      executableRouteIds: ['minimax-undisclosed/minimax-h3-max', 'fal-undisclosed/minimax-h3-max'],
     };
     const result = quote(canonical, options);
     expect(result.modelId).toBe('minimax/h3-max');
@@ -257,11 +262,12 @@ describe('regional quote selection', () => {
         .filter((candidate) => candidate.executable)
         .map((candidate) => candidate.routeId)
         .sort(),
-    ).toEqual(['fal-undisclosed/fal-h3-max', 'minimax-undisclosed/minimax-h3-max']);
+    ).toEqual(['fal-undisclosed/minimax-h3-max', 'minimax-undisclosed/minimax-h3-max']);
     expect(quote({ ...canonical, modelId: 'fal/h3-max' }, options)).toEqual(result);
+    // Legacy RouteAlias resolves cleanly to the canonical unified route.
     const pinned = quote({ ...canonical, routeId: 'fal-undisclosed/fal-h3-max' }, options);
     expect(pinned.candidates).toHaveLength(1);
-    expect(pinned.selectedRouteId).toBe('fal-undisclosed/fal-h3-max');
+    expect(pinned.selectedRouteId).toBe('fal-undisclosed/minimax-h3-max');
     const fullHd = quote(
       { ...canonical, input: { ...canonical.input, resolution: '1080p' } },
       options,
@@ -275,10 +281,10 @@ describe('regional quote selection', () => {
       },
     );
     expect(
-      fullHd.candidates.find((candidate) => candidate.routeId === 'fal-undisclosed/fal-h3-max')
+      fullHd.candidates.find((candidate) => candidate.routeId === 'fal-undisclosed/minimax-h3-max')
         ?.executable,
     ).toBe(true);
-    expect(fullHd.selectedRouteId).toBe('fal-undisclosed/fal-h3-max');
+    expect(fullHd.selectedRouteId).toBe('fal-undisclosed/minimax-h3-max');
   });
   it('keeps regional prices separate and refuses to imply execution without configuration', () => {
     const result = quote(input);

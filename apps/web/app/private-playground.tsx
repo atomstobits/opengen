@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { groupRoutesByProvider } from '@media-router/catalog';
 import {
   operationLabels,
+  resolveCatalogRoute,
   sortOperations,
   type Catalog,
   type GenerateInput,
@@ -349,8 +350,23 @@ export function Playground({
     let restoredNotice = '';
     if (context && !explicit) {
       try {
-        const saved = readRecovery(sessionStorage, context, 'draft', isPlaygroundDraft);
-        if (saved && saved.modelId === model.id && saved.operation === draft.operation) {
+        const rawSaved = readRecovery(sessionStorage, context, 'draft', isPlaygroundDraft);
+        if (rawSaved && rawSaved.modelId === model.id && rawSaved.operation === draft.operation) {
+          let saved = rawSaved;
+          if (rawSaved.routeId) {
+            const resolvedSaved = resolveCatalogRoute(catalog, rawSaved.routeId);
+            if (resolvedSaved?.alias) {
+              if (
+                resolvedSaved.alias.operation &&
+                resolvedSaved.alias.operation !== rawSaved.operation
+              ) {
+                const { routeId: _invalidAliasRoute, ...withoutRoute } = rawSaved;
+                saved = withoutRoute;
+              } else {
+                saved = { ...rawSaved, routeId: resolvedSaved.route.id };
+              }
+            }
+          }
           next = saved;
           const selectedRoutes = routes.filter(
             (route) =>

@@ -45,8 +45,11 @@ describe('informational provider tariffs', () => {
     expect(runway.publishedPricing?.source.url).toContain('runwayml.com');
     expect(fal.publishedPricing?.summary).toContain('$0.05');
     expect(fal.publishedPricing?.conditions.join(' ')).toContain('Reference tokens');
-    expect(publishedPricingFor({ deploymentId: fal.deploymentId, modelId: 'fal/h3-max' })).toBe(
-      fal.publishedPricing,
+    expect(
+      publishedPricingFor({ deploymentId: fal.deploymentId, modelId: 'fal/h3-max' })?.summary,
+    ).toBe(fal.publishedPricing?.summary);
+    expect(fal.operationCapabilities?.['reference-to-video']?.publishedPricing?.summary).toContain(
+      '$0.05',
     );
     expect(native.rates).toHaveLength(2);
     expect(native.rates.every((rate) => rate.operation === 'text-to-video')).toBe(true);
@@ -121,7 +124,7 @@ describe('informational provider tariffs', () => {
   });
 
   it('ensures every provider route has primary-sourced USD pricing across series tables and Playground', () => {
-    expect(catalog.routes.length).toBeGreaterThanOrEqual(255);
+    expect(catalog.routes.length).toBeGreaterThanOrEqual(164);
     for (const route of catalog.routes) {
       const model = catalog.models.find((entry) => entry.id === route.modelId)!;
       const unit = model.modality === 'image' ? 'image' : 'output-second';
@@ -371,7 +374,7 @@ describe('informational provider tariffs', () => {
     )!;
     const grokVideoRoutes = catalog.routes.filter((route) => route.modelId === grokVideoModel.id);
     const falGrokRef = grokVideoRoutes.find(
-      (route) => route.id === 'fal-undisclosed/xai/grok-imagine-video/v1.5/reference-to-video',
+      (route) => route.id === 'fal-undisclosed/xai-grok-imagine-video-1.5',
     )!;
     const grok1080Auto = initialPlaygroundRequest(
       grokVideoModel,

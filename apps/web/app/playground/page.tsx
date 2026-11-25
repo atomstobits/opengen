@@ -2,7 +2,7 @@ import { canonicalModelId, type Operation } from '@media-router/contracts';
 import { generationOperations } from '@media-router/contracts/generation';
 import { playgroundHref } from '../links';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { catalog } from '@media-router/catalog';
+import { catalog, resolveRoute } from '@media-router/catalog';
 import { PlaygroundApp } from '../catalog-browser';
 import { Footer, SiteHeader } from '../ui';
 import { pageMetadata, siteOrigin } from '../seo';
@@ -28,24 +28,33 @@ export default async function PlaygroundPage({
     route: routeQuery,
   } = query;
   if ([modelQuery, operationQuery, regionQuery, routeQuery].some(Array.isArray)) notFound();
-  const route = catalog.routes.find((item) => item.id === routeQuery && item.status !== 'retired');
+  const resolvedRoute = typeof routeQuery === 'string' ? resolveRoute(routeQuery) : undefined;
+  const route =
+    resolvedRoute && resolvedRoute.route.status !== 'retired' ? resolvedRoute.route : undefined;
   if (routeQuery !== undefined && !route) notFound();
   const modelId = typeof modelQuery === 'string' ? canonicalModelId(modelQuery) : route?.modelId;
   if (modelId !== undefined && !catalog.models.some((model) => model.id === modelId)) notFound();
   if (route && route.modelId !== modelId) notFound();
   const operation = operationQuery as Operation | undefined;
+  if (operation && !generationOperations.includes(operation)) notFound();
+  if (
+    resolvedRoute?.alias?.operation &&
+    operation !== undefined &&
+    operation !== resolvedRoute.alias.operation
+  )
+    notFound();
+  const effectiveOperation = operation ?? resolvedRoute?.alias?.operation;
   const region = typeof regionQuery === 'string' ? regionQuery : undefined;
   const routes = route
     ? [route]
     : catalog.routes.filter(
         (item) => item.modelId === (modelId ?? 'alibaba/wan-3.0') && item.status !== 'retired',
       );
-  if (operation && !generationOperations.includes(operation)) notFound();
-  if (operationQuery !== undefined || regionQuery !== undefined) {
+  if (effectiveOperation !== undefined || regionQuery !== undefined) {
     if (
       !routes.some(
         (item) =>
-          (operation === undefined || item.operations.includes(operation)) &&
+          (effectiveOperation === undefined || item.operations.includes(effectiveOperation)) &&
           (region === undefined ||
             catalog.deployments.some(
               (deployment) =>
@@ -55,8 +64,11 @@ export default async function PlaygroundPage({
     )
       notFound();
   }
-  if (typeof modelQuery === 'string' && modelQuery !== modelId)
-    permanentRedirect(playgroundHref(modelId, route?.id, operation, region));
+  if (
+    (typeof modelQuery === 'string' && modelQuery !== modelId) ||
+    (typeof routeQuery === 'string' && route && routeQuery !== route.id)
+  )
+    permanentRedirect(playgroundHref(modelId, route?.id, effectiveOperation, region));
   return (
     <>
       <SiteHeader active="playground" />
@@ -85,7 +97,7 @@ export default async function PlaygroundPage({
           catalog={catalog}
           initialModelId={modelId}
           initialRouteId={route?.id}
-          initialOperation={operation}
+          initialOperation={effectiveOperation}
           initialRegion={route ? undefined : region}
           gatewayOrigin={siteOrigin()}
         />

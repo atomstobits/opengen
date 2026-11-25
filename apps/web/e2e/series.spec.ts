@@ -55,16 +55,7 @@ test('company pages expose every owned variant through its canonical series', as
   ]);
   await expect(
     prices.locator(
-      '[data-route-id="fal-undisclosed/bytedance/seedance-2.5/text-to-video"] .price-details summary',
-    ),
-  ).toHaveText([
-    /480p\s*≈\$0\.2205\s*\/ sec/,
-    /720p\s*≈\$0\.473\s*\/ sec/,
-    /1080p\s*≈\$1\.164\s*\/ sec/,
-  ]);
-  await expect(
-    prices.locator(
-      '[data-route-id="fal-undisclosed/bytedance/seedance-2.5/image-to-video"] .price-details summary',
+      '[data-route-id="fal-undisclosed/bytedance-seedance-2.5"] .price-details summary',
     ),
   ).toHaveText([
     /480p\s*≈\$0\.2205\s*\/ sec/,
@@ -110,7 +101,7 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
     );
   }
   const max = variant(page, 'minimax/h3-max');
-  await expect(max.locator('.route-table tbody tr')).toHaveCount(5);
+  await expect(max.locator('.route-table tbody tr')).toHaveCount(3);
   await expect(max.locator('.route-table tbody tr').first()).toHaveAttribute(
     'data-route-id',
     'minimax-undisclosed/minimax-h3-max',
@@ -121,13 +112,13 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
   await expect(max).toContainText('Listed as H3 Max');
   await expect(max.locator('.variant-attribution .official-tag')).toHaveText('Official');
   const nativeMax = max.locator('tr[data-route-id="minimax-undisclosed/minimax-h3-max"]');
-  const falMax = max.locator('tr[data-route-id="fal-undisclosed/fal-h3-max"]');
+  const falMax = max.locator('tr[data-route-id="fal-undisclosed/minimax-h3-max"]');
   await expect(nativeMax.locator('.provider-name .official-tag')).toHaveText('Official');
   await expect(falMax.locator('.provider-name .official-tag')).toHaveCount(0);
   await expect(
     variant(page, 'fal/h3-max-turbo').locator('.provider-name .official-tag'),
   ).toHaveText(['Official']);
-  await expect(variant(page, 'fal/h3-max-turbo')).toContainText('3 feature routes');
+  await expect(variant(page, 'fal/h3-max-turbo').locator('.route-table tbody tr')).toHaveCount(1);
   await expect(variant(page, 'fal/h3-max')).toHaveCount(0);
   await expect(variant(page, 'pika/h3-flex')).toContainText('Pika');
   // Legacy provider-named links select the same canonical Max group.
@@ -148,12 +139,14 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
   await falTry.click();
   await expect(page.getByLabel('Choose generation model')).toHaveValue('minimax/h3-max');
   await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
-    'fal-undisclosed/fal-h3-max',
+    'fal-undisclosed/minimax-h3-max',
   );
+  // Legacy model alias + RouteAlias redirect cleanly to the unified canonical route.
   await page.goto('/playground?model=fal%2Fh3-max&route=fal-undisclosed%2Ffal-h3-max');
   await expect(page).toHaveURL(/model=minimax%2Fh3-max/);
+  await expect(page).toHaveURL(/route=fal-undisclosed%2Fminimax-h3-max/);
   await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
-    'fal-undisclosed/fal-h3-max',
+    'fal-undisclosed/minimax-h3-max',
   );
 });
 
@@ -165,7 +158,7 @@ test('Wan keeps Standard and Prime in separate provider tables with all regional
   const prime = variant(page, 'alibaba/wan-3.0-prime');
   await expect(page.getByTestId('series-variant')).toHaveCount(2);
   for (const section of [standard, prime]) {
-    await expect(section.locator('.route-table tbody tr')).toHaveCount(14);
+    await expect(section.locator('.route-table tbody tr')).toHaveCount(10);
     await expect(section.locator('.provider-name .official-tag')).toHaveCount(6);
     await expect(section.locator('.unknown-price')).toHaveCount(0);
     for (const location of [
@@ -205,7 +198,7 @@ test('provider region labels show only disclosed fields and explain missing deta
 }) => {
   await page.goto('/bytedance/seedance-2.5');
   const row = (route: string) => page.locator(`[data-route-id="${route}"] .provider-region`);
-  const unknown = row('fal-undisclosed/bytedance/seedance-2.5/text-to-video');
+  const unknown = row('fal-undisclosed/bytedance-seedance-2.5');
   const provider = unknown.getByRole('link', { name: 'fal', exact: true });
   const tooltip = unknown.locator('[role="tooltip"]');
   await expect(unknown.locator('.region-line')).toHaveCount(0);
@@ -432,53 +425,28 @@ test('published token tariffs render as crawlable information without claiming a
   await expect(page.locator('.unknown-price')).toHaveCount(0);
 });
 
-test('feature-split routes group by deployment, filter by feature, and switch cleanly in Playground', async ({
+test('unified official-standard routes filter by feature, switch operations cleanly in Playground, and redirect legacy aliases', async ({
   page,
 }) => {
   await page.goto('/bytedance/seedance-2.5');
   const section = variant(page, 'bytedance/seedance-2.5');
   const filter = section.getByRole('group', { name: 'Filter routes by feature' });
-  await expect(filter.getByRole('button', { name: 'All (9)' })).toHaveAttribute(
+  await expect(filter.getByRole('button', { name: 'All (5)' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
-  const falT2v = section.locator(
-    'tr[data-route-id="fal-undisclosed/bytedance/seedance-2.5/text-to-video"]',
-  );
-  const falI2v = section.locator(
-    'tr[data-route-id="fal-undisclosed/bytedance/seedance-2.5/image-to-video"]',
-  );
-  const falR2v = section.locator(
-    'tr[data-route-id="fal-undisclosed/bytedance/seedance-2.5/reference-to-video"]',
-  );
-  await expect(falT2v).toHaveAttribute('data-route-group', 'start');
-  await expect(falT2v).toContainText('3 feature routes');
-  await expect(falT2v).toContainText('Text to video');
-  await expect(falI2v).toHaveAttribute('data-route-group', 'middle');
-  await expect(falI2v).toContainText('Image to video');
-  await expect(falR2v).toHaveAttribute('data-route-group', 'end');
-  await expect(falR2v).toContainText('Reference to video');
-
-  const pikaT2v = section.locator(
-    'tr[data-route-id="pika-undisclosed/bytedance/seedance-2.5/text-to-video"]',
-  );
-  const pikaI2v = section.locator(
-    'tr[data-route-id="pika-undisclosed/bytedance/seedance-2.5/image-to-video"]',
-  );
-  const pikaR2v = section.locator(
-    'tr[data-route-id="pika-undisclosed/bytedance/seedance-2.5/reference-to-video"]',
-  );
-  await expect(pikaT2v).toHaveAttribute('data-route-group', 'start');
-  await expect(pikaT2v).toContainText('3 feature routes');
-  await expect(pikaI2v).toHaveAttribute('data-route-group', 'middle');
-  await expect(pikaR2v).toHaveAttribute('data-route-group', 'end');
+  const falRow = section.locator('tr[data-route-id="fal-undisclosed/bytedance-seedance-2.5"]');
+  const pikaRow = section.locator('tr[data-route-id="pika-undisclosed/bytedance-seedance-2.5"]');
+  await expect(falRow).toHaveAttribute('data-route-group', 'single');
+  await expect(falRow).toContainText('Text to video');
+  await expect(falRow).toContainText('Image to video');
+  await expect(falRow).toContainText('Reference to video');
+  await expect(pikaRow).toHaveAttribute('data-route-group', 'single');
 
   await filter.getByRole('button', { name: 'Image to video', exact: true }).click();
   await expect(section.locator('.route-table tbody tr')).toHaveCount(5);
-  await expect(falI2v).toHaveAttribute('data-route-group', 'single');
-  await expect(falT2v).toHaveCount(0);
-  await expect(pikaI2v).toHaveAttribute('data-route-group', 'single');
-  await expect(pikaT2v).toHaveCount(0);
+  await expect(falRow).toHaveAttribute('data-route-group', 'single');
+  await expect(pikaRow).toHaveAttribute('data-route-group', 'single');
 
   await filter.getByRole('button', { name: 'Video editing', exact: true }).click();
   await expect(section.locator('.route-table tbody tr')).toHaveCount(1);
@@ -487,45 +455,47 @@ test('feature-split routes group by deployment, filter by feature, and switch cl
   ).toHaveCount(1);
 
   await filter.getByRole('button', { name: 'Image to video', exact: true }).click();
-  await falI2v
+  await falRow
     .getByRole('link', { name: 'Use fal Not disclosed Image to video route', exact: true })
     .click();
   await expect(page).toHaveURL(/operation=image-to-video/);
-  await expect(page).toHaveURL(
-    /route=fal-undisclosed%2Fbytedance%2Fseedance-2\.5%2Fimage-to-video/,
-  );
+  await expect(page).toHaveURL(/route=fal-undisclosed%2Fbytedance-seedance-2\.5/);
   await expect(page.getByRole('combobox', { name: 'Operation' })).toHaveValue('image-to-video');
   await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
-    'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+    'fal-undisclosed/bytedance-seedance-2.5',
   );
   await expect(page.getByRole('region', { name: 'Seedance 2.5 pricing' })).toContainText(
-    'fal · Image to video · Not disclosed',
+    'fal · Not disclosed',
   );
 
-  // Switching operation while pinned to a split deployment switches explicitly to its unique sibling.
+  // Switching operation while pinned to a unified route keeps the exact same canonical route ID pinned.
   await page.getByRole('combobox', { name: 'Operation' }).selectOption('reference-to-video');
   await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
-    'fal-undisclosed/bytedance/seedance-2.5/reference-to-video',
-  );
-  await expect(page.locator('.recovery-notice')).toContainText(
-    'Switched pinned route to fal · Reference to video on the same deployment for Reference to video.',
+    'fal-undisclosed/bytedance-seedance-2.5',
   );
 
-  // Pika H3 Flex distinguishes its separately priced Text-to-video, Image-to-video, and Reference-to-video routes.
+  // Legacy split RouteAlias URLs redirect cleanly to the unified canonical route + operation.
+  await page.goto(
+    '/playground?model=bytedance%2Fseedance-2.5&route=fal-undisclosed%2Fbytedance%2Fseedance-2.5%2Fimage-to-video',
+  );
+  await expect(page).toHaveURL(/operation=image-to-video/);
+  await expect(page).toHaveURL(/route=fal-undisclosed%2Fbytedance-seedance-2\.5/);
+  await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
+    'fal-undisclosed/bytedance-seedance-2.5',
+  );
+
+  // Pika H3 Flex unifies into one route row and updates displayed pricing per operation lens.
   await page.goto('/minimax/h3');
   const flex = variant(page, 'pika/h3-flex');
-  await expect(flex.locator('tr[data-route-id="pika-undisclosed/pika-h3-flex"]')).toContainText(
-    'Text to video',
-  );
-  await expect(
-    flex.locator('tr[data-route-id="pika-undisclosed/pika-h3-flex-reference-to-video"]'),
-  ).toContainText('Reference to video');
+  await expect(flex.locator('.route-table tbody tr')).toHaveCount(1);
+  const flexRow = flex.locator('tr[data-route-id="pika-undisclosed/pika-h3-flex"]');
+  await expect(flexRow).toContainText('$0.01');
   await flex
     .getByRole('group', { name: 'Filter routes by feature' })
     .getByRole('button', { name: 'Reference to video', exact: true })
     .click();
   await expect(flex.locator('.route-table tbody tr')).toHaveCount(1);
-  await expect(flex.locator('.route-table tbody tr')).toContainText('$0.03');
+  await expect(flexRow).toContainText('$0.03');
   await expect(flex.locator('.cheapest-trigger')).toHaveCount(0);
 });
 
@@ -540,22 +510,19 @@ test('cheapest route highlight shows xx% off vs highest priced route with hover 
   const byteplus = seedance.locator(
     'tr[data-route-id="byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5"]',
   );
-  const falT2v = seedance.locator(
-    'tr[data-route-id="fal-undisclosed/bytedance/seedance-2.5/text-to-video"]',
-  );
+  const falRow = seedance.locator('tr[data-route-id="fal-undisclosed/bytedance-seedance-2.5"]');
   await expect(replicate.locator('.cheapest-trigger')).toContainText('Cheapest');
   await expect(replicate.locator('.cheapest-trigger')).toContainText('53% off');
   await expect(byteplus.locator('.cheapest-trigger')).toContainText('Cheapest');
   await expect(byteplus.locator('.cheapest-trigger')).toContainText('51% off');
-  await expect(falT2v.locator('.cheapest-trigger')).toHaveCount(0);
+  await expect(falRow.locator('.cheapest-trigger')).toHaveCount(0);
 
   const byteplusTooltip = byteplus.locator('.cheapest-tooltip');
   await expect(byteplusTooltip).toBeHidden();
   await byteplus.locator('.cheapest-trigger').hover();
   await expect(byteplusTooltip).toBeVisible();
   await expect(byteplusTooltip).toContainText('720p · Text to video');
-  await expect(byteplusTooltip).toContainText('fal · Text to video');
-  await expect(byteplusTooltip).toContainText('≈$0.473 / sec');
+  await expect(byteplusTooltip).toContainText('vs fal (≈$0.473 / sec)');
   await expect(byteplusTooltip).toContainText('51% off');
   // Clicking after hover pins the tooltip open instead of immediately collapsing it; a second click closes it.
   await byteplus.locator('.cheapest-trigger').click();
@@ -579,11 +546,9 @@ test('cheapest route highlight shows xx% off vs highest priced route with hover 
   const wan = variant(page, 'alibaba/wan-3.0');
   const frankfurt = wan.locator('tr[data-route-id="alibaba/eu-central-1/wan-3.0"]');
   const singapore = wan.locator('tr[data-route-id="alibaba/ap-southeast-1/wan-3.0"]');
-  const pikaT2v = wan.locator(
-    'tr[data-route-id="pika-undisclosed/alibaba/wan3.0-video/text-to-video"]',
-  );
-  await expect(pikaT2v.locator('.cheapest-trigger')).toContainText('Cheapest');
-  await expect(pikaT2v.locator('.cheapest-trigger')).toContainText('35% off');
+  const pikaRow = wan.locator('tr[data-route-id="pika-undisclosed/alibaba-wan-3.0"]');
+  await expect(pikaRow.locator('.cheapest-trigger')).toContainText('Cheapest');
+  await expect(pikaRow.locator('.cheapest-trigger')).toContainText('35% off');
   await expect(frankfurt.locator('.cheapest-trigger')).toContainText('Cheapest');
   await expect(frankfurt.locator('.cheapest-trigger')).toContainText('17% off');
   // Under All, Frankfurt displays its text-to-video qualified rate while winning only video-edit/extend -> not marked data-cheapest.
@@ -604,6 +569,6 @@ test('cheapest route highlight shows xx% off vs highest priced route with hover 
     .getByRole('group', { name: 'Filter routes by feature' })
     .getByRole('button', { name: 'Text to video', exact: true })
     .click();
-  await expect(pikaT2v.locator('.cheapest-trigger')).toContainText('35% off');
+  await expect(pikaRow.locator('.cheapest-trigger')).toContainText('35% off');
   await expect(frankfurt.locator('.cheapest-trigger')).toHaveCount(0);
 });
