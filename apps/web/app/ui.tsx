@@ -28,7 +28,6 @@ import {
   type Model,
   type Operation,
   type OutputAsset,
-  type Rate,
   type Route,
   type RouteMetrics,
 } from '@media-router/contracts';
@@ -482,8 +481,6 @@ function ProviderPrice({
   cheapestHighlight?: CheapestRouteHighlight;
 }) {
   const unit = modality === 'video' ? 'output-second' : 'image';
-  const matches = (rate: Rate) =>
-    rate.unit === unit && rate.resolution.toLowerCase() === resolution.toLowerCase();
   const published = route.publishedPricing;
   const resolved = resolveDisplayedRouteRate(route, resolution, modality, selectedOperation);
   const isCheapest = isDisplayedRateCheapest(cheapestHighlight, resolved, selectedOperation);
@@ -491,15 +488,18 @@ function ProviderPrice({
   const qualifiedRate = resolved?.qualified;
   const source = resolved?.source ?? published?.source ?? route.pricingSource;
   const samePriceOperations =
-    !selectedOperation && rate?.operation && route.operations.length > 1
-      ? sortOperations(route.operations).filter((operation) =>
-          (qualifiedRate ? route.rates : (published?.outputRates ?? [])).some(
-            (entry) =>
-              matches(entry) &&
-              entry.usdMicros === rate.usdMicros &&
-              (!entry.operation || entry.operation === operation),
-          ),
-        )
+    !selectedOperation && resolved && rate?.operation && route.operations.length > 1
+      ? sortOperations(route.operations).filter((operation) => {
+          const opResolved = resolveDisplayedRouteRate(route, resolution, modality, operation);
+          return (
+            opResolved !== null &&
+            opResolved.rate.unit === rate.unit &&
+            opResolved.rate.resolution.toLowerCase() === rate.resolution.toLowerCase() &&
+            opResolved.rate.usdMicros === rate.usdMicros &&
+            (opResolved.quality ?? '') === (resolved.quality ?? '') &&
+            opResolved.qualified === resolved.qualified
+          );
+        })
       : [];
   const operationScopeNote =
     !selectedOperation && rate?.operation && route.operations.length > 1

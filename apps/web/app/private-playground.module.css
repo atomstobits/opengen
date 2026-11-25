@@ -163,8 +163,8 @@
   cursor: pointer;
 }
 .conflictActions button:first-child {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .conflictActions button:hover {
   border-color: var(--ink);

@@ -994,8 +994,8 @@ select option {
   font-weight: 500;
 }
 .route-feature-pill.is-subfeature {
-  border-color: #c7b4e766;
-  background: #c7b4e71a;
+  border-color: color-mix(in srgb, var(--panel-agent) 40%, transparent);
+  background: color-mix(in srgb, var(--panel-agent) 10%, transparent);
   color: var(--panel-agent);
   font-weight: 500;
 }
@@ -1102,7 +1102,7 @@ select option {
   padding: 2px 6px;
   border: 1px solid var(--success-line);
   border-radius: 4px;
-  background: #acd0aa1f;
+  background: color-mix(in srgb, var(--success) 12%, transparent);
   color: var(--success);
   font-size: 10px;
   font-weight: 600;
