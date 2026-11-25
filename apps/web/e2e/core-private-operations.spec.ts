@@ -542,8 +542,8 @@ for (const width of [1440, 390]) {
         .getByLabel('Provider API key', { exact: true })
         .fill('synthetic-provider-key-never-sent');
       await provider
-        .getByLabel('Alibaba regional workspace ID', { exact: true })
-        .fill('fixture-region-workspace');
+        .getByLabel('Alibaba regional workspace endpoint', { exact: true })
+        .fill('https://fixture-region.example.invalid/api/v1');
       await staleManagementWrite(
         page,
         f,

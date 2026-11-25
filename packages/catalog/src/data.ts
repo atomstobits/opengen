@@ -75,11 +75,12 @@ const deployments: Deployment[] = regionalDefinitions.map(({ code, name, scope }
   scope,
   processingRegions: null,
   storageRegions: null,
-  endpointTemplate: `https://{workspaceId}.${code}.maas.aliyuncs.com/api/v1`,
+  endpointTemplate: null,
   credentialEnv: `ALIBABA_${code.toUpperCase().replaceAll('-', '_')}_API_KEY`,
+  endpointEnv: `ALIBABA_${code.toUpperCase().replaceAll('-', '_')}_ENDPOINT`,
   source: source(
     wanGuide,
-    'Endpoint region and deployment scope are documented. Neither establishes a per-request inference location. API key, workspace, endpoint and model access must match this region.',
+    'Endpoint region and deployment scope are documented. Neither establishes a per-request inference location. API key, workspace endpoint and model access must match this region.',
   ),
 }));
 

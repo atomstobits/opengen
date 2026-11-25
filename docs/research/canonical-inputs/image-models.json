@@ -3132,7 +3132,7 @@
         "alibaba/qwen-image-3.0-pro"
       ],
       "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
-      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+      "endpoint": "POST ${ALIBABA_<REGION>_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
       "transport": "JSON",
       "status": "documented",
       "sourceIds": ["qwen.api", "qwen.select"],
@@ -3321,7 +3321,7 @@
       "regionalEndpoints": [
         {
           "regionId": "ap-southeast-1",
-          "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+          "endpoint": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3330,7 +3330,7 @@
         },
         {
           "regionId": "us-east-1",
-          "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+          "endpoint": "${ALIBABA_US_EAST_1_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3339,7 +3339,7 @@
         },
         {
           "regionId": "cn-beijing",
-          "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+          "endpoint": "${ALIBABA_CN_BEIJING_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3348,7 +3348,7 @@
         },
         {
           "regionId": "cn-hongkong",
-          "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+          "endpoint": "${ALIBABA_CN_HONGKONG_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3357,7 +3357,7 @@
         },
         {
           "regionId": "eu-central-1",
-          "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+          "endpoint": "${ALIBABA_EU_CENTRAL_1_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3366,7 +3366,7 @@
         },
         {
           "regionId": "ap-northeast-1",
-          "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1/images/generations",
+          "endpoint": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3384,7 +3384,7 @@
         "alibaba/qwen-image-3.0-pro"
       ],
       "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
-      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "endpoint": "POST ${ALIBABA_<REGION>_ENDPOINT}/services/aigc/multimodal-generation/generation",
       "transport": "JSON",
       "status": "documented",
       "sourceIds": ["qwen.api"],
@@ -3625,7 +3625,7 @@
       "regionalEndpoints": [
         {
           "regionId": "ap-southeast-1",
-          "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+          "endpoint": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT}/services/aigc/multimodal-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3634,7 +3634,7 @@
         },
         {
           "regionId": "us-east-1",
-          "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+          "endpoint": "${ALIBABA_US_EAST_1_ENDPOINT}/services/aigc/multimodal-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3643,7 +3643,7 @@
         },
         {
           "regionId": "cn-beijing",
-          "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+          "endpoint": "${ALIBABA_CN_BEIJING_ENDPOINT}/services/aigc/multimodal-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3652,7 +3652,7 @@
         },
         {
           "regionId": "cn-hongkong",
-          "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+          "endpoint": "${ALIBABA_CN_HONGKONG_ENDPOINT}/services/aigc/multimodal-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3661,7 +3661,7 @@
         },
         {
           "regionId": "eu-central-1",
-          "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+          "endpoint": "${ALIBABA_EU_CENTRAL_1_ENDPOINT}/services/aigc/multimodal-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3670,7 +3670,7 @@
         },
         {
           "regionId": "ap-northeast-1",
-          "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+          "endpoint": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT}/services/aigc/multimodal-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3688,7 +3688,7 @@
         "alibaba/qwen-image-3.0-pro"
       ],
       "operations": ["text-to-image", "image-edit", "multi-reference-edit"],
-      "endpoint": "POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+      "endpoint": "POST ${ALIBABA_<REGION>_ENDPOINT}/services/aigc/image-generation/generation",
       "transport": "JSON",
       "status": "documented",
       "sourceIds": ["qwen.api"],
@@ -3929,7 +3929,7 @@
       "regionalEndpoints": [
         {
           "regionId": "ap-southeast-1",
-          "endpoint": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+          "endpoint": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT}/services/aigc/image-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3938,7 +3938,7 @@
         },
         {
           "regionId": "us-east-1",
-          "endpoint": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+          "endpoint": "${ALIBABA_US_EAST_1_ENDPOINT}/services/aigc/image-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3947,7 +3947,7 @@
         },
         {
           "regionId": "cn-beijing",
-          "endpoint": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+          "endpoint": "${ALIBABA_CN_BEIJING_ENDPOINT}/services/aigc/image-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3956,7 +3956,7 @@
         },
         {
           "regionId": "cn-hongkong",
-          "endpoint": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+          "endpoint": "${ALIBABA_CN_HONGKONG_ENDPOINT}/services/aigc/image-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3965,7 +3965,7 @@
         },
         {
           "regionId": "eu-central-1",
-          "endpoint": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+          "endpoint": "${ALIBABA_EU_CENTRAL_1_ENDPOINT}/services/aigc/image-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",
@@ -3974,7 +3974,7 @@
         },
         {
           "regionId": "ap-northeast-1",
-          "endpoint": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+          "endpoint": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT}/services/aigc/image-generation/generation",
           "status": "documented_endpoint",
           "sourceIds": ["qwen.api"],
           "modelAvailability": "Verify exact model, account and workspace availability; an endpoint listing is not live qualification.",

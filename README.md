@@ -42,7 +42,7 @@ The API supports public catalog/model/deployment/route discovery, single and bat
 1. Run `npm run setup:local` to create a private `.env` with random local database/gateway/vault/session secrets. It refuses to overwrite existing configuration and prints no values.
 2. Configure PostgreSQL and review the local settings; see [the self-hosting runbook](docs/OPERATIONS.md).
 3. Set `MR_INITIAL_BALANCE_MICROS` deliberately (1,000,000 micro-USD = $1); it only applies when a workspace is first created. It is operator-granted credit, not a payment integration.
-4. Configure credentials for the exact provider region you intend to use. Alibaba requires a matching region, workspace and API key. BytePlus uses its Singapore key.
+4. Configure credentials for the exact provider region you intend to use. Alibaba requires a matching region, workspace endpoint URL and API key. BytePlus uses its Singapore key.
 5. Start `npm run dev:api` and `npm run worker`. Schema initialization is idempotent.
 
 The installation token is an operator bootstrap credential. The account layer adds workspace-scoped API keys, saved policies, encrypted provider connections, revocable browser sessions and optional OIDC sign-in. Configure the session/vault secrets privately. Team membership and operator reconciliation are implemented; production identity/authorization verification remains a release gate; keep the managed backend private until its deployment gates pass.

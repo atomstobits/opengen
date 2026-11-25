@@ -5,6 +5,7 @@ import {
   createAlibabaAdapter,
   createBytePlusAdapter,
   createEngine,
+  normalizeAlibabaEndpoint,
   SubmissionRejected,
   SubmissionUnknown,
 } from '@media-router/engine';
@@ -20,8 +21,9 @@ const deployment: Deployment = {
   scope: 'international',
   processingRegions: null,
   storageRegions: null,
-  endpointTemplate: 'https://{workspace}.ap-southeast-1.maas.aliyuncs.com/api/v1',
+  endpointTemplate: null,
   credentialEnv: 'ALIBABA_AP_SOUTHEAST_1_API_KEY',
+  endpointEnv: 'ALIBABA_AP_SOUTHEAST_1_ENDPOINT',
   source,
 };
 const route: Route = {
@@ -51,7 +53,7 @@ const input: GenerateInput = {
 const context = { jobId: 'job', input, route, deployment };
 const env = {
   ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-key',
-  ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'fixture-workspace',
+  ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://fixture-workspace.example.invalid/api/v1/',
 };
 describe('Alibaba adapter protocol boundaries (no live calls)', () => {
   it('does not treat failed provider generation as an authoritative free charge', async () => {
@@ -68,19 +70,50 @@ describe('Alibaba adapter protocol boundaries (no live calls)', () => {
     expect(result.billedCostMicros).toBeNull();
     expect(result.error).not.toContain('private-provider-details');
   });
-  it('does not reuse a shared key outside its explicitly configured region', () => {
+  it('does not reuse a shared key outside its explicitly configured region and validates workspace endpoints', () => {
     const shared = {
       DASHSCOPE_API_KEY: 'fixture',
-      ALIBABA_WORKSPACE_ID: 'workspace',
+      ALIBABA_ENDPOINT: 'https://shared-workspace.example.invalid/api/v1',
       ALIBABA_REGION: 'cn-beijing',
     };
     expect(alibabaCredentials(deployment, shared)).toBeNull();
     expect(
-      alibabaCredentials(deployment, { ...shared, ALIBABA_REGION: 'ap-southeast-1' })?.workspaceId,
-    ).toBe('workspace');
-    expect(alibabaCredentials(deployment, env)?.apiKey).toBe('fixture-key');
+      alibabaCredentials(deployment, { ...shared, ALIBABA_REGION: 'ap-southeast-1' })?.endpoint,
+    ).toBe('https://shared-workspace.example.invalid/api/v1');
+    expect(alibabaCredentials(deployment, env)).toEqual({
+      apiKey: 'fixture-key',
+      endpoint: 'https://fixture-workspace.example.invalid/api/v1',
+    });
+    expect(
+      alibabaCredentials(deployment, {
+        ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-key',
+        ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'legacy-workspace-id',
+      }),
+    ).toBeNull();
+    for (const invalid of [
+      '',
+      'http://workspace.example.invalid/api/v1',
+      'https://127.0.0.1/api/v1',
+      'https://169.254.169.254/api/v1',
+      'https://localhost/api/v1',
+      'https://workspace.internal/api/v1',
+      'https://user:pass@workspace.example.invalid/api/v1',
+      'https://workspace.example.invalid:8443/api/v1',
+      'https://workspace.example.invalid/api/v1?x=1',
+      'https://workspace.example.invalid/api/v1#frag',
+      'https://workspace.example.invalid/api/../v1',
+      'https://workspace.example.invalid/api/%2e%2e/v1',
+    ]) {
+      expect(normalizeAlibabaEndpoint(invalid)).toBeNull();
+      expect(
+        alibabaCredentials(deployment, {
+          ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-key',
+          ALIBABA_AP_SOUTHEAST_1_ENDPOINT: invalid,
+        }),
+      ).toBeNull();
+    }
   });
-  it('uses the regional endpoint and documented asynchronous request shape', async () => {
+  it('uses the configured regional workspace endpoint and documented asynchronous request shape', async () => {
     let requestedUrl = '';
     let requestedBody: Record<string, unknown> = {};
     const adapter = createAlibabaAdapter({
@@ -94,7 +127,7 @@ describe('Alibaba adapter protocol boundaries (no live calls)', () => {
     });
     expect(await adapter.submit(context)).toEqual({ upstreamId: 'provider-task' });
     expect(requestedUrl).toBe(
-      'https://fixture-workspace.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+      'https://fixture-workspace.example.invalid/api/v1/services/aigc/video-generation/video-synthesis',
     );
     expect(requestedBody).toMatchObject({
       model: 'wan3.0-video',

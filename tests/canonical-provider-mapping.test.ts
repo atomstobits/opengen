@@ -264,7 +264,7 @@ describe('canonical common arguments across provider protocols (no network)', ()
     const adapter = createAlibabaAdapter({
       env: {
         [`ALIBABA_${region}_API_KEY`]: 'fixture',
-        [`ALIBABA_${region}_WORKSPACE_ID`]: 'workspace',
+        [`ALIBABA_${region}_ENDPOINT`]: 'https://workspace.example.invalid/api/v1',
       },
       fetch: async () =>
         Response.json({

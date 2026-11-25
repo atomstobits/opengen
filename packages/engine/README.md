@@ -41,10 +41,10 @@ For Singapore, set:
 
 ```dotenv
 ALIBABA_AP_SOUTHEAST_1_API_KEY=...
-ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID=...
+ALIBABA_AP_SOUTHEAST_1_ENDPOINT=https://<your-workspace-endpoint>/api/v1
 ```
 
-Other endpoint region codes use the same uppercase/underscore naming convention. Alternatively, the shared `DASHSCOPE_API_KEY` and `ALIBABA_WORKSPACE_ID` are accepted only when `ALIBABA_REGION` exactly matches the selected deployment's endpoint region. Region-scoped keys are never assumed interchangeable. Credentials are read server-side and are not stored in jobs, catalog responses or the ledger.
+Other endpoint region codes use the same uppercase/underscore naming convention. Alternatively, the shared `DASHSCOPE_API_KEY` and `ALIBABA_ENDPOINT` are accepted only when `ALIBABA_REGION` exactly matches the selected deployment's endpoint region. Region-scoped keys and workspace endpoints are never assumed interchangeable. Credentials and workspace endpoints are read server-side and are not stored in jobs, catalog responses or the ledger.
 
 Reference/video-edit/extension operations with unqualified input-media charges are comparison-only. The worker does not call a provider for quotes or catalog reads. It does not support arbitrary upstream URLs. Output URLs retain provider expiry and are not yet copied into owned storage.
 

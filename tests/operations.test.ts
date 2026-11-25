@@ -108,6 +108,60 @@ describe('machine-readable REST contract', () => {
       'fal-undisclosed',
       { apiKey: 'fixture-private-provider' },
     ]);
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/connections/fal-undisclosed',
+          headers: { authorization: 'Bearer fixture-customer' },
+          payload: {
+            apiKey: 'fixture-private-provider',
+            endpoint: 'https://custom.example.invalid/v1',
+          },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/connections/alibaba-model-studio-ap-southeast-1',
+          headers: { authorization: 'Bearer fixture-customer' },
+          payload: { apiKey: 'fixture-private-provider' },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/connections/alibaba-model-studio-ap-southeast-1',
+          headers: { authorization: 'Bearer fixture-customer' },
+          payload: {
+            apiKey: 'fixture-private-provider',
+            endpoint: 'http://127.0.0.1/api/v1',
+          },
+        })
+      ).statusCode,
+    ).toBe(400);
+    const alibabaResponse = await app.inject({
+      method: 'PUT',
+      url: '/v1/connections/alibaba-model-studio-ap-southeast-1',
+      headers: { authorization: 'Bearer fixture-customer' },
+      payload: {
+        apiKey: 'fixture-private-provider',
+        endpoint: 'https://fixture-ws.example.invalid/api/v1/',
+      },
+    });
+    expect(alibabaResponse.statusCode).toBe(200);
+    expect(writes[1]).toEqual([
+      'customer',
+      'alibaba-model-studio-ap-southeast-1',
+      {
+        apiKey: 'fixture-private-provider',
+        endpoint: 'https://fixture-ws.example.invalid/api/v1',
+      },
+    ]);
     for (const path of ['/v1/generations', '/v1/images/generations', '/v1/videos'])
       expect((spec.paths[path]!.post as { parameters: unknown[] }).parameters).toContainEqual({
         $ref: '#/components/parameters/IdempotencyKey',

@@ -442,7 +442,7 @@ describe.skipIf(!databaseUrl)('022 generation quote, admission and verified cost
       const key = await f.createKey();
       await f.engine.accounts.putConnection(f.workspaceId, deploymentId, {
         apiKey: 'fixture-byok-key',
-        workspaceId: 'fixture-byok-workspace',
+        endpoint: 'https://fixture-byok-workspace.example.invalid/api/v1',
       });
       const byok: GenerateInput = { ...input, billing: 'byok' };
       const pinnedFallback: GenerateInput = { ...input, routeId, routing: { fallback: true } };

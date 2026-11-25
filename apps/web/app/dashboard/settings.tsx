@@ -158,7 +158,7 @@ function SettingsRecords({
     catalog.deployments.find((item) => item.credentialEnv)?.id ?? '',
   );
   const [apiKey, setApiKey] = useState('');
-  const [providerWorkspace, setProviderWorkspace] = useState('');
+  const [providerEndpoint, setProviderEndpoint] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -562,10 +562,12 @@ function SettingsRecords({
               void act(async () => {
                 await request(`/api/connections/${encodeURIComponent(deployment)}`, 'PUT', {
                   apiKey,
-                  ...(providerWorkspace.trim() ? { workspaceId: providerWorkspace.trim() } : {}),
+                  ...(selectedDeployment?.endpointEnv && providerEndpoint.trim()
+                    ? { endpoint: providerEndpoint.trim() }
+                    : {}),
                 });
                 setApiKey('');
-                setProviderWorkspace('');
+                setProviderEndpoint('');
                 setNotice(
                   'Provider connection saved. Quotes will check whether its exact routes are executable.',
                 );
@@ -579,7 +581,7 @@ function SettingsRecords({
                 onChange={(event) => {
                   setDeployment(event.target.value);
                   setApiKey('');
-                  setProviderWorkspace('');
+                  setProviderEndpoint('');
                 }}
               >
                 {catalog.deployments
@@ -602,18 +604,28 @@ function SettingsRecords({
                 placeholder="Stored encrypted on your gateway"
               />
             </label>
-            {selectedDeployment?.providerId === 'alibaba' && (
+            {selectedDeployment?.endpointEnv && (
               <label>
-                Alibaba regional workspace ID
+                Alibaba regional workspace endpoint
                 <input
+                  type="url"
                   required
-                  value={providerWorkspace}
-                  onChange={(event) => setProviderWorkspace(event.target.value)}
-                  placeholder="Matching this regional provider key"
+                  autoComplete="off"
+                  value={providerEndpoint}
+                  onChange={(event) => setProviderEndpoint(event.target.value)}
+                  placeholder="https://... matching this regional provider key"
                 />
               </label>
             )}
-            <button className="button button-dark" type="submit" disabled={busy || !apiKey.trim()}>
+            <button
+              className="button button-dark"
+              type="submit"
+              disabled={
+                busy ||
+                !apiKey.trim() ||
+                Boolean(selectedDeployment?.endpointEnv && !providerEndpoint.trim())
+              }
+            >
               {busy ? 'Saving…' : 'Save provider connection'}
             </button>
           </form>

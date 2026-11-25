@@ -518,7 +518,7 @@ describe.skipIf(!databaseUrl)('PostgreSQL engine invariants', () => {
         createAlibabaAdapter({
           env: {
             DASHSCOPE_API_KEY: 'fixture',
-            ALIBABA_WORKSPACE_ID: 'fixture',
+            ALIBABA_ENDPOINT: 'https://fixture-workspace.example.invalid/api/v1',
             ALIBABA_REGION: 'ap-southeast-1',
           },
           fetch: noNetwork,

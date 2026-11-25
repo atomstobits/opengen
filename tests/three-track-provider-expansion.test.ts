@@ -53,13 +53,14 @@ describe('Track 1: Alibaba Cloud Model Studio 6-region coverage', () => {
   });
 
   it.each(regions)(
-    'submits Qwen Image 3.0 Pro via %s workspace MaAS endpoint',
+    'submits Qwen Image 3.0 Pro via %s configured workspace endpoint',
     async (region, envSuffix) => {
       const urls: string[] = [];
+      const configuredEndpoint = `https://alibaba-${region}.provider.example/api/v1`;
       const adapter = createAlibabaMediaAdapter({
         env: {
           [`ALIBABA_${envSuffix}_API_KEY`]: `sk-${region}`,
-          [`ALIBABA_${envSuffix}_WORKSPACE_ID`]: `ws-${region.replace(/-/g, '')}`,
+          [`ALIBABA_${envSuffix}_ENDPOINT`]: configuredEndpoint,
         },
         fetch: async (url, init) => {
           urls.push(String(url));
@@ -81,9 +82,7 @@ describe('Track 1: Alibaba Cloud Model Studio 6-region coverage', () => {
       });
       expect(adapter.isConfigured(ctx.route, ctx.deployment)).toBe(true);
       expect(await adapter.submit(ctx)).toEqual({ upstreamId: `task-${region}` });
-      expect(urls).toEqual([
-        `https://ws-${region.replace(/-/g, '')}.${region}.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation`,
-      ]);
+      expect(urls).toEqual([`${configuredEndpoint}/services/aigc/image-generation/generation`]);
     },
   );
 });

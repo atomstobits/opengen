@@ -85,7 +85,7 @@ describe.skipIf(!databaseUrl)('managed and BYOK credential ownership', () => {
       await engine.ensureWorkspace(workspaceId, 1_000_000);
       await engine.accounts.putConnection(workspaceId, deployment.id, {
         apiKey: 'synthetic-owner-key',
-        workspaceId: 'synthetic-workspace',
+        endpoint: 'https://synthetic-workspace.example.invalid/api/v1',
       });
       await operation(engine, workspaceId, () => calls);
       if (!providerFetch) expect(network).not.toHaveBeenCalled();
@@ -143,9 +143,7 @@ describe.skipIf(!databaseUrl)('managed and BYOK credential ownership', () => {
         true,
       );
       expect(
-        requests.every((value) =>
-          value.url.includes('synthetic-workspace.ap-southeast-1.maas.aliyuncs.com'),
-        ),
+        requests.every((value) => value.url.includes('synthetic-workspace.example.invalid/api/v1')),
       ).toBe(true);
       expect(await engine.getBalance(workspaceId)).toMatchObject({
         availableMicros: 1_000_000,
@@ -172,7 +170,7 @@ describe.skipIf(!databaseUrl)('managed and BYOK credential ownership', () => {
       ).toBe('synthetic-owned-task');
       await engine.accounts.putConnection(workspaceId, deployment.id, {
         apiKey: 'synthetic-replacement-key',
-        workspaceId: 'synthetic-replacement-workspace',
+        endpoint: 'https://synthetic-replacement-workspace.example.invalid/api/v1',
       });
       const completed = await workUntilJob(
         engine,

@@ -172,6 +172,35 @@ describe('source-backed catalog', () => {
       );
     }
   });
+  it('keeps generic provider endpoints in catalog code and requires env vars for workspace-specific endpoints', () => {
+    const alibabaRegional = catalog.deployments.filter(
+      (deployment) =>
+        deployment.providerId === 'alibaba' && deployment.endpointRegion !== 'undisclosed',
+    );
+    expect(alibabaRegional).toHaveLength(6);
+    for (const deployment of alibabaRegional) {
+      expect(deployment.endpointTemplate).toBeNull();
+      expect(deployment.endpointEnv).toBe(
+        `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}_ENDPOINT`,
+      );
+    }
+    for (const id of [
+      'byteplus-modelark-ap-southeast-1',
+      'fal-undisclosed',
+      'openai-undisclosed',
+      'xai-undisclosed',
+      'minimax-undisclosed',
+      'google-undisclosed',
+      'replicate-undisclosed',
+      'runway-undisclosed',
+      'pika-undisclosed',
+      'bfl-undisclosed',
+    ]) {
+      const deployment = catalog.deployments.find((item) => item.id === id);
+      expect(deployment?.endpointTemplate).toMatch(/^https:\/\//);
+      expect(deployment?.endpointEnv).toBeUndefined();
+    }
+  });
 });
 
 describe('regional quote selection', () => {

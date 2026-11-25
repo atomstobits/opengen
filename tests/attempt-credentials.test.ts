@@ -121,3 +121,53 @@ it('requires encryption for real managed snapshots before anything can dispatch'
     code: 'vault_not_configured',
   });
 });
+it('snapshots workspace-specific Alibaba endpoints for managed and BYOK attempts', async () => {
+  const alibabaDeployment = {
+    id: 'alibaba-model-studio-ap-southeast-1',
+    providerId: 'alibaba',
+    credentialEnv: 'ALIBABA_AP_SOUTHEAST_1_API_KEY',
+    endpointEnv: 'ALIBABA_AP_SOUTHEAST_1_ENDPOINT',
+    endpointRegion: 'ap-southeast-1',
+  } as Deployment;
+  const env = {
+    ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-alibaba-key',
+    ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://managed-ws.example.invalid/api/v1',
+    ALIBABA_ENDPOINT: 'https://shared-ws.example.invalid/api/v1',
+    ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'legacy-ignored',
+    UNRELATED_SECRET: 'never-snapshotted',
+  } as NodeJS.ProcessEnv;
+  expect(snapshotCredentialEnvironment(alibabaDeployment, env)).toEqual({
+    ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-alibaba-key',
+    ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://managed-ws.example.invalid/api/v1',
+    ALIBABA_ENDPOINT: 'https://shared-ws.example.invalid/api/v1',
+  });
+  const store = new AttemptCredentialStore(pool, { vaultKey, env, injected: false });
+  const jobId = randomUUID();
+  await query('INSERT INTO mr_jobs VALUES($1,$2)', [jobId, 'owner']);
+  const byokScope = {
+    workspaceId: 'owner',
+    jobId,
+    attempt: 1,
+    deployment: alibabaDeployment,
+    billing: 'byok' as const,
+  };
+  await query('INSERT INTO mr_connections VALUES($1,$2,$3)', [
+    'owner',
+    alibabaDeployment.id,
+    sealVault(
+      {
+        apiKey: 'fixture-byok-alibaba-key',
+        endpoint: 'https://byok-ws.example.invalid/api/v1',
+      },
+      vaultKey,
+      `owner:${alibabaDeployment.id}`,
+    ),
+  ]);
+  await store.freezeAdmission(client, byokScope);
+  await query('INSERT INTO mr_attempts VALUES($1,1)', [jobId]);
+  await store.freeze(client, byokScope);
+  expect((await store.read(byokScope)).env).toEqual({
+    ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-byok-alibaba-key',
+    ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://byok-ws.example.invalid/api/v1',
+  });
+});

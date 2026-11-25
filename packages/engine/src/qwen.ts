@@ -110,10 +110,10 @@ export function createQwenImageAdapter(
     const credentials = alibabaCredentials(context.deployment, env);
     if (!credentials)
       throw new SubmissionRejected(
-        `Configure matching Alibaba ${context.deployment.endpointRegion} credentials and workspace.`,
+        `Configure matching Alibaba ${context.deployment.endpointRegion} credentials and workspace endpoint.`,
       );
     return {
-      base: `https://${credentials.workspaceId}.${context.deployment.endpointRegion}.maas.aliyuncs.com/api/v1`,
+      base: credentials.endpoint,
       headers: { Authorization: `Bearer ${credentials.apiKey}` },
     };
   }

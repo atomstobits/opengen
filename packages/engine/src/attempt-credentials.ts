@@ -41,14 +41,15 @@ export function snapshotCredentialEnvironment(
 ): NodeJS.ProcessEnv {
   const names = new Set(providerFields[deployment.providerId] ?? []);
   if (deployment.credentialEnv) names.add(deployment.credentialEnv);
+  if (deployment.endpointEnv) names.add(deployment.endpointEnv);
   if (deployment.providerId === 'alibaba') {
     const prefix = `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}`;
     for (const key of [
       `${prefix}_API_KEY`,
-      `${prefix}_WORKSPACE_ID`,
+      `${prefix}_ENDPOINT`,
       'ALIBABA_REGION',
       'DASHSCOPE_API_KEY',
-      'ALIBABA_WORKSPACE_ID',
+      'ALIBABA_ENDPOINT',
     ])
       names.add(key);
   }
@@ -59,7 +60,7 @@ export function snapshotCredentialEnvironment(
       .map((name) => [name, env[name]]),
   ) as NodeJS.ProcessEnv;
 }
-function connectionEnvironment(
+export function connectionEnvironment(
   deployment: Deployment,
   values: Record<string, string>,
 ): NodeJS.ProcessEnv {
@@ -68,7 +69,10 @@ function connectionEnvironment(
   if (deployment.providerId === 'alibaba') {
     const prefix = `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}`;
     env[`${prefix}_API_KEY`] = values.apiKey;
-    env[`${prefix}_WORKSPACE_ID`] = values.workspaceId;
+    if (values.endpoint) {
+      if (deployment.endpointEnv) env[deployment.endpointEnv] = values.endpoint;
+      env[`${prefix}_ENDPOINT`] = values.endpoint;
+    }
   }
   return env;
 }

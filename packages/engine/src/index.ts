@@ -5,7 +5,11 @@ import {
   type NotificationEmailTransport,
 } from './notification-email.js';
 import { PendingEmailCreditStore } from './pending-email-credits.js';
-import { AttemptCredentialStore, type AttemptCredentialScope } from './attempt-credentials.js';
+import {
+  AttemptCredentialStore,
+  connectionEnvironment,
+  type AttemptCredentialScope,
+} from './attempt-credentials.js';
 import {
   DeliveryStore,
   deliveryDatabase,
@@ -1400,13 +1404,7 @@ export class Engine {
     if (billing !== 'byok') return this.adapters;
     const connection = await this.accounts.getConnection(workspaceId, deployment.id);
     if (!connection) return [];
-    const env = { ...process.env };
-    if (deployment.credentialEnv) env[deployment.credentialEnv] = connection.apiKey;
-    if (deployment.providerId === 'alibaba') {
-      const prefix = `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}`;
-      env[`${prefix}_API_KEY`] = connection.apiKey;
-      env[`${prefix}_WORKSPACE_ID`] = connection.workspaceId;
-    }
+    const env = connectionEnvironment(deployment, connection);
     return createDefaultAdapters({
       env,
       captureOutputs: this.captureProviderOutputs,

@@ -766,7 +766,7 @@ Media limit details:
 
 **Operations:** `text-to-image`, `image-edit`, `multi-reference-edit`.
 
-**Request:** `POST https://{workspace}.{region}.maas.aliyuncs.com/compatible-mode/v1/images/generations` · JSON.
+**Request:** `POST ${ALIBABA_<REGION>_ENDPOINT_ORIGIN}/compatible-mode/v1/images/generations` · JSON.
 
 **Sources:** [qwen.api](https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference), [qwen.select](https://www.alibabacloud.com/help/en/model-studio/text-to-image).
 
@@ -832,7 +832,7 @@ Media limit details:
 
 **Operations:** `text-to-image`, `image-edit`, `multi-reference-edit`.
 
-**Request:** `POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation` · JSON.
+**Request:** `POST ${ALIBABA_<REGION>_ENDPOINT}/services/aigc/multimodal-generation/generation` · JSON.
 
 **Sources:** [qwen.api](https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference).
 
@@ -902,7 +902,7 @@ Media limit details:
 
 **Operations:** `text-to-image`, `image-edit`, `multi-reference-edit`.
 
-**Request:** `POST https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/aigc/image-generation/generation` · JSON.
+**Request:** `POST ${ALIBABA_<REGION>_ENDPOINT}/services/aigc/image-generation/generation` · JSON.
 
 **Sources:** [qwen.api](https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference).
 

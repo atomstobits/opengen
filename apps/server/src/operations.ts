@@ -196,7 +196,7 @@ const coreCallOptions = [
       .object({
         deploymentId: z.string().min(1).max(200),
         apiKey: z.string().min(1).max(2000),
-        workspaceId: z.string().optional(),
+        endpoint: z.string().min(1).max(2048).optional(),
       })
       .strict(),
   ),

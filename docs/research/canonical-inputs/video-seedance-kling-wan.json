@@ -21735,7 +21735,7 @@
       "modelIds": ["alibaba/wan-3.0"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video",
-      "endpointUrl": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_CN_BEIJING_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -22107,7 +22107,7 @@
       "modelIds": ["alibaba/wan-3.0"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video",
-      "endpointUrl": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -22479,7 +22479,7 @@
       "modelIds": ["alibaba/wan-3.0"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video",
-      "endpointUrl": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -22851,7 +22851,7 @@
       "modelIds": ["alibaba/wan-3.0"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video",
-      "endpointUrl": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_EU_CENTRAL_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -23223,7 +23223,7 @@
       "modelIds": ["alibaba/wan-3.0"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video",
-      "endpointUrl": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_US_EAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -23595,7 +23595,7 @@
       "modelIds": ["alibaba/wan-3.0"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video",
-      "endpointUrl": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_CN_HONGKONG_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -23967,7 +23967,7 @@
       "modelIds": ["alibaba/wan-3.0-prime"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video-prime",
-      "endpointUrl": "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_CN_BEIJING_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -24339,7 +24339,7 @@
       "modelIds": ["alibaba/wan-3.0-prime"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video-prime",
-      "endpointUrl": "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_AP_SOUTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -24711,7 +24711,7 @@
       "modelIds": ["alibaba/wan-3.0-prime"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video-prime",
-      "endpointUrl": "https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_AP_NORTHEAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -25083,7 +25083,7 @@
       "modelIds": ["alibaba/wan-3.0-prime"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video-prime",
-      "endpointUrl": "https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_EU_CENTRAL_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -25455,7 +25455,7 @@
       "modelIds": ["alibaba/wan-3.0-prime"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video-prime",
-      "endpointUrl": "https://{WorkspaceId}.us-east-1.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_US_EAST_1_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -25827,7 +25827,7 @@
       "modelIds": ["alibaba/wan-3.0-prime"],
       "provider": "Alibaba ModelStudio",
       "endpointId": "wan3.0-video-prime",
-      "endpointUrl": "https://{WorkspaceId}.cn-hongkong.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+      "endpointUrl": "${ALIBABA_CN_HONGKONG_ENDPOINT}/services/aigc/video-generation/video-synthesis",
       "operation": "multi-mode",
       "documentedOperations": [
         "text-to-video",
@@ -26606,7 +26606,7 @@
       "modelIds": ["kling/kling-4.0"],
       "provider": "Cloudflare AI",
       "endpointId": "klingai/kling-v4",
-      "endpointUrl": "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run",
+      "endpointUrl": "${CLOUDFLARE_AI_ENDPOINT}",
       "operation": "text-or-keyframe-video",
       "documentedOperations": ["text-to-video", "first-frame-to-video", "multi-keyframe-to-video"],
       "sources": [
