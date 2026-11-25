@@ -20,12 +20,14 @@ import { z } from 'zod';
 import {
   keyScopes,
   normalizeAlibabaEndpoint,
+  resolvePublicTarget,
   notificationEmailIdentityFromVerifiedOidcClaims,
   pendingEmailCreditIdentityFromVerifiedOidcClaims,
   AccountGovernanceStore,
   RoutingPolicyStore,
   revalidateGovernanceAuthority,
   type Principal,
+  type PublicResolver,
   type KeyScope,
   type AccountStore,
   type AssetStore,
@@ -65,6 +67,8 @@ export async function registerAccounts(
     workspaceId?: string;
     publicUrl?: string;
     env?: NodeJS.ProcessEnv;
+    /** Optional DNS resolver seam for tests validating BYOK provider endpoints. */
+    resolvePublicEndpoint?: PublicResolver;
     /** Internal fixture seam; hosted policy adoption is not enabled by environment flags. */
     humanTermsPolicy?: () => HumanTermsPolicy;
   },
@@ -430,6 +434,10 @@ export async function registerAccounts(
             ),
             { statusCode: 400 },
           );
+        await resolvePublicTarget(endpoint, options.resolvePublicEndpoint, {
+          label: 'Provider endpoint',
+          allowIpLiteral: false,
+        });
         await store().putConnection(p.workspaceId, deployment.id, {
           apiKey: input.apiKey,
           endpoint,

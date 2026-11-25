@@ -1,4 +1,5 @@
 import { SubmissionRejected, SubmissionUnknown } from './adapters.js';
+import { PublicTargetRejectedError } from './public-network.js';
 
 export type ProviderJson = Record<string, unknown>;
 export const providerObject = (value: unknown): ProviderJson =>
@@ -47,7 +48,8 @@ export async function submitProviderJson(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof PublicTargetRejectedError) throw new SubmissionRejected(error.message);
     throw new SubmissionUnknown();
   }
   if (response.status >= 400 && response.status < 500 && response.status !== 408) {

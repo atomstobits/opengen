@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { Deployment } from '@media-router/contracts';
+import { alibabaCredentials, normalizeAlibabaEndpoint } from './adapters.js';
 import { openVault, sealVault } from './vault.js';
 
 export interface AttemptCredentialScope {
@@ -76,6 +77,138 @@ export function connectionEnvironment(
   }
   return env;
 }
+const alibabaRegionCodes = [
+  'ap-southeast-1',
+  'us-east-1',
+  'eu-central-1',
+  'cn-hongkong',
+  'ap-northeast-1',
+  'cn-beijing',
+] as const;
+
+const dnsLabelPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+function deriveLegacyAlibabaEndpoint(
+  deployment: Deployment,
+  workspaceId: string,
+  runtimeEnv: NodeJS.ProcessEnv,
+  byokConnection?: Record<string, string> | null,
+): string | null {
+  if (!dnsLabelPattern.test(workspaceId)) return null;
+  const region = deployment.endpointRegion.toLowerCase();
+  if (!dnsLabelPattern.test(region)) return null;
+  const prefix = `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}`;
+  const ws = workspaceId.toLowerCase();
+
+  // 1. Same-region configured runtime endpoint: replace only the leading workspace label
+  // so legacy managed/BYOK snapshots always recover against their original frozen workspace.
+  const sameRegionCandidate = normalizeAlibabaEndpoint(
+    (deployment.endpointEnv ? runtimeEnv[deployment.endpointEnv] : undefined) ||
+      runtimeEnv[`${prefix}_ENDPOINT`] ||
+      (runtimeEnv.ALIBABA_REGION === deployment.endpointRegion
+        ? runtimeEnv.ALIBABA_ENDPOINT
+        : undefined),
+  );
+  if (sameRegionCandidate) {
+    const parsed = new URL(sameRegionCandidate);
+    const labels = parsed.hostname.toLowerCase().split('.');
+    if (labels.length >= 4 && labels[1] === region) {
+      const recovered = normalizeAlibabaEndpoint(
+        `https://${ws}.${labels.slice(1).join('.')}${parsed.pathname}`,
+      );
+      if (recovered) return recovered;
+    }
+  }
+
+  // 2. Any other configured regional Alibaba endpoint in the runtime environment.
+  for (const otherRegion of alibabaRegionCodes) {
+    const otherPrefix = `ALIBABA_${otherRegion.toUpperCase().replaceAll('-', '_')}`;
+    const otherCandidate = normalizeAlibabaEndpoint(runtimeEnv[`${otherPrefix}_ENDPOINT`]);
+    if (!otherCandidate) continue;
+    const parsed = new URL(otherCandidate);
+    const labels = parsed.hostname.toLowerCase().split('.');
+    if (labels.length >= 4 && labels[1] === otherRegion) {
+      const recovered = normalizeAlibabaEndpoint(
+        `https://${ws}.${region}.${labels.slice(2).join('.')}${parsed.pathname}`,
+      );
+      if (recovered) return recovered;
+    }
+  }
+
+  // 3. Explicit operator recovery template for BYOK-only deployments without managed Alibaba envs.
+  const template = runtimeEnv.ALIBABA_LEGACY_ENDPOINT_TEMPLATE;
+  if (template && template.includes('{workspaceId}') && template.includes('{region}')) {
+    const recovered = normalizeAlibabaEndpoint(
+      template.replaceAll('{workspaceId}', ws).replaceAll('{region}', region),
+    );
+    if (recovered) return recovered;
+  }
+
+  // 4. For legacy BYOK snapshots, allow an updated BYOK connection only when its endpoint host
+  // starts with the exact same frozen workspace and region labels (never swapping accounts).
+  const byokEndpoint = normalizeAlibabaEndpoint(byokConnection?.endpoint);
+  if (byokEndpoint) {
+    const parsed = new URL(byokEndpoint);
+    if (parsed.hostname.toLowerCase().startsWith(`${ws}.${region}.`)) {
+      return byokEndpoint;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Upgrade-only recovery for previously frozen Alibaba attempt snapshots that persisted
+ * ALIBABA_<REGION>_WORKSPACE_ID (or shared ALIBABA_WORKSPACE_ID) before endpoint env vars.
+ * Never used for new admissions, which still require an explicit endpoint URL.
+ */
+export function recoverLegacyAlibabaSnapshotEnv(
+  deployment: Deployment,
+  frozenEnv: NodeJS.ProcessEnv,
+  runtimeEnv: NodeJS.ProcessEnv,
+  byokConnection?: Record<string, string> | null,
+): NodeJS.ProcessEnv {
+  if (deployment.providerId !== 'alibaba') return frozenEnv;
+  if (alibabaCredentials(deployment, frozenEnv) !== null) return frozenEnv;
+  const prefix = `ALIBABA_${deployment.endpointRegion.toUpperCase().replaceAll('-', '_')}`;
+  const regionalKey =
+    (deployment.credentialEnv ? frozenEnv[deployment.credentialEnv] : undefined) ||
+    frozenEnv[`${prefix}_API_KEY`];
+  const regionalWorkspace = frozenEnv[`${prefix}_WORKSPACE_ID`];
+  if (regionalKey && regionalWorkspace) {
+    const endpoint = deriveLegacyAlibabaEndpoint(
+      deployment,
+      regionalWorkspace,
+      runtimeEnv,
+      byokConnection,
+    );
+    if (!endpoint) return frozenEnv;
+    return {
+      ...frozenEnv,
+      ...(deployment.endpointEnv ? { [deployment.endpointEnv]: endpoint } : {}),
+      [`${prefix}_ENDPOINT`]: endpoint,
+    };
+  }
+  if (
+    frozenEnv.ALIBABA_REGION === deployment.endpointRegion &&
+    frozenEnv.DASHSCOPE_API_KEY &&
+    frozenEnv.ALIBABA_WORKSPACE_ID
+  ) {
+    const endpoint = deriveLegacyAlibabaEndpoint(
+      deployment,
+      frozenEnv.ALIBABA_WORKSPACE_ID,
+      runtimeEnv,
+      byokConnection,
+    );
+    if (!endpoint) return frozenEnv;
+    return {
+      ...frozenEnv,
+      ALIBABA_ENDPOINT: endpoint,
+    };
+  }
+  return frozenEnv;
+}
+
 /** Private immutable attempt credentials. No customer DTO or receipt contains ciphertext or keys. */
 export class AttemptCredentialStore {
   constructor(
@@ -200,6 +333,49 @@ export class AttemptCredentialStore {
       ).rows[0]?.identity ?? null
     );
   }
+  private async readStoredEnv(
+    scope: AttemptCredentialScope,
+    row: CredentialRow,
+  ): Promise<NodeJS.ProcessEnv> {
+    if (!row.ciphertext) throw denied();
+    const frozenEnv = openVault<NodeJS.ProcessEnv>(
+      row.ciphertext,
+      this.options.vaultKey,
+      this.context(scope),
+    );
+    if (
+      scope.deployment.providerId !== 'alibaba' ||
+      alibabaCredentials(scope.deployment, frozenEnv) !== null
+    ) {
+      return frozenEnv;
+    }
+    let byokConnection: Record<string, string> | null = null;
+    if (row.kind === 'byok') {
+      const current = (
+        await this.pool.query<{ ciphertext: string }>(
+          'SELECT ciphertext FROM mr_connections WHERE workspace_id=$1 AND deployment_id=$2',
+          [scope.workspaceId, scope.deployment.id],
+        )
+      ).rows[0];
+      if (current?.ciphertext) {
+        try {
+          byokConnection = openVault<Record<string, string>>(
+            current.ciphertext,
+            this.options.vaultKey,
+            `${scope.workspaceId}:${scope.deployment.id}`,
+          );
+        } catch {
+          byokConnection = null;
+        }
+      }
+    }
+    return recoverLegacyAlibabaSnapshotEnv(
+      scope.deployment,
+      frozenEnv,
+      this.options.env,
+      byokConnection,
+    );
+  }
   /** Original admitted credentials for an eligible fallback before its attempt exists. */
   async readAdmission(
     scope: AttemptCredentialScope,
@@ -220,11 +396,10 @@ export class AttemptCredentialStore {
         throw denied();
       return { ...row, env: {} as NodeJS.ProcessEnv };
     }
-    if (!row.ciphertext) throw denied();
     return {
       identity: row.identity,
       kind: row.kind,
-      env: openVault<NodeJS.ProcessEnv>(row.ciphertext, this.options.vaultKey, this.context(scope)),
+      env: await this.readStoredEnv(scope, row),
     };
   }
   async read(scope: AttemptCredentialScope): Promise<{
@@ -248,11 +423,10 @@ export class AttemptCredentialStore {
         throw denied();
       return { ...row, env: {} as NodeJS.ProcessEnv };
     }
-    if (!row.ciphertext) throw denied();
     return {
       identity: row.identity,
       kind: row.kind,
-      env: openVault<NodeJS.ProcessEnv>(row.ciphertext, this.options.vaultKey, this.context(scope)),
+      env: await this.readStoredEnv(scope, row),
     };
   }
 }

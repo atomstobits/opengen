@@ -127,6 +127,7 @@ export interface AppOptions {
   logger?: boolean;
   publicUrl?: string;
   env?: NodeJS.ProcessEnv;
+  resolvePublicEndpoint?: import('@media-router/engine').PublicResolver;
 }
 export async function buildApp(options: AppOptions = {}) {
   const publicUrl = new URL(

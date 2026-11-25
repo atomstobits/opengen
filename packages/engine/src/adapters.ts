@@ -6,6 +6,11 @@ import type {
   Route,
 } from '@media-router/contracts';
 import { isIP } from 'node:net';
+import {
+  createPublicPinnedFetch,
+  PublicTargetRejectedError,
+  type PublicResolver,
+} from './public-network.js';
 import type { AssetRef, GenerationArguments, ReferenceType } from '@media-router/contracts';
 import {
   assetUrl,
@@ -214,10 +219,10 @@ export function isPublicHttpsAssetUrl(value: string): boolean {
 }
 
 export function createAlibabaAdapter(
-  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch } = {},
+  options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; resolve?: PublicResolver } = {},
 ): ProviderAdapter {
   const env = options.env ?? process.env;
-  const request = options.fetch ?? fetch;
+  const request = options.fetch ?? createPublicPinnedFetch({ resolve: options.resolve });
   const supportedOperations: Operation[] = [
     'text-to-video',
     'image-to-video',
@@ -369,7 +374,8 @@ export function createAlibabaAdapter(
           }),
           signal: AbortSignal.timeout(30_000),
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof PublicTargetRejectedError) throw new SubmissionRejected(error.message);
         throw new SubmissionUnknown();
       }
       if (response.status >= 400 && response.status < 500 && response.status !== 408) {

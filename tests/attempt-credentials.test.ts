@@ -6,8 +6,10 @@ import type { Pool, PoolClient } from 'pg';
 import type { Deployment } from '@media-router/contracts';
 import {
   AttemptCredentialStore,
+  recoverLegacyAlibabaSnapshotEnv,
   snapshotCredentialEnvironment,
 } from '../packages/engine/src/attempt-credentials.js';
+import { alibabaCredentials } from '../packages/engine/src/adapters.js';
 import { sealVault } from '../packages/engine/src/vault.js';
 
 let db: PGlite;
@@ -169,5 +171,188 @@ it('snapshots workspace-specific Alibaba endpoints for managed and BYOK attempts
   expect((await store.read(byokScope)).env).toEqual({
     ALIBABA_AP_SOUTHEAST_1_API_KEY: 'fixture-byok-alibaba-key',
     ALIBABA_AP_SOUTHEAST_1_ENDPOINT: 'https://byok-ws.example.invalid/api/v1',
+  });
+});
+it('recovers previously frozen pre-upgrade Alibaba workspace snapshots without loosening new admissions', async () => {
+  const sgDeployment = {
+    id: 'alibaba-model-studio-ap-southeast-1',
+    providerId: 'alibaba',
+    credentialEnv: 'ALIBABA_AP_SOUTHEAST_1_API_KEY',
+    endpointEnv: 'ALIBABA_AP_SOUTHEAST_1_ENDPOINT',
+    endpointRegion: 'ap-southeast-1',
+  } as Deployment;
+  const usDeployment = {
+    id: 'alibaba-model-studio-us-east-1',
+    providerId: 'alibaba',
+    credentialEnv: 'ALIBABA_US_EAST_1_API_KEY',
+    endpointEnv: 'ALIBABA_US_EAST_1_ENDPOINT',
+    endpointRegion: 'us-east-1',
+  } as Deployment;
+
+  // 1. Legacy managed regional snapshot recovers original frozen workspace even after operator rotates.
+  const legacyManagedFrozen = {
+    ALIBABA_AP_SOUTHEAST_1_API_KEY: 'frozen-old-key',
+    ALIBABA_AP_SOUTHEAST_1_WORKSPACE_ID: 'old-managed-ws',
+  } as NodeJS.ProcessEnv;
+  expect(alibabaCredentials(sgDeployment, legacyManagedFrozen)).toBeNull();
+  const runtimeEnv = {
+    ALIBABA_AP_SOUTHEAST_1_API_KEY: 'new-operator-key',
+    ALIBABA_AP_SOUTHEAST_1_ENDPOINT:
+      'https://rotated-op-ws.ap-southeast-1.regional-api.example/api/v1',
+  } as NodeJS.ProcessEnv;
+  const recoveredManaged = recoverLegacyAlibabaSnapshotEnv(
+    sgDeployment,
+    legacyManagedFrozen,
+    runtimeEnv,
+  );
+  expect(alibabaCredentials(sgDeployment, recoveredManaged)).toEqual({
+    apiKey: 'frozen-old-key',
+    endpoint: 'https://old-managed-ws.ap-southeast-1.regional-api.example/api/v1',
+  });
+
+  // 2. Legacy shared-key snapshot recovers ALIBABA_ENDPOINT for matching region.
+  const legacySharedFrozen = {
+    ALIBABA_REGION: 'ap-southeast-1',
+    DASHSCOPE_API_KEY: 'frozen-shared-key',
+    ALIBABA_WORKSPACE_ID: 'old-shared-ws',
+  } as NodeJS.ProcessEnv;
+  const recoveredShared = recoverLegacyAlibabaSnapshotEnv(
+    sgDeployment,
+    legacySharedFrozen,
+    runtimeEnv,
+  );
+  expect(alibabaCredentials(sgDeployment, recoveredShared)).toEqual({
+    apiKey: 'frozen-shared-key',
+    endpoint: 'https://old-shared-ws.ap-southeast-1.regional-api.example/api/v1',
+  });
+
+  // 3. Cross-region runtime suffix or explicit ALIBABA_LEGACY_ENDPOINT_TEMPLATE recovers BYOK snapshots.
+  const legacyUsFrozen = {
+    ALIBABA_US_EAST_1_API_KEY: 'frozen-us-byok-key',
+    ALIBABA_US_EAST_1_WORKSPACE_ID: 'customer-us-ws',
+  } as NodeJS.ProcessEnv;
+  expect(
+    alibabaCredentials(
+      usDeployment,
+      recoverLegacyAlibabaSnapshotEnv(usDeployment, legacyUsFrozen, runtimeEnv),
+    ),
+  ).toEqual({
+    apiKey: 'frozen-us-byok-key',
+    endpoint: 'https://customer-us-ws.us-east-1.regional-api.example/api/v1',
+  });
+  expect(
+    alibabaCredentials(
+      usDeployment,
+      recoverLegacyAlibabaSnapshotEnv(usDeployment, legacyUsFrozen, {
+        ALIBABA_LEGACY_ENDPOINT_TEMPLATE: 'https://{workspaceId}.{region}.legacy.example/api/v1',
+      }),
+    ),
+  ).toEqual({
+    apiKey: 'frozen-us-byok-key',
+    endpoint: 'https://customer-us-ws.us-east-1.legacy.example/api/v1',
+  });
+
+  // 4. Persisted pre-upgrade mr_job_credentials + mr_attempt_credentials recover via AttemptCredentialStore.read().
+  const managedJobId = randomUUID();
+  await query('INSERT INTO mr_jobs VALUES($1,$2)', [managedJobId, 'owner']);
+  await query('INSERT INTO mr_attempts VALUES($1,1)', [managedJobId]);
+  const managedAad = `provider-job:owner:${managedJobId}:${sgDeployment.id}`;
+  const managedIdentity = `managed:${'a'.repeat(64)}`;
+  await query('INSERT INTO mr_job_credentials VALUES($1,$2,$3,$4,$5,$6)', [
+    managedJobId,
+    'owner',
+    sgDeployment.id,
+    'managed',
+    managedIdentity,
+    sealVault(legacyManagedFrozen, vaultKey, managedAad),
+  ]);
+  await query('INSERT INTO mr_attempt_credentials VALUES($1,1,$2,$3,$4)', [
+    managedJobId,
+    'owner',
+    sgDeployment.id,
+    managedIdentity,
+  ]);
+  const store = new AttemptCredentialStore(pool, { vaultKey, env: runtimeEnv, injected: false });
+  const readManaged = await store.read({
+    workspaceId: 'owner',
+    jobId: managedJobId,
+    attempt: 1,
+    deployment: sgDeployment,
+  });
+  expect(alibabaCredentials(sgDeployment, readManaged.env)).toEqual({
+    apiKey: 'frozen-old-key',
+    endpoint: 'https://old-managed-ws.ap-southeast-1.regional-api.example/api/v1',
+  });
+
+  // 5. BYOK-only deployment without managed Alibaba env recovers only when updated connection matches the frozen workspace.
+  const byokJobId = randomUUID();
+  await query('INSERT INTO mr_jobs VALUES($1,$2)', [byokJobId, 'byok-tenant']);
+  await query('INSERT INTO mr_attempts VALUES($1,1)', [byokJobId]);
+  const byokAad = `provider-job:byok-tenant:${byokJobId}:${usDeployment.id}`;
+  const byokIdentity = `byok:${'b'.repeat(64)}`;
+  await query('INSERT INTO mr_job_credentials VALUES($1,$2,$3,$4,$5,$6)', [
+    byokJobId,
+    'byok-tenant',
+    usDeployment.id,
+    'byok',
+    byokIdentity,
+    sealVault(legacyUsFrozen, vaultKey, byokAad),
+  ]);
+  await query('INSERT INTO mr_attempt_credentials VALUES($1,1,$2,$3,$4)', [
+    byokJobId,
+    'byok-tenant',
+    usDeployment.id,
+    byokIdentity,
+  ]);
+  const byokOnlyStore = new AttemptCredentialStore(pool, {
+    vaultKey,
+    env: {} as NodeJS.ProcessEnv,
+    injected: false,
+  });
+  await query('INSERT INTO mr_connections VALUES($1,$2,$3)', [
+    'byok-tenant',
+    usDeployment.id,
+    sealVault(
+      {
+        apiKey: 'different-rotated-key',
+        endpoint: 'https://other-ws.us-east-1.custom.example/api/v1',
+      },
+      vaultKey,
+      `byok-tenant:${usDeployment.id}`,
+    ),
+  ]);
+  const mismatched = await byokOnlyStore.read({
+    workspaceId: 'byok-tenant',
+    jobId: byokJobId,
+    attempt: 1,
+    deployment: usDeployment,
+    billing: 'byok',
+  });
+  expect(alibabaCredentials(usDeployment, mismatched.env)).toBeNull();
+  await query(
+    'UPDATE mr_connections SET ciphertext=$3 WHERE workspace_id=$1 AND deployment_id=$2',
+    [
+      'byok-tenant',
+      usDeployment.id,
+      sealVault(
+        {
+          apiKey: 'different-rotated-key',
+          endpoint: 'https://customer-us-ws.us-east-1.custom.example/api/v1',
+        },
+        vaultKey,
+        `byok-tenant:${usDeployment.id}`,
+      ),
+    ],
+  );
+  const matched = await byokOnlyStore.read({
+    workspaceId: 'byok-tenant',
+    jobId: byokJobId,
+    attempt: 1,
+    deployment: usDeployment,
+    billing: 'byok',
+  });
+  expect(alibabaCredentials(usDeployment, matched.env)).toEqual({
+    apiKey: 'frozen-us-byok-key',
+    endpoint: 'https://customer-us-ws.us-east-1.custom.example/api/v1',
   });
 });

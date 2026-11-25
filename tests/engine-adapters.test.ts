@@ -1,3 +1,6 @@
+import { EventEmitter } from 'node:events';
+import type { ClientRequest, IncomingMessage } from 'node:http';
+import type { request as httpsRequestType } from 'node:https';
 import { describe, expect, it } from 'vitest';
 import type { Deployment, GenerateInput, Route } from '@media-router/contracts';
 import {
@@ -5,7 +8,10 @@ import {
   createAlibabaAdapter,
   createBytePlusAdapter,
   createEngine,
+  createPublicPinnedFetch,
+  createQwenImageAdapter,
   normalizeAlibabaEndpoint,
+  PublicTargetRejectedError,
   SubmissionRejected,
   SubmissionUnknown,
 } from '@media-router/engine';
@@ -408,5 +414,148 @@ describe('BytePlus synchronous image adapter (no live calls)', () => {
       fetch: async () => Response.json({ data: [] }),
     });
     await expect(invalidResponse.submit(imageContext)).rejects.toBeInstanceOf(SubmissionUnknown);
+  });
+  it('resolves DNS once and pins public HTTPS provider requests without following redirects', async () => {
+    let lookups = 0;
+    let capturedOptions: Record<string, unknown> | undefined;
+    let singleLookupResult: [string, number] | undefined;
+    let allLookupResult: unknown;
+    const mockHttpsRequest = ((
+      _url: URL,
+      options: Record<string, unknown>,
+      cb: (res: IncomingMessage) => void,
+    ) => {
+      capturedOptions = options;
+      const lookupFn = options.lookup as (
+        host: string,
+        opts: unknown,
+        done: (err: Error | null, addr: unknown, family?: number) => void,
+      ) => void;
+      lookupFn('fixture-workspace.example.invalid', {}, (_err, addr, family) => {
+        singleLookupResult = [String(addr), Number(family)];
+      });
+      lookupFn('fixture-workspace.example.invalid', { all: true }, (_err, list) => {
+        allLookupResult = list;
+      });
+      const req = new EventEmitter() as ClientRequest;
+      req.end = (() => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 200;
+        res.headers = { 'content-type': 'application/json' };
+        res.destroy = () => res;
+        cb(res);
+        res.emit('data', Buffer.from(JSON.stringify({ output: { task_id: 'pinned-task' } })));
+        res.emit('end');
+        return req;
+      }) as ClientRequest['end'];
+      return req;
+    }) as unknown as typeof httpsRequestType;
+    const pinnedFetch = createPublicPinnedFetch({
+      resolve: async () => {
+        lookups++;
+        return [{ address: '93.184.216.34', family: 4 }];
+      },
+      httpsRequest: mockHttpsRequest,
+    });
+    const res = await pinnedFetch('https://fixture-workspace.example.invalid/api/v1/tasks/1', {
+      method: 'GET',
+      redirect: 'error',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ output: { task_id: 'pinned-task' } });
+    expect(lookups).toBe(1);
+    expect(capturedOptions).toMatchObject({
+      agent: false,
+      family: 4,
+      servername: 'fixture-workspace.example.invalid',
+    });
+    expect(singleLookupResult).toEqual(['93.184.216.34', 4]);
+    expect(allLookupResult).toEqual([{ address: '93.184.216.34', family: 4 }]);
+
+    const redirectFetch = createPublicPinnedFetch({
+      resolve: async () => [{ address: '93.184.216.34', family: 4 }],
+      httpsRequest: ((
+        _url: URL,
+        _options: Record<string, unknown>,
+        cb: (res: IncomingMessage) => void,
+      ) => {
+        const req = new EventEmitter() as ClientRequest;
+        req.end = (() => {
+          const res = new EventEmitter() as IncomingMessage;
+          res.statusCode = 302;
+          res.headers = { location: 'https://127.0.0.1/internal' };
+          res.destroy = () => res;
+          cb(res);
+          return req;
+        }) as ClientRequest['end'];
+        return req;
+      }) as unknown as typeof httpsRequestType,
+    });
+    await expect(
+      redirectFetch('https://fixture-workspace.example.invalid/api/v1/tasks/1', {
+        redirect: 'error',
+      }),
+    ).rejects.toThrow(/redirects/i);
+  });
+  it('blocks private, loopback, metadata and mixed DNS targets before opening sockets on Wan and Qwen adapters', async () => {
+    const blockedAnswers = [
+      [{ address: '127.0.0.1', family: 4 }],
+      [{ address: '169.254.169.254', family: 4 }],
+      [{ address: '10.0.0.12', family: 4 }],
+      [{ address: '::1', family: 6 }],
+      [
+        { address: '93.184.216.34', family: 4 },
+        { address: '10.0.0.12', family: 4 },
+      ],
+      [],
+    ];
+    for (const answers of blockedAnswers) {
+      let socketCalls = 0;
+      const pinned = createPublicPinnedFetch({
+        resolve: async () => answers,
+        httpsRequest: (() => {
+          socketCalls++;
+          throw new Error('should never connect');
+        }) as unknown as typeof httpsRequestType,
+      });
+      await expect(
+        pinned('https://attacker.example.invalid/api/v1', { redirect: 'error' }),
+      ).rejects.toBeInstanceOf(PublicTargetRejectedError);
+      expect(socketCalls).toBe(0);
+
+      const wan = createAlibabaAdapter({ env, resolve: async () => answers });
+      await expect(wan.submit(context)).rejects.toBeInstanceOf(SubmissionRejected);
+      await expect(wan.poll({ ...context, upstreamId: 'task-1' })).rejects.toBeInstanceOf(
+        PublicTargetRejectedError,
+      );
+
+      const qwenDeployment: Deployment = {
+        ...deployment,
+        id: 'alibaba-model-studio-ap-southeast-1',
+      };
+      const qwenRoute: Route = {
+        ...route,
+        id: 'alibaba-model-studio-ap-southeast-1/alibaba-qwen-image-3.0-pro',
+        deploymentId: qwenDeployment.id,
+        modelId: 'alibaba/qwen-image-3.0-pro',
+        upstreamModelId: 'qwen-image-3.0-pro',
+        supportedOperations: ['text-to-image'],
+      };
+      const qwenContext = {
+        jobId: 'job-qwen-ssrf',
+        route: qwenRoute,
+        deployment: qwenDeployment,
+        input: {
+          modelId: 'alibaba/qwen-image-3.0-pro',
+          operation: 'text-to-image' as const,
+          input: { prompt: 'Test prompt', resolution: '1K' },
+        },
+      };
+      const qwen = createQwenImageAdapter({ env, resolve: async () => answers });
+      await expect(qwen.submit(qwenContext)).rejects.toBeInstanceOf(SubmissionRejected);
+      await expect(qwen.poll({ ...qwenContext, upstreamId: 'task-1' })).rejects.toBeInstanceOf(
+        PublicTargetRejectedError,
+      );
+    }
   });
 });

@@ -59,7 +59,21 @@ async function appFixture() {
       return {};
     },
   };
-  const app = await buildApp({ engine, apiToken: 'fixture-operator' });
+  const app = await buildApp({
+    engine,
+    apiToken: 'fixture-operator',
+    resolvePublicEndpoint: async (hostname) => {
+      if (hostname === 'private-ws.example.invalid') return [{ address: '127.0.0.1', family: 4 }];
+      if (hostname === 'metadata-ws.example.invalid')
+        return [{ address: '169.254.169.254', family: 4 }];
+      if (hostname === 'mixed-ws.example.invalid')
+        return [
+          { address: '93.184.216.34', family: 4 },
+          { address: '10.0.0.5', family: 4 },
+        ];
+      return [{ address: '93.184.216.34', family: 4 }];
+    },
+  });
   apps.push(app);
   return { app, writes };
 }
@@ -131,19 +145,26 @@ describe('machine-readable REST contract', () => {
         })
       ).statusCode,
     ).toBe(400);
-    expect(
-      (
-        await app.inject({
-          method: 'PUT',
-          url: '/v1/connections/alibaba-model-studio-ap-southeast-1',
-          headers: { authorization: 'Bearer fixture-customer' },
-          payload: {
-            apiKey: 'fixture-private-provider',
-            endpoint: 'http://127.0.0.1/api/v1',
-          },
-        })
-      ).statusCode,
-    ).toBe(400);
+    for (const blocked of [
+      'http://127.0.0.1/api/v1',
+      'https://private-ws.example.invalid/api/v1',
+      'https://metadata-ws.example.invalid/api/v1',
+      'https://mixed-ws.example.invalid/api/v1',
+    ]) {
+      expect(
+        (
+          await app.inject({
+            method: 'PUT',
+            url: '/v1/connections/alibaba-model-studio-ap-southeast-1',
+            headers: { authorization: 'Bearer fixture-customer' },
+            payload: {
+              apiKey: 'fixture-private-provider',
+              endpoint: blocked,
+            },
+          })
+        ).statusCode,
+      ).toBe(400);
+    }
     const alibabaResponse = await app.inject({
       method: 'PUT',
       url: '/v1/connections/alibaba-model-studio-ap-southeast-1',
