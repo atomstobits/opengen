@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiResponseError, readApiJson } from '../dashboard/api-response';
 import { KeyGovernanceEditor, type GovernanceContext, type GovernanceKey } from './key-editor';
 import { PolicyGovernanceEditor, type GovernancePolicy } from './policy-editor';
 import styles from './governance.module.css';
@@ -125,14 +126,13 @@ function Settings({ context }: { context: GovernanceContext }) {
           },
           ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         });
-        const value = await response.json();
-        controller.signal.throwIfAborted();
+        const value = await readApiJson<T>(
+          response,
+          'Governance request was not confirmed. Refresh the current workspace before another action.',
+          { signal: controller.signal },
+        );
         if (!active.current) throw new DOMException('Workspace changed.', 'AbortError');
-        if (!response.ok)
-          throw new Error(
-            'Governance request was not confirmed. Refresh the current workspace before another action.',
-          );
-        return (value.data ?? value) as T;
+        return value;
       } finally {
         requests.current.delete(controller);
       }
@@ -175,14 +175,16 @@ function Settings({ context }: { context: GovernanceContext }) {
           ? current
           : (nextProfiles[0]?.id ?? ''),
       );
-    } catch {
+    } catch (cause) {
       if (active.current && epoch === loadEpoch.current) {
         setKeys([]);
         setProfiles([]);
         setModels([]);
         setProviders([]);
         setError(
-          'Governance settings could not be loaded. Refresh your current workspace and permissions before continuing.',
+          cause instanceof ApiResponseError && cause.hasServerMessage
+            ? cause.message
+            : 'Governance settings could not be loaded. Refresh your current workspace and permissions before continuing.',
         );
       }
     } finally {

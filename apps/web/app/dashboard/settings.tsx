@@ -5,6 +5,7 @@ import { catalog } from '@media-router/catalog';
 import { keyScopes as permissionScopes, type RoutingPolicy } from '@media-router/contracts';
 import { CopyButton } from '../ui';
 import { notifyBrowserSessionChanged } from '../gateway-access';
+import { readApiJson } from './api-response';
 import {
   hasWorkspaceAuthority,
   privateWorkspaceHeaders,
@@ -45,18 +46,12 @@ async function requestForAuthority<T>(
     },
     ...(input === undefined ? {} : { body: JSON.stringify(input) }),
   });
-  const body = await response.json();
-  signal?.throwIfAborted();
-  if (!response.ok) {
-    if (response.status === 409 && body.error?.code === 'browser_authority_changed')
-      notifyBrowserSessionChanged();
-    throw new Error(
-      typeof body.error === 'string'
-        ? body.error
-        : (body.error?.message ?? 'The gateway could not complete this request.'),
-    );
-  }
-  return body.data ?? body;
+  return readApiJson<T>(response, 'The gateway could not complete this request.', {
+    signal,
+    onError: ({ status, code }) => {
+      if (status === 409 && code === 'browser_authority_changed') notifyBrowserSessionChanged();
+    },
+  });
 }
 
 interface SettingsProps {

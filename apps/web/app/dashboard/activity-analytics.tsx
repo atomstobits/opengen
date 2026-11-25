@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { readApiJson } from './api-response';
 import {
   activityQuery,
   moneyMicros,
@@ -217,14 +218,10 @@ function AnalyticsRecords({
       headers: privateWorkspaceHeaders({ workspaceId, recoveryScope }),
     })
       .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok)
-          throw new Error(
-            typeof body.error === 'string'
-              ? body.error
-              : (body.error?.message ?? 'Usage report could not be loaded.'),
-          );
-        if (!controller.signal.aborted) setReport(body.data ?? body);
+        const next = await readApiJson<Analytics>(response, 'Usage report could not be loaded.', {
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) setReport(next);
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
