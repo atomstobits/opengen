@@ -43,6 +43,40 @@ export function initialPlaygroundRequest(
   };
 }
 
+export interface OperationRouteSwitch {
+  routeId?: string;
+  outcome: 'kept' | 'switched-sibling' | 'ambiguous-sibling' | 'cleared-unsupported' | 'none';
+  switchedRoute?: Route;
+}
+
+/**
+ * When changing operation while pinned to a feature-split route, preserve the deployment pin only
+ * when a single unambiguous sibling route on that exact deployment supports the new operation.
+ */
+export function resolveOperationRouteSwitch(
+  routes: readonly Route[],
+  previousRouteId: string | undefined,
+  nextOperation: Operation,
+): OperationRouteSwitch {
+  if (!previousRouteId) return { outcome: 'none' };
+  const previous = routes.find((route) => route.id === previousRouteId);
+  if (!previous) return { outcome: 'none' };
+  const available = routes.filter((route) => route.operations.includes(nextOperation));
+  if (available.some((route) => route.id === previousRouteId)) {
+    return { routeId: previousRouteId, outcome: 'kept' };
+  }
+  const sameDeployment = available.filter((route) => route.deploymentId === previous.deploymentId);
+  if (sameDeployment.length === 1) {
+    return {
+      routeId: sameDeployment[0]!.id,
+      outcome: 'switched-sibling',
+      switchedRoute: sameDeployment[0]!,
+    };
+  }
+  if (sameDeployment.length > 1) return { outcome: 'ambiguous-sibling' };
+  return { outcome: 'cleared-unsupported' };
+}
+
 /** A new model changes its inputs, never the caller's routing restrictions. */
 export function eligibleReuseRoutes(
   model: Catalog['models'][number],
@@ -109,6 +143,58 @@ export function validatePlaygroundRequest(
       throw new Error('A pinned regional route cannot enable provider fallback.');
   }
   return request;
+}
+
+/** Returns true when a draft's routing restrictions exclude a candidate sibling route. */
+export function siblingRouteRoutingConflict(
+  model: Catalog['models'][number],
+  route: Route,
+  deployments: Catalog['deployments'],
+  draft: GenerateInput,
+): boolean {
+  if (!draft.routing) return false;
+  return eligibleReuseRoutes(model, [route], deployments, draft, draft.operation).length === 0;
+}
+
+/** Removes only the routing restrictions that conflict with a chosen route, keeping compatible preferences. */
+export function clearConflictingRoutingFilters(
+  model: Catalog['models'][number],
+  route: Route,
+  deployments: Catalog['deployments'],
+  routing?: GenerateInput['routing'],
+): NonNullable<GenerateInput['routing']> {
+  if (!routing) return {};
+  const deployment = deployments.find((entry) => entry.id === route.deploymentId);
+  const next: NonNullable<GenerateInput['routing']> = { ...routing };
+  if (next.modelIds && !next.modelIds.includes(model.id)) delete next.modelIds;
+  if (deployment) {
+    if (next.deploymentIds && !next.deploymentIds.includes(deployment.id))
+      delete next.deploymentIds;
+    if (next.providerIds && !next.providerIds.includes(deployment.providerId))
+      delete next.providerIds;
+    if (next.modelProviderExceptions) {
+      const exception = next.modelProviderExceptions.find((item) => item.modelId === model.id);
+      if (exception && !exception.providerIds.includes(deployment.providerId)) {
+        const remaining = next.modelProviderExceptions.filter((item) => item.modelId !== model.id);
+        if (remaining.length) next.modelProviderExceptions = remaining;
+        else delete next.modelProviderExceptions;
+      }
+    }
+    if (next.authorOnly && !model.authorProviderIds.includes(deployment.providerId))
+      delete next.authorOnly;
+    if (next.endpointRegions && !next.endpointRegions.includes(deployment.endpointRegion))
+      delete next.endpointRegions;
+    if (
+      next.processingRegions &&
+      (!deployment.processingRegions?.length ||
+        !deployment.processingRegions.every((region) => next.processingRegions!.includes(region)))
+    )
+      delete next.processingRegions;
+    if (next.processingScopes && !next.processingScopes.includes(deployment.scope))
+      delete next.processingScopes;
+  }
+  if (next.fidelity === 'native' && route.fidelity !== 'native') delete next.fidelity;
+  return next;
 }
 
 /** Drafts may be incomplete, but are never restored under another namespace. */

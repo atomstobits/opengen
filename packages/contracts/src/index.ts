@@ -95,6 +95,15 @@ export interface Rate {
   usdMicros: number;
   note?: string;
 }
+/** Optional route-specific feature discriminator when one variant/deployment splits capabilities beyond Operation. */
+export interface RouteFeature {
+  /** Stable lowercase slug unique within (modelId, deploymentId, operations), e.g. 'layers', 'audio-stems'. */
+  id: string;
+  /** Plain-language feature label shown across catalog UI, quotes, CLI and discovery. */
+  label: string;
+  /** Optional short scope note describing what this route powers or restricts. */
+  summary?: string;
+}
 export interface Route {
   id: string;
   modelId: string;
@@ -103,6 +112,8 @@ export interface Route {
   /** Provider-specific display label; exact variant identity remains modelId. */
   providerModelName?: string;
   operations: Operation[];
+  /** Optional sub-operation feature identity when sibling routes share an operation on one deployment. */
+  feature?: RouteFeature;
   resolutions: string[];
   durations: number[];
   fidelity: Fidelity;
@@ -196,6 +207,10 @@ export interface QuoteCandidate {
   providerId: string;
   endpointRegion: string;
   scope: DeploymentScope;
+  /** Operations advertised by this route; clarifies why a feature-specific route is eligible or excluded. */
+  operations?: Operation[];
+  /** Optional sub-operation feature identity declared by this route. */
+  feature?: RouteFeature;
   estimatedCostMicros: number | null;
   currency: 'USD';
   executable: boolean;
@@ -325,6 +340,7 @@ export type {
 export type GenerateInput = GenerationRequest;
 
 export * from './catalog-discovery';
+export * from './route-features';
 
 export type { DoctorReport, DoctorBlocker, WorkspaceReadiness } from './doctor';
 

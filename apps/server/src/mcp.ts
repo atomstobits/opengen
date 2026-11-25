@@ -246,7 +246,7 @@ export async function registerMcp(app: FastifyInstance, context: Context) {
       'catalog_get',
       {
         description:
-          'Inspect a company, model series, exact variant, regional deployment or route. Models include canonical common/model-specific generationProfiles with JSON schemas, capabilities and sources. Series list variants and their separate providers; execution always uses an exact model ID.',
+          'Inspect a company, model series, exact variant, regional deployment or route. Models include canonical common/model-specific generationProfiles with JSON schemas, capabilities and sources. Routes declare supported operations and optional route-specific feature metadata when one deployment splits features across separate routes. Series list variants and their separate providers; execution always uses an exact model ID.',
         annotations: readOnly,
         inputSchema: { id: z.string() },
       },

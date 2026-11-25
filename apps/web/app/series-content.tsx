@@ -43,8 +43,8 @@ export function SeriesProviders({
         {showCompletionControl && <PercentileControl value={percentile} onChange={setPercentile} />}
       </div>
       <p className="series-section-intro">
-        Every variant and regional deployment is listed separately. Choose an exact variant when
-        generating; provider routing never substitutes another variant.
+        Every variant, regional deployment and feature-specific route is listed separately. Choose
+        an exact variant when generating; provider routing never substitutes another variant.
       </p>
       <div className="variant-sections">
         {variants.map(({ model, routes }) => {
@@ -100,7 +100,7 @@ export function SeriesProviders({
                 catalog={catalog}
                 metrics={metrics}
                 percentile={percentile}
-                tryHref={(routeId) => playgroundHref(model.id, routeId)}
+                tryHref={(routeId, operation) => playgroundHref(model.id, routeId, operation)}
               />
             </section>
           );

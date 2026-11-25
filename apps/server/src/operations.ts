@@ -35,6 +35,13 @@ export const modelSchemaQuerySchema = z
   .object({ modelId: generationSchema.shape.modelId, operation: generationSchema.shape.operation })
   .strict();
 
+export const routesListQuerySchema = z
+  .object({
+    modelId: z.string().min(1).max(160).optional(),
+    operation: generationSchema.shape.operation.optional(),
+  })
+  .strict();
+
 const keyId = z.uuid();
 const name = z.string().min(1).max(80);
 export const activityQuerySchema = z
@@ -94,7 +101,7 @@ const coreCallOptions = [
   body('models.schema', modelSchemaQuerySchema),
   body('providers.list', empty),
   body('deployments.list', empty),
-  body('routes.list', z.object({ modelId: z.string().max(160).optional() }).strict()),
+  body('routes.list', routesListQuerySchema),
   body('metrics.list', empty),
   body('operations.list', empty),
   body('quotes.single', generationSchema),

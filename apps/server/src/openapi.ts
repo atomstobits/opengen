@@ -1234,6 +1234,17 @@ export function openApiDocument(billingAvailable = false) {
         BillingPolicy: billingPolicy,
         BillingRechargeAttempt: billingRechargeAttempt,
         BillingDocument: billingDocument,
+        RouteFeature: {
+          ...object(
+            {
+              id: string,
+              label: string,
+              summary: string,
+            },
+            ['id', 'label'],
+          ),
+          additionalProperties: false,
+        },
         QuoteCandidate: object(
           {
             billing: object({
@@ -1248,6 +1259,8 @@ export function openApiDocument(billingAvailable = false) {
             scope: {
               enum: ['regional', 'mainland-china', 'international', 'global', 'undisclosed'],
             },
+            operations: array(z.toJSONSchema(generationSchema.shape.operation)),
+            feature: ref('RouteFeature'),
             estimatedCostMicros: nullableMoney,
             currency: { const: 'USD' },
             executable: { type: 'boolean' },

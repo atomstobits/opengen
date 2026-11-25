@@ -150,15 +150,37 @@ export function localCatalog(request: Request): Response | undefined {
   }
   if (url.pathname === '/v1/providers') return publicJson({ data: catalog.providers }, method);
   if (url.pathname === '/v1/deployments') return publicJson({ data: catalog.deployments }, method);
-  if (url.pathname === '/v1/routes')
+  if (url.pathname === '/v1/routes') {
+    const keys = [...url.searchParams.keys()];
+    const modelParam = url.searchParams.get('modelId');
+    const operationParam = url.searchParams.get('operation');
+    const parsedOperation =
+      operationParam === null ? null : generationSchema.shape.operation.safeParse(operationParam);
+    if (
+      keys.some((key) => key !== 'modelId' && key !== 'operation') ||
+      keys.some((key) => url.searchParams.getAll(key).length !== 1) ||
+      (modelParam !== null && (!modelParam.length || modelParam.length > 160)) ||
+      (parsedOperation !== null && !parsedOperation.success)
+    )
+      return publicJson(
+        {
+          error: {
+            code: 'invalid_input',
+            message: 'Request parameters do not match the documented schema.',
+          },
+        },
+        method,
+        400,
+      );
+    const operation = parsedOperation?.success ? parsedOperation.data : undefined;
+    const routes = modelParam ? getModelRoutes(modelParam) : catalog.routes;
     return publicJson(
       {
-        data: url.searchParams.get('modelId')
-          ? getModelRoutes(url.searchParams.get('modelId')!)
-          : catalog.routes,
+        data: operation ? routes.filter((route) => route.operations.includes(operation)) : routes,
       },
       method,
     );
+  }
   if (url.pathname === '/v1/operations')
     return publicJson(
       {

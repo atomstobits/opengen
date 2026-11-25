@@ -139,7 +139,7 @@ test('the separate playground quotes comparison-only routes and preserves a sele
     .fill('A quiet coastal road at sunrise, filmed in a slow tracking shot.');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   const pricing = page.getByRole('region', { name: 'Wan 3.0 pricing' });
-  await expect(pricing.getByText('Quote details · 14 routes')).toBeVisible();
+  await expect(pricing.getByText('Quote details · 10 routes')).toBeVisible();
   await expect(pricing).toContainText(
     'No qualified adapter and regional credentials are configured.',
   );

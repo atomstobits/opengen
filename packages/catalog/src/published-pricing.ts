@@ -2491,12 +2491,42 @@ const published: Record<string, PublishedPricing> = {
   ),
 };
 
-export function publishedPricingFor(
-  route: Pick<Route, 'modelId' | 'deploymentId'> & Partial<Pick<Route, 'upstreamModelId'>>,
+/** Exact route-ID overrides take highest priority for feature- or endpoint-specific tariffs. */
+const publishedByRoute: Record<string, PublishedPricing> = {};
+
+/** Operation-scoped overrides (`deploymentId|modelId|operation`) take priority over deployment-wide tariffs. */
+const publishedByOperation: Record<string, PublishedPricing> = {};
+
+export function scopePublishedPricing(
+  entry: PublishedPricing | undefined,
+  operations?: readonly Route['operations'][number][],
 ): Route['publishedPricing'] {
-  return (
-    (route.upstreamModelId
-      ? published[`${route.deploymentId}|${route.upstreamModelId}`]
-      : undefined) ?? published[`${route.deploymentId}|${canonicalModelId(route.modelId)}`]
+  if (!entry || !operations?.length || !entry.outputRates?.length) return entry;
+  const scopedRates = entry.outputRates.filter(
+    (rate) => !rate.operation || operations.includes(rate.operation),
   );
+  if (scopedRates.length === entry.outputRates.length) return entry;
+  const { outputRates: _omitted, ...rest } = entry;
+  return scopedRates.length ? { ...rest, outputRates: scopedRates } : rest;
+}
+
+export function publishedPricingFor(
+  route: Pick<Route, 'modelId' | 'deploymentId'> &
+    Partial<Pick<Route, 'id' | 'operations' | 'upstreamModelId'>>,
+): Route['publishedPricing'] {
+  const modelId = canonicalModelId(route.modelId);
+  if (route.id && Object.hasOwn(publishedByRoute, route.id))
+    return scopePublishedPricing(publishedByRoute[route.id], route.operations);
+  if (route.operations?.length === 1) {
+    const opKey = `${route.deploymentId}|${modelId}|${route.operations[0]}`;
+    if (Object.hasOwn(publishedByOperation, opKey))
+      return scopePublishedPricing(publishedByOperation[opKey], route.operations);
+  }
+  const upstreamKey = route.upstreamModelId
+    ? `${route.deploymentId}|${route.upstreamModelId}`
+    : undefined;
+  const entry =
+    (upstreamKey && Object.hasOwn(published, upstreamKey) ? published[upstreamKey] : undefined) ??
+    published[`${route.deploymentId}|${modelId}`];
+  return scopePublishedPricing(entry, route.operations);
 }
