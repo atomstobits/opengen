@@ -2,27 +2,17 @@
 
 import { getPublishedRate } from '@media-router/catalog';
 import type { Catalog, GenerateInput, Job, Model, Quote, Route } from '@media-router/contracts';
-import { Icon, regionNames } from './ui';
+import { Icon } from './ui';
+import { routeIdentity } from './route-identity';
+export { routeIdentity };
 import { eligibleReuseRoutes } from './playground-request';
 import styles from './playground-pricing.module.css';
 
-export const usd = (micros: number) =>
-  `$${(micros / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 6, minimumFractionDigits: 2 })}`;
-
-export function routeIdentity(catalog: Catalog, route: Route) {
-  const deployment = catalog.deployments.find((entry) => entry.id === route.deploymentId);
-  const provider = catalog.providers.find((entry) => entry.id === deployment?.providerId);
-  const service = deployment?.name.split(' · ')[0];
-  return {
-    label:
-      [provider?.name, service !== provider?.name ? service : undefined, route.providerModelName]
-        .filter(Boolean)
-        .join(' · ') || route.id,
-    region: deployment
-      ? (regionNames[deployment.endpointRegion] ?? deployment.endpointRegion)
-      : 'Not disclosed',
-  };
-}
+const usdFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+});
+export const usd = (micros: number) => `$${usdFormatter.format(micros / 1_000_000)}`;
 
 type PublishedOutputRate = NonNullable<
   NonNullable<Route['publishedPricing']>['outputRates']
@@ -212,7 +202,6 @@ function findPlaygroundRate(
     ...(quality ? { quality } : {}),
   };
 }
-
 function PublishedRate({
   route,
   model,
@@ -297,7 +286,7 @@ export function PlaygroundPricing({
 }) {
   const selected = quote?.candidates.find((entry) => entry.routeId === quote.selectedRouteId);
   const active = routes.find((entry) => entry.id === (selected?.routeId ?? draft.routeId));
-  const activeIdentity = active && routeIdentity(catalog, active);
+  const activeIdentity = active && routeIdentity(catalog, active, draft.operation, routes);
   const direct = draft.billing === 'byok';
   const priceRoutes = eligibleReuseRoutes(
     model,
@@ -314,7 +303,8 @@ export function PlaygroundPricing({
   const displayRoute =
     priceRoutes.find((route) => route.id === active?.id) ??
     (priceRoutes.length === 1 ? priceRoutes[0] : undefined);
-  const displayIdentity = displayRoute && routeIdentity(catalog, displayRoute);
+  const displayIdentity =
+    displayRoute && routeIdentity(catalog, displayRoute, draft.operation, routes);
   const resolvedRates = priceRoutes.map((route) => findPlaygroundRate(route, model, draft));
   const sources = priceRoutes.map((route, index) =>
     resolvedRates[index]?.qualified
@@ -384,7 +374,7 @@ export function PlaygroundPricing({
                 <summary>View {priceRoutes.length} regional route prices</summary>
                 <ul className={styles.routeList}>
                   {priceRoutes.map((route) => {
-                    const identity = routeIdentity(catalog, route);
+                    const identity = routeIdentity(catalog, route, draft.operation, routes);
                     return (
                       <li key={route.id}>
                         <b>
@@ -452,7 +442,7 @@ export function PlaygroundPricing({
           <ul className={styles.routeList}>
             {quote.candidates.map((candidate) => {
               const route = routes.find((entry) => entry.id === candidate.routeId);
-              const identity = route && routeIdentity(catalog, route);
+              const identity = route && routeIdentity(catalog, route, quote.operation);
               return (
                 <li key={candidate.routeId}>
                   <b>{identity ? `${identity.label} · ${identity.region}` : candidate.routeId}</b>
@@ -466,6 +456,7 @@ export function PlaygroundPricing({
                       ? 'Available on this installation'
                       : (candidate.reason ?? 'Comparison only')}
                   </p>
+                  {identity?.summary && <p>{identity.summary}</p>}
                 </li>
               );
             })}

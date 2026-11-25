@@ -9,6 +9,7 @@ import {
   catalogSearchFiltersSchema,
   catalogSearchQuerySchema,
   canonicalModelId,
+  routeFeatureSignature,
 } from '@media-router/contracts';
 import type {
   Catalog,
@@ -177,16 +178,47 @@ export function validateCatalog(): string[] {
     if (!providerIds.has(deployment.providerId))
       errors.push(`Unknown provider for ${deployment.id}`);
   }
+  const deploymentSignatures = new Map<string, string>();
   for (const route of catalog.routes) {
     if (!getModel(route.modelId)) errors.push(`Unknown model for ${route.id}`);
     else if (canonicalModelId(route.modelId) !== route.modelId)
       errors.push(`Noncanonical model reference for ${route.id}`);
     if (!catalog.deployments.some((deployment) => deployment.id === route.deploymentId))
       errors.push(`Unknown deployment for ${route.id}`);
+    if (!route.operations.length) errors.push(`Missing operations for ${route.id}`);
+    if (new Set(route.operations).size !== route.operations.length)
+      errors.push(`Duplicate operations for ${route.id}`);
+    if (route.feature) {
+      if (
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(route.feature.id) ||
+        !route.feature.label.trim() ||
+        (route.feature.summary !== undefined && !route.feature.summary.trim())
+      )
+        errors.push(`Invalid route feature metadata for ${route.id}`);
+    }
+    if (route.status !== 'retired') {
+      const siblingKey = `${route.modelId}|${route.deploymentId}|${routeFeatureSignature(route)}`;
+      const existing = deploymentSignatures.get(siblingKey);
+      if (existing)
+        errors.push(
+          `Ambiguous sibling routes for ${route.modelId} on ${route.deploymentId}: ${existing} and ${route.id} share the same operations and feature`,
+        );
+      else deploymentSignatures.set(siblingKey, route.id);
+    }
+    if (route.liveVerification) {
+      const verifiedOps = route.liveVerification.operations ?? [route.liveVerification.operation];
+      if (
+        !route.operations.includes(route.liveVerification.operation) ||
+        verifiedOps.some((operation) => !route.operations.includes(operation))
+      )
+        errors.push(`Live verification lists unsupported operation for ${route.id}`);
+    }
     if (!route.source.url.startsWith('https://') || !route.pricingSource.url.startsWith('https://'))
       errors.push(`Missing source for ${route.id}`);
     if (route.rates.some((rate) => !Number.isSafeInteger(rate.usdMicros) || rate.usdMicros < 0))
       errors.push(`Invalid rate for ${route.id}`);
+    if (route.rates.some((rate) => rate.operation && !route.operations.includes(rate.operation)))
+      errors.push(`Rate lists unsupported operation for ${route.id}`);
     if (route.publishedPricing) {
       const { summary, source, conditions, outputRates } = route.publishedPricing;
       let validSource = false;
@@ -206,6 +238,8 @@ export function validateCatalog(): string[] {
         !Number.isFinite(Date.parse(source.checkedAt))
       )
         errors.push(`Invalid published tariff evidence for ${route.id}`);
+      if (outputRates?.some((rate) => rate.operation && !route.operations.includes(rate.operation)))
+        errors.push(`Published tariff output rate lists unsupported operation for ${route.id}`);
     }
   }
   return errors;
@@ -280,8 +314,22 @@ export function quote(
       'no_matching_route',
       'No route satisfies the exact model and regional/fidelity restrictions.',
     );
+  // When routing automatically on a deployment that splits operations into separate routes,
+  // omit sibling routes for other operations once that deployment has a matching operation route.
+  const deploymentsSupportingOperation = new Set(
+    eligible
+      .filter((route) => route.operations.includes(input.operation))
+      .map((route) => route.deploymentId),
+  );
+  const evaluated = input.routeId
+    ? eligible
+    : eligible.filter(
+        (route) =>
+          route.operations.includes(input.operation) ||
+          !deploymentsSupportingOperation.has(route.deploymentId),
+      );
   const executableIds = new Set(options.executableRouteIds ?? []);
-  const candidates: QuoteCandidate[] = eligible
+  const candidates: QuoteCandidate[] = evaluated
     .map((route) => {
       const deployment = catalog.deployments.find((item) => item.id === route.deploymentId)!;
       const inputIssues = validateRouteInput(input, route);
@@ -375,6 +423,8 @@ export function quote(
         providerId: deployment.providerId,
         endpointRegion: deployment.endpointRegion,
         scope: deployment.scope,
+        operations: [...route.operations],
+        ...(route.feature ? { feature: route.feature } : {}),
         estimatedCostMicros: estimate,
         currency: 'USD' as const,
         executable,

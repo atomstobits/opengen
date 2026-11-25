@@ -56,10 +56,15 @@ function routeChoice(catalog: Catalog, route: Route) {
   );
   const endpoint = deployment?.endpointRegion ?? 'unknown';
   const modelName = model?.name ?? route.modelId;
-  const providerLabel =
+  const providerLabel = [
+    provider?.name ?? 'Provider',
     route.providerModelName && route.providerModelName !== modelName
-      ? `${provider?.name ?? 'Provider'} · ${route.providerModelName}`
-      : (provider?.name ?? 'Provider');
+      ? route.providerModelName
+      : undefined,
+    route.feature?.label,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const region = regionNames[endpoint] ?? endpoint;
   const resolution = getGenerationDefinition(route.modelId, 'text-to-image')?.defaults.resolution;
   const rate = route.rates.find(

@@ -57,7 +57,7 @@ import { registerPendingEmailCredits } from './pending-email-credits.js';
 import type { Job } from '@media-router/contracts';
 import type { Reconciliation } from '@media-router/engine';
 import { openApiDocument } from './openapi.js';
-import { describeOperations, modelSchemaQuerySchema } from './operations.js';
+import { describeOperations, modelSchemaQuerySchema, routesListQuerySchema } from './operations.js';
 import { registerFeedback } from './feedback.js';
 import type { FeedbackStore } from '@media-router/engine';
 import { registerEvents } from './events.js';
@@ -409,9 +409,15 @@ export async function buildApp(options: AppOptions = {}) {
   });
   app.get('/v1/providers', async () => ({ data: catalog.providers }));
   app.get('/v1/deployments', async () => ({ data: catalog.deployments }));
-  app.get<{ Querystring: { modelId?: string } }>('/v1/routes', async (request) => ({
-    data: request.query.modelId ? getModelRoutes(request.query.modelId) : catalog.routes,
-  }));
+  app.get('/v1/routes', async (request) => {
+    const query = routesListQuerySchema.parse(request.query);
+    const routes = query.modelId ? getModelRoutes(query.modelId) : catalog.routes;
+    return {
+      data: query.operation
+        ? routes.filter((route) => route.operations.includes(query.operation!))
+        : routes,
+    };
+  });
   app.post('/v1/quotes', async (request) =>
     makeQuote(parseInput(request.body), await quotePrincipal(request)),
   );

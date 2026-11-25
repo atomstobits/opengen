@@ -727,17 +727,67 @@ select option {
   color: var(--link);
   padding-left: 6px;
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .table-topline {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 22px 0 18px;
+}
+.table-topline-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 .table-topline p {
   color: var(--muted);
   margin: 0;
   font-size: 11px;
+}
+.feature-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.feature-filter button {
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+.feature-filter button:hover {
+  color: var(--ink);
+  background: var(--raised);
+}
+.feature-filter button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
 }
 .table-controls {
   display: flex;
@@ -897,13 +947,95 @@ select option {
 }
 .route-id {
   display: block;
-  font-size: 7px;
+  font-size: 9px;
   color: var(--subtle);
-  margin-top: 9px;
-  max-width: 250px;
+  margin-top: 8px;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.route-group-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--canvas);
+  color: var(--subtle);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.route-features {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+}
+.route-feature-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.route-feature-pill.is-dedicated,
+.route-feature-pill.is-active {
+  border-color: var(--control-line);
+  color: var(--ink);
+  font-weight: 500;
+}
+.route-feature-pill.is-subfeature {
+  border-color: color-mix(in srgb, var(--panel-agent) 40%, transparent);
+  background: color-mix(in srgb, var(--panel-agent) 10%, transparent);
+  color: var(--panel-agent);
+  font-weight: 500;
+}
+.route-feature-summary {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 320px;
+}
+.route-branch {
+  border-left: 2px solid var(--control-line);
+  padding-left: 12px;
+  margin-left: 10px;
+}
+.route-branch.is-start {
+  margin-top: 10px;
+}
+.route-branch-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.route-branch .route-features {
+  margin-top: 0;
+}
+.route-branch .route-id {
+  margin-top: 6px;
+}
+.route-table tr.route-group-start td,
+.route-table tr.route-group-middle td {
+  border-bottom-style: dashed;
+  border-bottom-color: var(--line);
+  padding-bottom: 14px;
+}
+.route-table tr.route-group-middle td,
+.route-table tr.route-group-end td {
+  padding-top: 14px;
 }
 .price-details > summary {
   display: inline-flex;
@@ -944,6 +1076,113 @@ select option {
   font-size: 14px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+.price-details[data-cheapest='true'] strong {
+  color: var(--success);
+}
+.cheapest-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cheapest-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.cheapest-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid var(--success-line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+.cheapest-savings {
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline dotted var(--success-line);
+  text-underline-offset: 3px;
+}
+.cheapest-tooltip {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  left: auto;
+  visibility: hidden;
+  width: max-content;
+  max-width: min(300px, 72vw);
+  padding: 10px 12px;
+  border: 1px solid var(--control-line);
+  border-radius: 7px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.45;
+  box-shadow: 0 10px 26px #00000066;
+  white-space: normal;
+}
+.cheapest-tooltip[data-placement='down'] {
+  top: calc(100% + 6px);
+}
+.cheapest-tooltip[data-placement='up'] {
+  bottom: calc(100% + 6px);
+}
+.cheapest-tooltip[data-open='true'] {
+  visibility: visible;
+}
+.cheapest-tooltip-title {
+  margin: 0 0 6px;
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 600;
+}
+.cheapest-tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cheapest-tooltip-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cheapest-tooltip-scope {
+  color: var(--ink);
+  font-size: 11px;
+}
+.cheapest-tooltip-scope strong {
+  color: var(--success);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cheapest-tooltip-compare {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.cheapest-tooltip-note {
+  margin: 7px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--subtle);
+  font-size: 10px;
+  line-height: 1.4;
 }
 .price-details small {
   font-size: 9px;
@@ -2394,6 +2633,16 @@ select option {
     flex-wrap: wrap;
     align-items: flex-start;
     padding: 18px 0;
+  }
+  .table-topline-summary {
+    width: 100%;
+  }
+  .feature-filter {
+    width: 100%;
+  }
+  .feature-filter button {
+    font-size: 10px;
+    padding: 5px 8px;
   }
   .table-controls {
     width: 100%;

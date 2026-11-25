@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { groupRoutesByProvider } from '@media-router/catalog';
-import type {
-  Catalog,
-  GenerateInput,
-  Job,
-  Model,
-  Operation,
-  Quote,
-  Route,
+import {
+  operationLabels,
+  sortOperations,
+  type Catalog,
+  type GenerateInput,
+  type Job,
+  type Model,
+  type Operation,
+  type Quote,
+  type Route,
 } from '@media-router/contracts';
 import { collectGenerationAssets } from '@media-router/contracts/generation';
 import { GatewayAccess, type BrowserSession } from './gateway-access';
@@ -21,8 +23,11 @@ import { PlaygroundPricing, routeIdentity, usd } from './playground-pricing';
 import { CopyButton, Icon, PlaygroundWorkflow, regionNames } from './ui';
 import { playgroundHref } from './links';
 import {
+  clearConflictingRoutingFilters,
   initialPlaygroundRequest,
   isPlaygroundDraft,
+  resolveOperationRouteSwitch,
+  siblingRouteRoutingConflict,
   validatePlaygroundRequest,
 } from './playground-request';
 import {
@@ -41,15 +46,7 @@ import {
 } from './playground-recovery';
 import styles from './private-playground.module.css';
 
-const names: Record<Operation, string> = {
-  'text-to-image': 'Text to image',
-  'image-edit': 'Image editing',
-  'text-to-video': 'Text to video',
-  'image-to-video': 'Image to video',
-  'reference-to-video': 'Reference to video',
-  'video-edit': 'Video editing',
-  'video-extend': 'Video extension',
-};
+const names = operationLabels;
 const singleRegion = (request: GenerateInput) =>
   request.routing?.endpointRegions?.length === 1 ? request.routing.endpointRegions[0] : undefined;
 
@@ -204,6 +201,11 @@ export function Playground({
   const [busy, setBusy] = useState<'quote' | 'generate' | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [pendingSiblingConflict, setPendingSiblingConflict] = useState<{
+    routeId: string;
+    label: string;
+    operation: Operation;
+  } | null>(null);
   const [lineage, setLineage] = useState<ReuseLineage[]>([]);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [storageReady, setStorageReady] = useState(true);
@@ -229,6 +231,12 @@ export function Playground({
   if (live.current.boundary !== boundary || live.current.fingerprint !== fingerprint)
     live.current = { boundary, fingerprint, version: live.current.version + 1 };
   const explicitOperation = useRef<{ boundary: string; request: GenerateInput } | null>(null);
+  const pendingRouteSwitch = useRef<{
+    operation: Operation;
+    routeId?: string;
+    label?: string;
+    notice: string;
+  } | null>(null);
   const authChange = useCallback((_authenticated: boolean) => {}, []);
   const sessionChange = useCallback(
     (next: BrowserSession) => {
@@ -283,6 +291,8 @@ export function Playground({
       selectionEdited.current = true;
     if (next.operation !== draft.operation && !restoreOperationDraft)
       explicitOperation.current = { boundary, request: next };
+    pendingRouteSwitch.current = null;
+    setPendingSiblingConflict(null);
     live.current.version++;
     setBusy(null);
     setDraft(next);
@@ -336,6 +346,7 @@ export function Playground({
         : null;
     explicitOperation.current = null;
     let next = explicit ?? draft;
+    let restoredNotice = '';
     if (context && !explicit) {
       try {
         const saved = readRecovery(sessionStorage, context, 'draft', isPlaygroundDraft);
@@ -381,14 +392,53 @@ export function Playground({
               },
             };
           }
-          setNotice(
-            'Your private draft was restored for this identity, workspace and operation. Nothing has been submitted.',
-          );
-        } else setNotice('');
+          restoredNotice =
+            'Your private draft was restored for this identity, workspace and operation. Nothing has been submitted.';
+        }
       } catch {
         setStorageReady(false);
       }
-    } else if (!explicit) setNotice('');
+    }
+    setPendingSiblingConflict(null);
+    const switched =
+      pendingRouteSwitch.current?.operation === draft.operation ? pendingRouteSwitch.current : null;
+    pendingRouteSwitch.current = null;
+    if (switched) {
+      const switchedRoute = switched.routeId
+        ? routes.find((entry) => entry.id === switched.routeId)
+        : undefined;
+      if (
+        switchedRoute &&
+        siblingRouteRoutingConflict(model, switchedRoute, catalog.deployments, next)
+      ) {
+        const switchedLabel =
+          switched.label ?? routeIdentity(catalog, switchedRoute, switched.operation, routes).label;
+        setPendingSiblingConflict({
+          routeId: switchedRoute.id,
+          label: switchedLabel,
+          operation: switched.operation,
+        });
+        setNotice(
+          `Your saved ${names[switched.operation]} draft restricts routing in a way that excludes ${switchedLabel}. Choose whether to switch to ${switchedLabel} or keep your saved routing filters.`,
+        );
+      } else {
+        const { routeId: _restoredRouteId, ...withoutRoute } = next;
+        next = {
+          ...withoutRoute,
+          ...(switched.routeId ? { routeId: switched.routeId } : {}),
+          routing: { ...withoutRoute.routing, fallback: false },
+        };
+        setNotice(
+          switched.notice
+            ? restoredNotice
+              ? `${switched.notice} ${restoredNotice}`
+              : switched.notice
+            : restoredNotice,
+        );
+      }
+    } else if (!explicit) {
+      setNotice(restoredNotice);
+    }
     setLineage(context ? (readRecovery(sessionStorage, context, 'lineage', isLineage) ?? []) : []);
     setDraft(next);
     setJson(JSON.stringify(next, null, 2));
@@ -813,24 +863,80 @@ export function Playground({
                   const { routeId, ...rest } = draft;
                   const { endpointRegions, ...routing } = rest.routing ?? {};
                   const available = routes.filter((route) => route.operations.includes(operation));
+                  const resolution = resolveOperationRouteSwitch(routes, routeId, operation);
+                  let switchNotice = '';
+                  const targetRoute =
+                    resolution.switchedRoute ??
+                    (resolution.routeId
+                      ? routes.find((entry) => entry.id === resolution.routeId)
+                      : undefined);
+                  const targetLabel = targetRoute
+                    ? routeIdentity(catalog, targetRoute, operation, routes).label
+                    : undefined;
+                  if (resolution.outcome === 'switched-sibling' && targetLabel) {
+                    switchNotice = `Switched pinned route to ${targetLabel} on the same deployment for ${names[operation]}. Review pricing and get a fresh quote.`;
+                  } else if (resolution.outcome === 'ambiguous-sibling') {
+                    switchNotice = `Multiple routes on this deployment support ${names[operation]}. Pinned route reset to Automatic routing — choose the specific feature route before quoting.`;
+                  } else if (resolution.outcome === 'cleared-unsupported') {
+                    switchNotice = `The previously pinned route does not support ${names[operation]}. Pinned route reset to Automatic routing.`;
+                  }
+                  const nextRouting = {
+                    ...routing,
+                    ...(endpointRegions &&
+                    available.some((route) => endpointRegions.includes(regionOf(route) ?? ''))
+                      ? { endpointRegions }
+                      : {}),
+                  };
+                  const nextDraftBase: GenerateInput = {
+                    ...rest,
+                    operation,
+                    routing: nextRouting,
+                  };
+                  const hasRoutingConflict = Boolean(
+                    targetRoute &&
+                    siblingRouteRoutingConflict(
+                      model,
+                      targetRoute,
+                      catalog.deployments,
+                      nextDraftBase,
+                    ),
+                  );
                   update(
                     {
-                      ...rest,
-                      operation,
-                      ...(available.some((route) => route.id === routeId) ? { routeId } : {}),
+                      ...nextDraftBase,
+                      ...(!hasRoutingConflict && resolution.routeId
+                        ? { routeId: resolution.routeId }
+                        : {}),
                       routing: {
-                        ...routing,
-                        ...(endpointRegions &&
-                        available.some((route) => endpointRegions.includes(regionOf(route) ?? ''))
-                          ? { endpointRegions }
-                          : {}),
+                        ...nextRouting,
+                        ...(!hasRoutingConflict && resolution.routeId ? { fallback: false } : {}),
                       },
                     },
                     true,
                   );
+                  if (resolution.outcome !== 'none') {
+                    pendingRouteSwitch.current = {
+                      operation,
+                      routeId: resolution.routeId,
+                      ...(targetLabel ? { label: targetLabel } : {}),
+                      notice: switchNotice,
+                    };
+                    if (hasRoutingConflict && targetRoute && targetLabel) {
+                      setPendingSiblingConflict({
+                        routeId: targetRoute.id,
+                        label: targetLabel,
+                        operation,
+                      });
+                      setNotice(
+                        `Your current routing filters exclude ${targetLabel} for ${names[operation]}. Choose whether to switch to ${targetLabel} or keep your routing filters.`,
+                      );
+                    } else if (switchNotice) {
+                      setNotice(switchNotice);
+                    }
+                  }
                 }}
               >
-                {[...new Set(routes.flatMap((route) => route.operations))].map((operation) => (
+                {sortOperations(routes.flatMap((route) => route.operations)).map((operation) => (
                   <option key={operation} value={operation}>
                     {names[operation]}
                   </option>
@@ -888,7 +994,7 @@ export function Playground({
                       route.id === draft.routeId,
                   )
                   .map((route) => {
-                    const identity = routeIdentity(catalog, route);
+                    const identity = routeIdentity(catalog, route, draft.operation);
                     return (
                       <option key={route.id} value={route.id}>
                         {identity.label} · {identity.region}
@@ -957,6 +1063,56 @@ export function Playground({
             <p className="recovery-notice" role="status">
               {notice}
             </p>
+          )}
+          {pendingSiblingConflict && pendingSiblingConflict.operation === draft.operation && (
+            <div
+              className={styles.conflictActions}
+              role="group"
+              aria-label="Resolve routing conflict"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  const target = routes.find(
+                    (entry) => entry.id === pendingSiblingConflict.routeId,
+                  );
+                  if (!target) {
+                    setPendingSiblingConflict(null);
+                    return;
+                  }
+                  const { routeId: _oldRouteId, ...rest } = draft;
+                  update({
+                    ...rest,
+                    routeId: target.id,
+                    routing: {
+                      ...clearConflictingRoutingFilters(
+                        model,
+                        target,
+                        catalog.deployments,
+                        draft.routing,
+                      ),
+                      fallback: false,
+                    },
+                  });
+                  setNotice(
+                    `Switched pinned route to ${pendingSiblingConflict.label} and cleared conflicting routing filters. Review pricing and get a fresh quote.`,
+                  );
+                }}
+              >
+                Use {pendingSiblingConflict.label} (clear conflicting filters)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingSiblingConflict(null);
+                  setNotice(
+                    'Kept your saved routing filters. Review pricing and get a fresh quote.',
+                  );
+                }}
+              >
+                Keep saved routing filters
+              </button>
+            </div>
           )}
           {mode === 'json' ? (
             <div className={styles.jsonEditor}>

@@ -4,47 +4,46 @@ import { useEffect, useId, useState } from 'react';
 import { usePublicOrigin } from './public-origin';
 import { useLegalPresentation } from './legal/presentation';
 import { HeroMedia } from './hero-media';
-import { groupRoutesByProvider } from './provider-order';
-import type {
-  Catalog,
-  Deployment,
-  GenerateInput,
-  Model,
-  Operation,
-  OutputAsset,
-  Rate,
-  Route,
-  RouteMetrics,
+import { buildProviderRouteRows } from './provider-order';
+import { regionNames } from './route-identity';
+import {
+  computeCheapestRouteHighlights,
+  formatComparisonScope,
+  formatRouteUnitPrice,
+  isDisplayedRateCheapest,
+  resolveDisplayedRouteRate,
+  type CheapestRouteHighlight,
+} from './route-pricing-comparison';
+export { regionNames };
+import {
+  describeRouteFeatures,
+  operationLabel,
+  operationLabels,
+  routeFeatureDiscriminator,
+  sortOperations,
+  variantHasFeatureDistinctions,
+  type Catalog,
+  type Deployment,
+  type GenerateInput,
+  type Model,
+  type Operation,
+  type OutputAsset,
+  type Route,
+  type RouteMetrics,
 } from '@media-router/contracts';
 
-const operationNames: Record<Operation, string> = {
-  'text-to-image': 'Text to image',
-  'image-edit': 'Image editing',
-  'text-to-video': 'Text to video',
-  'image-to-video': 'Image to video',
-  'reference-to-video': 'Reference to video',
-  'video-edit': 'Video editing',
-  'video-extend': 'Video extension',
-};
-export const regionNames: Record<string, string> = {
-  'cn-beijing': 'Beijing, China',
-  'ap-southeast-1': 'Singapore',
-  'ap-northeast-1': 'Tokyo, Japan',
-  'eu-central-1': 'Frankfurt, Germany',
-  'us-east-1': 'Virginia, US',
-  'cn-hongkong': 'Hong Kong, China',
-  global: 'Global endpoint',
-  undisclosed: 'Not disclosed',
-  unknown: 'Not disclosed',
-};
+const operationNames = operationLabels;
 const scopeNames: Record<Exclude<Deployment['scope'], 'undisclosed'>, string> = {
   global: 'Global',
   international: 'International',
   'mainland-china': 'Mainland China',
   regional: 'Regional',
 };
-const usd = (micros: number) =>
-  `$${(micros / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
+const usdFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+});
+const usd = (micros: number) => `$${usdFormatter.format(micros / 1_000_000)}`;
 const regionName = (deployment: Deployment) =>
   regionNames[deployment.endpointRegion] ?? deployment.endpointRegion;
 
@@ -435,27 +434,6 @@ export function PercentileControl({
   );
 }
 
-function findRouteRate(route: Route, resolution: string, modality: Model['modality']) {
-  const unit = modality === 'video' ? 'output-second' : 'image';
-  const matches = (rate: Rate) =>
-    rate.unit === unit && rate.resolution.toLowerCase() === resolution.toLowerCase();
-  const published = route.publishedPricing;
-  const qualifiedRate = route.rates.find(matches);
-  const preferredQuality = route.modelId.startsWith('openai/gpt-image-')
-    ? 'medium'
-    : route.modelId === 'xai/grok-imagine-image-2.0'
-      ? 'low'
-      : undefined;
-  const eligiblePublished = (published?.outputRates ?? []).filter(
-    (rate) => matches(rate) && (!rate.operation || route.operations.includes(rate.operation)),
-  );
-  const publishedRate =
-    (preferredQuality
-      ? eligiblePublished.find((rate) => rate.quality === preferredQuality)
-      : undefined) ?? eligiblePublished[0];
-  return { unit, published, qualifiedRate, publishedRate, rate: qualifiedRate ?? publishedRate };
-}
-
 function ProviderTariff({ route }: { route: Route }) {
   const published = route.publishedPricing;
   if (!published) return null;
@@ -493,20 +471,48 @@ function ProviderPrice({
   route,
   resolution,
   modality,
+  selectedOperation,
+  cheapestHighlight,
 }: {
   route: Route;
   resolution: string;
   modality: Model['modality'];
+  selectedOperation?: Operation;
+  cheapestHighlight?: CheapestRouteHighlight;
 }) {
-  const { unit, published, qualifiedRate, publishedRate, rate } = findRouteRate(
-    route,
-    resolution,
-    modality,
-  );
-  const source = qualifiedRate ? route.pricingSource : (published?.source ?? route.pricingSource);
+  const unit = modality === 'video' ? 'output-second' : 'image';
+  const published = route.publishedPricing;
+  const resolved = resolveDisplayedRouteRate(route, resolution, modality, selectedOperation);
+  const isCheapest = isDisplayedRateCheapest(cheapestHighlight, resolved, selectedOperation);
+  const rate = resolved?.rate;
+  const qualifiedRate = resolved?.qualified;
+  const source = resolved?.source ?? published?.source ?? route.pricingSource;
+  const samePriceOperations =
+    !selectedOperation && resolved && rate?.operation && route.operations.length > 1
+      ? sortOperations(route.operations).filter((operation) => {
+          const opResolved = resolveDisplayedRouteRate(route, resolution, modality, operation);
+          return (
+            opResolved !== null &&
+            opResolved.rate.unit === rate.unit &&
+            opResolved.rate.resolution.toLowerCase() === rate.resolution.toLowerCase() &&
+            opResolved.rate.usdMicros === rate.usdMicros &&
+            (opResolved.quality ?? '') === (resolved.quality ?? '') &&
+            opResolved.qualified === resolved.qualified
+          );
+        })
+      : [];
+  const operationScopeNote =
+    !selectedOperation && rate?.operation && route.operations.length > 1
+      ? `Applies to: ${(samePriceOperations.length ? samePriceOperations : [rate.operation]).map(operationLabel).join(', ')}. Other operations may have different or unqualified pricing.`
+      : null;
   const conditions = Array.from(
     new Set([
-      rate ? `Resolution: ${rate.resolution}` : 'No per-output price for this selection.',
+      rate
+        ? `Resolution: ${rate.resolution}`
+        : selectedOperation
+          ? `No per-output price for ${operationLabel(selectedOperation)} at this resolution.`
+          : 'No per-output price for this selection.',
+      ...(operationScopeNote ? [operationScopeNote] : []),
       ...(rate?.note ? [rate.note] : []),
       ...(published?.conditions ?? []),
       ...(source.note && !rate?.note ? [source.note] : []),
@@ -515,7 +521,7 @@ function ProviderPrice({
   const checked = `Checked ${source.checkedAt}`;
   const hoverDetails = [published?.summary, ...conditions, checked].filter(Boolean).join('\n');
   return (
-    <details className="price-details">
+    <details className="price-details" data-cheapest={isCheapest ? 'true' : undefined}>
       <summary
         title={hoverDetails}
         aria-label={rate ? undefined : `${resolution} price unavailable`.trim()}
@@ -524,7 +530,7 @@ function ProviderPrice({
         {rate ? (
           <>
             <strong>
-              {!qualifiedRate && publishedRate?.approximate && '≈'}
+              {resolved?.approximate && '≈'}
               {usd(rate.usdMicros)}
             </strong>
             <small>/ {unit === 'image' ? 'image' : 'sec'}</small>
@@ -550,6 +556,135 @@ function ProviderPrice({
   );
 }
 
+function CheapestBadge({
+  highlight,
+  tooltipId,
+  open,
+  pinned,
+  placement,
+  selectedOperation,
+  onOpen,
+  onClose,
+  onUnpin,
+  onToggle,
+}: {
+  highlight: CheapestRouteHighlight;
+  tooltipId: string;
+  open: boolean;
+  pinned: boolean;
+  placement: 'up' | 'down';
+  selectedOperation?: Operation;
+  onOpen: () => void;
+  onClose: () => void;
+  onUnpin: () => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className="cheapest-badge-wrap"
+      onMouseEnter={onOpen}
+      onMouseLeave={(event) => {
+        if (open && !pinned && !event.currentTarget.matches(':focus-within')) onClose();
+      }}
+      onFocus={onOpen}
+      onBlur={(event) => {
+        if (open && !event.currentTarget.contains(event.relatedTarget)) {
+          if (event.currentTarget.matches(':hover')) onUnpin();
+          else onClose();
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="cheapest-trigger"
+        aria-describedby={tooltipId}
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="cheapest-tag">Cheapest</span>
+        <span className="cheapest-savings">{highlight.savingsLabel}</span>
+      </button>
+      <div
+        className="cheapest-tooltip"
+        id={tooltipId}
+        role="tooltip"
+        data-open={open}
+        data-placement={placement}
+      >
+        <p className="cheapest-tooltip-title">
+          {highlight.isTied
+            ? `Tied cheapest across ${highlight.comparisons[0]!.tiedCheapestCount} routes`
+            : 'Cheapest vs highest priced route'}
+        </p>
+        <ul className="cheapest-tooltip-list">
+          {highlight.comparisons.map((entry) => {
+            const scope = formatComparisonScope(entry, selectedOperation);
+            const cheapestPrice = formatRouteUnitPrice(
+              entry.cheapestMicros,
+              entry.unit,
+              entry.cheapestApproximate,
+            );
+            const highestPrice = formatRouteUnitPrice(
+              entry.mostExpensiveMicros,
+              entry.unit,
+              entry.mostExpensiveApproximate,
+            );
+            const highestName = entry.mostExpensiveLabels.join(', ');
+            return (
+              <li key={`${entry.resolution}-${entry.quality ?? ''}-${entry.operations.join(',')}`}>
+                <span className="cheapest-tooltip-scope">
+                  {scope} · <strong>{entry.percentOff}% off</strong>
+                </span>
+                <span className="cheapest-tooltip-compare">
+                  {cheapestPrice} vs {highestName} ({highestPrice})
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="cheapest-tooltip-note">
+          {highlight.usesPublishedEstimates
+            ? 'Compares published list estimates at matching resolution and feature; actual charges vary.'
+            : 'Compares published list rates at matching resolution and feature; excludes additional input charges.'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function RouteFeatureBadges({
+  route,
+  selectedOperation,
+  dedicated,
+}: {
+  route: Route;
+  selectedOperation?: Operation;
+  dedicated: boolean;
+}) {
+  const descriptor = describeRouteFeatures(route);
+  return (
+    <div className="route-features" aria-label="Supported features">
+      {descriptor.operations.map((operation) => {
+        const isActive = selectedOperation === operation;
+        return (
+          <span
+            key={operation}
+            className={`route-feature-pill${dedicated ? ' is-dedicated' : ''}${isActive ? ' is-active' : ''}`}
+            data-operation={operation}
+          >
+            {operationLabel(operation)}
+          </span>
+        );
+      })}
+      {descriptor.featureLabel && (
+        <span className="route-feature-pill is-subfeature" data-feature-id={route.feature?.id}>
+          {descriptor.featureLabel}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function ProviderTable({
   model,
   routes,
@@ -562,27 +697,55 @@ export function ProviderTable({
   model: Model;
   routes: Route[];
   catalog: Catalog;
-  onTry?: (routeId: string) => void;
-  tryHref?: (routeId: string) => string;
+  onTry?: (routeId: string, operation?: Operation) => void;
+  tryHref?: (routeId: string, operation?: Operation) => string;
   metrics?: RouteMetrics[];
   percentile?: LatencyPercentile;
 }) {
   const providerTooltipPrefix = useId();
+  const cheapestTooltipPrefix = useId();
   const [activeProviderTooltip, setActiveProviderTooltip] = useState<string | null>(null);
+  const [activeCheapestTooltip, setActiveCheapestTooltip] = useState<{
+    id: string;
+    pinned: boolean;
+  } | null>(null);
+  const [selectedFeature, setSelectedFeature] = useState<Operation | 'all'>('all');
   useEffect(() => {
-    if (!activeProviderTooltip) return;
+    if (!activeProviderTooltip && !activeCheapestTooltip) return;
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setActiveProviderTooltip(null);
+      if (event.key === 'Escape') {
+        setActiveProviderTooltip(null);
+        setActiveCheapestTooltip(null);
+      }
     };
     document.addEventListener('keydown', dismiss);
     return () => document.removeEventListener('keydown', dismiss);
-  }, [activeProviderTooltip]);
+  }, [activeProviderTooltip, activeCheapestTooltip]);
   const [localPercentile, setLocalPercentile] = useState<LatencyPercentile>('p50');
   const localMetrics = useRouteMetrics(metrics === undefined);
   const observations = metrics ?? localMetrics;
   const selectedPercentile = percentile ?? localPercentile;
   const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
-  const groupedRoutes = groupRoutesByProvider(routes, deployments, model.authorProviderIds);
+  const availableOperations = sortOperations(routes.flatMap((route) => route.operations));
+  const activeOperation =
+    selectedFeature !== 'all' && availableOperations.includes(selectedFeature)
+      ? selectedFeature
+      : undefined;
+  const hasFeatureDistinctions = variantHasFeatureDistinctions(routes);
+  const deploymentTotals = new Map<string, number>();
+  for (const route of routes)
+    deploymentTotals.set(route.deploymentId, (deploymentTotals.get(route.deploymentId) ?? 0) + 1);
+  const hasSplitDeployment = [...deploymentTotals.values()].some((count) => count > 1);
+  const visibleRoutes = activeOperation
+    ? routes.filter((route) => route.operations.includes(activeOperation))
+    : routes;
+  const groupedRows = buildProviderRouteRows(visibleRoutes, deployments, model.authorProviderIds);
+  const cheapestHighlights = computeCheapestRouteHighlights(
+    visibleRoutes,
+    model,
+    catalog,
+    activeOperation,
+  );
   const sampledRoutes = new Map(
     observations.filter((item) => item.sampleCount > 0).map((item) => [item.routeId, item]),
   );
@@ -593,7 +756,40 @@ export function ProviderTable({
   return (
     <div className="providers-view">
       <div className="table-topline">
-        <p>Every regional deployment is its own route.</p>
+        <div className="table-topline-summary">
+          <p>
+            {hasSplitDeployment
+              ? 'Every regional deployment and feature-specific route is listed separately; split routes are grouped by deployment.'
+              : 'Every regional deployment is its own route.'}
+          </p>
+          {availableOperations.length > 1 && (
+            <div className="feature-filter" role="group" aria-label="Filter routes by feature">
+              <button
+                type="button"
+                aria-pressed={activeOperation === undefined}
+                onClick={() => {
+                  setSelectedFeature('all');
+                  setActiveCheapestTooltip(null);
+                }}
+              >
+                All ({routes.length})
+              </button>
+              {availableOperations.map((operation) => (
+                <button
+                  key={operation}
+                  type="button"
+                  aria-pressed={activeOperation === operation}
+                  onClick={() => {
+                    setSelectedFeature(operation);
+                    setActiveCheapestTooltip(null);
+                  }}
+                >
+                  {operationLabel(operation)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {percentile === undefined && showCompletion && (
           <div className="table-controls">
             <PercentileControl value={localPercentile} onChange={setLocalPercentile} />
@@ -604,7 +800,9 @@ export function ProviderTable({
         <table className="route-table">
           <thead>
             <tr>
-              <th>Provider / endpoint region</th>
+              <th>
+                {hasFeatureDistinctions ? 'Provider / feature route' : 'Provider / endpoint region'}
+              </th>
               <th>Published price</th>
               {showCompletion && <th>Attempt completion</th>}
               {showSuccessRate && <th>Success rate</th>}
@@ -612,14 +810,29 @@ export function ProviderTable({
             </tr>
           </thead>
           <tbody>
-            {groupedRoutes.map((route) => {
+            {groupedRows.map((row, rowIndex) => {
+              const { route, deploymentGroupSize, isGroupStart, isGroupContinuation, isGroupEnd } =
+                row;
               const deployment = deployments.get(route.deploymentId);
               const provider = catalog.providers.find((p) => p.id === deployment?.providerId);
               if (!deployment || !provider) return null;
               const observation = sampledRoutes.get(route.id);
               const duration = observation?.[`${selectedPercentile}CompletionMs`];
               const success = observation?.technicalSuccessRate;
-              const actionLabel = `Use ${provider.name} ${regionName(deployment)} route`;
+              const cheapest = cheapestHighlights.get(route.id);
+              const cheapestTooltipId = `${cheapestTooltipPrefix}-${route.id}`;
+              const cheapestPlacement =
+                rowIndex === groupedRows.length - 1 && groupedRows.length > 1 ? 'up' : 'down';
+              const discriminator = routeFeatureDiscriminator(route, routes, activeOperation);
+              const handoffOperation =
+                activeOperation ??
+                (route.operations.length === 1 ? route.operations[0] : undefined);
+              const actionFeature = activeOperation
+                ? (route.feature?.label ?? operationLabel(activeOperation))
+                : discriminator;
+              const actionLabel = actionFeature
+                ? `Use ${provider.name} ${regionName(deployment)} ${actionFeature} route`
+                : `Use ${provider.name} ${regionName(deployment)} route`;
               const endpointKnown = !['undisclosed', 'unknown'].includes(deployment.endpointRegion);
               const scope =
                 deployment.scope === 'undisclosed' ? null : scopeNames[deployment.scope];
@@ -640,101 +853,214 @@ export function ProviderTable({
               const providerTooltipId = `${providerTooltipPrefix}-${route.id}`;
               const resolutions = route.resolutions.length ? route.resolutions : [''];
               const hasResolutionRate = resolutions.some(
-                (resolution) => findRouteRate(route, resolution, model.modality).rate != null,
+                (resolution) =>
+                  resolveDisplayedRouteRate(route, resolution, model.modality, activeOperation) !=
+                  null,
               );
+              const isGrouped = deploymentGroupSize > 1;
+              const groupState = !isGrouped
+                ? 'single'
+                : isGroupStart
+                  ? 'start'
+                  : isGroupEnd
+                    ? 'end'
+                    : 'middle';
+              const showFeatureBadges =
+                isGrouped || hasFeatureDistinctions || Boolean(route.feature);
+              const isDedicatedRoute =
+                isGrouped ||
+                (deploymentTotals.get(route.deploymentId) ?? 1) > 1 ||
+                (availableOperations.length > 1 && route.operations.length === 1);
               return (
-                <tr key={route.id} data-route-id={route.id}>
+                <tr
+                  key={route.id}
+                  data-route-id={route.id}
+                  data-deployment-id={route.deploymentId}
+                  data-route-group={groupState}
+                  data-cheapest-route={cheapest ? 'true' : undefined}
+                  className={isGrouped ? `route-group-row route-group-${groupState}` : undefined}
+                >
                   <td>
-                    <div
-                      className="provider-region"
-                      onMouseEnter={
-                        providerTooltip
-                          ? () => setActiveProviderTooltip(providerTooltipId)
-                          : undefined
-                      }
-                      onMouseLeave={(event) => {
-                        if (
-                          activeProviderTooltip === providerTooltipId &&
-                          !event.currentTarget.matches(':focus-within')
-                        )
-                          setActiveProviderTooltip(null);
-                      }}
-                      onFocus={
-                        providerTooltip
-                          ? () => setActiveProviderTooltip(providerTooltipId)
-                          : undefined
-                      }
-                      onBlur={(event) => {
-                        if (
-                          activeProviderTooltip === providerTooltipId &&
-                          !event.currentTarget.contains(event.relatedTarget) &&
-                          !event.currentTarget.matches(':hover')
-                        )
-                          setActiveProviderTooltip(null);
-                      }}
-                    >
-                      <div className="provider-name">
-                        <span className="provider-initial">{provider.name.slice(0, 1)}</span>
-                        <a
-                          href={provider.website}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-describedby={providerTooltip ? providerTooltipId : undefined}
-                        >
-                          <strong>{provider.name}</strong>
-                        </a>
-                        {model.authorProviderIds.includes(provider.id) && (
-                          <span
-                            className="official-tag"
-                            title={`Operated by ${model.creator}, the author of this exact variant`}
+                    {!isGroupContinuation && (
+                      <div
+                        className="provider-region"
+                        onMouseEnter={
+                          providerTooltip
+                            ? () => setActiveProviderTooltip(providerTooltipId)
+                            : undefined
+                        }
+                        onMouseLeave={(event) => {
+                          if (
+                            activeProviderTooltip === providerTooltipId &&
+                            !event.currentTarget.matches(':focus-within')
+                          )
+                            setActiveProviderTooltip(null);
+                        }}
+                        onFocus={
+                          providerTooltip
+                            ? () => setActiveProviderTooltip(providerTooltipId)
+                            : undefined
+                        }
+                        onBlur={(event) => {
+                          if (
+                            activeProviderTooltip === providerTooltipId &&
+                            !event.currentTarget.contains(event.relatedTarget) &&
+                            !event.currentTarget.matches(':hover')
+                          )
+                            setActiveProviderTooltip(null);
+                        }}
+                      >
+                        <div className="provider-name">
+                          <span className="provider-initial">{provider.name.slice(0, 1)}</span>
+                          <a
+                            href={provider.website}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-describedby={providerTooltip ? providerTooltipId : undefined}
                           >
-                            Official
-                          </span>
+                            <strong>{provider.name}</strong>
+                          </a>
+                          {model.authorProviderIds.includes(provider.id) && (
+                            <span
+                              className="official-tag"
+                              title={`Operated by ${model.creator}, the author of this exact variant`}
+                            >
+                              Official
+                            </span>
+                          )}
+                          {isGrouped && (
+                            <span className="route-group-count">
+                              {deploymentGroupSize} feature routes
+                            </span>
+                          )}
+                          {!isGrouped && route.status !== 'documented' && (
+                            <span className="route-state">
+                              <i />
+                              {route.status === 'live-verified' ? 'Verified' : 'Retired'}
+                            </span>
+                          )}
+                        </div>
+                        {!isGrouped &&
+                          route.providerModelName &&
+                          route.providerModelName !== model.name && (
+                            <span className="provider-model-name">
+                              Listed as {route.providerModelName}
+                            </span>
+                          )}
+                        {(endpointKnown || scope) && (
+                          <div className="region-line">
+                            {endpointKnown && (
+                              <span
+                                className="endpoint-region"
+                                data-region={deployment.endpointRegion}
+                              >
+                                <Icon name="globe" size={12} />
+                                {deployment.endpointRegion === 'global'
+                                  ? 'Global endpoint'
+                                  : `Endpoint: ${regionName(deployment)}`}
+                              </span>
+                            )}
+                            {scope && <span className="scope-tag">Inference scope: {scope}</span>}
+                          </div>
                         )}
-                        {route.status !== 'documented' && (
-                          <span className="route-state">
-                            <i />
-                            {route.status === 'live-verified' ? 'Verified' : 'Retired'}
+                        {providerTooltip && (
+                          <span
+                            className="provider-tooltip"
+                            id={providerTooltipId}
+                            role="tooltip"
+                            data-open={activeProviderTooltip === providerTooltipId}
+                          >
+                            {providerTooltip}
                           </span>
                         )}
                       </div>
-                      {route.providerModelName && route.providerModelName !== model.name && (
-                        <span className="provider-model-name">
-                          Listed as {route.providerModelName}
-                        </span>
-                      )}
-                      {(endpointKnown || scope) && (
-                        <div className="region-line">
-                          {endpointKnown && (
-                            <span
-                              className="endpoint-region"
-                              data-region={deployment.endpointRegion}
-                            >
-                              <Icon name="globe" size={12} />
-                              {deployment.endpointRegion === 'global'
-                                ? 'Global endpoint'
-                                : `Endpoint: ${regionName(deployment)}`}
+                    )}
+                    {isGrouped ? (
+                      <div
+                        className={`route-branch${isGroupContinuation ? ' is-continuation' : ' is-start'}`}
+                      >
+                        <div className="route-branch-header">
+                          {isGroupContinuation && (
+                            <span className="sr-only">{provider.name} — </span>
+                          )}
+                          <RouteFeatureBadges
+                            route={route}
+                            selectedOperation={activeOperation}
+                            dedicated={isDedicatedRoute}
+                          />
+                          {route.status !== 'documented' && (
+                            <span className="route-state">
+                              <i />
+                              {route.status === 'live-verified' ? 'Verified' : 'Retired'}
                             </span>
                           )}
-                          {scope && <span className="scope-tag">Inference scope: {scope}</span>}
                         </div>
-                      )}
-                      {providerTooltip && (
-                        <span
-                          className="provider-tooltip"
-                          id={providerTooltipId}
-                          role="tooltip"
-                          data-open={activeProviderTooltip === providerTooltipId}
-                        >
-                          {providerTooltip}
-                        </span>
-                      )}
-                    </div>
-                    <code className="route-id" title={route.id}>
-                      {route.id}
-                    </code>
+                        {route.providerModelName && route.providerModelName !== model.name && (
+                          <span className="provider-model-name">
+                            Listed as {route.providerModelName}
+                          </span>
+                        )}
+                        {route.feature?.summary && (
+                          <span className="route-feature-summary">{route.feature.summary}</span>
+                        )}
+                        <code className="route-id" title={route.id}>
+                          {route.id}
+                        </code>
+                      </div>
+                    ) : (
+                      <>
+                        {showFeatureBadges && (
+                          <RouteFeatureBadges
+                            route={route}
+                            selectedOperation={activeOperation}
+                            dedicated={isDedicatedRoute}
+                          />
+                        )}
+                        {route.feature?.summary && (
+                          <span className="route-feature-summary">{route.feature.summary}</span>
+                        )}
+                        <code className="route-id" title={route.id}>
+                          {route.id}
+                        </code>
+                      </>
+                    )}
                   </td>
                   <td className="price-cell">
+                    {cheapest && (
+                      <CheapestBadge
+                        highlight={cheapest}
+                        tooltipId={cheapestTooltipId}
+                        open={activeCheapestTooltip?.id === cheapestTooltipId}
+                        pinned={
+                          activeCheapestTooltip?.id === cheapestTooltipId &&
+                          activeCheapestTooltip.pinned
+                        }
+                        placement={cheapestPlacement}
+                        selectedOperation={activeOperation}
+                        onOpen={() =>
+                          setActiveCheapestTooltip((current) =>
+                            current?.id === cheapestTooltipId
+                              ? current
+                              : { id: cheapestTooltipId, pinned: false },
+                          )
+                        }
+                        onClose={() => setActiveCheapestTooltip(null)}
+                        onUnpin={() =>
+                          setActiveCheapestTooltip((current) =>
+                            current?.id === cheapestTooltipId
+                              ? { id: cheapestTooltipId, pinned: false }
+                              : current,
+                          )
+                        }
+                        onToggle={() =>
+                          setActiveCheapestTooltip((current) =>
+                            current?.id === cheapestTooltipId && current.pinned
+                              ? null
+                              : { id: cheapestTooltipId, pinned: true },
+                          )
+                        }
+                      />
+                    )}
                     {!hasResolutionRate && route.publishedPricing ? (
                       <ProviderTariff route={route} />
                     ) : (
@@ -744,6 +1070,8 @@ export function ProviderTable({
                           route={route}
                           resolution={resolution}
                           modality={model.modality}
+                          selectedOperation={activeOperation}
+                          cheapestHighlight={cheapest}
                         />
                       ))
                     )}
@@ -781,13 +1109,17 @@ export function ProviderTable({
                   )}
                   <td>
                     {tryHref ? (
-                      <a className="route-action" href={tryHref(route.id)} aria-label={actionLabel}>
+                      <a
+                        className="route-action"
+                        href={tryHref(route.id, handoffOperation)}
+                        aria-label={actionLabel}
+                      >
                         <Icon name="arrow" size={17} />
                       </a>
                     ) : (
                       <button
                         className="route-action"
-                        onClick={() => onTry?.(route.id)}
+                        onClick={() => onTry?.(route.id, handoffOperation)}
                         aria-label={actionLabel}
                       >
                         <Icon name="arrow" size={17} />
@@ -797,11 +1129,13 @@ export function ProviderTable({
                 </tr>
               );
             })}
-            {!routes.length && (
+            {!groupedRows.length && (
               <tr>
                 <td colSpan={3 + Number(showCompletion) + Number(showSuccessRate)}>
                   <div className="table-empty">
-                    No documented serving provider is listed for this variant yet.
+                    {activeOperation
+                      ? `No documented serving route supports ${operationLabel(activeOperation)} for this variant.`
+                      : 'No documented serving provider is listed for this variant yet.'}
                   </div>
                 </td>
               </tr>

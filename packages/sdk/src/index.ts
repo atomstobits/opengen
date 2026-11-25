@@ -186,7 +186,7 @@ export interface OperationInputs {
   'models.schema': { modelId: string; operation: Operation };
   'providers.list': Empty;
   'deployments.list': Empty;
-  'routes.list': { modelId?: string };
+  'routes.list': { modelId?: string; operation?: Operation };
   'metrics.list': Empty;
   'operations.list': Empty;
   'quotes.single': GenerateInput;

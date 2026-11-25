@@ -713,7 +713,10 @@ function route(
   resolutions: string[],
   allowedDurations: number[] = [],
   extra: Partial<
-    Pick<Route, 'id' | 'providerModelName' | 'adapter' | 'rates' | 'fidelity' | 'pricingSource'>
+    Pick<
+      Route,
+      'id' | 'providerModelName' | 'feature' | 'adapter' | 'rates' | 'fidelity' | 'pricingSource'
+    >
   > = {},
 ): void {
   routes.push({

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Catalog, GenerateInput, Job, OutputAsset } from '@media-router/contracts';
+import { routeIdentity } from './playground-pricing';
 import { regionNames, OutputCredentials } from './ui';
 import { OutputReuse } from './playground-reuse';
 import styles from './private-playground.module.css';
@@ -97,6 +98,8 @@ export function PlaygroundResult({
   error: string;
 }) {
   const deployment = catalog.deployments.find(({ id }) => id === job.deploymentId);
+  const route = catalog.routes.find(({ id }) => id === job.routeId);
+  const identity = route && routeIdentity(catalog, route, job.input.operation);
   const exactModel = catalog.models.find(({ id }) => id === job.input.modelId);
   return (
     <>
@@ -112,10 +115,13 @@ export function PlaygroundResult({
         <div>
           <dt>Provider route</dt>
           <dd>
-            {deployment?.name ?? job.deploymentId}
-            {deployment
-              ? ` · ${regionNames[deployment.endpointRegion] ?? deployment.endpointRegion}`
-              : ''}
+            {identity
+              ? `${identity.label} · ${identity.region}`
+              : `${deployment?.name ?? job.deploymentId}${
+                  deployment
+                    ? ` · ${regionNames[deployment.endpointRegion] ?? deployment.endpointRegion}`
+                    : ''
+                }`}
           </dd>
         </div>
         <div>
