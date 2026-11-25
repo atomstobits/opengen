@@ -3804,9 +3804,28 @@ export class Engine {
   }
 
   async routeMetrics(configuration?: GenerateInput): Promise<RouteMetrics[]> {
+    const canonicalIds = new Set(this.catalog.routes.map((route) => route.id));
+    const aliasEntries = new Map<string, { routeId: string; operation: string | null }>();
+    for (const alias of this.catalog.routeAliases ?? []) {
+      if (
+        canonicalIds.has(alias.routeId) &&
+        !canonicalIds.has(alias.id) &&
+        !aliasEntries.has(alias.id)
+      ) {
+        aliasEntries.set(alias.id, {
+          routeId: alias.routeId,
+          operation: alias.operation ?? null,
+        });
+      }
+    }
+    const aliasIds = [...aliasEntries.keys()];
+    const aliasTargets = [...aliasEntries.values()].map((entry) => entry.routeId);
+    const aliasOperations = [...aliasEntries.values()].map((entry) => entry.operation);
     const { rows } = await this.pool.query(
-      `WITH attempts AS (
-      SELECT a.route_id,count(*)::int AS samples,
+      `WITH route_aliases(alias_id,canonical_id,alias_operation) AS (
+      SELECT * FROM unnest($4::text[],$5::text[],$6::text[])
+    ), attempts AS (
+      SELECT coalesce(ra.canonical_id,a.route_id) AS route_id,count(*)::int AS samples,
         count(*) FILTER (WHERE a.state='succeeded')::int AS succeeded,
         count(*) FILTER (WHERE a.state IN ('failed','rejected'))::int AS failed,
         count(*) FILTER (WHERE a.state IN ('failed','rejected') AND (a.failure_category IS NULL OR a.failure_category='unknown'))::int AS unclassified_failures,
@@ -3818,17 +3837,24 @@ export class Engine {
         percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM a.completed_at-a.started_at)*1000) FILTER (WHERE a.state='succeeded') AS p95,
         percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM a.completed_at-a.started_at)*1000) FILTER (WHERE a.state='succeeded') AS p99
       FROM mr_attempts a JOIN mr_jobs j ON j.id=a.job_id
+      LEFT JOIN route_aliases ra
+        ON ra.alias_id=a.route_id
+        AND (ra.alias_operation IS NULL OR j.input->>'operation'=ra.alias_operation)
       WHERE a.started_at>=now()-interval '7 days'
         AND ($1::text IS NULL OR (j.input->>'operation'=$1 AND j.input->'input'->>'resolution' IS NOT DISTINCT FROM $2::text AND j.input->'input'->>'duration' IS NOT DISTINCT FROM $3::text))
-      GROUP BY a.route_id
+      GROUP BY coalesce(ra.canonical_id,a.route_id)
     ), delivery_observations AS (
-      SELECT j.route_snapshot->>'id' AS route_id,j.status,j.delivery_status,
+      SELECT coalesce(ra.canonical_id,j.route_snapshot->>'id') AS route_id,j.status,j.delivery_status,
         j.status='succeeded' AND j.delivery_status='available' AND coalesce(receipt.available,false) AS delivery_available,
         CASE WHEN j.status='succeeded' AND j.delivery_status='available' AND coalesce(receipt.available,false)
           AND j.delivery_updated_at IS NOT NULL AND isfinite(j.delivery_updated_at) AND isfinite(j.created_at)
           AND j.delivery_updated_at>=j.created_at AND j.delivery_updated_at<=clock_timestamp()
           THEN extract(epoch FROM j.delivery_updated_at-j.created_at)*1000 END AS delivery_ms
-      FROM mr_jobs j LEFT JOIN LATERAL (
+      FROM mr_jobs j
+      LEFT JOIN route_aliases ra
+        ON ra.alias_id=j.route_snapshot->>'id'
+        AND (ra.alias_operation IS NULL OR j.input->>'operation'=ra.alias_operation)
+      LEFT JOIN LATERAL (
         SELECT count(*)>0 AND bool_and(coalesce(r.state='available' AND r.sha256 ~ '^[a-f0-9]{64}$'
           AND r.byte_length>0 AND r.object_key LIKE ('outputs/' || j.id::text || '/%'),false)) AS available
         FROM mr_output_receipts r WHERE r.workspace_id=j.workspace_id AND r.job_id=j.id AND r.attempt=j.attempt_count
@@ -3854,6 +3880,9 @@ export class Engine {
         configuration?.operation ?? null,
         configuration?.input.resolution ?? null,
         configuration?.input.duration === undefined ? null : String(configuration.input.duration),
+        aliasIds,
+        aliasTargets,
+        aliasOperations,
       ],
     );
     return this.catalog.routes.map((route) => {

@@ -38,6 +38,7 @@ import {
   writeRecovery,
   retireLegacyPlaygroundStorage,
   requestFingerprint,
+  equivalentRequestFingerprints,
   prepareSubmission,
   recordSubmissionJob,
   recordSubmissionRejection,
@@ -546,7 +547,11 @@ export function Playground({
   let hasResultSubmission = false;
   try {
     if (context && loadedKey === contextKey)
-      savedSubmission = findSubmission(sessionStorage, context, fingerprint);
+      savedSubmission = findSubmission(
+        sessionStorage,
+        context,
+        equivalentRequestFingerprints(validRequest ?? draft, catalog),
+      );
     if (job) {
       const resultContext = recoveryContext(session, job.input.modelId, job.input.operation);
       if (resultContext)
@@ -628,7 +633,8 @@ export function Playground({
       }
       if (snapshot.version !== live.current.version) return;
       const epoch = ++resultEpoch.current;
-      const existing = findSubmission(sessionStorage, context, requestHash);
+      const requestFingerprints = equivalentRequestFingerprints(data, catalog);
+      const existing = findSubmission(sessionStorage, context, requestFingerprints);
       const recover = !!existing && !existing.rejected && !pendingAttempt;
       if (!recover && (!canGenerate || canRecoverSubmission)) return;
       if (
@@ -645,6 +651,7 @@ export function Playground({
             data,
             undefined,
             existing ? pendingAttempt?.jobId : undefined,
+            catalog,
           );
       const path = recover
         ? receipt.jobId
@@ -743,7 +750,11 @@ export function Playground({
         // Admission freezes external references and narrows routing. The returned snapshot can
         // differ from the original browser body, whose submission still guards the new attempt.
         const source = findSubmissionForJob(sessionStorage, target, current.id);
-        const matchingDraft = findSubmission(sessionStorage, target, nextFingerprint);
+        const matchingDraft = findSubmission(
+          sessionStorage,
+          target,
+          equivalentRequestFingerprints(next, catalog),
+        );
         if (
           !isTerminal(current) ||
           !source ||
