@@ -114,7 +114,7 @@ function walkFiles(rootDir, current = rootDir, acc = []) {
   return acc.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-async function cfRequest(token, method, path, body, extraHeaders = {}) {
+async function cfRequest(token, method, path, operationLabel, body, extraHeaders = {}) {
   const headers = {
     Authorization: `Bearer ${token}`,
     ...extraHeaders,
@@ -137,7 +137,6 @@ async function cfRequest(token, method, path, body, extraHeaders = {}) {
     json = { raw: text };
   }
   if (!res.ok || (json && json.success === false)) {
-    const safePath = path.replace(/\/accounts\/[^/]+/, '/accounts/<redacted>');
     const codes = Array.isArray(json?.errors)
       ? json.errors
           .map((item) => (typeof item?.code === 'number' ? String(item.code) : ''))
@@ -145,7 +144,7 @@ async function cfRequest(token, method, path, body, extraHeaders = {}) {
           .join(',')
       : '';
     const err = new Error(
-      `Cloudflare API ${method} ${safePath} failed (HTTP ${res.status}${codes ? `, codes=${codes}` : ''})`,
+      `Cloudflare ${operationLabel} failed (HTTP ${res.status}${codes ? `, codes=${codes}` : ''})`,
     );
     err.status = res.status;
     throw err;
@@ -252,11 +251,11 @@ async function verifyPublicUrls(domain, files) {
     );
     if (isVideo && res.status !== 206) {
       throw new Error(
-        `Expected HTTP 206 Partial Content for Range request on ${url}, got ${res.status}`,
+        `Expected HTTP 206 Partial Content for Range request on ${item.key}, got ${res.status}`,
       );
     }
     if (!isVideo && res.status !== 200) {
-      throw new Error(`Expected HTTP 200 on ${url}, got ${res.status}`);
+      throw new Error(`Expected HTTP 200 on ${item.key}, got ${res.status}`);
     }
   }
 }
@@ -326,11 +325,16 @@ async function main() {
     // 1. Ensure public bucket exists (never touches private customer assets bucket)
     console.log(`\n[1/4] Ensuring R2 bucket "${args.bucket}" exists...`);
     try {
-      await cfRequest(apiToken, 'GET', `/accounts/${accountId}/r2/buckets/${args.bucket}`);
+      await cfRequest(
+        apiToken,
+        'GET',
+        `/accounts/${accountId}/r2/buckets/${args.bucket}`,
+        'R2 bucket lookup',
+      );
       console.log('  Bucket already exists.');
     } catch (err) {
       if (err.status === 404) {
-        await cfRequest(apiToken, 'POST', `/accounts/${accountId}/r2/buckets`, {
+        await cfRequest(apiToken, 'POST', `/accounts/${accountId}/r2/buckets`, 'R2 bucket create', {
           name: args.bucket,
           locationHint: args.locationHint,
           storageClass: 'Standard',
@@ -343,32 +347,38 @@ async function main() {
 
     // 2. Configure read-only CORS policy for Range video streaming and web fonts/images
     console.log('[2/4] Configuring read-only CORS policy...');
-    await cfRequest(apiToken, 'PUT', `/accounts/${accountId}/r2/buckets/${args.bucket}/cors`, {
-      rules: [
-        {
-          id: 'opengen-public-hero-read',
-          allowed: {
-            origins: [
-              'https://opengen.dev',
-              'https://www.opengen.dev',
-              'http://localhost:3000',
-              'http://localhost:4320',
-              'http://127.0.0.1:4320',
+    await cfRequest(
+      apiToken,
+      'PUT',
+      `/accounts/${accountId}/r2/buckets/${args.bucket}/cors`,
+      'R2 CORS update',
+      {
+        rules: [
+          {
+            id: 'opengen-public-hero-read',
+            allowed: {
+              origins: [
+                'https://opengen.dev',
+                'https://www.opengen.dev',
+                'http://localhost:3000',
+                'http://localhost:4320',
+                'http://127.0.0.1:4320',
+              ],
+              methods: ['GET', 'HEAD'],
+              headers: ['Range', 'If-None-Match', 'If-Modified-Since'],
+            },
+            exposeHeaders: [
+              'Content-Length',
+              'Content-Range',
+              'Accept-Ranges',
+              'ETag',
+              'Cache-Control',
             ],
-            methods: ['GET', 'HEAD'],
-            headers: ['Range', 'If-None-Match', 'If-Modified-Since'],
+            maxAgeSeconds: 86400,
           },
-          exposeHeaders: [
-            'Content-Length',
-            'Content-Range',
-            'Accept-Ranges',
-            'ETag',
-            'Cache-Control',
-          ],
-          maxAgeSeconds: 86400,
-        },
-      ],
-    });
+        ],
+      },
+    );
     console.log('  CORS policy applied.');
 
     // 3. Attach custom domain media.opengen.dev (preserving all unrelated DNS records)
@@ -378,6 +388,7 @@ async function main() {
         apiToken,
         'GET',
         `/zones?name=${encodeURIComponent(args.zoneName)}`,
+        'zone lookup',
       );
       const zone = zonesRes.result?.[0];
       if (!zone?.id) {
@@ -387,6 +398,7 @@ async function main() {
         apiToken,
         'GET',
         `/accounts/${accountId}/r2/buckets/${args.bucket}/domains/custom`,
+        'R2 custom domain list',
       );
       const matchingDomain = existingDomains.result?.domains?.find((d) => d.domain === args.domain);
       if (matchingDomain?.enabled) {
@@ -396,6 +408,7 @@ async function main() {
           apiToken,
           'PUT',
           `/accounts/${accountId}/r2/buckets/${args.bucket}/domains/custom/${encodeURIComponent(args.domain)}`,
+          'R2 custom domain enable',
           {
             enabled: true,
             minTLS: '1.2',
@@ -407,6 +420,7 @@ async function main() {
           apiToken,
           'POST',
           `/accounts/${accountId}/r2/buckets/${args.bucket}/domains/custom`,
+          'R2 custom domain attach',
           {
             domain: args.domain,
             zoneId: zone.id,
@@ -441,6 +455,7 @@ async function main() {
         apiToken,
         'PUT',
         `/accounts/${accountId}/r2/buckets/${args.bucket}/objects/${file.key}`,
+        `R2 object upload (${file.key})`,
         body,
         {
           'Content-Type': file.contentType,
@@ -464,10 +479,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  const safeMessage =
-    err instanceof Error
-      ? err.message.replace(/\/accounts\/[^/\s]+/g, '/accounts/<redacted>')
-      : 'R2 publish failed.';
-  console.error(safeMessage);
+  console.error(err instanceof Error ? err.message : 'R2 publish failed.');
   process.exit(1);
 });
