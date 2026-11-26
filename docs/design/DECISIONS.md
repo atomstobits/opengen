@@ -242,3 +242,12 @@ playground conflict actions:
 See `PANTONE-SOURCES.md` for the 2022–2026 Pantone reference table, active v3
 `:root` tokens, Python-verified WCAG 2.1 & APCA `Lc` contrast matrices,
 typography roles and v4 hardware-instrument surface notes.
+
+## Owner-approved split comparison hero overlays & lazy modal — 2026-11-26
+
+Superseding the earlier 2026-11-02 note that baked model labels and prompt context solely into the background clip, the owner approved an interactive split-comparison hero layer when `OPENGEN_HERO_MEDIA_BASE_URL` is configured:
+
+- **Agent / CLI / API onboarding remains front and center** with no visible pause button, keeping the static `/hero-poster.png` fallback whenever `OPENGEN_HERO_MEDIA_BASE_URL` is unset or invalid.
+- **Single-stream 50/50 split background video** (`AV1` primary + `H.264` fallback, muted, `<= 10s`) mounted client-side after an immediate SSR `AVIF`/`WebP` LCP poster (`HeroSplitMedia`), skipping background autoplay on `prefers-reduced-motion`, `saveData`/`2g`, and narrow mobile (`<= 620px`).
+- **Live catalog-backed corner badges (`HeroModelBadge`)**: display each side's model name, cheapest published/qualified per-second rate, and verified savings/discount (linked directly to its canonical series page). On narrow mobile (`<= 620px`), both compare price and discount hide together so discounts are never displayed without comparison context.
+- **Ultra-compact bottom prompt capsule (`hero-prompt-dock`)**: shows only the shared input thumbnail, single-line prompt summary, and `Generate` action button (no model info or playlist list; clips auto-advance in sequence). Clicking the capsule or `Generate` opens a lazy `HeroComparisonModal` portal that fetches full-duration audio clips only on interaction, contains keyboard focus, and exposes Agent, CLI, API, and browser playground pathways.

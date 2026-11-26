@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getHeroComparisons,
+  getHeroComparisonsSafe,
   resolveHeroModelPricing,
   validatePublicMediaBaseUrl,
 } from '../apps/web/app/hero-comparisons';
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe('hero comparison pricing and media configuration', () => {
   it('computes honest catalog prices and cross-provider discounts from @media-router/catalog', () => {
@@ -14,13 +18,13 @@ describe('hero comparison pricing and media configuration', () => {
     expect(seedance720.seriesHref).toBe('/bytedance/seedance-2.5');
     expect(seedance720.providerName).toBe('BytePlus');
     expect(seedance720.priceLabel).toBe('≈$0.231/s');
-    expect(seedance720.comparePriceLabel).toBe('$0.473/s');
+    expect(seedance720.comparePriceLabel).toBe('≈$0.473/s');
     expect(seedance720.discountLabel).toBe('-51%');
 
     const seedance1080 = resolveHeroModelPricing('bytedance/seedance-2.5', '1080p', '2026-11-25');
     expect(seedance1080.providerName).toBe('BytePlus');
     expect(seedance1080.priceLabel).toBe('≈$0.569/s');
-    expect(seedance1080.comparePriceLabel).toBe('$1.164/s');
+    expect(seedance1080.comparePriceLabel).toBe('≈$1.164/s');
     expect(seedance1080.discountLabel).toBe('-51%');
   });
 
@@ -110,5 +114,13 @@ describe('hero comparison pricing and media configuration', () => {
     });
     expect(clips[1]?.left.discountLabel).toBe('-51%');
     expect(clips[1]?.right.discountLabel).toBe('-20%');
+  });
+
+  it('falls back safely to an empty comparison list when optional hero media URL is malformed', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(getHeroComparisonsSafe({ mediaBaseUrl: 'https://user:pass@media.opengen.dev' })).toEqual(
+      [],
+    );
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

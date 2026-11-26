@@ -232,7 +232,7 @@ export function resolveHeroModelPricing(
       resolution,
       providerName: cheapest.providerName,
       priceLabel: formatPerSecondUsd(cheapest.effectiveUsdMicros, cheapest.approximate),
-      comparePriceLabel: formatPerSecondUsd(highest.listUsdMicros, false),
+      comparePriceLabel: formatPerSecondUsd(highest.listUsdMicros, highest.approximate),
       discountLabel: savingsPct > 0 ? `-${savingsPct}%` : null,
       priceNote: `Cheapest published ${resolution} route (${cheapest.providerName} vs ${highest.providerName})`,
       sourceUrl: cheapest.sourceUrl,
@@ -325,4 +325,22 @@ export function getHeroComparisons({
       },
     };
   });
+}
+
+/**
+ * Fail-safe wrapper for server page rendering: logs invalid optional configuration
+ * and falls back to the static hero poster instead of breaking homepage rendering.
+ */
+export function getHeroComparisonsSafe(
+  options?: Parameters<typeof getHeroComparisons>[0],
+): HeroComparisonItem[] {
+  try {
+    return getHeroComparisons(options);
+  } catch (err) {
+    console.error(
+      'Ignoring invalid optional hero media configuration:',
+      err instanceof Error ? err.message : 'Invalid media base URL',
+    );
+    return [];
+  }
 }

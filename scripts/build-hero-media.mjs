@@ -195,7 +195,7 @@ function formatBytes(bytes) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  for (const bin of ['ffmpeg', 'ffprobe', 'cwebp']) {
+  for (const bin of ['ffmpeg', 'ffprobe', 'cwebp', 'avifenc']) {
     if (!hasBinary(bin)) {
       throw new Error(`Required binary not found on PATH: ${bin}`);
     }
@@ -341,7 +341,15 @@ function main() {
     }
 
     // Tier 1: Static posters extracted from exact first frame (t=0.05s) so video fade-in has zero jump
-    if (!args.skipExisting || !existsSync(heroPosterWebp)) {
+    const tier1Images = [
+      heroPosterWebp,
+      heroPosterAvif,
+      leftPosterWebp,
+      rightPosterWebp,
+      inputThumbWebp,
+      inputModalWebp,
+    ];
+    if (!args.skipExisting || !tier1Images.every(existsSync)) {
       console.log(
         '  [Tier 1] hero-poster.webp + hero-poster.avif + modal posters + input thumbs...',
       );

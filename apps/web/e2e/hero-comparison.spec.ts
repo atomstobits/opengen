@@ -27,16 +27,15 @@ test.describe('split comparison homepage hero', () => {
     await expect(hero.getByRole('region', { name: 'Give this to your agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: /pause/i })).toHaveCount(0);
 
-    // Model + cheapest price + discount badges link directly to canonical series pages.
+    // Model + cheapest price badges link directly to canonical series pages.
+    // Exact promotional dates/expiry are covered deterministically in tests/hero-comparisons.test.ts.
     const leftBadge = hero.getByTestId('hero-badge-left');
     const rightBadge = hero.getByTestId('hero-badge-right');
     await expect(leftBadge).toContainText('Seedance 2.5');
-    await expect(leftBadge).toContainText('$0.569/s');
-    await expect(leftBadge).toContainText('-51%');
+    await expect(leftBadge).toContainText(/\$\d+\.\d{3}\/s/);
     await expect(leftBadge).toHaveAttribute('href', '/bytedance/seedance-2.5');
     await expect(rightBadge).toContainText('Kling 4.0');
-    await expect(rightBadge).toContainText('$0.188/s');
-    await expect(rightBadge).toContainText('-20%');
+    await expect(rightBadge).toContainText(/\$\d+\.\d{3}\/s/);
     await expect(rightBadge).toHaveAttribute('href', '/kling/kling-4.0');
 
     // Compact prompt capsule has no model labels or video playlist, and zero modal videos loaded yet.

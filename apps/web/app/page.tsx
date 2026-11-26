@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { catalog, modelSeries, seriesHref } from '@media-router/catalog';
 import { Footer, HomeHero, Icon, SiteHeader } from './ui';
 import { SeriesCards } from './company-cards';
-import { getHeroComparisons } from './hero-comparisons';
+import { getHeroComparisonsSafe } from './hero-comparisons';
 import {
   HomeOverview,
   JsonLd,
@@ -47,7 +47,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       return series ? [series] : [];
     },
   );
-  const comparisons = getHeroComparisons();
+  const comparisons = getHeroComparisonsSafe();
   return (
     <>
       <JsonLd data={homeStructuredData()} />

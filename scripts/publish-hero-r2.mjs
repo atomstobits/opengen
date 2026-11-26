@@ -137,11 +137,17 @@ async function cfRequest(token, method, path, body, extraHeaders = {}) {
     json = { raw: text };
   }
   if (!res.ok || (json && json.success === false)) {
+    const safePath = path.replace(/\/accounts\/[^/]+/, '/accounts/<redacted>');
+    const codes = Array.isArray(json?.errors)
+      ? json.errors
+          .map((item) => (typeof item?.code === 'number' ? String(item.code) : ''))
+          .filter(Boolean)
+          .join(',')
+      : '';
     const err = new Error(
-      `Cloudflare API ${method} ${path} failed (${res.status}): ${text.slice(0, 400)}`,
+      `Cloudflare API ${method} ${safePath} failed (HTTP ${res.status}${codes ? `, codes=${codes}` : ''})`,
     );
     err.status = res.status;
-    err.body = json;
     throw err;
   }
   return json;
@@ -222,8 +228,7 @@ async function r2S3Put({
     body,
   });
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`R2 S3 PUT ${key} failed (${res.status}): ${errText.slice(0, 300)}`);
+    throw new Error(`R2 S3 PUT ${key} failed (HTTP ${res.status})`);
   }
 }
 
@@ -383,11 +388,20 @@ async function main() {
         'GET',
         `/accounts/${accountId}/r2/buckets/${args.bucket}/domains/custom`,
       );
-      const alreadyAttached = existingDomains.result?.domains?.some(
-        (d) => d.domain === args.domain,
-      );
-      if (alreadyAttached) {
-        console.log(`  Custom domain "${args.domain}" already attached.`);
+      const matchingDomain = existingDomains.result?.domains?.find((d) => d.domain === args.domain);
+      if (matchingDomain?.enabled) {
+        console.log(`  Custom domain "${args.domain}" already attached and enabled.`);
+      } else if (matchingDomain) {
+        await cfRequest(
+          apiToken,
+          'PUT',
+          `/accounts/${accountId}/r2/buckets/${args.bucket}/domains/custom/${encodeURIComponent(args.domain)}`,
+          {
+            enabled: true,
+            minTLS: '1.2',
+          },
+        );
+        console.log(`  Re-enabled existing custom domain "${args.domain}" on "${args.bucket}".`);
       } else {
         await cfRequest(
           apiToken,
@@ -450,6 +464,10 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
+  const safeMessage =
+    err instanceof Error
+      ? err.message.replace(/\/accounts\/[^/\s]+/g, '/accounts/<redacted>')
+      : 'R2 publish failed.';
+  console.error(safeMessage);
   process.exit(1);
 });

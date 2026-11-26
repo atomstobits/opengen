@@ -13,6 +13,9 @@ type AgentGuide = {
 
 type AudioChannel = 'mute' | 'left' | 'right';
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])';
+
 function ModelPriceChip({ model, side }: { model: HeroModelPricing; side: 'left' | 'right' }) {
   return (
     <div className="hero-modal-video-bar">
@@ -52,22 +55,65 @@ export function HeroComparisonModal({
   onClose: () => void;
 }) {
   const [audio, setAudio] = useState<AudioChannel>('mute');
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const leftVideo = useRef<HTMLVideoElement>(null);
   const rightVideo = useRef<HTMLVideoElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
+    // Make background siblings inert while the modal is open so keyboard/AT focus stays contained.
+    const inertStates: Array<{ el: HTMLElement; prev: boolean }> = [];
+    for (const child of Array.from(document.body.children)) {
+      if (child instanceof HTMLElement && child !== backdropRef.current) {
+        inertStates.push({ el: child, prev: child.inert });
+        child.inert = true;
+      }
+    }
+
     closeRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key === 'Tab' && dialogRef.current) {
+        const focusables = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+        ).filter((el) => el.offsetParent !== null);
+        if (!focusables.length) return;
+        const first = focusables[0]!;
+        const last = focusables[focusables.length - 1]!;
+        const active = document.activeElement;
+        if (event.shiftKey) {
+          if (active === first || !dialogRef.current.contains(active)) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !dialogRef.current.contains(active)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
+
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      for (const { el, prev } of inertStates) {
+        el.inert = prev;
+      }
       document.removeEventListener('keydown', onKeyDown);
+      if (previouslyFocused && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
     };
   }, [onClose]);
 
@@ -82,19 +128,81 @@ export function HeroComparisonModal({
     const lv = leftVideo.current;
     const rv = rightVideo.current;
     if (!lv || !rv) return;
+
+    let syncing = false;
+    const withGuard = (fn: () => void) => {
+      if (syncing) return;
+      syncing = true;
+      try {
+        fn();
+      } finally {
+        queueMicrotask(() => {
+          syncing = false;
+        });
+      }
+    };
+
+    const syncPlay = (source: HTMLVideoElement, target: HTMLVideoElement) => () => {
+      withGuard(() => {
+        if (Math.abs(source.currentTime - target.currentTime) > 0.25) {
+          target.currentTime = source.currentTime;
+        }
+        if (target.paused) void target.play().catch(() => {});
+      });
+    };
+
+    const syncPause = (target: HTMLVideoElement) => () => {
+      withGuard(() => {
+        if (!target.paused) target.pause();
+      });
+    };
+
+    const syncSeek = (source: HTMLVideoElement, target: HTMLVideoElement) => () => {
+      withGuard(() => {
+        if (Math.abs(source.currentTime - target.currentTime) > 0.1) {
+          target.currentTime = source.currentTime;
+        }
+      });
+    };
+
+    // Only correct playback drift while both videos are actively playing.
+    const syncDrift = () => {
+      if (syncing || lv.paused || rv.paused) return;
+      if (Math.abs(lv.currentTime - rv.currentTime) > 0.25) {
+        withGuard(() => {
+          rv.currentTime = lv.currentTime;
+        });
+      }
+    };
+
+    const onLeftPlay = syncPlay(lv, rv);
+    const onRightPlay = syncPlay(rv, lv);
+    const onLeftPause = syncPause(rv);
+    const onRightPause = syncPause(lv);
+    const onLeftSeeked = syncSeek(lv, rv);
+    const onRightSeeked = syncSeek(rv, lv);
+
+    lv.addEventListener('play', onLeftPlay);
+    rv.addEventListener('play', onRightPlay);
+    lv.addEventListener('pause', onLeftPause);
+    rv.addEventListener('pause', onRightPause);
+    lv.addEventListener('seeked', onLeftSeeked);
+    rv.addEventListener('seeked', onRightSeeked);
+    lv.addEventListener('timeupdate', syncDrift);
+
     lv.currentTime = 0;
     rv.currentTime = 0;
     void lv.play().catch(() => {});
     void rv.play().catch(() => {});
 
-    const syncRight = () => {
-      if (!lv.paused && Math.abs(lv.currentTime - rv.currentTime) > 0.25) {
-        rv.currentTime = lv.currentTime;
-      }
-    };
-    lv.addEventListener('timeupdate', syncRight);
     return () => {
-      lv.removeEventListener('timeupdate', syncRight);
+      lv.removeEventListener('play', onLeftPlay);
+      rv.removeEventListener('play', onRightPlay);
+      lv.removeEventListener('pause', onLeftPause);
+      rv.removeEventListener('pause', onRightPause);
+      lv.removeEventListener('seeked', onLeftSeeked);
+      rv.removeEventListener('seeked', onRightSeeked);
+      lv.removeEventListener('timeupdate', syncDrift);
       lv.pause();
       rv.pause();
     };
@@ -115,12 +223,14 @@ export function HeroComparisonModal({
 
   const modalContent = (
     <div
+      ref={backdropRef}
       className="modal-backdrop hero-comparison-backdrop"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="hero-comparison-modal-title"

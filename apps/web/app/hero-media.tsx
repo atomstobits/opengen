@@ -111,6 +111,7 @@ export function HeroSplitMedia({
   const container = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [readyClipId, setReadyClipId] = useState<string | null>(null);
+  const [avifFailedClipId, setAvifFailedClipId] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
   const prefetchedPosters = useRef(new Set<string>());
   const enabled = useHeroVideoAllowed({ skipNarrowMobile: true });
@@ -165,14 +166,23 @@ export function HeroSplitMedia({
   };
 
   const isVideoReady = readyClipId === clip.id;
+  const showAvifSource = Boolean(clip.media.heroPosterAvif) && avifFailedClipId !== clip.id;
 
   return (
     <div className="hero-media hero-media-split" ref={container} aria-hidden="true">
-      <picture className="hero-split-poster">
-        {clip.media.heroPosterAvif && (
+      <picture className="hero-split-poster" key={`${clip.id}-${showAvifSource ? 'avif' : 'webp'}`}>
+        {showAvifSource && clip.media.heroPosterAvif && (
           <source srcSet={clip.media.heroPosterAvif} type="image/avif" />
         )}
-        <img src={clip.media.heroPosterWebp} alt="" fetchPriority="high" decoding="sync" />
+        <img
+          src={clip.media.heroPosterWebp}
+          alt=""
+          fetchPriority="high"
+          decoding="sync"
+          onError={() => {
+            if (showAvifSource) setAvifFailedClipId(clip.id);
+          }}
+        />
       </picture>
       {enabled && (
         <video

@@ -5834,12 +5834,9 @@ select option {
   .hero-price-current {
     font-size: 11px;
   }
-  .hero-price-compare {
-    display: none;
-  }
+  .hero-price-compare,
   .hero-price-discount {
-    font-size: 9.5px;
-    padding: 1px 5px;
+    display: none;
   }
   .hero-prompt-dock {
     bottom: 16px;
