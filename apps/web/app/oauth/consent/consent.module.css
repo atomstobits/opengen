@@ -101,14 +101,14 @@
 .card p {
   font-size: 15px;
 }
-.card a:not(.button) {
+.card a:not(:global(.button)) {
   color: var(--link);
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent);
   text-underline-offset: 0.2em;
   text-decoration-thickness: 1.5px;
 }
-.card a:not(.button):hover {
+.card a:not(:global(.button)):hover {
   color: var(--link-hover);
   text-decoration-color: currentColor;
 }

@@ -2056,6 +2056,11 @@ select option {
   scrollbar-color: var(--control-line) var(--canvas);
   margin: 22px 0;
 }
+.docs-table-wrap:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 .docs-table {
   width: 100%;
   min-width: 560px;
@@ -5016,6 +5021,13 @@ select option {
 .workspace-choice :is(input, select) {
   min-width: 0;
   font-size: 15px;
+}
+@media (max-width: 620px) {
+  .gateway-access input,
+  .operator-form :is(input:not([type='checkbox']), select, textarea),
+  .workspace-choice :is(input, select) {
+    font-size: 16px;
+  }
 }
 .workspace-choice:only-child {
   grid-column: 1 / -1;

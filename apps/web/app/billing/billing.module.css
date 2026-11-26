@@ -236,12 +236,12 @@
 .topUp button:focus-visible {
   outline-color: var(--on-light);
 }
-.topUp a {
+.topUp a:not(.primary) {
   color: var(--on-light);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
-.topUp a:hover {
+.topUp a:not(.primary):hover {
   color: var(--accent-hover);
 }
 .help {

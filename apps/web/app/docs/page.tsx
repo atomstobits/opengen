@@ -273,7 +273,12 @@ export default function DocsPage() {
                 Wan 3.0 Standard and Prime each have documented offerings in Beijing, Singapore,
                 Tokyo, Frankfurt, Virginia and Hong Kong.
               </p>
-              <div className="docs-table-wrap">
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Regional field definitions"
+              >
                 <table className="docs-table">
                   <thead>
                     <tr>
@@ -443,7 +448,12 @@ POST /v1/assets/complete`}
                 executable managed quote. Review both requests, their notices and the combined
                 spending ceiling before approving the run.
               </p>
-              <div className="docs-table-wrap">
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Private comparison HTTP endpoints"
+              >
                 <table className="docs-table">
                   <thead>
                     <tr>
@@ -504,7 +514,12 @@ POST /v1/assets/complete`}
                 being silently dropped. They require an OpenGen workspace key and a stable{' '}
                 <code>Idempotency-Key</code>, and accept exact OpenGen model IDs.
               </p>
-              <div className="docs-table-wrap">
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Compatibility HTTP endpoints"
+              >
                 <table className="docs-table">
                   <thead>
                     <tr>
@@ -646,7 +661,12 @@ POST /v1/assets/complete`}
                 protocol support and synthetic fixture tests do not establish live account access,
                 measured quality or final billing accuracy.
               </p>
-              <div className="docs-table-wrap">
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Release requirements by layer"
+              >
                 <table className="docs-table">
                   <thead>
                     <tr>
