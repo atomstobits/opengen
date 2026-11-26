@@ -50,7 +50,6 @@ export function initialPlaygroundRequest(
       deploymentIds: [...new Set(routes.map((route) => route.deploymentId))],
     },
     billing: 'managed',
-    maxCostMicros: 2_000_000,
   };
 }
 
@@ -138,12 +137,10 @@ export function validatePlaygroundRequest(
       'Choose that exact model in the model picker before applying its settings. Your current form is unchanged.',
     );
   if (
-    request.billing !== 'byok' &&
-    (!Number.isSafeInteger(request.maxCostMicros) || request.maxCostMicros! <= 0)
+    request.maxCostMicros !== undefined &&
+    (!Number.isSafeInteger(request.maxCostMicros) || request.maxCostMicros <= 0)
   )
-    throw new Error('Enter a positive managed spending limit.');
-  if (request.maxCostMicros !== undefined && request.maxCostMicros <= 0)
-    throw new Error('Enter a positive spending limit or omit it for BYOK.');
+    throw new Error('Enter a positive spending limit or leave it blank.');
   if (request.routeId) {
     const resolved = resolveCatalogRoute(catalog, request.routeId);
     if (!resolved) throw new Error('The selected exact regional route is not in this catalog.');

@@ -286,6 +286,13 @@ describe('informational provider tariffs', () => {
     expect(defaultAutoHtml).toContain('Rates vary by provider and endpoint region');
     expect(defaultAutoHtml).toContain('$0.047 USD / output image · 1K');
     expect(defaultAutoHtml).not.toContain('$0.25 USD / output image · 1K');
+    expect(defaultAutoHtml).toContain('<dt>Maximum spend</dt><dd>No cap set</dd>');
+
+    const cappedAutoDraft = {
+      ...initialPlaygroundRequest(flareModel, flareRoutes),
+      maxCostMicros: 1_250_000,
+    };
+    expect(renderFlare(cappedAutoDraft)).toContain('<dt>Maximum spend</dt><dd>$1.25 USD</dd>');
 
     // At high quality (1:1), all five providers resolve high-tier rates and aggregate cleanly.
     const highDraft = initialPlaygroundRequest(flareModel, flareRoutes);
@@ -294,7 +301,7 @@ describe('informational provider tariffs', () => {
     expect(highAutoHtml).toContain('≈$0.05–$0.128 USD / output image · 1K');
     expect(highAutoHtml).toContain('≈$0.11 USD / output image · 1K');
 
-    // Selecting Replicate updates dynamically across quality tiers.
+    // Selecting Replicate updates dynamically across quality tiers and omits the automatic-routing spend cap row.
     for (const [quality, expected] of [
       ['low', '$0.012 USD / output image · 1K'],
       ['medium', '$0.047 USD / output image · 1K'],
@@ -304,8 +311,15 @@ describe('informational provider tariffs', () => {
     ] as const) {
       const pinned = initialPlaygroundRequest(flareModel, flareRoutes, replicateFlare.id);
       pinned.input.quality = quality;
-      expect(renderFlare(pinned)).toContain(expected);
+      const pinnedHtml = renderFlare(pinned);
+      expect(pinnedHtml).toContain(expected);
+      expect(pinnedHtml).not.toContain('<dt>Maximum spend</dt>');
     }
+    const jsonCappedPinned = {
+      ...initialPlaygroundRequest(flareModel, flareRoutes, replicateFlare.id),
+      maxCostMicros: 500_000,
+    };
+    expect(renderFlare(jsonCappedPinned)).toContain('<dt>Maximum spend</dt><dd>$0.50 USD</dd>');
 
     // Grok Imagine Image 2.0 does not retain the $0.04 low-quality rate when medium quality is selected.
     const grokModel = catalog.models.find((entry) => entry.id === 'xai/grok-imagine-image-2.0')!;

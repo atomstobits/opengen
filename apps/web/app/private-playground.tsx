@@ -392,7 +392,7 @@ export function Playground({
             : initialRegion &&
               (saved.routeId || singleRegion(saved) !== initialRegion || savedFiltersConflict);
           if (!selectionEdited.current && selectionChanged) {
-            const { routeId: _savedRouteId, ...rest } = saved;
+            const { routeId: _savedRouteId, maxCostMicros: _savedMaxCost, ...rest } = saved;
             const {
               endpointRegions: _savedRegions,
               providerIds: _savedProviders,
@@ -401,7 +401,11 @@ export function Playground({
             } = saved.routing ?? {};
             next = {
               ...rest,
-              ...(initialRouteId ? { routeId: initialRouteId } : {}),
+              ...(initialRouteId
+                ? { routeId: initialRouteId }
+                : _savedMaxCost !== undefined
+                  ? { maxCostMicros: _savedMaxCost }
+                  : {}),
               routing: {
                 ...routing,
                 fallback: false,
@@ -439,10 +443,18 @@ export function Playground({
           `Your saved ${names[switched.operation]} draft restricts routing in a way that excludes ${switchedLabel}. Choose whether to switch to ${switchedLabel} or keep your saved routing filters.`,
         );
       } else {
-        const { routeId: _restoredRouteId, ...withoutRoute } = next;
+        const {
+          routeId: _restoredRouteId,
+          maxCostMicros: _restoredMaxCost,
+          ...withoutRoute
+        } = next;
         next = {
           ...withoutRoute,
-          ...(switched.routeId ? { routeId: switched.routeId } : {}),
+          ...(switched.routeId
+            ? { routeId: switched.routeId }
+            : _restoredMaxCost !== undefined
+              ? { maxCostMicros: _restoredMaxCost }
+              : {}),
           routing: { ...withoutRoute.routing, fallback: false },
         };
         setNotice(
@@ -928,15 +940,19 @@ export function Playground({
                       nextDraftBase,
                     ),
                   );
+                  const willPinRoute = Boolean(!hasRoutingConflict && resolution.routeId);
+                  const { maxCostMicros: _keptMaxCost, ...draftWithoutCap } = nextDraftBase;
                   update(
                     {
-                      ...nextDraftBase,
-                      ...(!hasRoutingConflict && resolution.routeId
+                      ...draftWithoutCap,
+                      ...(willPinRoute
                         ? { routeId: resolution.routeId }
-                        : {}),
+                        : _keptMaxCost !== undefined
+                          ? { maxCostMicros: _keptMaxCost }
+                          : {}),
                       routing: {
                         ...nextRouting,
-                        ...(!hasRoutingConflict && resolution.routeId ? { fallback: false } : {}),
+                        ...(willPinRoute ? { fallback: false } : {}),
                       },
                     },
                     true,
@@ -1004,10 +1020,15 @@ export function Playground({
                 aria-label="Provider route"
                 value={draft.routeId ?? 'auto'}
                 onChange={(event) => {
-                  const { routeId: _, ...rest } = draft;
+                  const { routeId: _, maxCostMicros: _previousCap, ...rest } = draft;
+                  const pinned = event.target.value !== 'auto';
                   update({
                     ...rest,
-                    ...(event.target.value !== 'auto' ? { routeId: event.target.value } : {}),
+                    ...(pinned
+                      ? { routeId: event.target.value }
+                      : _previousCap !== undefined
+                        ? { maxCostMicros: _previousCap }
+                        : {}),
                     routing: { ...draft.routing, fallback: false },
                   });
                 }}
@@ -1107,7 +1128,7 @@ export function Playground({
                     setPendingSiblingConflict(null);
                     return;
                   }
-                  const { routeId: _oldRouteId, ...rest } = draft;
+                  const { routeId: _oldRouteId, maxCostMicros: _oldMaxCost, ...rest } = draft;
                   update({
                     ...rest,
                     routeId: target.id,
@@ -1247,7 +1268,52 @@ export function Playground({
                   }}
                 />
               </label>
-              <div className="field-grid">
+              {!draft.routeId || draft.maxCostMicros !== undefined ? (
+                <>
+                  <div className="field-grid">
+                    <label>
+                      Pay with
+                      <select
+                        value={draft.billing ?? 'managed'}
+                        onChange={(event) =>
+                          update({ ...draft, billing: event.target.value as 'managed' | 'byok' })
+                        }
+                      >
+                        <option value="managed">OpenGen workspace credit</option>
+                        <option value="byok">My provider account</option>
+                      </select>
+                    </label>
+                    <label>
+                      Maximum spend, USD
+                      <input
+                        type="number"
+                        min="0.000001"
+                        step="0.01"
+                        placeholder="No cap"
+                        value={
+                          draft.maxCostMicros === undefined ? '' : draft.maxCostMicros / 1_000_000
+                        }
+                        onChange={(event) => {
+                          const { maxCostMicros: _, ...rest } = draft;
+                          update({
+                            ...rest,
+                            ...(event.target.value
+                              ? {
+                                  maxCostMicros: Math.round(Number(event.target.value) * 1_000_000),
+                                }
+                              : {}),
+                          });
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <p className="fallback-note">
+                    {draft.routeId
+                      ? 'Optional spending cap from JSON. Clear it to use the pinned route quote directly; workspace and API key caps still apply.'
+                      : 'Optional ceiling for automatic routing and provider fallback. Workspace and API key caps still apply.'}
+                  </p>
+                </>
+              ) : (
                 <label>
                   Pay with
                   <select
@@ -1260,30 +1326,14 @@ export function Playground({
                     <option value="byok">My provider account</option>
                   </select>
                 </label>
-                <label>
-                  Maximum spend, USD
-                  <input
-                    type="number"
-                    min="0.000001"
-                    step="0.01"
-                    value={draft.maxCostMicros === undefined ? '' : draft.maxCostMicros / 1_000_000}
-                    onChange={(event) => {
-                      const { maxCostMicros: _, ...rest } = draft;
-                      update({
-                        ...rest,
-                        ...(event.target.value
-                          ? { maxCostMicros: Math.round(Number(event.target.value) * 1_000_000) }
-                          : {}),
-                      });
-                    }}
-                  />
-                </label>
-              </div>
+              )}
               {draft.billing === 'byok' && (
                 <p className="byok-notice">
                   Your provider bills your saved connection directly. Unknown-priced routes cannot
-                  enforce an OpenGen spending ceiling. Remove the optional cap explicitly only if
-                  you accept that exposure.
+                  enforce an OpenGen spending ceiling.
+                  {draft.maxCostMicros !== undefined
+                    ? ' Clear Maximum spend explicitly only if you accept that exposure.'
+                    : ''}
                 </p>
               )}
             </>
