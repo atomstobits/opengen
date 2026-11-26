@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getGenerationDefinition } from '@media-router/contracts/generation';
 import {
+  resolveCatalogRoute,
   routePricingSourceForOperation,
   type Catalog,
   type ComparisonChildQuote,
@@ -109,6 +110,7 @@ export function PrivateComparison({ catalog }: { catalog: Catalog }) {
       {context && context.scopes.includes('read') && (
         <ComparisonWorkspace
           key={JSON.stringify([context.workspaceId, context.recoveryScope, context.scopes])}
+          catalog={catalog}
           context={context}
           choices={choices}
           active={active}
@@ -122,14 +124,18 @@ export function PrivateComparison({ catalog }: { catalog: Catalog }) {
 }
 
 function ComparisonWorkspace({
+  catalog,
   context,
   choices,
   active,
 }: {
+  catalog: Catalog;
   context: RecoveryContext;
   choices: Choice[];
   active: boolean;
 }) {
+  const canonicalRouteId = (id?: string) =>
+    (id ? resolveCatalogRoute(catalog, id)?.route.id : undefined) ?? id;
   const defaultRouteIds: [string, string] = [
     choices[0]?.route.id ?? '',
     choices.find((choice) => choice.route.modelId !== choices[0]?.route.modelId)?.route.id ?? '',
@@ -203,7 +209,12 @@ function ComparisonWorkspace({
     }
     setRun(value);
     setPrompt(value.children[0].input.input.prompt ?? '');
-    setRouteIds(value.children.map((child) => child.input.routeId ?? '') as [string, string]);
+    setRouteIds(
+      value.children.map((child) => canonicalRouteId(child.input.routeId) ?? '') as [
+        string,
+        string,
+      ],
+    );
     setExpired(false);
     remember(value.id);
   }
@@ -446,10 +457,14 @@ function ComparisonWorkspace({
       setError('Browser recovery is unavailable. Open this job from Workspace activity.');
       return;
     }
-    window.location.assign(playgroundHref(receipt.modelId, job.routeId, receipt.operation));
+    window.location.assign(
+      playgroundHref(receipt.modelId, canonicalRouteId(job.routeId), receipt.operation),
+    );
   }
 
-  const selected = routeIds.map((id) => choices.find((item) => item.route.id === id));
+  const selected = routeIds.map((id) =>
+    choices.find((item) => item.route.id === canonicalRouteId(id)),
+  );
   const distinct = Boolean(
     selected[0] && selected[1] && selected[0].route.modelId !== selected[1].route.modelId,
   );
@@ -683,11 +698,12 @@ function ComparisonWorkspace({
           )}
           <div className={styles.pair}>
             {run.children.map((child, index) => {
-              const choice = choices.find((item) => item.route.id === child.input.routeId);
-              const job = result?.jobs.find((item) => item.routeId === child.input.routeId);
+              const targetId = canonicalRouteId(child.input.routeId);
+              const choice = choices.find((item) => item.route.id === targetId);
+              const job = result?.jobs.find((item) => canonicalRouteId(item.routeId) === targetId);
               return (
                 <ChildCard
-                  key={child.input.routeId}
+                  key={targetId ?? child.input.routeId}
                   position={index}
                   child={child}
                   choice={choice}
@@ -717,7 +733,11 @@ function ComparisonWorkspace({
                 >
                   {new Date(item.admittedAt).toLocaleString()} ·{' '}
                   {item.routeIds
-                    .map((id) => choices.find((choice) => choice.route.id === id)?.modelName ?? id)
+                    .map(
+                      (id) =>
+                        choices.find((choice) => choice.route.id === canonicalRouteId(id))
+                          ?.modelName ?? id,
+                    )
                     .join(' + ')}
                 </button>
               </li>

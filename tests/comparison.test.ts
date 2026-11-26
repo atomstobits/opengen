@@ -50,6 +50,16 @@ describe.skipIf(!databaseUrl)('Private comparison admission and recovery', () =>
           error: 'Synthetic provider failure.',
         }),
       },
+      {
+        id: 'fal',
+        isConfigured: () => true,
+        submit,
+        poll: async ({ jobId }) => ({
+          status: 'succeeded',
+          billedCostMicros: 20_000,
+          outputs: [await privateOutputFixture(storage, jobId, 'image/png')],
+        }),
+      },
     ];
     const options = {
       databaseUrl: database.databaseUrl,
@@ -283,5 +293,52 @@ describe.skipIf(!databaseUrl)('Private comparison admission and recovery', () =>
       code: 'comparison_quote_expired',
     });
     expect(await engine.getComparison(principal.workspaceId, quote.id)).toBeNull();
+  });
+
+  it('admits unexpired pre-upgrade comparison quotes whose persisted child routeId is a retired RouteAlias', async () => {
+    const legacyAlias = 'fal-undisclosed/bytedance/seedream/v5.5/text-to-image';
+    const canonicalRoute = 'fal-undisclosed/bytedance-seedream-5.5';
+    const { engine } = await setup(200_000);
+
+    // New quotes accept the legacy alias and store the canonical route ID.
+    const quoted = await engine.quoteComparison(principal, privatePrompt, [
+      routeIds[0],
+      legacyAlias,
+    ]);
+    expect(quoted.children[1].input.routeId).toBe(canonicalRoute);
+
+    // Simulate a pre-upgrade saved comparison quote still storing the retired split routeId.
+    const preUpgradeQuote = structuredClone(quoted);
+    preUpgradeQuote.children[1].input.routeId = legacyAlias;
+    await engine.pool.query(
+      'UPDATE mr_comparison_runs SET quote=$3 WHERE workspace_id=$1 AND id=$2',
+      [
+        principal.workspaceId,
+        quoted.id,
+        JSON.stringify({
+          children: preUpgradeQuote.children,
+          estimatedMicros: preUpgradeQuote.estimatedMicros,
+          ceilingMicros: preUpgradeQuote.ceilingMicros,
+        }),
+      ],
+    );
+
+    const admitted = await engine.submitComparison(principal, quoted.id);
+    expect(admitted.id).toBe(quoted.id);
+    expect(admitted.ceilingMicros).toBe(quoted.ceilingMicros);
+    expect(admitted.admittedAt).not.toBeNull();
+    expect(admitted.jobs).toHaveLength(2);
+    expect(admitted.jobs[0]!.routeId).toBe(routeIds[0]);
+    expect(admitted.jobs[1]!.routeId).toBe(canonicalRoute);
+    expect(admitted.children[1].input.routeId).toBe(legacyAlias);
+
+    // Idempotent replay preserves the same comparison and child jobs without double reservation.
+    const replay = await engine.submitComparison(principal, quoted.id);
+    expect(replay.jobs.map((job) => job.id)).toEqual(admitted.jobs.map((job) => job.id));
+    expect(await engine.getBalance(principal.workspaceId)).toEqual({
+      availableMicros: 200_000 - quoted.ceilingMicros,
+      reservedMicros: quoted.ceilingMicros,
+      currency: 'USD',
+    });
   });
 });

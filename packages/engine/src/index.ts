@@ -2216,17 +2216,27 @@ export class Engine {
       // Both children retain their supply locks until this transaction commits.
       // Acquire their union in the usual stable order before either admission.
       const routes = current.quote.children.map(({ input }) => {
-        const route = this.catalog.routes.find((value) => value.id === input.routeId);
+        const resolved = input.routeId
+          ? resolveCatalogRoute(this.catalog, input.routeId)
+          : undefined;
+        if (resolved?.alias?.operation && resolved.alias.operation !== input.operation) {
+          throw new EngineError(
+            'unsupported_operation',
+            `Route alias ${resolved.alias.id} is bound to ${resolved.alias.operation} and cannot execute ${input.operation}.`,
+            422,
+          );
+        }
+        const route = resolved?.route;
         const deployment = this.catalog.deployments.find(
           (value) => value.id === route?.deploymentId,
         );
-        if (!route || !deployment)
+        if (!route || !deployment || route.modelId !== input.modelId)
           throw new EngineError('invalid_catalog', 'A comparison route is unavailable.', 500);
         return { route, deployment };
       });
       await this.configureDispatchPools(client, workspaceId, routes, 'managed');
-      const firstJob = await this.admitSubmission(client, first, firstQuote.input.routeId!);
-      const secondJob = await this.admitSubmission(client, second, secondQuote.input.routeId!);
+      const firstJob = await this.admitSubmission(client, first, routes[0]!.route.id);
+      const secondJob = await this.admitSubmission(client, second, routes[1]!.route.id);
       const updated = await client.query<ComparisonRow>(
         `UPDATE mr_comparison_runs SET admitted_at=clock_timestamp(),first_job_id=$3,second_job_id=$4
          WHERE workspace_id=$1 AND id=$2 RETURNING *`,
