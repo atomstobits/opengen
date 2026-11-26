@@ -28,6 +28,17 @@ import { createHash, createHmac } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 
+class SafePublishError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = 'SafePublishError';
+    this.sanitized = true;
+    if (status !== undefined) {
+      this.status = status;
+    }
+  }
+}
+
 const CF_API = 'https://api.cloudflare.com/client/v4';
 const MIME_BY_EXT = {
   '.mp4': 'video/mp4',
@@ -86,11 +97,11 @@ function parseArgs(argv) {
       );
       process.exit(0);
     } else {
-      throw new Error(`Unknown or incomplete argument: ${flag}`);
+      throw new SafePublishError(`Unknown or incomplete argument: ${flag}`);
     }
   }
   if (!args.dist && !args.verifyOnly) {
-    throw new Error('--dist <hero-media-dist> is required.');
+    throw new SafePublishError('--dist <hero-media-dist> is required.');
   }
   return args;
 }
@@ -128,7 +139,14 @@ async function cfRequest(token, method, path, operationLabel, body, extraHeaders
       payload = JSON.stringify(body);
     }
   }
-  const res = await fetch(`${CF_API}${path}`, { method, headers, body: payload });
+  let res;
+  try {
+    res = await fetch(`${CF_API}${path}`, { method, headers, body: payload });
+  } catch {
+    throw new SafePublishError(
+      `Cloudflare ${operationLabel} failed: network or invalid request header error.`,
+    );
+  }
   const text = await res.text();
   let json = null;
   try {
@@ -143,11 +161,10 @@ async function cfRequest(token, method, path, operationLabel, body, extraHeaders
           .filter(Boolean)
           .join(',')
       : '';
-    const err = new Error(
+    throw new SafePublishError(
       `Cloudflare ${operationLabel} failed (HTTP ${res.status}${codes ? `, codes=${codes}` : ''})`,
+      res.status,
     );
-    err.status = res.status;
-    throw err;
   }
   return json;
 }
@@ -214,20 +231,25 @@ async function r2S3Put({
   const signature = createHmac('sha256', kSigning).update(stringToSign).digest('hex');
   const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
-  const res = await fetch(`https://${host}${canonicalUri}`, {
-    method: 'PUT',
-    headers: {
-      Host: host,
-      'Content-Type': contentType,
-      'Cache-Control': cacheControl,
-      'x-amz-content-sha256': payloadHash,
-      'x-amz-date': amzDate,
-      Authorization: authorization,
-    },
-    body,
-  });
+  let res;
+  try {
+    res = await fetch(`https://${host}${canonicalUri}`, {
+      method: 'PUT',
+      headers: {
+        Host: host,
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl,
+        'x-amz-content-sha256': payloadHash,
+        'x-amz-date': amzDate,
+        Authorization: authorization,
+      },
+      body,
+    });
+  } catch {
+    throw new SafePublishError(`R2 S3 PUT ${key} failed: network or invalid request header error.`);
+  }
   if (!res.ok) {
-    throw new Error(`R2 S3 PUT ${key} failed (HTTP ${res.status})`);
+    throw new SafePublishError(`R2 S3 PUT ${key} failed (HTTP ${res.status})`, res.status);
   }
 }
 
@@ -241,21 +263,26 @@ async function verifyPublicUrls(domain, files) {
   for (const item of checks) {
     const url = `https://${domain}/${item.key}`;
     const isVideo = item.key.endsWith('.mp4');
-    const res = await fetch(url, {
-      method: isVideo ? 'GET' : 'HEAD',
-      headers: isVideo ? { Range: 'bytes=0-1023' } : {},
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: isVideo ? 'GET' : 'HEAD',
+        headers: isVideo ? { Range: 'bytes=0-1023' } : {},
+      });
+    } catch {
+      throw new SafePublishError(`Public CDN verification failed for ${item.key}: network error.`);
+    }
     console.log(
       `  ${res.status} ${url}\n` +
         `      content-type=${res.headers.get('content-type')} | cache-control=${res.headers.get('cache-control')} | cf-cache=${res.headers.get('cf-cache-status')} | content-range=${res.headers.get('content-range') ?? '-'}`,
     );
     if (isVideo && res.status !== 206) {
-      throw new Error(
+      throw new SafePublishError(
         `Expected HTTP 206 Partial Content for Range request on ${item.key}, got ${res.status}`,
       );
     }
     if (!isVideo && res.status !== 200) {
-      throw new Error(`Expected HTTP 200 on ${item.key}, got ${res.status}`);
+      throw new SafePublishError(`Expected HTTP 200 on ${item.key}, got ${res.status}`);
     }
   }
 }
@@ -265,13 +292,16 @@ async function main() {
   const files = args.dist && existsSync(args.dist) ? walkFiles(args.dist) : [];
 
   if (args.verifyOnly) {
-    if (!files.length) throw new Error('--verify-only requires --dist with built assets.');
+    if (!files.length)
+      throw new SafePublishError('--verify-only requires --dist with built assets.');
     await verifyPublicUrls(args.domain, files);
     return;
   }
 
   if (!files.length) {
-    throw new Error(`No files found under ${args.dist}. Run scripts/build-hero-media.mjs first.`);
+    throw new SafePublishError(
+      `No files found under ${args.dist}. Run scripts/build-hero-media.mjs first.`,
+    );
   }
 
   const totalBytes = files.reduce((sum, f) => sum + f.bytes, 0);
@@ -305,19 +335,23 @@ async function main() {
   }
 
   if (!accountId) {
-    throw new Error('CLOUDFLARE_ACCOUNT_ID must be set for --apply.');
+    throw new SafePublishError('CLOUDFLARE_ACCOUNT_ID must be set for --apply.');
+  }
+
+  if (apiToken && /[\r\n]/.test(apiToken)) {
+    throw new SafePublishError('CLOUDFLARE_API_TOKEN contains invalid newline characters.');
   }
 
   if (args.uploadOnly) {
     if (!useS3Upload && !apiToken) {
-      throw new Error(
+      throw new SafePublishError(
         'For --upload-only, set R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY (recommended) or CLOUDFLARE_API_TOKEN.',
       );
     }
     console.log('\n[1-3/4] Skipping bucket/CORS/domain provisioning (--upload-only).');
   } else {
     if (!apiToken) {
-      throw new Error(
+      throw new SafePublishError(
         'CLOUDFLARE_API_TOKEN must be set for bucket/CORS/domain provisioning (or pass --upload-only with R2 S3 credentials).',
       );
     }
@@ -392,7 +426,7 @@ async function main() {
       );
       const zone = zonesRes.result?.[0];
       if (!zone?.id) {
-        throw new Error(`Could not find Cloudflare zone "${args.zoneName}".`);
+        throw new SafePublishError(`Could not find Cloudflare zone "${args.zoneName}".`);
       }
       const existingDomains = await cfRequest(
         apiToken,
@@ -479,6 +513,10 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err instanceof Error ? err.message : 'R2 publish failed.');
+  if (err instanceof SafePublishError && err.sanitized) {
+    console.error(err.message);
+  } else {
+    console.error('R2 publish failed due to an unexpected error.');
+  }
   process.exit(1);
 });

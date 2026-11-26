@@ -130,6 +130,7 @@ export function HeroComparisonModal({
     if (!lv || !rv) return;
 
     let syncing = false;
+    let pendingSeekSource: 'left' | 'right' | null = null;
     const withGuard = (fn: () => void) => {
       if (syncing) return;
       syncing = true;
@@ -157,21 +158,54 @@ export function HeroComparisonModal({
       });
     };
 
-    const syncSeek = (source: HTMLVideoElement, target: HTMLVideoElement) => () => {
-      withGuard(() => {
-        if (Math.abs(source.currentTime - target.currentTime) > 0.1) {
-          target.currentTime = source.currentTime;
-        }
-      });
+    const markSeeking = (side: 'left' | 'right') => () => {
+      if (syncing) return;
+      if (pendingSeekSource === null || pendingSeekSource === side) {
+        pendingSeekSource = side;
+      }
     };
 
-    // Only correct playback drift while both videos are actively playing.
+    const syncSeek =
+      (source: HTMLVideoElement, target: HTMLVideoElement, sourceSide: 'left' | 'right') => () => {
+        if (pendingSeekSource !== null && pendingSeekSource !== sourceSide) {
+          if (!target.seeking) {
+            pendingSeekSource = null;
+          }
+          return;
+        }
+        if (Math.abs(source.currentTime - target.currentTime) > 0.1) {
+          pendingSeekSource = sourceSide;
+          withGuard(() => {
+            target.currentTime = source.currentTime;
+          });
+          if (!target.seeking) {
+            pendingSeekSource = null;
+          }
+        } else {
+          pendingSeekSource = null;
+        }
+      };
+
+    // Only correct playback drift while both videos are actively playing and neither is seeking.
     const syncDrift = () => {
-      if (syncing || lv.paused || rv.paused) return;
+      if (
+        syncing ||
+        pendingSeekSource !== null ||
+        lv.seeking ||
+        rv.seeking ||
+        lv.paused ||
+        rv.paused
+      ) {
+        return;
+      }
       if (Math.abs(lv.currentTime - rv.currentTime) > 0.25) {
+        pendingSeekSource = 'left';
         withGuard(() => {
           rv.currentTime = lv.currentTime;
         });
+        if (!rv.seeking) {
+          pendingSeekSource = null;
+        }
       }
     };
 
@@ -179,13 +213,17 @@ export function HeroComparisonModal({
     const onRightPlay = syncPlay(rv, lv);
     const onLeftPause = syncPause(rv);
     const onRightPause = syncPause(lv);
-    const onLeftSeeked = syncSeek(lv, rv);
-    const onRightSeeked = syncSeek(rv, lv);
+    const onLeftSeeking = markSeeking('left');
+    const onRightSeeking = markSeeking('right');
+    const onLeftSeeked = syncSeek(lv, rv, 'left');
+    const onRightSeeked = syncSeek(rv, lv, 'right');
 
     lv.addEventListener('play', onLeftPlay);
     rv.addEventListener('play', onRightPlay);
     lv.addEventListener('pause', onLeftPause);
     rv.addEventListener('pause', onRightPause);
+    lv.addEventListener('seeking', onLeftSeeking);
+    rv.addEventListener('seeking', onRightSeeking);
     lv.addEventListener('seeked', onLeftSeeked);
     rv.addEventListener('seeked', onRightSeeked);
     lv.addEventListener('timeupdate', syncDrift);
@@ -200,6 +238,8 @@ export function HeroComparisonModal({
       rv.removeEventListener('play', onRightPlay);
       lv.removeEventListener('pause', onLeftPause);
       rv.removeEventListener('pause', onRightPause);
+      lv.removeEventListener('seeking', onLeftSeeking);
+      rv.removeEventListener('seeking', onRightSeeking);
       lv.removeEventListener('seeked', onLeftSeeked);
       rv.removeEventListener('seeked', onRightSeeked);
       lv.removeEventListener('timeupdate', syncDrift);
