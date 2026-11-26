@@ -33,26 +33,28 @@ function PolicyBlock({ block }: { block: LegalBlock }) {
       </ul>
     );
   return (
-    <table className="docs-table">
-      <thead>
-        <tr>
-          {block.columns.map((column) => (
-            <th key={column} scope="col">
-              {column}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {block.rows.map((row) => (
-          <tr key={row[0]}>
-            {row.map((cell, index) => (
-              <td key={index}>{cell}</td>
+    <div className="docs-table-wrap">
+      <table className="docs-table">
+        <thead>
+          <tr>
+            {block.columns.map((column) => (
+              <th key={column} scope="col">
+                {column}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {block.rows.map((row) => (
+            <tr key={row[0]}>
+              {row.map((cell, index) => (
+                <td key={index}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

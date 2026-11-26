@@ -9,14 +9,16 @@ export const jobResultHtml = String.raw`<!doctype html>
 <style>
   :root {
     color-scheme: dark;
-    --canvas: #071c16;
-    --surface: #0d261e;
-    --ink: #f7f6ec;
-    --muted: #b0c3b6;
-    --line: #b9d8c138;
+    --canvas: #061c15;
+    --surface: #0c271e;
+    --ink: #faf8f2;
+    --muted: #e2dfd6;
+    --subtle: #b8c9bf;
+    --line: rgba(246, 243, 236, 0.22);
     --accent: #d81757;
-    --on-accent: #fff8f0;
-    --signal: #94dde2;
+    --on-accent: #ffffff;
+    --signal: #8ee5ea;
+    --focus-ring: #f6f3ec;
   }
   * { box-sizing: border-box; }
   body { margin: 0; color: var(--ink); font: 15px/1.45 "Avenir Next", "Segoe UI", sans-serif; }
@@ -24,7 +26,7 @@ export const jobResultHtml = String.raw`<!doctype html>
   header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; }
   .brand::before { content: ""; width: 8px; height: 8px; background: var(--accent); box-shadow: 3px 3px 0 var(--signal); }
-  .label { color: var(--signal); font: 11px/1.25 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+  .label { color: var(--subtle); font: 11px/1.25 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
   .body { padding: 14px 16px 16px; }
   .status { margin: 0; color: var(--muted); }
   .media { display: grid; gap: 14px; margin-top: 12px; max-height: 440px; overflow-y: auto; }
@@ -34,7 +36,7 @@ export const jobResultHtml = String.raw`<!doctype html>
   figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
   .kind { color: var(--muted); font-size: 13px; }
   a { padding: 7px 12px; border-radius: 6px; color: var(--on-accent); background: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
-  a:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 </style>
 </head>
 <body>

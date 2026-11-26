@@ -13,18 +13,27 @@
 }
 .heading h2 {
   margin: 8px 0 10px;
-  font-size: clamp(24px, 2.6vw, 34px);
-  letter-spacing: -0.04em;
-  line-height: 1.1;
+  font-family: var(--heading);
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  letter-spacing: -0.015em;
+  line-height: 1.22;
+  font-weight: 700;
 }
-.heading h3 {
+.heading h3,
+.section > div > h3 {
+  font-family: var(--heading);
+  font-size: 20px;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  font-weight: 600;
   margin: 0 0 8px;
 }
 .heading p {
   color: var(--muted);
-  max-width: 660px;
+  font-size: 15px;
+  max-width: 66ch;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .heading > button,
 .heading > a {
@@ -42,21 +51,32 @@
   border: 0;
   border-bottom: 3px solid transparent;
   padding: 12px 16px;
-  font: inherit;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
   cursor: pointer;
+}
+.tabs button:hover:not(:disabled) {
+  color: var(--ink);
 }
 .tabs button[aria-current] {
   color: var(--ink);
+  font-weight: 600;
   border-bottom-color: var(--accent);
 }
 .filters {
   border: 1px solid var(--line);
+  border-radius: 8px;
   padding: 16px 20px;
   background: var(--surface);
 }
 .filters summary {
   cursor: pointer;
+  font-family: var(--sans);
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.4;
 }
 .filterGrid {
   display: grid;
@@ -68,19 +88,29 @@
 .form label:not(.check, .checks label) {
   display: grid;
   gap: 8px;
-  font-size: 13px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 .filterGrid input,
 .form input:not([type='checkbox']) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--control-line);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 11px 12px;
   color: var(--ink);
   background: var(--canvas);
-  font: inherit;
+  font-family: var(--sans);
   font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.filterGrid input:hover:not(:disabled),
+.form input:not([type='checkbox']):hover:not(:disabled) {
+  border-color: var(--control-line-hover);
 }
 .filterGrid input::placeholder,
 .form input::placeholder {
@@ -90,17 +120,19 @@
 .section input:focus-visible,
 .section summary:focus-visible,
 .section a:focus-visible {
-  outline: 2px solid var(--panel-stat);
-  outline-offset: 4px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 .section button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.62;
 }
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-block: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
 }
 .stats > div {
   padding: 20px 16px;
@@ -109,79 +141,99 @@
   gap: 8px;
 }
 .stats > div + div {
-  border-left: 1px solid var(--line);
+  border-left: 1px solid var(--line-subtle);
 }
 .stats span,
 .stats small {
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--subtle);
 }
 .stats strong {
-  font-size: 25px;
-  font-weight: 500;
-  letter-spacing: -0.04em;
+  font-family: var(--heading);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums;
 }
 .tableWrap {
   min-width: 0;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-color: var(--control-line) var(--canvas);
   border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
 }
 .table {
   width: 100%;
   text-align: left;
   border-collapse: collapse;
-  font-size: 13px;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 .table th {
   padding: 13px 16px;
   border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 11px;
+  background: rgba(246, 243, 236, 0.05);
+  color: var(--subtle);
+  font-family: var(--sans);
+  font-size: 13px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 500;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  line-height: 1.35;
   white-space: nowrap;
 }
 .table td {
-  padding: 18px 16px;
+  padding: 16px;
   vertical-align: top;
   min-width: 155px;
   max-width: 310px;
   overflow-wrap: anywhere;
   line-height: 1.5;
 }
-.table td + td {
-  border-left: 1px solid var(--line);
-}
 .table tr + tr td {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-subtle);
 }
 .table small,
 .table code {
   display: block;
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--subtle);
+  font-size: 13px;
+  line-height: 1.45;
   margin-top: 5px;
+  overflow-wrap: anywhere;
 }
 .table strong {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.4;
 }
 .table code {
   font-family: var(--mono);
 }
 .status {
   display: inline-block;
-  border: 1px solid var(--control-line);
-  padding: 3px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.4;
+  border: 1px solid var(--line-subtle);
+  border-radius: 4px;
+  background: rgba(246, 243, 236, 0.06);
+  color: var(--ink);
+  padding: 4px 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .identity {
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.45;
 }
 .actions {
   display: flex;
@@ -196,21 +248,25 @@
   gap: 18px;
 }
 .pagination p {
-  color: var(--muted);
-  font-size: 12px;
-  max-width: 420px;
-  line-height: 1.6;
+  color: var(--subtle);
+  font-size: 13px;
+  max-width: 48ch;
+  line-height: 1.5;
   margin: 0;
 }
 .empty {
   padding: 34px 22px;
   color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
   text-align: center;
 }
 .empty h3 {
   color: var(--ink);
-  font-size: 18px;
-  font-weight: 500;
+  font-family: var(--heading);
+  font-size: 20px;
+  line-height: 1.28;
+  font-weight: 600;
 }
 .split {
   display: grid;
@@ -222,14 +278,17 @@
   padding: 22px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 8px;
   display: grid;
   gap: 18px;
 }
 .form h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 500;
+  font-family: var(--heading);
+  font-size: 20px;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  font-weight: 600;
 }
 .fieldset {
   display: grid;
@@ -240,8 +299,11 @@
   min-width: 0;
 }
 .fieldset legend {
-  font-size: 18px;
-  padding-bottom: 20px;
+  font-family: var(--heading);
+  font-size: 20px;
+  line-height: 1.28;
+  font-weight: 600;
+  padding-bottom: 18px;
 }
 .checks {
   display: grid;
@@ -252,15 +314,18 @@
   min-width: 0;
 }
 .checks legend {
-  margin-bottom: 14px;
-  font-size: 13px;
+  margin-bottom: 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 .checks label,
 .check {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .checks input,
@@ -276,6 +341,8 @@
 }
 .record {
   border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
   padding: 20px;
   display: grid;
   gap: 12px;
@@ -288,8 +355,10 @@
   gap: 12px;
 }
 .recordHeading h3 {
-  font-size: 16px;
-  font-weight: 500;
+  font-family: var(--heading);
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 600;
   margin: 0;
 }
 .recordHeading .status {
@@ -298,30 +367,58 @@
 .record p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 .record small {
-  color: var(--muted);
-  line-height: 1.5;
+  color: var(--subtle);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+.record .endpoint,
 .endpoint {
   font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
 }
 .secret {
   display: grid;
   gap: 14px;
   padding: 22px;
   background: var(--panel-stat);
+  border: 1.5px solid var(--on-light);
+  border-radius: 8px;
+  box-shadow: 5px 5px 0 rgba(4, 19, 14, 0.55);
   color: var(--on-light);
+}
+.secret strong {
+  color: var(--on-light);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 .secret p {
   margin: 0;
-  font-size: 14px;
+  color: var(--muted-on-light);
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 68ch;
 }
-.secret button {
+.secret > button {
+  justify-self: start;
   color: var(--on-light);
+  text-decoration: underline;
+  text-decoration-color: var(--line-on-light);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
+}
+.secret > button:hover:not(:disabled) {
+  color: var(--on-light);
+  text-decoration-color: currentColor;
 }
 .secretValue {
   display: flex;
@@ -333,6 +430,28 @@
   overflow-wrap: anywhere;
   font-family: var(--mono);
   font-size: 13px;
+  line-height: 1.5;
+  background: var(--surface-code);
+  border: 1px solid var(--on-light);
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+.secretValue button {
+  border: 1px solid var(--on-light);
+  border-radius: 5px;
+  background: var(--on-light);
+  color: var(--panel-light);
+  box-shadow: 3px 3px 0 rgba(7, 30, 22, 0.35);
+}
+.secretValue button:hover:not(:disabled) {
+  background: #123428;
+  color: var(--panel-light);
+  border-color: #123428;
+}
+.section .secret :focus-visible {
+  outline: 2px solid var(--on-light);
+  outline-offset: 3px;
 }
 .srOnly {
   position: absolute;
@@ -352,6 +471,12 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+@media (max-width: 620px) {
+  .filterGrid input,
+  .form input:not([type='checkbox']) {
+    font-size: 16px;
+  }
+}
 @media (max-width: 560px) {
   .heading {
     display: grid;
@@ -364,7 +489,7 @@
   }
   .stats > div + div {
     border-left: 0;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--line-subtle);
   }
   .pagination {
     align-items: flex-start;

@@ -1,14 +1,21 @@
 .pricing {
-  border: 1px solid var(--control-line);
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   background: var(--surface);
+  box-shadow: 5px 5px 0 rgba(4, 19, 14, 0.55);
   margin-bottom: 24px;
   scroll-margin-block: 16px;
 }
 .pricing a {
   color: var(--link);
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
+}
+.pricing a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentColor;
 }
 .heading,
 .tariff,
@@ -22,47 +29,85 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.4;
 }
 .heading h3 {
   margin: 5px 0 0;
+  color: var(--ink);
+  font-family: var(--heading);
   font-size: 20px;
-  letter-spacing: -0.025em;
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
 }
 .tariff {
   background: var(--canvas);
-  border-block: 1px solid var(--line);
-  font-size: 13px;
+  border-block: 1px solid var(--line-subtle);
+  font-size: 14px;
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 .term,
-.facts dt,
-.rate p {
-  color: var(--muted);
-  font-size: 12px;
+.facts dt {
+  color: var(--subtle);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 .routeLabel {
   margin: 4px 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .rate {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
   align-items: baseline;
+  font-variant-numeric: tabular-nums;
 }
-.rate p,
+.rate strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.rate p {
+  margin: 0;
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 68ch;
+}
 .rate details {
   margin: 0;
   flex-basis: 100%;
 }
+.rate ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
+}
 .pricing summary {
   cursor: pointer;
-  color: var(--link);
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
   width: fit-content;
 }
+.pricing summary:hover,
+.pricing details[open] > summary {
+  color: var(--ink);
+}
 .pricing summary:focus-visible {
-  outline: 2px solid var(--link);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .routeList {
@@ -71,13 +116,21 @@
   margin: 8px 0 0;
 }
 .routeList li {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-subtle);
   padding: 8px 0;
   display: grid;
   gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.routeList strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .routeList p {
   margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 .facts {
   display: grid;
@@ -86,29 +139,41 @@
   margin: 0;
 }
 .facts dd {
-  font-size: 14px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
   margin: 3px 0 0;
-  line-height: 1.35;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.explainer,
+.explainer {
+  margin: 0 16px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
+}
 .quoteDetails {
   margin: 0 16px 12px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.55;
 }
 .quoteDetails .explainer {
   margin: 8px 0 0;
 }
 .actionDock {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-subtle);
 }
 .desktopStatus,
 .mobileStatus {
-  margin: 0 0 9px;
-  font-size: 13px;
-  line-height: 1.4;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  max-width: 68ch;
 }
 .actionRow {
   display: grid;
@@ -117,8 +182,31 @@
 }
 .actionRow button {
   min-height: 44px;
-  padding: 7px 9px;
-  font-size: 13px;
+  min-width: 0;
+  padding: 8px 10px;
+  gap: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: center;
+}
+.actionRow button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.actionRow button:global(.button-outline):disabled {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--subtle);
+  opacity: 1;
+}
+.actionRow button:global(.button-dark):disabled {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--subtle);
+  opacity: 1;
 }
 .mobileStatus,
 .jumps {
@@ -132,21 +220,24 @@
     padding: 8px max(16px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom))
       max(16px, env(safe-area-inset-left));
     background: var(--surface);
-    border-color: var(--control-line);
-    box-shadow: 0 -5px 22px #0003;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -5px 22px color-mix(in srgb, var(--canvas) 55%, transparent);
   }
   .desktopStatus {
     display: none;
   }
   .mobileStatus {
     display: block;
+    margin-bottom: 8px;
   }
   .jumps {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 0 8px;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
   }
   .jumps a {
     display: inline-flex;
@@ -158,7 +249,8 @@
 .error {
   margin: 0 16px 14px;
   color: var(--danger);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
+  max-width: 68ch;
   overflow-wrap: anywhere;
 }

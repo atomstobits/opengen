@@ -6,8 +6,78 @@
 }
 
 .body h3 {
-  margin-top: 32px;
-  font-size: 20px;
-  line-height: 1.4;
-  font-weight: 500;
+  margin: 32px 0 12px;
+  font-family: var(--heading);
+  font-size: 1.25rem;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.body p,
+.body li {
+  max-width: 68ch;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.body li + li {
+  margin-top: 8px;
+}
+
+.body a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
+}
+
+.body a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentColor;
+}
+
+.body a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.body code:not(pre code) {
+  background: rgba(246, 243, 236, 0.1);
+  border: 1px solid rgba(246, 243, 236, 0.2);
+  border-radius: 4px;
+  color: var(--ink);
+}
+
+.body a code:not(pre code) {
+  color: var(--link);
+}
+
+.body table {
+  min-width: 540px;
+}
+
+.body td code {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+@media (max-width: 620px) {
+  .paths {
+    gap: 10px;
+  }
+
+  .paths a {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .body p,
+  .body li {
+    font-size: 15px;
+  }
 }

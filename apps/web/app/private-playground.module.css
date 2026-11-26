@@ -8,25 +8,42 @@
 }
 .modeBar p {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--muted);
+  max-width: 68ch;
 }
 .modeBar button {
-  font: inherit;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
   padding: 8px 16px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   background: transparent;
-  color: inherit;
+  color: var(--ink);
   cursor: pointer;
 }
 .modeBar button:first-child {
-  border-radius: 8px 0 0 8px;
+  border-radius: 6px 0 0 6px;
 }
 .modeBar button:last-child {
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 6px 6px 0;
+}
+.modeBar button:hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--raised);
+  border-color: var(--control-line-hover);
+  color: var(--ink);
+}
+.modeBar button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  position: relative;
+  z-index: 1;
 }
 .modeBar button[aria-pressed='true'] {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--on-accent);
 }
 .jsonEditor {
@@ -35,21 +52,34 @@
   margin-bottom: 20px;
 }
 .jsonEditor textarea {
-  font: 12px/1.6 var(--mono);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.55;
+  background: var(--surface-code);
+  border-color: var(--control-line);
+  color: var(--ink);
   min-height: 360px;
   width: 100%;
   tab-size: 2;
 }
+.jsonEditor textarea:hover:not(:disabled) {
+  border-color: var(--control-line-hover);
+}
 .incompatibility {
-  border: 1px solid var(--warning);
-  padding: 12px;
+  border: 1px solid var(--warning-line);
+  color: var(--warning);
+  padding: 12px 14px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
   overflow-wrap: anywhere;
 }
 .scope {
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--muted);
+  max-width: 68ch;
   overflow-wrap: anywhere;
 }
 .outputActions {
@@ -59,48 +89,56 @@
   margin: 12px 0;
 }
 .outputActions button {
-  font: inherit;
-  color: inherit;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink);
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 6px;
   padding: 8px 12px;
   cursor: pointer;
 }
+.outputActions button:hover:not(:disabled) {
+  background: var(--raised);
+  border-color: var(--control-line-hover);
+  color: var(--ink);
+}
 .outputActions button[aria-pressed='true'] {
   background: var(--raised);
-  border-color: var(--control-line);
+  border-color: var(--control-line-hover);
+  color: var(--ink);
 }
 .outputActions button:focus-visible,
+.jsonEditor textarea:focus-visible,
 .reuse select:focus-visible,
 .reuse button:focus-visible,
 .responseJson:focus-visible {
-  outline: 2px solid var(--panel-agent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .responseJson {
   max-height: 24rem;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px;
-  font: 12px/1.55 var(--mono);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--surface-code);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .lineage {
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 68ch;
   overflow-wrap: anywhere;
 }
-@media (max-width: 600px) {
-  .modeBar {
-    align-items: flex-start;
-  }
-  .jsonEditor textarea {
-    min-height: 300px;
-  }
-}
-
 .reuse {
   display: grid;
   gap: 10px;
@@ -110,15 +148,27 @@
 .reuse label {
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 .reuse select {
   max-width: 100%;
   min-width: 0;
-  padding: 8px;
+  padding: 9px 10px;
   background: var(--canvas);
   border: 1px solid var(--control-line);
   border-radius: 6px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.reuse select:hover:not(:disabled) {
+  border-color: var(--control-line-hover);
 }
 
 .modeBar[id] {
@@ -134,6 +184,19 @@
 .selection label {
   min-width: 0;
   margin-bottom: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.selection select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
 }
 .routeSelect,
 .selectionLink {
@@ -144,7 +207,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--muted);
 }
 .conflictActions {
@@ -154,12 +218,15 @@
   margin: -6px 0 14px;
 }
 .conflictActions button {
-  padding: 6px 11px;
+  padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid var(--control-line);
   background: var(--surface);
   color: var(--ink);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
   cursor: pointer;
 }
 .conflictActions button:first-child {
@@ -167,5 +234,29 @@
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .conflictActions button:hover {
-  border-color: var(--ink);
+  border-color: var(--control-line-hover);
+}
+.conflictActions button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 620px) {
+  .jsonEditor textarea,
+  .reuse select,
+  .selection select {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .modeBar {
+    align-items: flex-start;
+  }
+  .jsonEditor textarea {
+    min-height: 300px;
+  }
+  .selection {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

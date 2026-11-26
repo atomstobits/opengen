@@ -181,7 +181,7 @@ const escapeHtml = (value: string) =>
     (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!,
   );
 const css =
-  'body{margin:0;background:#071c16;color:#f7f6ec;font:18px/1.6 ui-sans-serif,sans-serif}main{max-width:620px;margin:8vh auto;padding:28px}h1{line-height:1.1;font-size:42px;letter-spacing:-.035em}a{color:#c7e5cc;text-underline-offset:4px}aside{border:1px solid #476354;padding:18px;border-radius:10px}button{background:#e81859;color:white;border:0;border-radius:8px;font:inherit;font-weight:600;padding:13px 22px;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid #c7e5cc;outline-offset:4px}small{display:block;overflow-wrap:anywhere;color:#b1c6bb}form{margin:26px 0}';
+  'body{margin:0;background:#061c15;color:#faf8f2;font:18px/1.6 ui-sans-serif,sans-serif}main{max-width:620px;margin:8vh auto;padding:28px}h1{line-height:1.1;font-size:42px;letter-spacing:-.035em}a{color:#8ee5ea;text-underline-offset:4px}aside{background:#0c271e;border:1px solid rgba(246,243,236,.22);padding:18px;border-radius:10px}button{background:#d81757;color:#ffffff;border:0;border-radius:8px;font:inherit;font-weight:600;padding:13px 22px;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid #f6f3ec;outline-offset:4px}small{display:block;overflow-wrap:anywhere;color:#b8c9bf}form{margin:26px 0}';
 const csp = `default-src 'none'; style-src 'sha256-${createHash('sha256').update(css).digest('base64')}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`;
 export function renderHumanLoginNotice(policy: HumanTermsPolicy, actionToken: string): string {
   const status =

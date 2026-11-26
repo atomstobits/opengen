@@ -26,19 +26,28 @@
   justify-content: space-between;
   gap: 5px 12px;
   color: var(--ink);
+  font-family: var(--sans);
   font-weight: 600;
   font-size: 14px;
+  line-height: 1.4;
 }
-.optional,
-.note {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.5;
+.optional {
+  color: var(--subtle);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .note {
   margin: 0;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+  max-width: 68ch;
+  overflow-wrap: anywhere;
 }
 .controls textarea,
 .controls input,
@@ -47,6 +56,10 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
 }
 .controls textarea {
   resize: vertical;
@@ -55,18 +68,22 @@
 .controls label.wide,
 .controls label.label {
   margin-bottom: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 .controls input:focus-visible,
 .controls textarea:focus-visible,
 .controls select:focus-visible,
 .controls button:focus-visible,
 .controls summary:focus-visible {
-  outline: 2px solid var(--panel-agent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .structured {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 14px;
   display: grid;
   gap: 10px;
@@ -74,8 +91,13 @@
 }
 .structured textarea {
   font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.55;
+  background: var(--surface-code);
+  border-color: var(--control-line);
+}
+.structured textarea:hover:not(:disabled) {
+  border-color: var(--control-line-hover);
 }
 .actions {
   display: flex;
@@ -85,35 +107,53 @@
 }
 .actions button,
 .remove {
-  background: var(--raised);
+  background: transparent;
   border: 1px solid var(--control-line);
   border-radius: 6px;
-  padding: 7px 11px;
+  padding: 8px 12px;
   color: var(--ink);
-  font: inherit;
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
   cursor: pointer;
 }
+.actions button:hover:not(:disabled),
+.remove:hover:not(:disabled) {
+  background: var(--raised);
+  border-color: var(--control-line-hover);
+  color: var(--ink);
+}
 .actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--subtle);
+  opacity: 1;
+  cursor: not-allowed;
 }
 .advanced {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line-subtle);
+  border-bottom: 1px solid var(--line-subtle);
   padding: 16px 0;
 }
 .advanced summary {
   cursor: pointer;
-  color: var(--panel-agent);
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.4;
+}
+.advanced summary:hover,
+.advanced[open] summary {
+  color: var(--ink);
 }
 .advanced[open] summary {
   margin-bottom: 18px;
 }
 .asset {
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr);
+  grid-template-columns: 150px minmax(0, 1fr);
   gap: 8px;
 }
 .intake {
@@ -124,7 +164,7 @@
   min-width: 0;
 }
 .intake :global(.upload-picker):focus-within {
-  outline: 2px solid var(--panel-agent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .uploadStatus {
@@ -141,30 +181,52 @@
   gap: 4px 10px;
   margin: 0;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .error {
   color: var(--danger);
   border-left: 2px solid var(--danger-line);
   padding-left: 10px;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 68ch;
   overflow-wrap: anywhere;
   margin: 0;
 }
 .unsupported {
   border: 1px solid var(--warning-line);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 14px;
 }
 .unsupported p {
   color: var(--warning);
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
 }
 .unsupported code {
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid rgba(246, 243, 236, 0.2);
+  border-radius: 6px;
+  background: rgba(246, 243, 236, 0.1);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+@media (max-width: 620px) {
+  .controls textarea,
+  .controls input,
+  .controls select,
+  .structured textarea {
+    font-size: 16px;
+  }
 }
 @media (max-width: 600px) {
   .grid {
