@@ -3,7 +3,9 @@
 import { useEffect, useId, useState } from 'react';
 import { usePublicOrigin } from './public-origin';
 import { useLegalPresentation } from './legal/presentation';
-import { HeroMedia } from './hero-media';
+import { HeroMedia, HeroSplitMedia } from './hero-media';
+import { HeroComparisonModal } from './hero-comparison-modal';
+import type { HeroComparisonItem, HeroModelPricing } from './hero-comparisons';
 import { buildProviderRouteRows } from './provider-order';
 import { regionNames } from './route-identity';
 import {
@@ -313,7 +315,7 @@ export function SiteHeader({
   );
 }
 
-const heroAgentGuides = [
+export const heroAgentGuides = [
   { slug: 'claude-code', name: 'Claude Code' },
   { slug: 'codex', name: 'Codex' },
   { slug: 'openclaw', name: 'OpenClaw' },
@@ -322,20 +324,89 @@ const heroAgentGuides = [
   { slug: 'pi', name: 'pi' },
 ] as const;
 
+function HeroModelBadge({ model, side }: { model: HeroModelPricing; side: 'left' | 'right' }) {
+  return (
+    <a
+      className={`hero-model-badge is-${side}`}
+      href={model.seriesHref}
+      title={model.priceNote}
+      data-testid={`hero-badge-${side}`}
+    >
+      <span className={`hero-model-dot is-${side}`} aria-hidden="true" />
+      <span className="hero-badge-name">{model.modelName}</span>
+      {model.priceLabel && (
+        <>
+          <span className="hero-badge-sep" aria-hidden="true" />
+          <span className="hero-price-group">
+            <span className="hero-price-current">{model.priceLabel}</span>
+            {model.comparePriceLabel && (
+              <span className="hero-price-compare">{model.comparePriceLabel}</span>
+            )}
+            {model.discountLabel && (
+              <span className="hero-price-discount">{model.discountLabel}</span>
+            )}
+          </span>
+        </>
+      )}
+    </a>
+  );
+}
+
 export function HomeHero({
   heroVideoUrl,
   heroPosterUrl,
   agentUrl,
+  comparisons = [],
 }: {
   heroVideoUrl?: string;
   heroPosterUrl?: string;
   agentUrl?: string;
+  comparisons?: HeroComparisonItem[];
 }) {
   const publicOrigin = usePublicOrigin();
   const setupPrompt = `Set up OpenGen - ${agentUrl ?? new URL('/llms.txt', publicOrigin).href}`;
+  const [sequenceIndex, setSequenceIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const hasComparisons = comparisons.length > 0;
+  const activeClip = hasComparisons ? comparisons[sequenceIndex % comparisons.length] : undefined;
+  const nextClip =
+    hasComparisons && comparisons.length > 1
+      ? comparisons[(sequenceIndex + 1) % comparisons.length]
+      : undefined;
+
+  const advanceClip = () => {
+    if (comparisons.length <= 1) return;
+    setProgress(0);
+    setSequenceIndex((prev) => (prev + 1) % comparisons.length);
+  };
+
   return (
-    <section className="hero" aria-labelledby="home-title">
-      <HeroMedia videoUrl={heroVideoUrl} posterUrl={heroPosterUrl} />
+    <section
+      className={`hero${hasComparisons ? ' hero-has-comparisons' : ''}`}
+      aria-labelledby="home-title"
+    >
+      {activeClip ? (
+        <HeroSplitMedia
+          clip={activeClip}
+          nextClip={nextClip}
+          paused={modalOpen}
+          loopSingle={comparisons.length === 1}
+          onEnded={advanceClip}
+          onProgress={setProgress}
+        />
+      ) : (
+        <HeroMedia videoUrl={heroVideoUrl} posterUrl={heroPosterUrl} />
+      )}
+
+      {activeClip && (
+        <>
+          <HeroModelBadge model={activeClip.left} side="left" />
+          <HeroModelBadge model={activeClip.right} side="right" />
+        </>
+      )}
+
       <div className="hero-copy">
         <h1 id="home-title">
           Image & video models.
@@ -368,14 +439,62 @@ export function HomeHero({
         <div className="hero-setup-links">
           <a href="/agents/cli">CLI setup</a>
           <a href="/docs#http-examples">API docs</a>
+          {hasComparisons && <a href="/models">Explore models</a>}
         </div>
         <a className="hero-create-link" href="/playground">
           Create in browser <Icon name="arrow" size={20} />
         </a>
       </div>
-      <a className="hero-explore" href="/models">
-        Explore models <span aria-hidden="true">↗</span>
-      </a>
+
+      {activeClip ? (
+        <div className="hero-prompt-dock" data-testid="hero-prompt-dock">
+          <div className="hero-prompt-capsule">
+            <button
+              type="button"
+              className="hero-prompt-trigger"
+              onClick={() => setModalOpen(true)}
+              aria-label="Inspect shared input and comparison videos"
+            >
+              <img
+                className="hero-prompt-thumb"
+                src={activeClip.media.inputThumbWebp}
+                alt=""
+                width={34}
+                height={34}
+                loading="lazy"
+                decoding="async"
+              />
+              <span className="hero-prompt-line">{activeClip.shortPrompt}</span>
+            </button>
+            <button
+              type="button"
+              className="hero-prompt-generate"
+              onClick={() => setModalOpen(true)}
+            >
+              Generate
+            </button>
+            <div className="hero-prompt-progress" aria-hidden="true">
+              <div
+                className="hero-prompt-progress-fill"
+                style={{ width: `${progress.toFixed(1)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <a className="hero-explore" href="/models">
+          Explore models <span aria-hidden="true">↗</span>
+        </a>
+      )}
+
+      {modalOpen && activeClip && (
+        <HeroComparisonModal
+          clip={activeClip}
+          agentPrompt={setupPrompt}
+          agentGuides={heroAgentGuides}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </section>
   );
 }
