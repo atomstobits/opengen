@@ -60,20 +60,21 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Pool, type PoolClient } from 'pg';
 import { catalog as defaultCatalog, quote as defaultQuote } from '@media-router/catalog';
-import type {
-  Catalog,
-  ComparisonChildQuote,
-  ComparisonJob,
-  ComparisonQuote,
-  ComparisonRun,
-  ComparisonSummary,
-  Deployment,
-  GenerateInput,
-  Job,
-  JobStatus,
-  Quote,
-  Route,
-  RouteMetrics,
+import {
+  resolveCatalogRoute,
+  type Catalog,
+  type ComparisonChildQuote,
+  type ComparisonJob,
+  type ComparisonQuote,
+  type ComparisonRun,
+  type ComparisonSummary,
+  type Deployment,
+  type GenerateInput,
+  type Job,
+  type JobStatus,
+  type Quote,
+  type Route,
+  type RouteMetrics,
 } from '@media-router/contracts';
 import {
   createAlibabaAdapter,
@@ -1334,8 +1335,9 @@ export class Engine {
   private normalizeInput(input: GenerateInput): GenerateInput {
     // Custom catalogs supply their own quote/validation contract, including synthetic test models.
     if (this.customQuote) return input;
+    let parsed: GenerateInput;
     try {
-      return parseGenerationRequest(input);
+      parsed = parseGenerationRequest(input);
     } catch (error) {
       throw new EngineError(
         'invalid_generation_input',
@@ -1343,6 +1345,20 @@ export class Engine {
         422,
       );
     }
+    if (parsed.routeId) {
+      const resolved = resolveCatalogRoute(this.catalog, parsed.routeId);
+      if (resolved?.alias) {
+        if (resolved.alias.operation && resolved.alias.operation !== parsed.operation) {
+          throw new EngineError(
+            'unsupported_operation',
+            `Route alias ${resolved.alias.id} is bound to ${resolved.alias.operation} and cannot execute ${parsed.operation}.`,
+            422,
+          );
+        }
+        return { ...parsed, routeId: resolved.route.id };
+      }
+    }
+    return parsed;
   }
 
   getExecutableRouteIds(
@@ -1521,12 +1537,14 @@ export class Engine {
           'invalid_continuation',
           'This model does not support an owned Omni continuation.',
         );
-      if (input.routeId && input.routeId !== previous.routeId)
+      const previousRouteId =
+        resolveCatalogRoute(this.catalog, previous.routeId)?.route.id ?? previous.routeId;
+      if (input.routeId && input.routeId !== previousRouteId)
         throw new EngineError(
           'continuation_route_mismatch',
           'Continue on the original deployment; cross-provider continuation is not supported.',
         );
-      input = { ...input, routeId: previous.routeId };
+      input = { ...input, routeId: previousRouteId };
     }
     const args = await mapGenerationAssets(input.input, async (asset, role) => {
       if ('url' in asset && asset.url) {
@@ -2072,9 +2090,13 @@ export class Engine {
     routeIds: [string, string],
   ): Promise<ComparisonRun> {
     this.assertProviderExecutionEnabled();
-    const [first, second] = routeIds.map((id) =>
-      this.catalog.routes.find((route) => route.id === id && route.status !== 'retired'),
-    );
+    const [first, second] = routeIds.map((id) => {
+      const resolved = resolveCatalogRoute(this.catalog, id);
+      if (!resolved || resolved.route.status === 'retired') return undefined;
+      if (resolved.alias?.operation && resolved.alias.operation !== 'text-to-image')
+        return undefined;
+      return resolved.route;
+    });
     if (
       !first ||
       !second ||
@@ -2194,17 +2216,27 @@ export class Engine {
       // Both children retain their supply locks until this transaction commits.
       // Acquire their union in the usual stable order before either admission.
       const routes = current.quote.children.map(({ input }) => {
-        const route = this.catalog.routes.find((value) => value.id === input.routeId);
+        const resolved = input.routeId
+          ? resolveCatalogRoute(this.catalog, input.routeId)
+          : undefined;
+        if (resolved?.alias?.operation && resolved.alias.operation !== input.operation) {
+          throw new EngineError(
+            'unsupported_operation',
+            `Route alias ${resolved.alias.id} is bound to ${resolved.alias.operation} and cannot execute ${input.operation}.`,
+            422,
+          );
+        }
+        const route = resolved?.route;
         const deployment = this.catalog.deployments.find(
           (value) => value.id === route?.deploymentId,
         );
-        if (!route || !deployment)
+        if (!route || !deployment || route.modelId !== input.modelId)
           throw new EngineError('invalid_catalog', 'A comparison route is unavailable.', 500);
         return { route, deployment };
       });
       await this.configureDispatchPools(client, workspaceId, routes, 'managed');
-      const firstJob = await this.admitSubmission(client, first, firstQuote.input.routeId!);
-      const secondJob = await this.admitSubmission(client, second, secondQuote.input.routeId!);
+      const firstJob = await this.admitSubmission(client, first, routes[0]!.route.id);
+      const secondJob = await this.admitSubmission(client, second, routes[1]!.route.id);
       const updated = await client.query<ComparisonRow>(
         `UPDATE mr_comparison_runs SET admitted_at=clock_timestamp(),first_job_id=$3,second_job_id=$4
          WHERE workspace_id=$1 AND id=$2 RETURNING *`,
@@ -3782,9 +3814,28 @@ export class Engine {
   }
 
   async routeMetrics(configuration?: GenerateInput): Promise<RouteMetrics[]> {
+    const canonicalIds = new Set(this.catalog.routes.map((route) => route.id));
+    const aliasEntries = new Map<string, { routeId: string; operation: string | null }>();
+    for (const alias of this.catalog.routeAliases ?? []) {
+      if (
+        canonicalIds.has(alias.routeId) &&
+        !canonicalIds.has(alias.id) &&
+        !aliasEntries.has(alias.id)
+      ) {
+        aliasEntries.set(alias.id, {
+          routeId: alias.routeId,
+          operation: alias.operation ?? null,
+        });
+      }
+    }
+    const aliasIds = [...aliasEntries.keys()];
+    const aliasTargets = [...aliasEntries.values()].map((entry) => entry.routeId);
+    const aliasOperations = [...aliasEntries.values()].map((entry) => entry.operation);
     const { rows } = await this.pool.query(
-      `WITH attempts AS (
-      SELECT a.route_id,count(*)::int AS samples,
+      `WITH route_aliases(alias_id,canonical_id,alias_operation) AS (
+      SELECT * FROM unnest($4::text[],$5::text[],$6::text[])
+    ), attempts AS (
+      SELECT coalesce(ra.canonical_id,a.route_id) AS route_id,count(*)::int AS samples,
         count(*) FILTER (WHERE a.state='succeeded')::int AS succeeded,
         count(*) FILTER (WHERE a.state IN ('failed','rejected'))::int AS failed,
         count(*) FILTER (WHERE a.state IN ('failed','rejected') AND (a.failure_category IS NULL OR a.failure_category='unknown'))::int AS unclassified_failures,
@@ -3796,17 +3847,24 @@ export class Engine {
         percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM a.completed_at-a.started_at)*1000) FILTER (WHERE a.state='succeeded') AS p95,
         percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM a.completed_at-a.started_at)*1000) FILTER (WHERE a.state='succeeded') AS p99
       FROM mr_attempts a JOIN mr_jobs j ON j.id=a.job_id
+      LEFT JOIN route_aliases ra
+        ON ra.alias_id=a.route_id
+        AND (ra.alias_operation IS NULL OR j.input->>'operation'=ra.alias_operation)
       WHERE a.started_at>=now()-interval '7 days'
         AND ($1::text IS NULL OR (j.input->>'operation'=$1 AND j.input->'input'->>'resolution' IS NOT DISTINCT FROM $2::text AND j.input->'input'->>'duration' IS NOT DISTINCT FROM $3::text))
-      GROUP BY a.route_id
+      GROUP BY coalesce(ra.canonical_id,a.route_id)
     ), delivery_observations AS (
-      SELECT j.route_snapshot->>'id' AS route_id,j.status,j.delivery_status,
+      SELECT coalesce(ra.canonical_id,j.route_snapshot->>'id') AS route_id,j.status,j.delivery_status,
         j.status='succeeded' AND j.delivery_status='available' AND coalesce(receipt.available,false) AS delivery_available,
         CASE WHEN j.status='succeeded' AND j.delivery_status='available' AND coalesce(receipt.available,false)
           AND j.delivery_updated_at IS NOT NULL AND isfinite(j.delivery_updated_at) AND isfinite(j.created_at)
           AND j.delivery_updated_at>=j.created_at AND j.delivery_updated_at<=clock_timestamp()
           THEN extract(epoch FROM j.delivery_updated_at-j.created_at)*1000 END AS delivery_ms
-      FROM mr_jobs j LEFT JOIN LATERAL (
+      FROM mr_jobs j
+      LEFT JOIN route_aliases ra
+        ON ra.alias_id=j.route_snapshot->>'id'
+        AND (ra.alias_operation IS NULL OR j.input->>'operation'=ra.alias_operation)
+      LEFT JOIN LATERAL (
         SELECT count(*)>0 AND bool_and(coalesce(r.state='available' AND r.sha256 ~ '^[a-f0-9]{64}$'
           AND r.byte_length>0 AND r.object_key LIKE ('outputs/' || j.id::text || '/%'),false)) AS available
         FROM mr_output_receipts r WHERE r.workspace_id=j.workspace_id AND r.job_id=j.id AND r.attempt=j.attempt_count
@@ -3832,6 +3890,9 @@ export class Engine {
         configuration?.operation ?? null,
         configuration?.input.resolution ?? null,
         configuration?.input.duration === undefined ? null : String(configuration.input.duration),
+        aliasIds,
+        aliasTargets,
+        aliasOperations,
       ],
     );
     return this.catalog.routes.map((route) => {

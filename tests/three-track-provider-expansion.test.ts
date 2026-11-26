@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalog, getModel, quote } from '@media-router/catalog';
+import { catalog, getModel, getRoute, quote } from '@media-router/catalog';
 import type { GenerateInput } from '@media-router/contracts';
 import { parseGenerationRequest } from '@media-router/contracts/generation';
 import { SubmissionRejected } from '../packages/engine/src/adapters.js';
@@ -8,7 +8,7 @@ import { createFalAdapter } from '../packages/engine/src/fal.js';
 import { createAlibabaMediaAdapter } from '../packages/engine/src/providers.js';
 
 function catalogContext(routeId: string, input: GenerateInput) {
-  const route = catalog.routes.find((entry) => entry.id === routeId)!;
+  const route = getRoute(routeId)!;
   expect(route, `missing route ${routeId}`).toBeDefined();
   const deployment = catalog.deployments.find((entry) => entry.id === route.deploymentId)!;
   expect(deployment, `missing deployment ${route.deploymentId}`).toBeDefined();

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { catalog, quote } from '@media-router/catalog';
+import { catalog, getRoute, quote } from '@media-router/catalog';
 import {
   GenerationValidationError,
   parseGenerationRequest,
@@ -23,9 +23,9 @@ import { createPikaAdapter } from '../packages/engine/src/pika.js';
 const png = Buffer.from('89504e470d0a1a0a00000000', 'hex');
 
 function findRoute(key: string) {
-  const route = catalog.routes.find(
-    (entry) => entry.id === key || `${entry.deploymentId}/${entry.upstreamModelId}` === key,
-  );
+  const route =
+    getRoute(key) ??
+    catalog.routes.find((entry) => `${entry.deploymentId}/${entry.upstreamModelId}` === key);
   if (!route) throw new Error(`Missing route ${key}`);
   return route;
 }
@@ -54,11 +54,11 @@ function ctx(routeKey: string, operation: Operation, input: GenerationArguments)
 }
 
 describe('November 2026 frontier models & provider routes', () => {
-  it('catalogs 49 exact variants, 12 companies, 19 deployments and 255 documented/live routes without merging derivatives', () => {
+  it('catalogs 49 exact variants, 12 companies, 19 deployments and 164 unified documented/live routes without merging derivatives', () => {
     expect(catalog.models).toHaveLength(49);
     expect(catalog.providers).toHaveLength(12);
     expect(catalog.deployments).toHaveLength(19);
-    expect(catalog.routes).toHaveLength(255);
+    expect(catalog.routes).toHaveLength(164);
 
     for (const distinctPair of [
       ['openai/gpt-image-2.6-sunburst', 'openai/gpt-image-2.6-flare'],

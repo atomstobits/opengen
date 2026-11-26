@@ -30,7 +30,7 @@ describe('hosted native API routing', () => {
       new Request('https://opengen.example/v1/routes?modelId=fal%2Fh3-max'),
     )!;
     const maxRoutes = (await legacy.json()).data;
-    expect(maxRoutes).toHaveLength(5);
+    expect(maxRoutes).toHaveLength(3);
     expect(maxRoutes[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(
       maxRoutes.every((route: { modelId: string }) => route.modelId === 'minimax/h3-max'),
@@ -53,7 +53,7 @@ describe('hosted native API routing', () => {
     const regional = localCatalog(
       new Request('https://opengen.example/v1/routes?modelId=alibaba%2Fwan-3.0'),
     )!;
-    expect((await regional.json()).data).toHaveLength(14);
+    expect((await regional.json()).data).toHaveLength(10);
     expect(localCatalog(new Request('https://opengen.example/v1/metrics'))).toBeUndefined();
     expect(localCatalog(new Request('https://opengen.example/v1/generations'))).toBeUndefined();
     const head = await nativeGateway(

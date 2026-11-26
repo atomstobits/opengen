@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { catalog } from '@media-router/catalog';
 import type { GenerateInput } from '@media-router/contracts';
 import {
   clearRecovery,
+  equivalentRequestFingerprints,
   findSubmission,
   prepareSubmission,
   readRecovery,
@@ -303,5 +305,99 @@ describe('private playground browser recovery', () => {
     const circular = { ...request } as GenerateInput & { self?: unknown };
     circular.self = circular;
     expect(() => requestFingerprint(circular)).toThrow('circular');
+  });
+
+  it('matches pre-upgrade legacy RouteAlias receipts without issuing a duplicate submission key', () => {
+    const storage = new MemoryStorage();
+    const seedanceContext = recoveryContext(session, 'bytedance/seedance-2.5', 'image-to-video')!;
+    const legacyRequest: GenerateInput = {
+      modelId: 'bytedance/seedance-2.5',
+      operation: 'image-to-video',
+      routeId: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+      input: {
+        prompt: 'A sailboat glides across calm water.',
+        firstFrame: { url: 'https://assets.example.test/frame.png' },
+        resolution: '720p',
+        duration: 5,
+      },
+      billing: 'managed',
+      maxCostMicros: 2_000_000,
+    };
+    const canonicalRequest: GenerateInput = {
+      ...legacyRequest,
+      routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+    };
+
+    // Simulate a pre-upgrade submission saved with the retired split routeId.
+    const preUpgradeReceipt = prepareSubmission(
+      storage,
+      seedanceContext,
+      legacyRequest,
+      () => 'legacy-idempotency-key',
+    );
+    const equivalent = equivalentRequestFingerprints(canonicalRequest, catalog);
+    expect(equivalent).toContain(requestFingerprint(canonicalRequest));
+    expect(equivalent).toContain(preUpgradeReceipt.fingerprint);
+    // An unrelated operation's retired split alias must not match image-to-video.
+    expect(equivalent).not.toContain(
+      requestFingerprint({
+        ...legacyRequest,
+        routeId: 'fal-undisclosed/bytedance/seedance-2.5/text-to-video',
+      }),
+    );
+
+    // Upgraded canonical request finds the pre-upgrade receipt and reuses its original key.
+    expect(findSubmission(storage, seedanceContext, equivalent)).toEqual(preUpgradeReceipt);
+    expect(
+      prepareSubmission(
+        storage,
+        seedanceContext,
+        canonicalRequest,
+        () => 'duplicate-key-must-not-be-used',
+        undefined,
+        catalog,
+      ),
+    ).toEqual(preUpgradeReceipt);
+
+    // Pre-admission rejection on a pre-upgrade receipt permits retry with the same key and updates to canonical fingerprint.
+    expect(recordSubmissionRejection(storage, seedanceContext, preUpgradeReceipt)).toBe(true);
+    const retried = prepareSubmission(
+      storage,
+      seedanceContext,
+      canonicalRequest,
+      () => 'duplicate-key-must-not-be-used',
+      undefined,
+      catalog,
+    );
+    expect(retried).toEqual({
+      key: 'legacy-idempotency-key',
+      fingerprint: requestFingerprint(canonicalRequest),
+    });
+
+    // After recording the accepted job, only an explicit newAttemptAfter for that job opens a new key.
+    expect(recordSubmissionJob(storage, seedanceContext, retried, 'job-legacy-1')).toBe(true);
+    expect(() =>
+      prepareSubmission(
+        storage,
+        seedanceContext,
+        canonicalRequest,
+        () => 'stale-new-key',
+        'different-job',
+        catalog,
+      ),
+    ).toThrow('latest submission');
+    const secondAttempt = prepareSubmission(
+      storage,
+      seedanceContext,
+      canonicalRequest,
+      () => 'second-attempt-key',
+      'job-legacy-1',
+      catalog,
+    );
+    expect(secondAttempt).toEqual({
+      key: 'second-attempt-key',
+      fingerprint: requestFingerprint(canonicalRequest),
+      attemptAfter: 'job-legacy-1',
+    });
   });
 });

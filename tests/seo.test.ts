@@ -156,7 +156,7 @@ describe('truthful server-rendered evidence', () => {
   });
 
   it('groups interleaved deployments by serving provider and preserves their route IDs', () => {
-    const first = getRoute('fal-undisclosed/bytedance/seedance-2.0/text-to-video')!;
+    const first = getRoute('fal-undisclosed/bytedance-seedance-2.0')!;
     const middle = getRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.0')!;
     const last = getRoute('fal-seedance-us-account-enabled/bytedance-seedance-2.0')!;
     const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
@@ -169,14 +169,14 @@ describe('truthful server-rendered evidence', () => {
     const runway = getRoute('runway-undisclosed/bytedance-seedance-2.5')!;
     const replicate = getRoute('replicate-undisclosed/bytedance-seedance-2.5')!;
     const byteplus = getRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5')!;
-    const falText = getRoute('fal-undisclosed/bytedance/seedance-2.5/text-to-video')!;
-    const falImage = getRoute('fal-undisclosed/bytedance/seedance-2.5/image-to-video')!;
+    const fal = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
+    const pika = getRoute('pika-undisclosed/bytedance-seedance-2.5')!;
     const deployments = new Map(catalog.deployments.map((item) => [item.id, item]));
     expect(
-      groupRoutesByProvider([runway, falText, replicate, byteplus, falImage], deployments, [
+      groupRoutesByProvider([runway, fal, replicate, byteplus, pika], deployments, [
         'byteplus',
       ]).map((route) => route.id),
-    ).toEqual([byteplus.id, runway.id, falText.id, falImage.id, replicate.id]);
+    ).toEqual([byteplus.id, runway.id, fal.id, replicate.id, pika.id]);
   });
 });
 

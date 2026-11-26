@@ -1,4 +1,8 @@
-import type { GenerationArguments } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  routeUpstreamModelIds,
+  type GenerationArguments,
+} from '@media-router/contracts';
 import {
   isPublicHttpsAssetUrl,
   adapterInputIssue,
@@ -34,7 +38,7 @@ export function createReplicateAdapter(
   const request = options.fetch ?? fetch;
   const readAsset = options.readAsset ?? readPublicAsset;
   const fields = (context: Omit<AdapterContext, 'jobId'>): (keyof GenerationArguments)[] =>
-    context.route.upstreamModelId === videoModel
+    resolveRouteUpstreamModelId(context.route, context.input.operation) === videoModel
       ? [
           'prompt',
           'resolution',
@@ -53,20 +57,18 @@ export function createReplicateAdapter(
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     const { route, deployment, input } = context;
     if (deployment.id !== 'replicate-undisclosed') return 'Unsupported Replicate deployment.';
+    const upstream = resolveRouteUpstreamModelId(route, input.operation);
     const args = input.input;
     const issue =
       adapterInputIssue(context, fields(context)) ??
-      referenceTypeIssue(
-        input,
-        route.upstreamModelId === videoModel ? ['image', 'video', 'audio'] : ['image'],
-      );
+      referenceTypeIssue(input, upstream === videoModel ? ['image', 'video', 'audio'] : ['image']);
     if (issue) return issue;
     const references = referenceUrls(input);
     if (args.count !== undefined && args.count !== 1)
       return 'This Replicate adapter returns one output per job.';
     if (references.some((url) => !isPublicHttpsAssetUrl(url)))
       return 'References must use public HTTPS URLs without embedded credentials.';
-    if (route.upstreamModelId === videoModel) {
+    if (upstream === videoModel) {
       if (!['text-to-video', 'image-to-video', 'reference-to-video'].includes(input.operation))
         return 'This Replicate Seedance adapter supports generation only.';
       if (!['480p', '720p'].includes((input.input.resolution ?? '').toLowerCase()))
@@ -119,7 +121,7 @@ export function createReplicateAdapter(
         !ratios.has(input.input.aspectRatio)
       )
         return 'Unsupported Seedance aspect ratio.';
-    } else if (route.upstreamModelId === imageModel) {
+    } else if (upstream === imageModel) {
       if (!['text-to-image', 'image-edit'].includes(input.operation))
         return 'This Replicate Seedream adapter supports text images and image edits only.';
       if (!['1K', '2K'].includes((input.input.resolution ?? '').toUpperCase()))
@@ -161,19 +163,22 @@ export function createReplicateAdapter(
     isConfigured: (route, deployment) =>
       route.adapter === 'replicate' &&
       deployment.id === 'replicate-undisclosed' &&
-      [videoModel, imageModel].includes(route.upstreamModelId) &&
+      routeUpstreamModelIds(route).some((upstream) =>
+        [videoModel, imageModel].includes(upstream),
+      ) &&
       Boolean(env.REPLICATE_API_TOKEN && (options.captureOutputs || options.storeOutput)),
     async submit(context) {
       const issue = preflight(context);
       if (issue) throw new SubmissionRejected(issue);
       const { input, route } = context;
+      const upstream = resolveRouteUpstreamModelId(route, input.operation);
       const references = referenceUrls(input);
       const args = input.input;
-      const video = route.upstreamModelId === videoModel;
+      const video = upstream === videoModel;
       const body = await submitProviderJson(
         request,
         'Replicate',
-        `https://api.replicate.com/v1/models/${route.upstreamModelId}/predictions`,
+        `https://api.replicate.com/v1/models/${upstream}/predictions`,
         auth(),
         {
           input: video
@@ -230,7 +235,8 @@ export function createReplicateAdapter(
             'Replicate ended the prediction without delivered media. Billing requires reconciliation.',
           billedCostMicros: null,
         };
-      const video = context.route.upstreamModelId === videoModel;
+      const video =
+        resolveRouteUpstreamModelId(context.route, context.input.operation) === videoModel;
       const url = video
         ? body.output
         : Array.isArray(body.output) && body.output.length === 1

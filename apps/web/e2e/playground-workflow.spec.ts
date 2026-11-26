@@ -151,7 +151,7 @@ test('agent instructions carry the selected variant and request without API cred
   const request = JSON.parse(brief.slice(brief.indexOf('{'))) as GenerateInput;
   expect(request).toMatchObject({
     modelId: 'minimax/h3-max',
-    routeId: 'fal-undisclosed/fal-h3-max',
+    routeId: 'fal-undisclosed/minimax-h3-max',
     input: { prompt: 'A paper sailboat on a quiet lake.' },
   });
   await instructions.getByRole('button', { name: 'Copy agent brief', exact: true }).click();

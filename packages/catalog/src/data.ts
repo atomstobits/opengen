@@ -10,6 +10,7 @@ import type {
 } from '@media-router/contracts';
 import { publishedPricingFor } from './published-pricing';
 import { groupRoutesByProvider } from './route-order';
+import { unifyRoutes } from './unify-routes';
 
 const checkedAt = '2026-11-02';
 const recheckedAt = '2026-11-14';
@@ -2462,17 +2463,25 @@ for (const route of routes) {
   if (publishedPricing) route.publishedPricing = publishedPricing;
 }
 
+const { routes: unifiedRoutes, routeAliases } = unifyRoutes(routes);
+
 const deploymentsById = new Map(deployments.map((deployment) => [deployment.id, deployment]));
 const catalogModelIds = new Set(models.map((entry) => entry.id));
 const orderedRoutes: Route[] = [
   ...models.flatMap((entry) =>
     groupRoutesByProvider(
-      routes.filter((item) => item.modelId === entry.id),
+      unifiedRoutes.filter((item) => item.modelId === entry.id),
       deploymentsById,
       entry.authorProviderIds,
     ),
   ),
-  ...routes.filter((item) => !catalogModelIds.has(item.modelId)),
+  ...unifiedRoutes.filter((item) => !catalogModelIds.has(item.modelId)),
 ];
 
-export const catalog: Catalog = { providers, deployments, models, routes: orderedRoutes };
+export const catalog: Catalog = {
+  providers,
+  deployments,
+  models,
+  routes: orderedRoutes,
+  routeAliases,
+};

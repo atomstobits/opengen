@@ -43,7 +43,7 @@ describe('public catalog and quote API', () => {
     const app = await setup();
     const wan = (await app.inject({ url: '/v1/series/alibaba/wan-3.0' })).json();
     expect(wan.models).toHaveLength(2);
-    expect(wan.routes).toHaveLength(28);
+    expect(wan.routes).toHaveLength(20);
     expect(wan.deployments).toHaveLength(10);
     expect(new Set(wan.routes.map((route: { modelId: string }) => route.modelId)).size).toBe(2);
     const h3 = (await app.inject({ url: '/v1/series/minimax/h3' })).json();
@@ -60,7 +60,7 @@ describe('public catalog and quote API', () => {
     expect(models.filter((model: { id: string }) => model.id === 'minimax/h3-max')).toHaveLength(1);
     expect(models.some((model: { id: string }) => model.id === 'fal/h3-max')).toBe(false);
     const routes = (await app.inject({ url: '/v1/routes?modelId=minimax%2Fh3-max' })).json().data;
-    expect(routes).toHaveLength(5);
+    expect(routes).toHaveLength(3);
     expect(routes[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(
       (await app.inject({ url: '/v1/routes?modelId=bytedance%2Fseedance-2.5' })).json().data[0]?.id,
@@ -72,16 +72,21 @@ describe('public catalog and quote API', () => {
       true,
     );
     expect(
-      routes.find((route: { id: string }) => route.id === 'fal-undisclosed/fal-h3-max'),
+      routes.find((route: { id: string }) => route.id === 'fal-undisclosed/minimax-h3-max'),
     ).toMatchObject({
-      id: 'fal-undisclosed/fal-h3-max',
-      upstreamModelId: 'minimax/h3-max/text-to-video',
+      id: 'fal-undisclosed/minimax-h3-max',
+      upstreamModelId: 'minimax/h3-max',
+      upstreamEndpoints: {
+        'text-to-video': 'minimax/h3-max/text-to-video',
+        'image-to-video': 'minimax/h3-max/image-to-video',
+        'reference-to-video': 'minimax/h3-max/reference-to-video',
+      },
     });
   });
   it('returns independent regional routes and honest empty observations', async () => {
     const app = await setup();
     const result = (await app.inject({ url: '/v1/routes?modelId=alibaba%2Fwan-3.0' })).json();
-    expect(result.data).toHaveLength(14);
+    expect(result.data).toHaveLength(10);
     const metrics = (await app.inject({ url: '/v1/metrics' })).json();
     expect(
       metrics.data.every(
@@ -201,6 +206,17 @@ describe('MCP shares the catalog contract', () => {
       expect(
         detail.routes.some((route: { modelId: string }) => route.modelId === 'pika/h3-flex'),
       ).toBe(true);
+      const aliasEntry = await client.callTool({
+        name: 'catalog_get',
+        arguments: { id: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video' },
+      });
+      const aliasDetail = JSON.parse((aliasEntry.content as { text: string }[])[0]!.text);
+      expect(aliasDetail.route.id).toBe('fal-undisclosed/bytedance-seedance-2.5');
+      expect(aliasDetail.resolvedFromAlias).toEqual({
+        id: 'fal-undisclosed/bytedance/seedance-2.5/image-to-video',
+        routeId: 'fal-undisclosed/bytedance-seedance-2.5',
+        operation: 'image-to-video',
+      });
     } finally {
       await client.close();
     }

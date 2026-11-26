@@ -1,5 +1,8 @@
 import {
   operationLabel,
+  routePricingSourceForOperation,
+  routePublishedPricingForOperation,
+  routeResolutionsForOperation,
   sortOperations,
   type Catalog,
   type Model,
@@ -40,19 +43,22 @@ export function resolveDisplayedRouteRate(
 ): DisplayedRouteRate | null {
   const unit: Rate['unit'] = modality === 'video' ? 'output-second' : 'image';
   if (selectedOperation && !route.operations.includes(selectedOperation)) return null;
+  const allowedResolutions = routeResolutionsForOperation(route, selectedOperation);
   if (
     resolution &&
-    route.resolutions.length > 0 &&
-    !route.resolutions.some((item) => item.toLowerCase() === resolution.toLowerCase())
+    allowedResolutions.length > 0 &&
+    !allowedResolutions.some((item) => item.toLowerCase() === resolution.toLowerCase())
   )
     return null;
+  if (resolution && selectedOperation && allowedResolutions.length === 0) return null;
   const effectiveOperation =
     selectedOperation ?? (route.operations.length === 1 ? route.operations[0] : undefined);
   const matches = (rate: Rate) =>
     rate.unit === unit && rate.resolution.toLowerCase() === resolution.toLowerCase();
   const matchesOperation = (rate: Rate) =>
     !effectiveOperation || !rate.operation || rate.operation === effectiveOperation;
-  const published = route.publishedPricing;
+  const published = routePublishedPricingForOperation(route, effectiveOperation);
+  const pricingSource = routePricingSourceForOperation(route, effectiveOperation);
   const preferredQuality = preferredDisplayQuality(route.modelId);
   const qualifiedRate = route.rates.find((rate) => matches(rate) && matchesOperation(rate));
   const eligiblePublished = (published?.outputRates ?? []).filter(
@@ -72,7 +78,7 @@ export function resolveDisplayedRouteRate(
   const quality = qualifiedRate ? preferredQuality : publishedRate?.quality;
   return {
     rate,
-    source: qualifiedRate ? route.pricingSource : (published?.source ?? route.pricingSource),
+    source: qualifiedRate ? pricingSource : (published?.source ?? pricingSource),
     qualified: Boolean(qualifiedRate),
     approximate: !qualifiedRate && Boolean(publishedRate?.approximate),
     ...(quality ? { quality } : {}),
@@ -162,7 +168,7 @@ export function computeCheapestRouteHighlights(
 
   const resolutions = new Map<string, string>();
   for (const route of activeRoutes) {
-    for (const resolution of route.resolutions) {
+    for (const resolution of routeResolutionsForOperation(route, selectedOperation)) {
       const key = resolution.toLowerCase();
       if (!resolutions.has(key)) resolutions.set(key, resolution);
     }

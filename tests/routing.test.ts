@@ -92,7 +92,7 @@ describe('evidence-based routing and reservation bounds', () => {
 
   it('allows unpriced BYOK only without a gateway spending-cap promise', () => {
     const route = catalog.routes.find(
-      (route) => route.id === 'fal-undisclosed/openai/gpt-image-2.5/flare/text-to-image',
+      (route) => route.id === 'fal-undisclosed/openai-gpt-image-2.5-flare',
     )!;
     const request: GenerateInput = {
       modelId: route.modelId,

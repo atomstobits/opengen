@@ -1,4 +1,9 @@
-import type { GenerateInput, Route, Source } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  type GenerateInput,
+  type Route,
+  type Source,
+} from '@media-router/contracts';
 
 export interface BoundedTokenQuote {
   estimatedCostMicros: number;
@@ -361,7 +366,8 @@ function falGoogleOmni12BoundedQuote(route: Route, input: GenerateInput): Bounde
   if (
     route.adapter !== 'fal' ||
     route.deploymentId !== 'fal-undisclosed' ||
-    route.upstreamModelId !== 'google/gemini-omni-flash/v1.2/text-to-video' ||
+    resolveRouteUpstreamModelId(route, input.operation) !==
+      'google/gemini-omni-flash/v1.2/text-to-video' ||
     input.operation !== 'text-to-video'
   )
     return null;

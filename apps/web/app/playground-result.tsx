@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Catalog, GenerateInput, Job, OutputAsset } from '@media-router/contracts';
+import {
+  resolveCatalogRoute,
+  type Catalog,
+  type GenerateInput,
+  type Job,
+  type OutputAsset,
+} from '@media-router/contracts';
 import { routeIdentity } from './playground-pricing';
 import { regionNames, OutputCredentials } from './ui';
 import { OutputReuse } from './playground-reuse';
@@ -98,7 +104,7 @@ export function PlaygroundResult({
   error: string;
 }) {
   const deployment = catalog.deployments.find(({ id }) => id === job.deploymentId);
-  const route = catalog.routes.find(({ id }) => id === job.routeId);
+  const route = resolveCatalogRoute(catalog, job.routeId)?.route;
   const identity = route && routeIdentity(catalog, route, job.input.operation);
   const exactModel = catalog.models.find(({ id }) => id === job.input.modelId);
   return (

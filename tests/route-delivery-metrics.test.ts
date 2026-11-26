@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { describe, it } from 'vitest';
+import { catalog as realCatalog, quote } from '@media-router/catalog';
 import { createEngine } from '../packages/engine/src/index.js';
 import { isolatedEngineDatabase } from './helpers/isolated-engine';
 import { privateStorageFixture, privateOutputFixture } from './helpers/private-storage';
@@ -267,6 +268,158 @@ describe.skipIf(!databaseUrl)('owned delivery route metrics', () => {
         reservedMicros: 0,
         currency: 'USD',
       });
+    } finally {
+      await engine.close();
+      await isolated.close();
+    }
+  }, 60000);
+
+  it('aggregates historical retired RouteAlias observations into canonical unified route metrics without mutating attempts', async () => {
+    const isolated = await isolatedEngineDatabase(databaseUrl!, 'route_alias_metrics');
+    const canonicalRouteId = 'fal-undisclosed/alibaba-wan-3.0';
+    const legacyT2vAliasId = 'fal-undisclosed/alibaba/wan-3.0/text-to-video';
+    const legacyI2vAliasId = 'fal-undisclosed/alibaba/wan-3.0/image-to-video';
+    const canonicalRoute = realCatalog.routes.find((route) => route.id === canonicalRouteId)!;
+    const deployment = realCatalog.deployments.find(
+      (entry) => entry.id === canonicalRoute.deploymentId,
+    )!;
+    const deploymentId = deployment.id;
+    const storage = privateStorageFixture();
+    const engine = isolated.bind(
+      createEngine({
+        databaseUrl: isolated.databaseUrl,
+        publicUrl: 'https://fixture.invalid',
+        catalog: realCatalog,
+        adapters: [],
+        poolSize: 1,
+        providerEnv: {},
+        vaultKey: '0'.repeat(64),
+        storage,
+      }),
+    );
+    const workspace = 'alias-metrics-workspace';
+    const t2vInput: any = {
+      modelId: 'alibaba/wan-3.0',
+      operation: 'text-to-video',
+      input: { prompt: 'Ocean waves.', resolution: '720p', duration: 5 },
+    };
+    const i2vInput: any = {
+      modelId: 'alibaba/wan-3.0',
+      operation: 'image-to-video',
+      input: {
+        prompt: 'Ocean waves.',
+        firstFrame: { url: 'https://fixture.invalid/first.png' },
+        resolution: '720p',
+        duration: 5,
+      },
+    };
+    try {
+      await engine.initialize();
+      await engine.ensureWorkspace(workspace, 0);
+      async function seedObservedJob(
+        storedRouteId: string,
+        jobInput: any,
+        attemptDurationMs: number,
+        deliveryMs: number,
+      ) {
+        const id = randomUUID();
+        const created = new Date(Date.now() - 60_000);
+        const owned = await privateOutputFixture(storage, id, 'video/mp4');
+        await engine.pool.query(
+          `INSERT INTO mr_jobs(id,workspace_id,idempotency_key,request_hash,input,route_snapshot,deployment_snapshot,status,upstream_id,outputs,reserved_micros,settled_micros,attempt_count,created_at,completed_at,delivery_status,delivery_updated_at)
+           VALUES($1::uuid,$2,$1::text,'synthetic',$3,$4,$5,'succeeded','upstream-1',$6,0,0,1,$7,$8,'available',$9)`,
+          [
+            id,
+            workspace,
+            JSON.stringify(jobInput),
+            JSON.stringify({ ...canonicalRoute, id: storedRouteId }),
+            JSON.stringify(deployment),
+            JSON.stringify([owned]),
+            created,
+            new Date(created.getTime() + attemptDurationMs),
+            new Date(created.getTime() + deliveryMs),
+          ],
+        );
+        await engine.pool.query(
+          `INSERT INTO mr_attempts(id,job_id,number,route_id,deployment_id,state,started_at,completed_at)
+           VALUES($1,$2,1,$3,$4,'succeeded',$5,$6)`,
+          [
+            randomUUID(),
+            id,
+            storedRouteId,
+            deploymentId,
+            created,
+            new Date(created.getTime() + attemptDurationMs),
+          ],
+        );
+        await engine.pool.query(
+          `INSERT INTO mr_output_receipts(id,workspace_id,job_id,attempt,route_id,deployment_id,upstream_id,slot,kind,media_type,source_key,object_key,source_hash,state,sha256,byte_length)
+           VALUES($1,$2,$3,1,$4,$5,'upstream-1',0,'owned','video/mp4',$6,$6,$7,'available',$7,$8)`,
+          [
+            randomUUID(),
+            workspace,
+            id,
+            storedRouteId,
+            deploymentId,
+            owned.storageKey,
+            owned.sha256,
+            owned.byteLength,
+          ],
+        );
+      }
+
+      // 4 historical observations under the retired text-to-video alias + 1 new canonical observation = 5 T2V samples.
+      for (const durationMs of [1000, 2000, 3000, 4000])
+        await seedObservedJob(legacyT2vAliasId, t2vInput, durationMs, durationMs + 500);
+      await seedObservedJob(canonicalRouteId, t2vInput, 5000, 5500);
+      // 1 historical observation under the retired image-to-video alias stays isolated from T2V cohort.
+      await seedObservedJob(legacyI2vAliasId, i2vInput, 9000, 9500);
+
+      const t2vRouteMetrics = await engine.routeMetrics(t2vInput);
+      const t2vMetrics = t2vRouteMetrics.find((value) => value.routeId === canonicalRouteId)!;
+      assert.equal(t2vMetrics.sampleCount, 5);
+      assert.equal(t2vMetrics.succeeded, 5);
+      assert.equal(t2vMetrics.technicalSuccessRate, 1);
+      assert.equal(t2vMetrics.p50CompletionMs, 3000);
+      assert.equal(t2vMetrics.jobSampleCount, 5);
+      assert.equal(t2vMetrics.deliveryAvailableJobCount, 5);
+      assert.equal(t2vMetrics.endToEndSampleCount, 5);
+      assert.equal(t2vMetrics.p50EndToEndMs, 3500);
+
+      // Historical retired alias observations count toward speed-based performance routing for T2V.
+      const speedQuote = quote(
+        { ...t2vInput, routing: { preference: 'speed' } },
+        { executableRouteIds: [canonicalRouteId], metrics: t2vRouteMetrics },
+      );
+      assert.equal(speedQuote.selectedRouteId, canonicalRouteId);
+
+      const i2vRouteMetrics = await engine.routeMetrics(i2vInput);
+      const i2vMetrics = i2vRouteMetrics.find((value) => value.routeId === canonicalRouteId)!;
+      assert.equal(i2vMetrics.sampleCount, 1);
+      assert.equal(i2vMetrics.p50CompletionMs, 9000);
+      assert.equal(i2vMetrics.deliveryAvailableJobCount, 1);
+
+      // Undersampled I2V cohort stays isolated and does not inherit T2V observations for speed routing.
+      const i2vSpeedQuote = quote(
+        { ...i2vInput, routing: { preference: 'speed' } },
+        { executableRouteIds: [canonicalRouteId], metrics: i2vRouteMetrics },
+      );
+      assert.equal(i2vSpeedQuote.selectedRouteId, null);
+
+      // Unfiltered route metrics combine all historical + canonical observations for the unified route.
+      const allMetrics = (await engine.routeMetrics()).find(
+        (value) => value.routeId === canonicalRouteId,
+      )!;
+      assert.equal(allMetrics.sampleCount, 6);
+      assert.equal(allMetrics.deliveryAvailableJobCount, 6);
+
+      // Immutable persisted attempt records retain their original stored route_id.
+      const storedAttemptIds = (
+        await engine.pool.query('SELECT route_id FROM mr_attempts ORDER BY route_id')
+      ).rows.map((row) => row.route_id);
+      assert.equal(storedAttemptIds.filter((id) => id === legacyT2vAliasId).length, 4);
+      assert.equal(storedAttemptIds.filter((id) => id === legacyI2vAliasId).length, 1);
+      assert.equal(storedAttemptIds.filter((id) => id === canonicalRouteId).length, 1);
     } finally {
       await engine.close();
       await isolated.close();

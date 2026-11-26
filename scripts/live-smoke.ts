@@ -4,7 +4,15 @@ import { mkdir, open, readFile, rename, unlink, stat, realpath } from 'node:fs/p
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import type { Catalog, GenerateInput, Job, Quote, Source } from '@media-router/contracts';
+import {
+  routeDurationsForOperation,
+  routeResolutionsForOperation,
+  type Catalog,
+  type GenerateInput,
+  type Job,
+  type Quote,
+  type Source,
+} from '@media-router/contracts';
 import { parseGenerationRequest } from '@media-router/contracts/generation';
 
 export const maxSmokeBudgetMicros = 50_000_000;
@@ -126,12 +134,15 @@ export function catalogSmokeCases(catalog: Catalog): SmokeCase[] {
     .map((route) => {
       const model = catalog.models.find((model) => model.id === route.modelId)!;
       const operation = model.modality === 'image' ? 'text-to-image' : 'text-to-video';
-      const duration = model.modality === 'video' ? Math.min(...route.durations) : undefined;
+      const opDurations = routeDurationsForOperation(route, operation);
+      const opResolutions = routeResolutionsForOperation(route, operation);
+      const duration =
+        model.modality === 'video' && opDurations.length ? Math.min(...opDurations) : undefined;
       const priced = route.rates
         .filter(
           (rate) =>
             (!rate.operation || rate.operation === operation) &&
-            route.resolutions.includes(rate.resolution),
+            opResolutions.includes(rate.resolution),
         )
         .map((rate) => ({
           rate,

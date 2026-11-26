@@ -17,6 +17,7 @@ import {
   catalogSearchFiltersSchema,
   operationTargets,
   canonicalModelId,
+  resolveCatalogRoute,
 } from '@media-router/contracts';
 import { parseGenerationRequest } from '@media-router/contracts/generation';
 import { browserLogin, savedLogin, logout } from './login.js';
@@ -281,7 +282,7 @@ export async function runCommand(args: string[], options: CommandOptions = {}): 
     if (catalog.companies.some((entry) => entry.id === id)) return client.company(id, { signal });
     const result =
       catalog.models.find((entry) => entry.id === canonicalModelId(id)) ??
-      catalog.routes.find((entry) => entry.id === id) ??
+      resolveCatalogRoute(catalog, id)?.route ??
       catalog.deployments.find((entry) => entry.id === id);
     if (!result) throw new Error('Catalog entry not found.');
     return result;

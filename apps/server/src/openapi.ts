@@ -628,6 +628,7 @@ function responseSchema(id: string): Schema {
       providers: array({ type: 'object' }),
       deployments: array({ type: 'object' }),
       routes: array({ type: 'object' }),
+      routeAliases: array(ref('RouteAlias')),
       companies: array({ type: 'object' }),
       series: array({ type: 'object' }),
     });
@@ -1234,6 +1235,17 @@ export function openApiDocument(billingAvailable = false) {
         BillingPolicy: billingPolicy,
         BillingRechargeAttempt: billingRechargeAttempt,
         BillingDocument: billingDocument,
+        RouteAlias: {
+          ...object(
+            {
+              id: string,
+              routeId: string,
+              operation: z.toJSONSchema(generationSchema.shape.operation),
+            },
+            ['id', 'routeId'],
+          ),
+          additionalProperties: false,
+        },
         RouteFeature: {
           ...object(
             {

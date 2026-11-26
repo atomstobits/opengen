@@ -1,4 +1,9 @@
-import type { GenerateInput, Operation } from '@media-router/contracts';
+import {
+  resolveCatalogRoute,
+  type Catalog,
+  type GenerateInput,
+  type Operation,
+} from '@media-router/contracts';
 
 type RecoveryKind =
   'draft' | 'submission' | 'job' | 'lineage' | 'last-result' | 'comparison-approval';
@@ -197,15 +202,45 @@ function isSubmissionJournal(value: unknown): value is SubmissionJournal {
   );
 }
 
+/**
+ * Returns the canonical request fingerprint plus any equivalent pre-upgrade RouteAlias
+ * fingerprints for the same route and operation so restored receipts are matched safely.
+ */
+export function equivalentRequestFingerprints(
+  request: GenerateInput,
+  catalog?: Pick<Catalog, 'routes' | 'routeAliases'>,
+): string[] {
+  const fingerprints = new Set<string>([requestFingerprint(request)]);
+  if (!request.routeId || !catalog?.routeAliases?.length) return [...fingerprints];
+  const resolved = resolveCatalogRoute(catalog, request.routeId);
+  if (!resolved) return [...fingerprints];
+  const canonicalId = resolved.route.id;
+  if (canonicalId !== request.routeId) {
+    fingerprints.add(requestFingerprint({ ...request, routeId: canonicalId }));
+  }
+  for (const alias of catalog.routeAliases) {
+    if (
+      alias.routeId === canonicalId &&
+      (alias.operation === undefined || alias.operation === request.operation)
+    ) {
+      fingerprints.add(requestFingerprint({ ...request, routeId: alias.id }));
+    }
+  }
+  return [...fingerprints];
+}
+
 export function findSubmission(
   storage: RecoveryStorage,
   context: RecoveryContext,
-  fingerprint: string,
+  fingerprint: string | readonly string[],
 ): SubmissionReceipt | undefined {
+  const accepted = Array.isArray(fingerprint) ? new Set(fingerprint) : null;
   return readRecovery(storage, context, 'submission', isSubmissionJournal)
     ?.receipts.slice()
     .reverse()
-    .find((receipt) => receipt.fingerprint === fingerprint);
+    .find((receipt) =>
+      accepted ? accepted.has(receipt.fingerprint) : receipt.fingerprint === fingerprint,
+    );
 }
 
 export function findSubmissionForJob(
@@ -225,10 +260,12 @@ export function prepareSubmission(
   request: GenerateInput,
   newKey: () => string = () => crypto.randomUUID(),
   newAttemptAfter?: string,
+  catalog?: Pick<Catalog, 'routes' | 'routeAliases'>,
 ): SubmissionReceipt {
   if (request.modelId !== context.modelId || request.operation !== context.operation)
     throw new Error('The request does not match the selected model and operation.');
   const fingerprint = requestFingerprint(request);
+  const accepted = new Set(equivalentRequestFingerprints(request, catalog));
   let hasSavedSubmission: boolean;
   try {
     hasSavedSubmission = storage.getItem(recoveryKey(context, 'submission')) !== null;
@@ -241,10 +278,11 @@ export function prepareSubmission(
       'Saved submission recovery is invalid. Review existing workspace jobs before creating a new generation.',
     );
   const journal = saved ?? { receipts: [] };
-  const previous = journal.receipts.filter((receipt) => receipt.fingerprint === fingerprint).at(-1);
+  const previous = journal.receipts.filter((receipt) => accepted.has(receipt.fingerprint)).at(-1);
   if (previous && newAttemptAfter === undefined) {
     if (previous.rejected) {
       delete previous.rejected;
+      previous.fingerprint = fingerprint;
       if (!writeRecovery(storage, context, 'submission', journal))
         throw new Error(
           'Browser recovery could not be saved. This request has not been submitted.',

@@ -1,6 +1,11 @@
 import { captureProviderResult, type CaptureProviderOutputs } from './adapter-output.js';
 import { createHash } from 'node:crypto';
-import type { GenerationArguments, Operation } from '@media-router/contracts';
+import {
+  resolveRouteUpstreamModelId,
+  routeUpstreamModelIds,
+  type GenerationArguments,
+  type Operation,
+} from '@media-router/contracts';
 import {
   isPublicHttpsAssetUrl,
   adapterInputIssue,
@@ -275,7 +280,7 @@ export function createFalAdapter(
   const env = options.env ?? process.env;
   const request = options.fetch ?? fetch;
   function fields(context: Omit<AdapterContext, 'jobId'>): (keyof GenerationArguments)[] {
-    const model = context.route.upstreamModelId;
+    const model = resolveRouteUpstreamModelId(context.route, context.input.operation);
     if (isFalImageEndpoint(model)) return [...falImageFields(model)];
     const seedance = seedanceEndpoints.get(model);
     if (seedance) {
@@ -453,7 +458,7 @@ export function createFalAdapter(
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     if (context.deployment.id !== 'fal-undisclosed')
       return 'This adapter does not establish account-specific fal region access.';
-    const model = context.route.upstreamModelId;
+    const model = resolveRouteUpstreamModelId(context.route, context.input.operation);
     const issue = isFalImageEndpoint(model) ? null : adapterInputIssue(context, fields(context));
     if (issue) return issue;
     const args = context.input.input,
@@ -901,8 +906,19 @@ export function createFalAdapter(
   }
   function base(context: AdapterContext) {
     // Queue management uses owner/app, excluding endpoint paths such as text-to-video.
-    return `https://queue.fal.run/${context.route.upstreamModelId.split('/').slice(0, 2).join('/')}`;
+    const model = resolveRouteUpstreamModelId(context.route, context.input.operation);
+    return `https://queue.fal.run/${model.split('/').slice(0, 2).join('/')}`;
   }
+  const isKnownEndpoint = (endpoint: string) =>
+    h3Endpoints.has(endpoint) ||
+    seedanceEndpoints.has(endpoint) ||
+    wanEndpoints.has(endpoint) ||
+    geminiOmniEndpoints.has(endpoint) ||
+    xaiVideoEndpoints.has(endpoint) ||
+    klingEndpoints.has(endpoint) ||
+    fluxVideoEndpoints.has(endpoint) ||
+    happyHorseEndpoints.has(endpoint) ||
+    isFalImageEndpoint(endpoint);
   const supportedOperations: Operation[] = [
     'text-to-video',
     'image-to-video',
@@ -920,20 +936,12 @@ export function createFalAdapter(
     isConfigured: (route, deployment) =>
       route.adapter === 'fal' &&
       deployment.id === 'fal-undisclosed' &&
-      (h3Endpoints.has(route.upstreamModelId) ||
-        seedanceEndpoints.has(route.upstreamModelId) ||
-        wanEndpoints.has(route.upstreamModelId) ||
-        geminiOmniEndpoints.has(route.upstreamModelId) ||
-        xaiVideoEndpoints.has(route.upstreamModelId) ||
-        klingEndpoints.has(route.upstreamModelId) ||
-        fluxVideoEndpoints.has(route.upstreamModelId) ||
-        happyHorseEndpoints.has(route.upstreamModelId) ||
-        isFalImageEndpoint(route.upstreamModelId)) &&
+      routeUpstreamModelIds(route).some(isKnownEndpoint) &&
       Boolean(env.FAL_KEY),
     async submit(context) {
       const issue = preflight(context);
       if (issue) throw new SubmissionRejected(issue);
-      const model = context.route.upstreamModelId;
+      const model = resolveRouteUpstreamModelId(context.route, context.input.operation);
       const seedance = seedanceEndpoints.get(model);
       const wanOp = wanEndpoints.get(model);
       const omni = geminiOmniEndpoints.get(model);
@@ -1242,7 +1250,8 @@ export function createFalAdapter(
           billedCostMicros: null,
         };
       const output = await pollProviderJson(request, 'fal', path, auth());
-      const image = isFalImageEndpoint(context.route.upstreamModelId);
+      const upstreamModel = resolveRouteUpstreamModelId(context.route, context.input.operation);
+      const image = isFalImageEndpoint(upstreamModel);
       if (Array.isArray(output.has_nsfw_concepts) && output.has_nsfw_concepts.some(Boolean))
         return {
           status: 'failed',
@@ -1261,7 +1270,7 @@ export function createFalAdapter(
       )
         throw new Error('Fal has not returned the requested output assets.');
       const defaultMediaType = image
-        ? `image/${falImageDefaultFormat(context.route.upstreamModelId, context.input.input.outputFormat)}`
+        ? `image/${falImageDefaultFormat(upstreamModel, context.input.input.outputFormat)}`
         : 'video/mp4';
       const assetMediaType = (asset: Record<string, unknown>) =>
         image &&

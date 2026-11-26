@@ -9,7 +9,9 @@ import {
   catalogSearchFiltersSchema,
   catalogSearchQuerySchema,
   canonicalModelId,
-  routeFeatureSignature,
+  resolveCatalogRoute,
+  resolveRouteUpstreamModelId,
+  routePricingSourceForOperation,
 } from '@media-router/contracts';
 import type {
   Catalog,
@@ -21,8 +23,11 @@ import type {
   Operation,
   Quote,
   QuoteCandidate,
+  ResolvedCatalogRoute,
   Route,
+  RouteAlias,
   RouteMetrics,
+  RoutePublishedPricing,
 } from '@media-router/contracts';
 import { catalog } from './data';
 import { groupRoutesByProvider, selectModelRoutes } from './route-order';
@@ -61,8 +66,29 @@ export function getModel(id: string): Model | undefined {
   const canonicalId = canonicalModelId(id);
   return catalog.models.find((item) => item.id === canonicalId);
 }
-export function getRoute(id: string): Route | undefined {
-  return catalog.routes.find((item) => item.id === id);
+export function getRouteAlias(
+  id: string,
+  sourceCatalog: Pick<Catalog, 'routeAliases'> = catalog,
+): RouteAlias | undefined {
+  return sourceCatalog.routeAliases?.find((entry) => entry.id === id);
+}
+export function canonicalRouteId(
+  id: string,
+  sourceCatalog: Pick<Catalog, 'routeAliases'> = catalog,
+): string {
+  return getRouteAlias(id, sourceCatalog)?.routeId ?? id;
+}
+export function resolveRoute(
+  id: string,
+  sourceCatalog: Pick<Catalog, 'routes' | 'routeAliases'> = catalog,
+): ResolvedCatalogRoute | undefined {
+  return resolveCatalogRoute(sourceCatalog, id);
+}
+export function getRoute(
+  id: string,
+  sourceCatalog: Pick<Catalog, 'routes' | 'routeAliases'> = catalog,
+): Route | undefined {
+  return resolveRoute(id, sourceCatalog)?.route;
 }
 export function getModelRoutes(
   id: string,
@@ -147,10 +173,39 @@ export function searchCatalog(query = '', filters: CatalogSearchFilters = {}) {
   });
 }
 
+function validatePublishedPricingEvidence(
+  published: RoutePublishedPricing,
+  route: Route,
+  label: string,
+  errors: string[],
+): void {
+  const { summary, source, conditions, outputRates } = published;
+  let validSource = false;
+  try {
+    const url = new URL(source.url);
+    validSource = url.protocol === 'https:' && !url.username && !url.password;
+  } catch {
+    /* Invalid catalog evidence is reported below. */
+  }
+  if (
+    !summary.trim() ||
+    !conditions.length ||
+    conditions.some((condition) => !condition.trim()) ||
+    outputRates?.some((rate) => !Number.isSafeInteger(rate.usdMicros) || rate.usdMicros < 0) ||
+    !validSource ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(source.checkedAt) ||
+    !Number.isFinite(Date.parse(source.checkedAt))
+  )
+    errors.push(`Invalid published tariff evidence for ${label}`);
+  if (outputRates?.some((rate) => rate.operation && !route.operations.includes(rate.operation)))
+    errors.push(`Published tariff output rate lists unsupported operation for ${label}`);
+}
+
 export function validateCatalog(): string[] {
   const errors: string[] = validateSeriesCatalog();
   const providerIds = new Set(catalog.providers.map((provider) => provider.id));
   for (const [name, items] of Object.entries(catalog)) {
+    if (!Array.isArray(items)) continue;
     const ids = new Set<string>();
     for (const item of items) {
       if (ids.has(item.id)) errors.push(`${name}: duplicate ID ${item.id}`);
@@ -178,7 +233,8 @@ export function validateCatalog(): string[] {
     if (!providerIds.has(deployment.providerId))
       errors.push(`Unknown provider for ${deployment.id}`);
   }
-  const deploymentSignatures = new Map<string, string>();
+  const activeDeploymentRoutes = new Map<string, string>();
+  const routesById = new Map(catalog.routes.map((route) => [route.id, route]));
   for (const route of catalog.routes) {
     if (!getModel(route.modelId)) errors.push(`Unknown model for ${route.id}`);
     else if (canonicalModelId(route.modelId) !== route.modelId)
@@ -197,13 +253,49 @@ export function validateCatalog(): string[] {
         errors.push(`Invalid route feature metadata for ${route.id}`);
     }
     if (route.status !== 'retired') {
-      const siblingKey = `${route.modelId}|${route.deploymentId}|${routeFeatureSignature(route)}`;
-      const existing = deploymentSignatures.get(siblingKey);
+      const deploymentKey = `${route.modelId}|${route.deploymentId}`;
+      const existing = activeDeploymentRoutes.get(deploymentKey);
       if (existing)
         errors.push(
-          `Ambiguous sibling routes for ${route.modelId} on ${route.deploymentId}: ${existing} and ${route.id} share the same operations and feature`,
+          `Duplicate active routes for ${route.modelId} on ${route.deploymentId}: ${existing} and ${route.id} must be unified into one canonical route`,
         );
-      else deploymentSignatures.set(siblingKey, route.id);
+      else activeDeploymentRoutes.set(deploymentKey, route.id);
+    }
+    if (route.upstreamEndpoints) {
+      for (const [operation, endpoint] of Object.entries(route.upstreamEndpoints)) {
+        if (!route.operations.includes(operation as Operation))
+          errors.push(`Upstream endpoint lists unsupported operation ${operation} for ${route.id}`);
+        if (!endpoint?.trim())
+          errors.push(`Empty upstream endpoint for ${route.id} (${operation})`);
+      }
+    }
+    if (route.operationCapabilities) {
+      for (const [operation, cap] of Object.entries(route.operationCapabilities)) {
+        if (!route.operations.includes(operation as Operation))
+          errors.push(
+            `Operation capability override lists unsupported operation ${operation} for ${route.id}`,
+          );
+        if (!cap) continue;
+        if (cap.resolutions?.some((res) => !route.resolutions.includes(res)))
+          errors.push(
+            `Operation capability resolution outside route resolutions for ${route.id} (${operation})`,
+          );
+        if (cap.durations?.some((duration) => !route.durations.includes(duration)))
+          errors.push(
+            `Operation capability duration outside route durations for ${route.id} (${operation})`,
+          );
+        if (cap.source && !cap.source.url.startsWith('https://'))
+          errors.push(`Invalid operation capability source for ${route.id} (${operation})`);
+        if (cap.pricingSource && !cap.pricingSource.url.startsWith('https://'))
+          errors.push(`Invalid operation capability pricingSource for ${route.id} (${operation})`);
+        if (cap.publishedPricing)
+          validatePublishedPricingEvidence(
+            cap.publishedPricing,
+            route,
+            `${route.id} (${operation})`,
+            errors,
+          );
+      }
     }
     if (route.liveVerification) {
       const verifiedOps = route.liveVerification.operations ?? [route.liveVerification.operation];
@@ -219,28 +311,18 @@ export function validateCatalog(): string[] {
       errors.push(`Invalid rate for ${route.id}`);
     if (route.rates.some((rate) => rate.operation && !route.operations.includes(rate.operation)))
       errors.push(`Rate lists unsupported operation for ${route.id}`);
-    if (route.publishedPricing) {
-      const { summary, source, conditions, outputRates } = route.publishedPricing;
-      let validSource = false;
-      try {
-        const url = new URL(source.url);
-        validSource = url.protocol === 'https:' && !url.username && !url.password;
-      } catch {
-        /* Invalid catalog evidence is reported below. */
-      }
-      if (
-        !summary.trim() ||
-        !conditions.length ||
-        conditions.some((condition) => !condition.trim()) ||
-        outputRates?.some((rate) => !Number.isSafeInteger(rate.usdMicros) || rate.usdMicros < 0) ||
-        !validSource ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(source.checkedAt) ||
-        !Number.isFinite(Date.parse(source.checkedAt))
-      )
-        errors.push(`Invalid published tariff evidence for ${route.id}`);
-      if (outputRates?.some((rate) => rate.operation && !route.operations.includes(rate.operation)))
-        errors.push(`Published tariff output rate lists unsupported operation for ${route.id}`);
-    }
+    if (route.publishedPricing)
+      validatePublishedPricingEvidence(route.publishedPricing, route, route.id, errors);
+  }
+  for (const alias of catalog.routeAliases ?? []) {
+    if (routesById.has(alias.id))
+      errors.push(`Route alias collides with canonical route ID ${alias.id}`);
+    const target = routesById.get(alias.routeId);
+    if (!target) errors.push(`Route alias ${alias.id} references unknown route ${alias.routeId}`);
+    else if (alias.operation && !target.operations.includes(alias.operation))
+      errors.push(
+        `Route alias ${alias.id} lists unsupported operation ${alias.operation} for ${alias.routeId}`,
+      );
   }
   return errors;
 }
@@ -282,7 +364,10 @@ export function quote(
   const args = input.input;
   const model = validateInput(input);
   const policy = input.routing ?? {};
-  if (input.routeId && getRoute(input.routeId)?.modelId !== model.id)
+  const resolvedPin = input.routeId ? resolveRoute(input.routeId) : undefined;
+  const pinnedRouteId = resolvedPin?.route.id ?? input.routeId;
+  const pinnedAlias = resolvedPin?.alias;
+  if (input.routeId && resolvedPin?.route.modelId !== model.id)
     throw new CatalogError(
       'route_model_mismatch',
       'The pinned route does not serve this exact model.',
@@ -291,7 +376,7 @@ export function quote(
     if (
       route.modelId !== model.id ||
       route.status === 'retired' ||
-      (input.routeId && route.id !== input.routeId)
+      (pinnedRouteId && route.id !== pinnedRouteId)
     )
       return false;
     const deployment = catalog.deployments.find((item) => item.id === route.deploymentId)!;
@@ -321,19 +406,33 @@ export function quote(
       .filter((route) => route.operations.includes(input.operation))
       .map((route) => route.deploymentId),
   );
-  const evaluated = input.routeId
+  const evaluated = pinnedRouteId
     ? eligible
     : eligible.filter(
         (route) =>
           route.operations.includes(input.operation) ||
           !deploymentsSupportingOperation.has(route.deploymentId),
       );
-  const executableIds = new Set(options.executableRouteIds ?? []);
+  const executableIds = new Set(
+    (options.executableRouteIds ?? []).flatMap((id) => {
+      const resolved = resolveRoute(id);
+      if (resolved?.alias?.operation && resolved.alias.operation !== input.operation) return [];
+      return [resolved?.route.id ?? id];
+    }),
+  );
   const candidates: QuoteCandidate[] = evaluated
     .map((route) => {
       const deployment = catalog.deployments.find((item) => item.id === route.deploymentId)!;
       const inputIssues = validateRouteInput(input, route);
+      if (pinnedAlias?.operation && pinnedAlias.operation !== input.operation) {
+        inputIssues.push({
+          code: 'unsupported_operation',
+          field: 'operation',
+          message: `Route alias ${pinnedAlias.id} is bound to ${pinnedAlias.operation} and cannot execute ${input.operation}.`,
+        });
+      }
       const rate = getPublishedRate(route, input.operation, args.resolution);
+      const upstream = resolveRouteUpstreamModelId(route, input.operation);
       // Reference media can incur additional input billing. No partial output-only estimate is presented as a full quote.
       const extraInputs = Boolean(
         args.references?.length ||
@@ -355,18 +454,18 @@ export function quote(
         args.shots?.length ||
         args.codec ||
         args.bitrateMode ||
-        ((route.upstreamModelId === 'grok-imagine-image-2.0' ||
-          route.upstreamModelId === 'xai/grok-imagine-image/v2.0/text-to-image') &&
+        ((upstream === 'grok-imagine-image-2.0' ||
+          upstream === 'xai/grok-imagine-image/v2.0/text-to-image') &&
           (count !== 1 || ![undefined, 'low'].includes(args.quality))) ||
         (route.adapter === 'minimax' &&
-          !route.upstreamModelId.startsWith('MiniMax-H3-Image') &&
+          !upstream.startsWith('MiniMax-H3-Image') &&
           args.promptExpansion !== undefined &&
-          (route.upstreamModelId !== 'MiniMax-H3-Max' ||
+          (upstream !== 'MiniMax-H3-Max' ||
             ![false, 'none', 'disabled'].includes(args.promptExpansion))) ||
-        ((route.upstreamModelId === 'minimax/h3-max/text-to-video' ||
-          route.upstreamModelId === 'minimax/h3-max-turbo/text-to-video' ||
-          route.upstreamModelId === 'minimax/h3/text-to-video' ||
-          route.upstreamModelId === 'minimax/h3/image-to-video') &&
+        ((upstream === 'minimax/h3-max/text-to-video' ||
+          upstream === 'minimax/h3-max-turbo/text-to-video' ||
+          upstream === 'minimax/h3/text-to-video' ||
+          upstream === 'minimax/h3/image-to-video') &&
           ![undefined, false, 'none', 'disabled'].includes(args.promptExpansion)),
       );
       const quantity =
@@ -429,7 +528,7 @@ export function quote(
         currency: 'USD' as const,
         executable,
         reason,
-        source: tokenQuote?.source ?? route.pricingSource,
+        source: tokenQuote?.source ?? routePricingSourceForOperation(route, input.operation),
         issues: inputIssues,
         notices: [
           ...(directBilling

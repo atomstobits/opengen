@@ -1,10 +1,13 @@
 import { expect, it, vi } from 'vitest';
 import { catalog } from '@media-router/catalog';
+import { resolveRouteUpstreamModelId } from '@media-router/contracts';
 import { createFalAdapter } from '../packages/engine/src/fal.js';
 
 it('opts out of fal payload history and checkpoints terminal output without enabling private ACL or returning a raw URL', async () => {
   const route = catalog.routes.find(
-    (value) => value.adapter === 'fal' && value.upstreamModelId === 'minimax/h3-max/text-to-video',
+    (value) =>
+      value.adapter === 'fal' &&
+      resolveRouteUpstreamModelId(value, 'text-to-video') === 'minimax/h3-max/text-to-video',
   )!;
   const deployment = catalog.deployments.find((value) => value.id === route.deploymentId)!;
   const capture = vi.fn().mockResolvedValue([]);

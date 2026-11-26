@@ -120,7 +120,7 @@ describe('native MiniMax H3 text-only tariffs', () => {
     expect(quoted(input).candidates[0]!.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'unsupported_duration' })]),
     );
-    const falMax = catalog.routes.find((route) => route.id === 'fal-undisclosed/fal-h3-max')!;
+    const falMax = catalog.routes.find((route) => route.id === 'fal-undisclosed/minimax-h3-max')!;
     expect(falMax.pricingSource.url).toBe('https://fal.ai/models/minimax/h3-max/text-to-video');
     expect(falMax.rates.map((rate) => [rate.resolution, rate.usdMicros])).toEqual([
       ['480p', 50_000],

@@ -105,11 +105,40 @@ export interface RouteFeature {
   /** Optional short scope note describing what this route powers or restricts. */
   summary?: string;
 }
+export interface RouteAlias {
+  /** Legacy split or provider-endpoint route ID, e.g. 'fal-undisclosed/bytedance/seedance-2.5/image-to-video'. */
+  id: string;
+  /** Canonical unified route ID, e.g. 'fal-undisclosed/bytedance-seedance-2.5'. */
+  routeId: string;
+  /** Optional operation bound to this alias; prevents silently executing a conflicting operation. */
+  operation?: Operation;
+}
+export interface RoutePublishedPricing {
+  summary: string;
+  source: Source;
+  conditions: string[];
+  /** Published per-output prices for comparison only. */
+  outputRates?: Array<
+    Rate & {
+      approximate?: true;
+      quality?: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+    }
+  >;
+}
+export interface RouteOperationCapabilities {
+  resolutions?: string[];
+  durations?: number[];
+  pricingSource?: Source;
+  source?: Source;
+  publishedPricing?: RoutePublishedPricing;
+}
 export interface Route {
   id: string;
   modelId: string;
   deploymentId: string;
   upstreamModelId: string;
+  /** Explicit per-operation upstream endpoint mapping when a serving provider splits endpoints by operation. */
+  upstreamEndpoints?: Partial<Record<Operation, string>>;
   /** Provider-specific display label; exact variant identity remains modelId. */
   providerModelName?: string;
   operations: Operation[];
@@ -117,6 +146,8 @@ export interface Route {
   feature?: RouteFeature;
   resolutions: string[];
   durations: number[];
+  /** Optional per-operation narrower capability bounds, sources or tariffs wrapped under one canonical route. */
+  operationCapabilities?: Partial<Record<Operation, RouteOperationCapabilities>>;
   fidelity: Fidelity;
   adapter:
     | 'alibaba'
@@ -143,18 +174,7 @@ export interface Route {
   };
   rates: Rate[];
   /** Informational provider tariff only; never participates in execution, quotes or settlement. */
-  publishedPricing?: {
-    summary: string;
-    source: Source;
-    conditions: string[];
-    /** Published per-output prices for comparison only. */
-    outputRates?: Array<
-      Rate & {
-        approximate?: true;
-        quality?: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-      }
-    >;
-  };
+  publishedPricing?: RoutePublishedPricing;
   pricingSource: Source;
   source: Source;
 }
@@ -163,6 +183,8 @@ export interface Catalog {
   deployments: Deployment[];
   models: Model[];
   routes: Route[];
+  /** Dedicated alias table mapping retired/provider-specific route IDs to canonical unified routes. */
+  routeAliases?: RouteAlias[];
 }
 export interface RoutingPolicy {
   modelIds?: string[];

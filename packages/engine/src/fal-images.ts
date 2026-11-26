@@ -1,5 +1,5 @@
 import type { AdapterContext } from './adapters.js';
-import type { GenerationArguments } from '@media-router/contracts';
+import { resolveRouteUpstreamModelId, type GenerationArguments } from '@media-router/contracts';
 import {
   adapterInputIssue,
   referenceUrls,
@@ -462,7 +462,7 @@ export function falImageFields(id: string): readonly (keyof GenerationArguments)
 export function falImageInput(
   context: Omit<AdapterContext, 'jobId'>,
 ): { body: Record<string, unknown> } | { error: string } | null {
-  const modelId = context.route.upstreamModelId;
+  const modelId = resolveRouteUpstreamModelId(context.route, context.input.operation);
   const endpoint = endpoints.get(modelId);
   if (!endpoint) return null;
   const { input } = context;
