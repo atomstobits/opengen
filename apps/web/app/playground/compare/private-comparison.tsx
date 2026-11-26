@@ -529,7 +529,7 @@ function ComparisonWorkspace({
             </div>
           </fieldset>
           <button
-            className="button button-primary"
+            className="button button-dark"
             disabled={
               !prompt.trim() ||
               !distinct ||
@@ -598,7 +598,7 @@ function ComparisonWorkspace({
               </p>
               <div className={styles.actions}>
                 <button
-                  className="button button-primary"
+                  className="button button-dark"
                   disabled={
                     !authorized ||
                     Boolean(busy) ||

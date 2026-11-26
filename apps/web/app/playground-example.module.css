@@ -2,25 +2,49 @@
   margin: 0 0 20px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: var(--surface);
 }
 
 .example summary {
   min-height: 44px;
   padding: 12px 14px;
+  border-radius: 7px;
+  font-family: var(--sans);
   font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--ink);
   cursor: pointer;
+}
+
+.example[open] summary {
+  border-radius: 7px 7px 0 0;
+}
+
+.example summary:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.example summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 7px;
 }
 
 .example summary span {
   margin: 0 8px 0 4px;
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--subtle);
   font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .body {
-  padding: 0 14px 14px;
+  border-top: 1px solid var(--line-subtle);
+  padding: 14px;
 }
 
 .media {
@@ -28,7 +52,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   max-width: 440px;
-  margin: 6px 0 12px;
+  margin: 0 0 12px;
 }
 
 .media figure {
@@ -38,8 +62,11 @@
 
 .media figcaption {
   margin-bottom: 6px;
-  font-size: 12px;
-  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--subtle);
 }
 
 .media img,
@@ -54,22 +81,46 @@
 }
 
 .settings {
-  font: 12px var(--mono);
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgba(246, 243, 236, 0.2);
+  border-radius: 6px;
+  background: rgba(246, 243, 236, 0.1);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .prompt {
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 68ch;
+  color: var(--ink);
 }
 
 .source,
 .action p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
 }
 
 .source a {
-  color: inherit;
+  color: var(--link);
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
+}
+
+.source a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentColor;
 }
 
 .action {

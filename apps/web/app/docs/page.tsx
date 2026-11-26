@@ -73,10 +73,10 @@ export default function DocsPage() {
           <a className="button button-dark" href="#http-examples">
             Use the API
           </a>
-          <a className="button" href="/agents">
+          <a className="button button-outline" href="/agents">
             Connect an agent
           </a>
-          <a className="button" href="/playground">
+          <a className="button button-outline" href="/playground">
             Create in Playground
           </a>
         </nav>
@@ -209,33 +209,35 @@ export default function DocsPage() {
                 <a href="/v1/operations">operation registry</a> lists the same native operations
                 available through MCP’s <code>call</code> tool. These paths use your gateway origin.
               </p>
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th scope="col">HTTP endpoint</th>
-                    <th scope="col">MCP operation</th>
-                    <th scope="col">Workflow</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {apiOperations.map(([id, title, href]) => (
-                    <tr key={id}>
-                      <td>
-                        <code>
-                          {operationTargets[id].method}{' '}
-                          {operationTargets[id].path.replace(/:([a-zA-Z]+)/g, '{$1}')}
-                        </code>
-                      </td>
-                      <td>
-                        <code>{id}</code>
-                      </td>
-                      <td>
-                        <a href={href}>{title}</a>
-                      </td>
+              <div className="docs-table-wrap">
+                <table className="docs-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">HTTP endpoint</th>
+                      <th scope="col">MCP operation</th>
+                      <th scope="col">Workflow</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {apiOperations.map(([id, title, href]) => (
+                      <tr key={id}>
+                        <td>
+                          <code>
+                            {operationTargets[id].method}{' '}
+                            {operationTargets[id].path.replace(/:([a-zA-Z]+)/g, '{$1}')}
+                          </code>
+                        </td>
+                        <td>
+                          <code>{id}</code>
+                        </td>
+                        <td>
+                          <a href={href}>{title}</a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <p>
                 Inspect <code>models.schema</code> for the selected model and operation. Its{' '}
                 <code>inputSchema</code> describes fields inside <code>input</code>. The request
@@ -271,32 +273,39 @@ export default function DocsPage() {
                 Wan 3.0 Standard and Prime each have documented offerings in Beijing, Singapore,
                 Tokyo, Frankfurt, Virginia and Hong Kong.
               </p>
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>What it tells you</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Endpoint region</td>
-                    <td>Where requests enter the provider</td>
-                  </tr>
-                  <tr>
-                    <td>Inference scope</td>
-                    <td>Where the provider permits processing</td>
-                  </tr>
-                  <tr>
-                    <td>Processing/storage regions</td>
-                    <td>Provider-published locations, or unknown</td>
-                  </tr>
-                  <tr>
-                    <td>Measurement origin</td>
-                    <td>Where a performance sample was taken</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Regional field definitions"
+              >
+                <table className="docs-table">
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>What it tells you</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Endpoint region</td>
+                      <td>Where requests enter the provider</td>
+                    </tr>
+                    <tr>
+                      <td>Inference scope</td>
+                      <td>Where the provider permits processing</td>
+                    </tr>
+                    <tr>
+                      <td>Processing/storage regions</td>
+                      <td>Provider-published locations, or unknown</td>
+                    </tr>
+                    <tr>
+                      <td>Measurement origin</td>
+                      <td>Where a performance sample was taken</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <p>
                 <strong>
                   A Frankfurt endpoint with a Global inference scope is not an EU-only commitment.
@@ -439,49 +448,56 @@ POST /v1/assets/complete`}
                 executable managed quote. Review both requests, their notices and the combined
                 spending ceiling before approving the run.
               </p>
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th scope="col">HTTP endpoint</th>
-                    <th scope="col">Behavior</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <code>POST /v1/comparisons/quote</code>
-                    </td>
-                    <td>
-                      Save a private quote from a prompt and exactly two route IDs. Requires read
-                      scope. Returns 201.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <code>POST /v1/comparisons/&#123;id&#125;/approve</code>
-                    </td>
-                    <td>
-                      Approve the saved run with generate scope and an absent request body. Returns
-                      202.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <code>GET /v1/comparisons/&#123;id&#125;</code>
-                    </td>
-                    <td>
-                      Read the same private run, its child jobs and current output links with read
-                      scope.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <code>GET /v1/comparisons</code>
-                    </td>
-                    <td>List the latest 20 admitted runs for the authorized workspace.</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Private comparison HTTP endpoints"
+              >
+                <table className="docs-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">HTTP endpoint</th>
+                      <th scope="col">Behavior</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <code>POST /v1/comparisons/quote</code>
+                      </td>
+                      <td>
+                        Save a private quote from a prompt and exactly two route IDs. Requires read
+                        scope. Returns 201.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>POST /v1/comparisons/&#123;id&#125;/approve</code>
+                      </td>
+                      <td>
+                        Approve the saved run with generate scope and an absent request body.
+                        Returns 202.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>GET /v1/comparisons/&#123;id&#125;</code>
+                      </td>
+                      <td>
+                        Read the same private run, its child jobs and current output links with read
+                        scope.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>GET /v1/comparisons</code>
+                      </td>
+                      <td>List the latest 20 admitted runs for the authorized workspace.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <p>
                 These comparison routes use HTTP directly. The OpenAPI specification describes their
                 payloads. The saved run ID and server-owned child keys make repeated approval
@@ -498,64 +514,71 @@ POST /v1/assets/complete`}
                 being silently dropped. They require an OpenGen workspace key and a stable{' '}
                 <code>Idempotency-Key</code>, and accept exact OpenGen model IDs.
               </p>
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th>Endpoint</th>
-                    <th>Implemented subset</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <code>POST /v1/images/generations</code>
-                    </td>
-                    <td>
-                      One text-to-image result at a supported 1K/2K/4K tier, delivered by owned URL
-                      or base64. Base64 is limited to 8 MiB decoded PNG/JPEG/WebP; a larger result
-                      remains the same job and can be retrieved by URL.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <code>POST /v1/images/edits</code>
-                    </td>
-                    <td>
-                      Ready owned image references in JSON or bounded multipart text fields (256
-                      KiB, 24 parts). Upload and complete through native assets first. Model limits
-                      may narrow the 1–10 reference envelope; binary parts and masks are
-                      unsupported.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Slow image requests</td>
-                    <td>
-                      After a bounded wait, HTTP 202 returns the existing job ID and native poll
-                      URL. This is an OpenGen extension, not a synchronous image result.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <code>POST /v1/videos</code>
-                    </td>
-                    <td>
-                      JSON text-to-video with exact supported duration and landscape/portrait size.
-                      No multipart first frame or remix.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <code>GET /v1/videos/&#123;id&#125;/content</code>
-                    </td>
-                    <td>
-                      Without Range, authenticated HTTP 303 to a private owned capability. A single
-                      byte Range returns 206 from owned MP4 storage up to 100 MiB; malformed,
-                      multiple or unsatisfiable ranges return 416. If-Range mismatch returns the
-                      complete 200 response. Binary Range retrieval is HTTP-only.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Compatibility HTTP endpoints"
+              >
+                <table className="docs-table">
+                  <thead>
+                    <tr>
+                      <th>Endpoint</th>
+                      <th>Implemented subset</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <code>POST /v1/images/generations</code>
+                      </td>
+                      <td>
+                        One text-to-image result at a supported 1K/2K/4K tier, delivered by owned
+                        URL or base64. Base64 is limited to 8 MiB decoded PNG/JPEG/WebP; a larger
+                        result remains the same job and can be retrieved by URL.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>POST /v1/images/edits</code>
+                      </td>
+                      <td>
+                        Ready owned image references in JSON or bounded multipart text fields (256
+                        KiB, 24 parts). Upload and complete through native assets first. Model
+                        limits may narrow the 1–10 reference envelope; binary parts and masks are
+                        unsupported.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Slow image requests</td>
+                      <td>
+                        After a bounded wait, HTTP 202 returns the existing job ID and native poll
+                        URL. This is an OpenGen extension, not a synchronous image result.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>POST /v1/videos</code>
+                      </td>
+                      <td>
+                        JSON text-to-video with exact supported duration and landscape/portrait
+                        size. No multipart first frame or remix.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>GET /v1/videos/&#123;id&#125;/content</code>
+                      </td>
+                      <td>
+                        Without Range, authenticated HTTP 303 to a private owned capability. A
+                        single byte Range returns 206 from owned MP4 storage up to 100 MiB;
+                        malformed, multiple or unsatisfiable ranges return 416. If-Range mismatch
+                        returns the complete 200 response. Binary Range retrieval is HTTP-only.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <p>
                 This is a selected compatibility subset. Use native jobs to inspect the original
                 route, unknown-submission state, output delivery, C2PA evidence and settlement. The
@@ -638,49 +661,56 @@ POST /v1/assets/complete`}
                 protocol support and synthetic fixture tests do not establish live account access,
                 measured quality or final billing accuracy.
               </p>
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th>Layer</th>
-                    <th>Release requirement</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Catalog</td>
-                    <td>
-                      Complete initial model scope, separate regional deployments, source links and
-                      capability contracts
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Execution</td>
-                    <td>
-                      Durable jobs, idempotency, regional pinning, bounded reservations and explicit
-                      unknown submissions
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Agent interfaces</td>
-                    <td>
-                      Canonical HTTP and MCP over the same application services; CLI onboarding is
-                      separately available
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Full v1 additions</td>
-                    <td>
-                      Output provenance verification, saved routing profiles, compatibility
-                      endpoints, batch quotes, signed outbound webhooks, alerts and browser
-                      submission recovery
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Later optional modules</td>
-                    <td>Opt-in stalled-image acceleration, rebates and referral workflows</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div
+                className="docs-table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Release requirements by layer"
+              >
+                <table className="docs-table">
+                  <thead>
+                    <tr>
+                      <th>Layer</th>
+                      <th>Release requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Catalog</td>
+                      <td>
+                        Complete initial model scope, separate regional deployments, source links
+                        and capability contracts
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Execution</td>
+                      <td>
+                        Durable jobs, idempotency, regional pinning, bounded reservations and
+                        explicit unknown submissions
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Agent interfaces</td>
+                      <td>
+                        Canonical HTTP and MCP over the same application services; CLI onboarding is
+                        separately available
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Full v1 additions</td>
+                      <td>
+                        Output provenance verification, saved routing profiles, compatibility
+                        endpoints, batch quotes, signed outbound webhooks, alerts and browser
+                        submission recovery
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Later optional modules</td>
+                      <td>Opt-in stalled-image acceleration, rebates and referral workflows</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <p>
                 The repository plan records the implementation milestones and acceptance gates.
                 Catalog breadth must never be presented as verified execution coverage.

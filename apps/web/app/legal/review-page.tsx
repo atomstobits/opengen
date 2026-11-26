@@ -8,7 +8,7 @@ import { legalDraftNotice, legalPolicies, type LegalBlock, type LegalPolicy } fr
 import { LegalPresentationProvider } from './presentation';
 import { legalSurfacePresentationFromPublication, readWebLegalPublication } from './publication';
 
-function PolicyBlock({ block }: { block: LegalBlock }) {
+function PolicyBlock({ block, sectionTitle }: { block: LegalBlock; sectionTitle: string }) {
   if (block.type === 'paragraph') return <p>{block.text}</p>;
   if (block.type === 'linkedParagraph')
     return (
@@ -33,26 +33,33 @@ function PolicyBlock({ block }: { block: LegalBlock }) {
       </ul>
     );
   return (
-    <table className="docs-table">
-      <thead>
-        <tr>
-          {block.columns.map((column) => (
-            <th key={column} scope="col">
-              {column}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {block.rows.map((row) => (
-          <tr key={row[0]}>
-            {row.map((cell, index) => (
-              <td key={index}>{cell}</td>
+    <div
+      className="docs-table-wrap"
+      tabIndex={0}
+      role="region"
+      aria-label={`${sectionTitle} table`}
+    >
+      <table className="docs-table">
+        <thead>
+          <tr>
+            {block.columns.map((column) => (
+              <th key={column} scope="col">
+                {column}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {block.rows.map((row) => (
+            <tr key={row[0]}>
+              {row.map((cell, index) => (
+                <td key={index}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -114,7 +121,7 @@ export function LegalReviewPage({
                 <section key={section.id} id={section.id} aria-labelledby={`${section.id}-title`}>
                   <h2 id={`${section.id}-title`}>{section.title}</h2>
                   {section.blocks.map((block, index) => (
-                    <PolicyBlock key={index} block={block} />
+                    <PolicyBlock key={index} block={block} sectionTitle={section.title} />
                   ))}
                 </section>
               ))}
@@ -207,7 +214,7 @@ export function LegalReviewPage({
               <section key={section.id} id={section.id} aria-labelledby={`${section.id}-title`}>
                 <h2 id={`${section.id}-title`}>{section.title}</h2>
                 {section.blocks.map((block, index) => (
-                  <PolicyBlock key={index} block={block} />
+                  <PolicyBlock key={index} block={block} sectionTitle={section.title} />
                 ))}
               </section>
             ))}

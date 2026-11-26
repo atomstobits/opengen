@@ -3,27 +3,33 @@
   padding-block: clamp(36px, 6vw, 80px);
 }
 .page h1 {
-  max-width: 17ch;
-  font-size: clamp(38px, 6vw, 64px);
-  line-height: 1.08;
+  max-width: 18ch;
+  font-family: var(--heading);
+  font-size: clamp(2rem, 3.8vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   margin-block: 18px;
   text-wrap: balance;
 }
 .page p {
   color: var(--muted);
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 68ch;
   text-wrap: pretty;
 }
-.intro {
-  max-width: 62ch;
+.page .intro {
+  max-width: 60ch;
   font-size: 19px;
+  line-height: 1.55;
 }
 .form,
 .preview,
 .notice {
   margin-block: 24px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 8px;
   padding: clamp(20px, 3vw, 32px);
   background: var(--surface);
 }
@@ -36,8 +42,11 @@
 .form legend,
 .preview h2,
 .notice h2 {
-  font-size: 24px;
-  font-weight: 650;
+  font-family: var(--heading);
+  font-size: clamp(1.375rem, 2.2vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.24;
   margin-block: 0 18px;
   text-wrap: balance;
 }
@@ -47,6 +56,10 @@
 .form label {
   display: block;
   margin-block: 0 20px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 .form input,
 .form textarea,
@@ -55,22 +68,34 @@
   width: 100%;
   margin-top: 9px;
   border: 1px solid var(--control-line);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 12px;
   background: var(--canvas);
   color: var(--ink);
-  font: inherit;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+.form input:hover:not(:disabled),
+.form textarea:hover:not(:disabled),
+.form select:hover:not(:disabled) {
+  border-color: var(--control-line-hover);
 }
 .form textarea {
   resize: vertical;
 }
 .form details {
-  border-block: 1px solid var(--line);
+  border-block: 1px solid var(--line-subtle);
   margin-block: 22px;
   padding-block: 18px;
 }
 .form summary {
   cursor: pointer;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 .columns {
   display: grid;
@@ -78,32 +103,55 @@
   gap: 20px;
 }
 .preview {
-  border-color: var(--accent);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  box-shadow: 5px 5px 0 rgba(4, 19, 14, 0.55);
 }
 .preview pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: var(--canvas);
+  background: var(--surface-code);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 18px;
-  font-size: 13px;
-  line-height: 1.6;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.preview strong,
+.notice strong {
+  color: var(--ink);
 }
 .preview strong,
 .notice strong,
 .notice code {
   overflow-wrap: anywhere;
 }
+.notice code {
+  font-family: var(--mono);
+  font-size: 14px;
+  background: rgba(246, 243, 236, 0.1);
+  border: 1px solid rgba(246, 243, 236, 0.2);
+  color: var(--ink);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
 .check {
   display: flex;
   align-items: start;
   gap: 10px;
   margin-block: 24px;
-  line-height: 1.6;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.55;
+  max-width: 68ch;
 }
 .check input {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
   accent-color: var(--accent);
-  margin-top: 6px;
+  margin-top: 4px;
 }
 .links {
   display: flex;
@@ -111,16 +159,37 @@
   flex-wrap: wrap;
   margin-top: 32px;
 }
-.page :focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 4px;
+.links a {
+  color: var(--link);
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
 }
-@media (max-width: 600px) {
+.links a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentColor;
+}
+.page :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+@media (max-width: 620px) {
+  .form input,
+  .form textarea,
+  .form select {
+    font-size: 16px;
+  }
   .columns {
     grid-template-columns: 1fr;
     gap: 0;
   }
   .preview pre {
     padding: 12px;
+    font-size: 13px;
   }
 }

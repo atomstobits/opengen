@@ -108,7 +108,7 @@ export function McpConsent({
       <div className={styles.layout}>
         <header className={styles.intro}>
           <a className={styles.brand} href="/">
-            OpenGen
+            <img src="/brand/opengen-wordmark-on-dark.svg" width="142" height="34" alt="OpenGen" />
           </a>
           <span className={styles.eyebrow}>Workspace authorization</span>
           <h1 id="consent-title">Connect your agent.</h1>
