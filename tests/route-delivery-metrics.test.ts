@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { describe, it } from 'vitest';
+import { catalog as realCatalog, quote } from '@media-router/catalog';
 import { createEngine } from '../packages/engine/src/index.js';
 import { isolatedEngineDatabase } from './helpers/isolated-engine';
 import { privateStorageFixture, privateOutputFixture } from './helpers/private-storage';
@@ -275,74 +276,20 @@ describe.skipIf(!databaseUrl)('owned delivery route metrics', () => {
 
   it('aggregates historical retired RouteAlias observations into canonical unified route metrics without mutating attempts', async () => {
     const isolated = await isolatedEngineDatabase(databaseUrl!, 'route_alias_metrics');
-    const source = { url: 'https://fixture.invalid/docs', checkedAt: '2026-11-24' };
-    const canonicalRouteId = 'fixture-deployment/fixture-video';
-    const legacyT2vAliasId = 'fixture-deployment/fixture/video/text-to-video';
-    const legacyI2vAliasId = 'fixture-deployment/fixture/video/image-to-video';
-    const deploymentId = 'fixture-deployment';
-    const catalog: any = {
-      providers: [{ id: 'fixture', name: 'Fixture', website: source.url }],
-      deployments: [
-        {
-          id: deploymentId,
-          providerId: 'fixture',
-          name: 'Fixture',
-          endpointRegion: 'fixture-region',
-          scope: 'regional',
-          processingRegions: ['fixture-region'],
-          storageRegions: null,
-          endpointTemplate: null,
-          credentialEnv: null,
-          source,
-        },
-      ],
-      models: [
-        {
-          id: 'fixture/video',
-          name: 'Fixture Video',
-          creator: 'Fixture',
-          authorProviderIds: [],
-          familyId: 'fixture',
-          modality: 'video',
-          aliases: [],
-          openness: 'closed',
-          license: 'Synthetic',
-          source,
-          description: 'Synthetic',
-        },
-      ],
-      routes: [
-        {
-          id: canonicalRouteId,
-          modelId: 'fixture/video',
-          deploymentId,
-          upstreamModelId: 'fixture/video',
-          upstreamEndpoints: {
-            'text-to-video': 'fixture/video/text-to-video',
-            'image-to-video': 'fixture/video/image-to-video',
-          },
-          operations: ['text-to-video', 'image-to-video'],
-          resolutions: ['720p'],
-          durations: [5],
-          fidelity: 'unknown',
-          adapter: null,
-          status: 'documented',
-          rates: [{ resolution: '720p', unit: 'output-second', usdMicros: 100_000 }],
-          pricingSource: source,
-          source,
-        },
-      ],
-      routeAliases: [
-        { id: legacyT2vAliasId, routeId: canonicalRouteId, operation: 'text-to-video' },
-        { id: legacyI2vAliasId, routeId: canonicalRouteId, operation: 'image-to-video' },
-      ],
-    };
+    const canonicalRouteId = 'fal-undisclosed/alibaba-wan-3.0';
+    const legacyT2vAliasId = 'fal-undisclosed/alibaba/wan-3.0/text-to-video';
+    const legacyI2vAliasId = 'fal-undisclosed/alibaba/wan-3.0/image-to-video';
+    const canonicalRoute = realCatalog.routes.find((route) => route.id === canonicalRouteId)!;
+    const deployment = realCatalog.deployments.find(
+      (entry) => entry.id === canonicalRoute.deploymentId,
+    )!;
+    const deploymentId = deployment.id;
     const storage = privateStorageFixture();
     const engine = isolated.bind(
       createEngine({
         databaseUrl: isolated.databaseUrl,
         publicUrl: 'https://fixture.invalid',
-        catalog,
+        catalog: realCatalog,
         adapters: [],
         poolSize: 1,
         providerEnv: {},
@@ -352,12 +299,12 @@ describe.skipIf(!databaseUrl)('owned delivery route metrics', () => {
     );
     const workspace = 'alias-metrics-workspace';
     const t2vInput: any = {
-      modelId: 'fixture/video',
+      modelId: 'alibaba/wan-3.0',
       operation: 'text-to-video',
       input: { prompt: 'Ocean waves.', resolution: '720p', duration: 5 },
     };
     const i2vInput: any = {
-      modelId: 'fixture/video',
+      modelId: 'alibaba/wan-3.0',
       operation: 'image-to-video',
       input: {
         prompt: 'Ocean waves.',
@@ -385,8 +332,8 @@ describe.skipIf(!databaseUrl)('owned delivery route metrics', () => {
             id,
             workspace,
             JSON.stringify(jobInput),
-            JSON.stringify({ ...catalog.routes[0], id: storedRouteId }),
-            JSON.stringify(catalog.deployments[0]),
+            JSON.stringify({ ...canonicalRoute, id: storedRouteId }),
+            JSON.stringify(deployment),
             JSON.stringify([owned]),
             created,
             new Date(created.getTime() + attemptDurationMs),
@@ -428,9 +375,8 @@ describe.skipIf(!databaseUrl)('owned delivery route metrics', () => {
       // 1 historical observation under the retired image-to-video alias stays isolated from T2V cohort.
       await seedObservedJob(legacyI2vAliasId, i2vInput, 9000, 9500);
 
-      const t2vMetrics = (await engine.routeMetrics(t2vInput)).find(
-        (value) => value.routeId === canonicalRouteId,
-      )!;
+      const t2vRouteMetrics = await engine.routeMetrics(t2vInput);
+      const t2vMetrics = t2vRouteMetrics.find((value) => value.routeId === canonicalRouteId)!;
       assert.equal(t2vMetrics.sampleCount, 5);
       assert.equal(t2vMetrics.succeeded, 5);
       assert.equal(t2vMetrics.technicalSuccessRate, 1);
@@ -440,12 +386,25 @@ describe.skipIf(!databaseUrl)('owned delivery route metrics', () => {
       assert.equal(t2vMetrics.endToEndSampleCount, 5);
       assert.equal(t2vMetrics.p50EndToEndMs, 3500);
 
-      const i2vMetrics = (await engine.routeMetrics(i2vInput)).find(
-        (value) => value.routeId === canonicalRouteId,
-      )!;
+      // Historical retired alias observations count toward speed-based performance routing for T2V.
+      const speedQuote = quote(
+        { ...t2vInput, routing: { preference: 'speed' } },
+        { executableRouteIds: [canonicalRouteId], metrics: t2vRouteMetrics },
+      );
+      assert.equal(speedQuote.selectedRouteId, canonicalRouteId);
+
+      const i2vRouteMetrics = await engine.routeMetrics(i2vInput);
+      const i2vMetrics = i2vRouteMetrics.find((value) => value.routeId === canonicalRouteId)!;
       assert.equal(i2vMetrics.sampleCount, 1);
       assert.equal(i2vMetrics.p50CompletionMs, 9000);
       assert.equal(i2vMetrics.deliveryAvailableJobCount, 1);
+
+      // Undersampled I2V cohort stays isolated and does not inherit T2V observations for speed routing.
+      const i2vSpeedQuote = quote(
+        { ...i2vInput, routing: { preference: 'speed' } },
+        { executableRouteIds: [canonicalRouteId], metrics: i2vRouteMetrics },
+      );
+      assert.equal(i2vSpeedQuote.selectedRouteId, null);
 
       // Unfiltered route metrics combine all historical + canonical observations for the unified route.
       const allMetrics = (await engine.routeMetrics()).find(
