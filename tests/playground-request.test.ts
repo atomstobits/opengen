@@ -55,16 +55,37 @@ describe('canonical playground requests', () => {
       ),
     ).toThrow(/pinned/);
   });
-  it('requires a managed cap but permits explicitly uncapped BYOK', () => {
+  it('omits maxCostMicros by default, allows optional caps, and rejects non-positive limits', () => {
+    const pinned = initialPlaygroundRequest(model, routes, 'alibaba/ap-southeast-1/wan-3.0');
+    const automatic = initialPlaygroundRequest(model, routes);
+    expect(pinned.maxCostMicros).toBeUndefined();
+    expect(automatic.maxCostMicros).toBeUndefined();
+
     const value = {
-      ...initialPlaygroundRequest(model, routes),
+      ...automatic,
       input: { prompt: 'Fixture' },
-      maxCostMicros: undefined,
     };
-    expect(() => validatePlaygroundRequest(value, catalog, model.id)).toThrow(/spending limit/);
+    expect(validatePlaygroundRequest(value, catalog, model.id).maxCostMicros).toBeUndefined();
     expect(
       validatePlaygroundRequest({ ...value, billing: 'byok' }, catalog, model.id).maxCostMicros,
     ).toBeUndefined();
+    expect(
+      validatePlaygroundRequest({ ...value, maxCostMicros: 1_250_000 }, catalog, model.id)
+        .maxCostMicros,
+    ).toBe(1_250_000);
+    expect(
+      validatePlaygroundRequest(
+        { ...pinned, input: { prompt: 'Fixture' }, maxCostMicros: 500_000 },
+        catalog,
+        model.id,
+      ).maxCostMicros,
+    ).toBe(500_000);
+    expect(() =>
+      validatePlaygroundRequest({ ...value, maxCostMicros: 0 }, catalog, model.id),
+    ).toThrow(/spending limit/);
+    expect(() =>
+      validatePlaygroundRequest({ ...value, maxCostMicros: -1 }, catalog, model.id),
+    ).toThrow(/spending limit|>=0/i);
   });
   it('ignores malformed stored draft shapes without requiring completed model inputs', () => {
     const value = initialPlaygroundRequest(model, routes);

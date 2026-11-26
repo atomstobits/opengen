@@ -65,7 +65,9 @@ test('API instructions export the same pinned image-to-video request as the brow
   await page
     .getByLabel('First frame URL', { exact: false })
     .fill('https://assets.example/frame.png');
-  await page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }).fill('0.37');
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toHaveCount(0);
   await instructions.getByRole('button', { name: 'Use the API', exact: true }).click();
 
   const requestCode = instructionCode(page, 'Copy request JSON');
@@ -75,9 +77,9 @@ test('API instructions export the same pinned image-to-video request as the brow
     operation: 'image-to-video',
     routeId: 'alibaba/ap-southeast-1/wan-3.0',
     billing: 'managed',
-    maxCostMicros: 370000,
     input: { prompt, firstFrame: { url: 'https://assets.example/frame.png' } },
   });
+  expect(exported.maxCostMicros).toBeUndefined();
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   await expect.poll(() => gateway.quotes.length).toBe(1);
   expect(exported).toEqual(gateway.quotes[0]);
@@ -106,6 +108,10 @@ test('API instructions export the same pinned image-to-video request as the brow
 
   const updatedPrompt = `${prompt}\nA softer afternoon light.`;
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(updatedPrompt);
+  await page.getByLabel('Provider route', { exact: true }).selectOption('auto');
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toBeVisible();
   await page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }).fill('0.42');
   const updatedJson = await requestCode.innerText();
   await instructions.getByRole('button', { name: 'Copy request JSON', exact: true }).click();
@@ -117,6 +123,17 @@ test('API instructions export the same pinned image-to-video request as the brow
     input: { prompt: updatedPrompt },
     maxCostMicros: 420000,
   });
+  expect(gateway.quotes[1]?.routeId).toBeUndefined();
+
+  await page
+    .getByLabel('Provider route', { exact: true })
+    .selectOption('alibaba/ap-southeast-1/wan-3.0');
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toHaveCount(0);
+  const repinned = JSON.parse(await requestCode.innerText()) as GenerateInput;
+  expect(repinned.routeId).toBe('alibaba/ap-southeast-1/wan-3.0');
+  expect(repinned.maxCostMicros).toBeUndefined();
   expect(gateway.submissions).toEqual([]);
 });
 

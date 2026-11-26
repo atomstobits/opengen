@@ -422,10 +422,14 @@ export function PlaygroundPricing({
           <dt>Request estimate</dt>
           <dd>{estimate}</dd>
         </div>
-        <div>
-          <dt>Maximum spend</dt>
-          <dd>{draft.maxCostMicros != null ? `${usd(draft.maxCostMicros)} USD` : 'No cap set'}</dd>
-        </div>
+        {(!draft.routeId || draft.maxCostMicros != null) && (
+          <div>
+            <dt>Maximum spend</dt>
+            <dd>
+              {draft.maxCostMicros != null ? `${usd(draft.maxCostMicros)} USD` : 'No cap set'}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Credit hold at submission</dt>
           <dd>
@@ -446,7 +450,9 @@ export function PlaygroundPricing({
       <p className={styles.explainer}>
         {direct
           ? 'Your provider sets the final charge. With unknown pricing, OpenGen cannot enforce a provider charge limit.'
-          : 'Published rates are list prices. The gateway estimates this request and checks route eligibility and the spend cap again at admission.'}
+          : draft.routeId && draft.maxCostMicros == null
+            ? 'Published rates are list prices. The gateway estimates this pinned route and checks eligibility and any workspace or API key spend caps at admission.'
+            : 'Published rates are list prices. The gateway estimates this request and checks route eligibility and the spend cap again at admission.'}
       </p>
       {quote && (
         <details className={styles.quoteDetails}>

@@ -266,18 +266,18 @@ function ReuseAction({
       if (target.field === 'references')
         input.references = [...references, { type: target.type, asset: ref }];
       else input[target.field] = ref;
+      const nextRouteId = sameOperation && previousRoute ? previousRoute : routeId || undefined;
+      const { maxCostMicros: _baseMaxCost, ...cleanBase } = base;
       const next: GenerateInput = {
-        ...base,
+        ...cleanBase,
         // Attaching another input cannot silently replace an existing execution pin.
-        ...(sameOperation && previousRoute
-          ? { routeId: previousRoute }
-          : routeId
-            ? { routeId }
-            : {}),
+        ...(nextRouteId ? { routeId: nextRouteId } : {}),
         operation: target.operation,
         input,
         billing: draft.billing,
-        maxCostMicros: draft.maxCostMicros,
+        ...(!nextRouteId && draft.maxCostMicros !== undefined
+          ? { maxCostMicros: draft.maxCostMicros }
+          : {}),
         routing: { ...(draft.routing ?? base.routing), fallback: false },
       };
       if (!sameOperation) delete next.previousJobId;

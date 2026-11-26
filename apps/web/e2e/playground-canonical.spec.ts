@@ -504,6 +504,9 @@ test('unknown image pricing cannot enable managed or capped BYOK generation', as
   const stub = await gateway(page);
   await page.goto(unknownPriceImagePlayground);
   await expect(page.getByText('Connected to', { exact: false })).toBeVisible();
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole('textbox', { name: 'Prompt', exact: true })
     .fill('A synthetic unknown-price image.');
@@ -517,9 +520,18 @@ test('unknown image pricing cannot enable managed or capped BYOK generation', as
       .filter({ hasText: 'Request price is not qualified; comparison only.' }),
   ).toBeVisible();
   await expect(generate).toBeDisabled();
-  expect(stub.quotes[0]).toMatchObject({ billing: 'managed', maxCostMicros: 2000000 });
+  expect(stub.quotes[0]?.billing).toBe('managed');
+  expect(stub.quotes[0]).not.toHaveProperty('maxCostMicros');
 
-  await page.getByRole('combobox', { name: 'Pay with', exact: true }).selectOption('byok');
+  await applyJson(page, {
+    ...stub.quotes[0]!,
+    billing: 'byok',
+    maxCostMicros: 2000000,
+  });
+  await page.getByRole('button', { name: 'Form', exact: true }).click();
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toHaveValue('2');
   await expect(generate).toBeDisabled();
   await quoteButton.click();
   await expect.poll(() => stub.quotes.length).toBe(2);
@@ -532,6 +544,9 @@ test('unknown image pricing cannot enable managed or capped BYOK generation', as
   expect(stub.quotes[1]).toMatchObject({ billing: 'byok', maxCostMicros: 2000000 });
 
   await page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }).fill('');
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toHaveCount(0);
   await expect(generate).toBeDisabled(); // A meaningful edit invalidates the old quote.
   await quoteButton.click();
   await expect.poll(() => stub.quotes.length).toBe(3);
@@ -547,6 +562,9 @@ test('bounded token image pricing enables managed generation on text-only OpenAI
   const stub = await gateway(page);
   await page.goto(imagePlayground);
   await expect(page.getByText('Connected to', { exact: false })).toBeVisible();
+  await expect(
+    page.getByRole('spinbutton', { name: 'Maximum spend, USD', exact: true }),
+  ).toHaveValue('');
   await page
     .getByRole('textbox', { name: 'Prompt', exact: true })
     .fill('A bounded max-token studio still life.');
@@ -558,8 +576,8 @@ test('bounded token image pricing enables managed generation on text-only OpenAI
     modelId: 'openai/gpt-image-2',
     operation: 'text-to-image',
     billing: 'managed',
-    maxCostMicros: 2000000,
   });
+  expect(stub.quotes[0]).not.toHaveProperty('maxCostMicros');
   expect(stub.submissions).toEqual([]);
 });
 
