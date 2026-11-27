@@ -761,8 +761,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
         <aside className={styles.explanation}>
           <span className={styles.eyebrow}>MAKE ROOM TO CREATE</span>
           <h2>
-            You choose when
-            <br />
+            You choose when <br />
             to add more.
           </h2>
           <p>
@@ -1281,8 +1280,7 @@ export function BillingOwnerEnrollmentCard({
         <aside className={styles.explanation}>
           <span className={styles.eyebrow}>HOW PREPAID CREDIT WORKS</span>
           <h2>
-            Manual top-ups,
-            <br />
+            Manual top-ups, <br />
             clear boundaries.
           </h2>
           <p>
@@ -1502,8 +1500,7 @@ function PersonalOneStepFundingCard({
         <aside className={styles.explanation}>
           <span className={styles.eyebrow}>MAKE ROOM TO CREATE</span>
           <h2>
-            You choose when
-            <br />
+            You choose when <br />
             to add more.
           </h2>
           <p>
@@ -1567,11 +1564,21 @@ function StarterTrialCreditCard({
   }
 
   if (!trialCredit.eligible) {
+    const blockedHeading =
+      trialCredit.reason === 'terms-inactive'
+        ? `${displayUsd} starter credit pending Terms`
+        : trialCredit.reason === 'billing-hold'
+          ? `${displayUsd} starter credit paused`
+          : trialCredit.reason === 'terms-required'
+            ? `${displayUsd} starter credit requires Terms acceptance`
+            : trialCredit.reason === 'personal-workspace-required'
+              ? `${displayUsd} starter credit available on personal workspace`
+              : `${displayUsd} starter credit requires verified sign-in`;
     return (
       <section className={styles.trialCardMuted} aria-labelledby="starter-trial-status">
         <div>
           <span className={styles.eyebrow}>STARTER TRIAL CREDIT</span>
-          <h2 id="starter-trial-status">{displayUsd} starter credit available</h2>
+          <h2 id="starter-trial-status">{blockedHeading}</h2>
           <p>
             {trialCredit.reason === 'personal-workspace-required' ? (
               'Switch to your personal workspace to claim your one-time non-refundable starter credit.'
