@@ -2,6 +2,7 @@ import { operationTargets, type OperationId } from '@media-router/contracts';
 import { Footer, SiteHeader } from '../ui';
 import { readWebLegalSurfacePresentation } from '../legal/publication';
 import { CodeSample } from './code-sample';
+import { CopyDocsMarkdownButton } from './copy-markdown';
 import styles from './page.module.css';
 import { JsonLd, canonicalUrl, pageMetadata } from '../seo';
 
@@ -73,12 +74,16 @@ export default function DocsPage() {
           <a className="button button-dark" href="#http-examples">
             Use the API
           </a>
+          <a className="button button-outline" href="/docs/api">
+            Interactive API explorer
+          </a>
           <a className="button button-outline" href="/agents">
             Connect an agent
           </a>
           <a className="button button-outline" href="/playground">
             Create in Playground
           </a>
+          <CopyDocsMarkdownButton />
         </nav>
         <div className="docs-grid">
           <nav className="docs-index" aria-label="Documentation sections">
@@ -102,15 +107,16 @@ export default function DocsPage() {
                 code={`curl --fail-with-body "$OPENGEN_API_URL/v1/models/schema?modelId=bytedance%2Fseedream-5.0-pro&operation=text-to-image"`}
               />
               <p>
-                For private operations, <a href="/start">sign in to your workspace</a> and create a
-                scoped OpenGen API key. Store it privately as <code>OPENGEN_TOKEN</code>. Submission
-                requires <code>generate</code>, and private job reads require <code>read</code>.
-                Provider credentials are configured on the gateway.
+                For private operations, <a href="/start">sign in to your workspace</a> and{' '}
+                <a href="/app#keys">create a scoped OpenGen API key</a>. Store it privately as{' '}
+                <code>OPENGEN_API_KEY</code>. Submission requires <code>generate</code>, and private
+                job reads require <code>read</code>. Provider credentials are configured on the
+                gateway.
               </p>
               <CodeSample
                 title="Workspace access"
                 code={`curl --fail-with-body "$OPENGEN_API_URL/v1/doctor" \\
-  -H "Authorization: Bearer $OPENGEN_TOKEN"`}
+  -H "Authorization: Bearer $OPENGEN_API_KEY"`}
               />
               <p>
                 Check the access report’s paying workspace, scopes, balance and billing holds. Use
@@ -142,7 +148,7 @@ export default function DocsPage() {
               <CodeSample
                 title="Quote"
                 code={`curl --fail-with-body "$OPENGEN_API_URL/v1/quotes" \\
-  -H "Authorization: Bearer $OPENGEN_TOKEN" -H 'Content-Type: application/json' \\
+  -H "Authorization: Bearer $OPENGEN_API_KEY" -H 'Content-Type: application/json' \\
   --data-binary @request.json`}
               />
               <div className="docs-callout">
@@ -162,14 +168,14 @@ export default function DocsPage() {
               <CodeSample
                 title="Paid submit"
                 code={`curl --fail-with-body "$OPENGEN_API_URL/v1/generations" \\
-  -H "Authorization: Bearer $OPENGEN_TOKEN" -H 'Content-Type: application/json' \\
+  -H "Authorization: Bearer $OPENGEN_API_KEY" -H 'Content-Type: application/json' \\
   -H "Idempotency-Key: $OPENGEN_IDEMPOTENCY_KEY" --data-binary @request.json`}
               />
               <h3>4. Read the same job.</h3>
               <CodeSample
                 title="Status"
                 code={`curl --fail-with-body "$OPENGEN_API_URL/v1/generations/$OPENGEN_JOB_ID/status" \\
-  -H "Authorization: Bearer $OPENGEN_TOKEN"`}
+  -H "Authorization: Bearer $OPENGEN_API_KEY"`}
               />
               <p>
                 Repeat the status read while work or delivery is pending. Compact status accepts the
@@ -180,7 +186,7 @@ export default function DocsPage() {
               <CodeSample
                 title="Job and output links"
                 code={`curl --fail-with-body "$OPENGEN_API_URL/v1/generations/$OPENGEN_JOB_ID" \\
-  -H "Authorization: Bearer $OPENGEN_TOKEN"`}
+  -H "Authorization: Bearer $OPENGEN_API_KEY"`}
               />
               <h3>Recover a lost submit response.</h3>
               <p>
@@ -191,7 +197,7 @@ export default function DocsPage() {
               <CodeSample
                 title="Recover request"
                 code={`curl --fail-with-body --get "$OPENGEN_API_URL/v1/generations/lookup" \\
-  -H "Authorization: Bearer $OPENGEN_TOKEN" \\
+  -H "Authorization: Bearer $OPENGEN_API_KEY" \\
   --data-urlencode "idempotencyKey=$OPENGEN_IDEMPOTENCY_KEY"`}
               />
               <p>
@@ -204,8 +210,10 @@ export default function DocsPage() {
             <section id="api-reference">
               <h2>API reference</h2>
               <p>
-                <a href="/openapi.json">Open the OpenAPI 3.1 specification</a> for request fields,
-                authentication, response schemas and error codes. The{' '}
+                Browse endpoints interactively in the{' '}
+                <a href="/docs/api">OpenGen interactive API explorer</a>, or{' '}
+                <a href="/openapi.json">Open the OpenAPI 3.1 specification</a> for raw request
+                fields, authentication, response schemas and error codes. The{' '}
                 <a href="/v1/operations">operation registry</a> lists the same native operations
                 available through MCP’s <code>call</code> tool. These paths use your gateway origin.
               </p>
@@ -402,7 +410,7 @@ curl --fail-with-body "$OPENGEN_API_URL/llms.txt"
             <section id="workspace">
               <h2>One workspace for people and agents.</h2>
               <p>
-                The <a href="/dashboard">workspace</a> shows recent generations, available and
+                The <a href="/app#start">workspace</a> shows recent generations, available and
                 reserved credit, and usage ledger entries. A generation keeps the exact selected
                 model and regional provider route. A pending settlement remains visible instead of
                 being presented as a confirmed refund.

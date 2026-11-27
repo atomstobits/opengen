@@ -22,6 +22,13 @@ import {
   type BindingOptions,
 } from '../apps/cli/src/bindings';
 import { runBindingCommand } from '../apps/cli/src/bindings-command';
+import {
+  DEFAULT_GATEWAY_URL,
+  resolveGatewayToken,
+  resolveGatewayUrl,
+  runCommand,
+} from '../apps/cli/src/index';
+import { recoveryCommand } from '../apps/cli/src/recovery';
 
 const directories: string[] = [];
 const baseUrl = 'https://opengen.example';
@@ -296,5 +303,63 @@ describe('previewable remote OAuth client binding', () => {
     await expect(
       runBindingCommand(['preview', ...args, '--profile', '/private/auth.json']),
     ).rejects.toThrow('never copied');
+  });
+});
+
+describe('CLI environment variable conventions and hosted defaults', () => {
+  it('defaults gateway origin to https://opengen.dev and accepts OPENGEN_API_URL / OPENGEN_API_KEY with legacy aliases', async () => {
+    expect(DEFAULT_GATEWAY_URL).toBe('https://opengen.dev');
+    expect(resolveGatewayUrl({})).toBe('https://opengen.dev');
+    expect(
+      resolveGatewayUrl({
+        OPENGEN_API_URL: 'https://primary.example',
+        MEDIA_ROUTER_URL: 'https://legacy.example',
+      }),
+    ).toBe('https://primary.example');
+    expect(resolveGatewayUrl({ MEDIA_ROUTER_URL: 'https://legacy.example' })).toBe(
+      'https://legacy.example',
+    );
+    expect(
+      resolveGatewayToken({
+        OPENGEN_API_KEY: 'key-primary',
+        OPENGEN_TOKEN: 'key-mid',
+        MEDIA_ROUTER_TOKEN: 'key-legacy',
+      }),
+    ).toBe('key-primary');
+    expect(resolveGatewayToken({ MEDIA_ROUTER_TOKEN: 'key-legacy' })).toBe('key-legacy');
+    expect(resolveGatewayToken({})).toBeUndefined();
+
+    const seen: { url: string; auth: string | null }[] = [];
+    const result = await runCommand(['doctor'], {
+      env: {
+        OPENGEN_API_URL: 'https://hosted.example',
+        OPENGEN_API_KEY: 'fixture-opengen-api-key',
+      },
+      request: async (url, init) => {
+        seen.push({ url: String(url), auth: new Headers(init?.headers).get('authorization') });
+        return Response.json({
+          authenticated: true,
+          authorized: true,
+          payingWorkspace: { id: 'studio-a', name: 'Studio A' },
+          scopes: ['read', 'generate'],
+        });
+      },
+    });
+    expect(result).toMatchObject({
+      connected: true,
+      baseUrl: 'https://hosted.example',
+      workspaceId: 'studio-a',
+      authentication: 'environment',
+    });
+    expect(seen).toEqual([
+      { url: 'https://hosted.example/v1/doctor', auth: 'Bearer fixture-opengen-api-key' },
+    ]);
+
+    const resume = recoveryCommand(['job', 'resume', 'job-1'], 'https://hosted.example');
+    expect(resume.command).toContain("OPENGEN_API_URL='https://hosted.example'");
+    expect(resume.environment).toEqual({
+      OPENGEN_API_URL: 'https://hosted.example',
+      MEDIA_ROUTER_URL: 'https://hosted.example',
+    });
   });
 });

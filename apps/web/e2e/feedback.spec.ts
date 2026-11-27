@@ -162,9 +162,21 @@ test('home onboarding uses the configured public origin and the setup dialog kee
     .first()
     .click();
   const setup = page.getByRole('dialog');
-  await expect(setup.locator('code')).toHaveText(`${setupOrigin}/llms.txt`);
+  await expect(setup.locator('code')).toHaveText(`Set up OpenGen - ${setupOrigin}/llms.txt`);
+  await expect(setup).toContainText(`${setupOrigin}/mcp`);
+  await expect(setup.getByRole('link', { name: /Setup guide/ })).toHaveAttribute('href', '/agents');
+  await setup.getByRole('tab', { name: 'CLI', exact: true }).click();
+  await expect(setup.locator('code')).toHaveText('opengen login && opengen doctor');
+  await expect(setup.getByRole('link', { name: /Setup guide/ })).toHaveAttribute(
+    'href',
+    '/agents/cli',
+  );
   await setup.getByRole('tab', { name: 'API', exact: true }).click();
   await expect(setup.locator('code')).toHaveText(`curl ${setupOrigin}/v1/models`);
+  await expect(setup.getByRole('link', { name: /Setup guide/ })).toHaveAttribute(
+    'href',
+    '/docs#http-examples',
+  );
   await setup.getByRole('button', { name: 'Close setup' }).click();
   await expect(
     page.getByRole('contentinfo').getByRole('link', { name: 'Private feedback', exact: true }),

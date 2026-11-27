@@ -22,9 +22,14 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
   if (!client) notFound();
   const origin = siteOrigin();
   const snippet = client.snippet?.(origin);
+  const secondarySnippet = client.secondarySnippet?.(origin);
   const bindingCommand = ['cursor', 'claude-code'].includes(client.slug)
-    ? `opengen bind preview --client ${client.slug} --config /absolute/path/to/your-project/${client.slug === 'cursor' ? '.cursor/mcp.json' : '.mcp.json'} --url ${origin}`
+    ? `opengen bind preview --client ${client.slug} --config "$PWD/${client.slug === 'cursor' ? '.cursor/mcp.json' : '.mcp.json'}" --url ${origin}`
     : null;
+  const firstPrompt =
+    client.slug === 'cli'
+      ? 'Use the OpenGen CLI to run `opengen doctor`, inspect `openai/gpt-image-2` for `text-to-image`, quote a 1K low-quality studio product photo of a matte ceramic teapot on dark slate, and wait for my approval before running `opengen generate`.'
+      : 'Check my OpenGen workspace balance, inspect `openai/gpt-image-2` for `text-to-image`, quote a 1K low-quality studio product photo of a matte ceramic teapot on dark slate, and wait for my approval before generating.';
   return (
     <>
       <SiteHeader />
@@ -77,6 +82,15 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
                 <CopyButton text={snippet.code} label="Copy example" />
               </div>
             )}
+            {secondarySnippet && (
+              <div className={styles.codeBlock}>
+                <span>{secondarySnippet.label}</span>
+                <pre>
+                  <code>{secondarySnippet.code}</code>
+                </pre>
+                <CopyButton text={secondarySnippet.code} label="Copy quote & generate" />
+              </div>
+            )}
             {bindingCommand && (
               <details className={styles.codeBlock}>
                 <summary>Preview a project configuration change</summary>
@@ -92,11 +106,23 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
                 <CopyButton text={bindingCommand} label="Copy preview command" />
               </details>
             )}
+            <div className={`${styles.codeBlock} ${styles.promptBlock}`} data-testid="first-prompt">
+              <span>Try your first prompt · discovery and quotes are free</span>
+              <pre className={styles.promptPre}>
+                <code>{firstPrompt}</code>
+              </pre>
+              <CopyButton text={firstPrompt} label="Copy first prompt" />
+            </div>
             <p className={styles.source}>
               Instructions based on <a href={client.source.url}>{client.source.label} ↗</a>,
               reviewed {AGENT_REVIEW_DATE}. Client interfaces and permissions can change.
             </p>
-            {client.slug !== 'cli' && (
+            {client.slug === 'cli' ? (
+              <p>
+                Need a scoped key for scripts or servers?{' '}
+                <a href="/app#keys">Manage workspace API keys →</a>
+              </p>
+            ) : (
               <p>
                 Prefer a shell workflow?{' '}
                 <a href="/agents/cli">Use OpenGen’s CLI and browser login →</a>
@@ -107,6 +133,10 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
             <span className={styles.status}>VERIFICATION PENDING</span>
             <h2>Know what you’re connecting.</h2>
             <p>{client.caution}</p>
+            <p className={styles.creditNote}>
+              New personal workspaces start with $0 managed credit.{' '}
+              <a href="/billing">Add workspace credit ↗</a>
+            </p>
             <dl className={styles.evidence}>
               <div>
                 <dt>Documentation reviewed</dt>
@@ -144,8 +174,9 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
               <h3>Start with discovery</h3>
               <p>
                 Ask for catalog search, inspect a model and request a quote. Check availability and
-                the spending ceiling before generation. Your new personal workspace starts with zero
-                managed credit.
+                the spending ceiling before generation. Your new personal workspace starts with $0
+                managed credit — <a href="/billing">Add workspace credit ↗</a> when you are ready to
+                run managed jobs.
               </p>
             </div>
             <div>

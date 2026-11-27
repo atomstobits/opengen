@@ -11,6 +11,7 @@ export type AgentClient = {
   caution: string;
   source: { label: string; url: string };
   snippet?: (origin: string) => { label: string; code: string };
+  secondarySnippet?: (origin: string) => { label: string; code: string };
 };
 
 export const agentClients: AgentClient[] = [
@@ -23,11 +24,11 @@ export const agentClients: AgentClient[] = [
     approach: 'Hosted MCP with OAuth',
     steps: [
       'On ChatGPT web, open Plugins, select the plus button and Add custom MCP server. Workspace permissions can restrict this option.',
-      'Name it OpenGen, enter your configured gateway’s /mcp URL and select OAuth. Use dynamic client registration (DCR); OpenGen does not advertise Client ID Metadata Documents.',
+      'Name it OpenGen, enter https://opengen.dev/mcp (or your self-hosted gateway’s /mcp URL) and select OAuth. Use dynamic client registration (DCR); OpenGen does not advertise Client ID Metadata Documents.',
       'Review the plugin, install it and complete OpenGen’s workspace consent. Invoke the installed plugin with @ in a new conversation.',
     ],
     caution:
-      'A public HTTPS gateway and configured sign-in are required. Creating a plugin does not verify that its tools or authorization work.',
+      'Hosted OAuth is live on https://opengen.dev; self-hosted gateways need public HTTPS and configured sign-in. Creating a plugin does not verify end-to-end ChatGPT client interoperability.',
     source: {
       label: 'Official OpenAI documentation',
       url: 'https://developers.openai.com/api/docs/guides/custom-mcp-server',
@@ -41,7 +42,7 @@ export const agentClients: AgentClient[] = [
     summary: 'Use a remote connector, with no local installer or provider credentials.',
     approach: 'Remote connector with OAuth',
     steps: [
-      'Open Customize → Connectors and add a custom connector with your gateway’s /mcp URL. Team and Enterprise setup may require an owner.',
+      'Open Customize → Connectors and add a custom connector with https://opengen.dev/mcp (or your self-hosted gateway’s /mcp URL). Team and Enterprise setup may require an owner.',
       'Choose sign-in authentication and Register automatically for the OAuth client. OpenGen supports dynamic registration, not Claude’s published CIMD identity.',
       'Connect, review the OpenGen consent screen and enable the connector for your conversation.',
     ],
@@ -183,8 +184,8 @@ export const agentClients: AgentClient[] = [
     summary: 'Use the portable OpenGen CLI; native MCP is not assumed.',
     approach: 'CLI through the agent’s shell',
     steps: [
-      'Install @opengen-dev/cli into an isolated prefix on Node 22.12+ (npm install --prefix /absolute/private/opengen-client @opengen-dev/cli --ignore-scripts --no-audit --no-fund) or use the reviewed offline release bundle; no source checkout is needed.',
-      'Complete opengen login in an interactive terminal with the intended gateway configured, then run opengen doctor.',
+      'Install @opengen-dev/cli into an isolated prefix on Node 22.12+ (npm install --prefix "$HOME/.opengen/cli" @opengen-dev/cli --ignore-scripts --no-audit --no-fund) or use the reviewed offline release bundle; no source checkout is needed.',
+      'Complete opengen login in an interactive terminal (defaults to https://opengen.dev, or set OPENGEN_API_URL for a self-hosted gateway), then run opengen doctor.',
       'Ask pi to use the documented CLI for catalog discovery. Keep credentials in the private profile, outside the project.',
     ],
     caution:
@@ -221,16 +222,20 @@ export const agentClients: AgentClient[] = [
     summary: 'Use the portable CLI with browser login, or create one scoped workspace API key.',
     approach: 'OpenGen browser PKCE login / scoped API key',
     steps: [
-      'Install @opengen-dev/cli into an isolated prefix on Node 22.12 or later (npm install --prefix /absolute/private/opengen-client @opengen-dev/cli --ignore-scripts --no-audit --no-fund), or use the checksum-verified offline release bundle.',
-      'Configure MEDIA_ROUTER_URL for your gateway, then run login and status below. Review the paying workspace and read/generate permissions in your browser.',
-      'For a backend API integration, create a separate expiring read/generate key in Workspace → API keys. Save it once in your application’s secret manager and send it only in the Authorization header.',
+      'Install @opengen-dev/cli into an isolated prefix on Node 22.12 or later (npm install --prefix "$HOME/.opengen/cli" @opengen-dev/cli --ignore-scripts --no-audit --no-fund), or install from the checksum-verified offline release bundle, then add "$HOME/.opengen/cli/node_modules/.bin" to your PATH.',
+      'Set OPENGEN_API_URL if targeting a self-hosted gateway (defaults to https://opengen.dev; MEDIA_ROUTER_URL remains a supported alias), then run login and doctor below. Review the paying workspace and read/generate permissions in your browser.',
+      'For a backend API integration, create a separate expiring read/generate key in Workspace → API keys (/app#keys). Save it once as OPENGEN_API_KEY in your secret manager and send it only in the Authorization header.',
     ],
     caution:
-      'Local protocol fixtures cover login and private-profile behavior, not a deployed identity provider. Sign-in provides no credit. Do not pass tokens in command arguments, URLs or checked-in files.',
+      'Local protocol fixtures cover login and private-profile behavior, not a deployed identity provider. New personal workspaces start with $0 managed credit. Do not pass tokens in command arguments, URLs or checked-in files.',
     source: { label: 'OpenGen CLI guide', url: '/docs#agents' },
     snippet: (origin) => ({
-      label: 'After installing the reviewed CLI · gateway URL is public configuration',
-      code: `export MEDIA_ROUTER_URL="${origin}"\nopengen login\nopengen doctor\nopengen catalog search "image"`,
+      label: 'Sign in, diagnose your workspace, and search the catalog',
+      code: `export OPENGEN_API_URL="${origin}"\nopengen login\nopengen doctor\nopengen catalog search "gpt-image-2"`,
+    }),
+    secondarySnippet: () => ({
+      label: 'Quote first, then submit once with a persisted idempotency key',
+      code: `cat <<'EOF' > request.json\n{\n  "modelId": "openai/gpt-image-2",\n  "operation": "text-to-image",\n  "input": {\n    "prompt": "A matte ceramic teapot on dark slate, studio lighting",\n    "resolution": "1K",\n    "quality": "low"\n  },\n  "billing": "managed",\n  "maxCostMicros": 50000\n}\nEOF\nopengen quote --input request.json\n\n# After confirming route, estimate and balance:\nOPENGEN_IDEMPOTENCY_KEY="$(node -e 'console.log(crypto.randomUUID())')"\nopengen generate --input request.json --idempotency-key "$OPENGEN_IDEMPOTENCY_KEY"`,
     }),
   },
 ];

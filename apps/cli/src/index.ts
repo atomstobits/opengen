@@ -25,6 +25,16 @@ import { runBindingCommand } from './bindings-command.js';
 import { jobRecovery, serializeCommandError } from './recovery.js';
 export { serializeCommandError } from './recovery.js';
 
+export const DEFAULT_GATEWAY_URL = 'https://opengen.dev';
+
+export function resolveGatewayUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return env.OPENGEN_API_URL?.trim() || env.MEDIA_ROUTER_URL?.trim() || DEFAULT_GATEWAY_URL;
+}
+
+export function resolveGatewayToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return env.OPENGEN_API_KEY || env.OPENGEN_TOKEN || env.MEDIA_ROUTER_TOKEN || undefined;
+}
+
 export const help = `OpenGen — discover → inspect → quote → upload → submit → resume
 
 Commands:
@@ -50,8 +60,8 @@ Commands:
   job cancel <id>
   balance
 
-MEDIA_ROUTER_URL selects the gateway (default http://127.0.0.1:4310).
-MEDIA_ROUTER_TOKEN explicitly overrides browser login. No token or provider-key argv option exists.
+OPENGEN_API_URL selects the gateway (default ${DEFAULT_GATEWAY_URL}; MEDIA_ROUTER_URL alias supported).
+OPENGEN_API_KEY explicitly overrides browser login (MEDIA_ROUTER_TOKEN / OPENGEN_TOKEN aliases supported). No token or provider-key argv option exists.
 Run login to select a paying workspace in your browser; status validates access without refreshing or changing credentials.
 Use a private input file or stdin for account/connection payloads. Catalog listing is not live verification.
 Persist the original input/key before generation and the returned job ID before waiting.
@@ -144,8 +154,8 @@ export async function runCommand(args: string[], options: CommandOptions = {}): 
   const [command = 'doctor', action, id] = positionals;
   const { signal } = options;
   const env = options.env ?? process.env;
-  const baseUrl = env.MEDIA_ROUTER_URL ?? 'http://127.0.0.1:4310';
-  const environmentToken = env.MEDIA_ROUTER_TOKEN || undefined;
+  const baseUrl = resolveGatewayUrl(env);
+  const environmentToken = resolveGatewayToken(env);
   const loginOptions = { baseUrl, profilePath: options.profilePath, request: options.request };
   if (command === 'login')
     return browserLogin({
@@ -438,7 +448,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     console.error(
       JSON.stringify(
         serializeCommandError(error, {
-          baseUrl: process.env.MEDIA_ROUTER_URL ?? 'http://127.0.0.1:4310',
+          baseUrl: resolveGatewayUrl(process.env),
         }),
         null,
         2,

@@ -152,7 +152,15 @@ export function Icon({
   );
 }
 
-export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+export function CopyButton({
+  text,
+  label = 'Copy',
+  className,
+}: {
+  text: string;
+  label?: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   async function copy() {
@@ -167,7 +175,8 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
   }
   return (
     <button
-      className="copy-button"
+      type="button"
+      className={className ? `copy-button ${className}` : 'copy-button'}
       onClick={copy}
       title={failed ? 'Select and copy the text manually' : label}
     >
@@ -180,11 +189,15 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
 function ConnectCard() {
   const publicOrigin = usePublicOrigin();
   const [tab, setTab] = useState<'agent' | 'cli' | 'api'>('agent');
+  const llmsUrl = new URL('/llms.txt', publicOrigin).href;
+  const mcpUrl = new URL('/mcp', publicOrigin).href;
   const commands = {
-    agent: new URL('/llms.txt', publicOrigin).href,
-    cli: 'opengen doctor',
+    agent: `Set up OpenGen - ${llmsUrl}`,
+    cli: 'opengen login && opengen doctor',
     api: `curl ${new URL('/v1/models', publicOrigin).href}`,
   };
+  const guideHref =
+    tab === 'agent' ? '/agents' : tab === 'cli' ? '/agents/cli' : '/docs#http-examples';
   return (
     <div className="connect-card compact">
       <div className="connect-tabs" role="tablist" aria-label="Connection method">
@@ -205,17 +218,22 @@ function ConnectCard() {
       </div>
       <p className="connect-instruction">
         {tab === 'agent'
-          ? 'Ask your agent to read:'
+          ? 'Paste this prompt into your agent:'
           : tab === 'cli'
-            ? 'With your configured OpenGen CLI:'
+            ? 'Sign in and check your workspace with the OpenGen CLI:'
             : 'Discover models on your gateway:'}
       </p>
       <div className="command-box">
         <code>{commands[tab]}</code>
-        <CopyButton text={commands[tab]} label={tab === 'agent' ? 'Copy link' : 'Copy'} />
+        <CopyButton text={commands[tab]} label={tab === 'agent' ? 'Copy prompt' : 'Copy'} />
       </div>
       <p className="connect-caption">
-        Discover, inspect, quote, then create. <a href="/agents">Setup guide ↗</a>
+        {tab === 'agent'
+          ? `Direct MCP endpoint: ${mcpUrl}. `
+          : tab === 'cli'
+            ? 'Defaults to https://opengen.dev (or set OPENGEN_API_URL). '
+            : 'Discover, inspect, quote, then create. '}
+        <a href={guideHref}>Setup guide ↗</a>
       </p>
     </div>
   );
@@ -225,7 +243,7 @@ export function SiteHeader({
   active,
   overlay = false,
 }: {
-  active?: 'catalog' | 'companies' | 'playground' | 'dashboard';
+  active?: 'catalog' | 'companies' | 'playground' | 'dashboard' | 'pricing';
   overlay?: boolean;
 }) {
   const [setup, setSetup] = useState(false);
@@ -609,6 +627,9 @@ export function SiteHeader({
                   </a>
                   <a href="/playground" onClick={closeMobileNav}>
                     Playground
+                  </a>
+                  <a href="/pricing" onClick={closeMobileNav}>
+                    Pricing
                   </a>
                   <a href="/app#start" onClick={closeMobileNav}>
                     Workspace
@@ -1749,8 +1770,9 @@ export function PlaygroundWorkflow({
           ) : (
             <>
               <p>
-                <a href="/dashboard#keys">Create an API key ↗</a> with read and generate
-                permissions. Set <code>OPENGEN_API_KEY</code> privately in your terminal or server.
+                <a href="/app#keys">Create an API key ↗</a> with read and generate permissions. Set{' '}
+                <code>OPENGEN_API_KEY</code> privately in your terminal or server (and set{' '}
+                <code>OPENGEN_API_URL</code> if targeting a self-hosted gateway).
               </p>
               <h4>1. Save your inputs as request.json</h4>
               {requestError ? (
@@ -1876,6 +1898,7 @@ export function Footer() {
       </a>
       <p>Open-source image & video routing.</p>
       <div>
+        <a href="/pricing">Pricing</a>
         <a href="/docs">Documentation</a>
         <a href="/docs#self-host">Self-host</a>
         <a href="/feedback">Private feedback</a>

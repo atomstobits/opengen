@@ -82,6 +82,7 @@
   border-radius: 8px;
   padding: 22px 24px;
   background: var(--surface);
+  min-width: 0;
 }
 .routes h2,
 .routes h3 {
@@ -142,7 +143,8 @@
 }
 .notice a,
 .source a,
-.aside > a,
+.aside a,
+.routes a,
 .instructions > p a,
 .recovery a,
 .matrix a {
@@ -154,7 +156,8 @@
 }
 .notice a:hover,
 .source a:hover,
-.aside > a:hover,
+.aside a:hover,
+.routes a:hover,
 .instructions > p a:hover,
 .recovery a:hover,
 .matrix a:hover {
@@ -203,6 +206,9 @@
   min-width: 0;
   text-decoration: none;
   transition: background 0.15s ease;
+}
+.client > div {
+  min-width: 0;
 }
 .client:nth-child(2n) {
   padding-left: 24px;
@@ -361,6 +367,9 @@
   gap: 56px;
   align-items: start;
 }
+.instructions {
+  min-width: 0;
+}
 .instructions > h2 {
   font-family: var(--heading);
   font-size: clamp(1.5rem, 2.4vw, 1.875rem);
@@ -381,6 +390,8 @@
   font-size: 16px;
   line-height: 1.6;
   max-width: 68ch;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 .steps li::before {
   content: counter(setup, decimal-leading-zero);
@@ -399,6 +410,10 @@
   padding: 18px;
   margin-block: 20px;
   min-width: 0;
+  max-width: 100%;
+}
+.promptBlock {
+  border-left: 3px solid var(--accent);
 }
 .codeBlock > span {
   display: block;
@@ -438,6 +453,7 @@
 }
 .codeBlock pre {
   overflow-x: auto;
+  max-width: 100%;
   line-height: 1.55;
   font-family: var(--mono);
   font-size: 14px;
@@ -447,6 +463,15 @@
 }
 .codeBlock pre code {
   overflow-wrap: normal;
+}
+.codeBlock .promptPre {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: visible;
+  padding-bottom: 0;
+}
+.codeBlock .promptPre code {
+  overflow-wrap: break-word;
 }
 .source,
 .instructions > p {
@@ -463,11 +488,17 @@
   color: var(--subtle);
 }
 .aside {
+  min-width: 0;
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: 4px 4px 0 rgba(4, 19, 14, 0.55);
+}
+.creditNote {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-subtle);
 }
 .status {
   display: inline-block;
@@ -516,6 +547,7 @@
   color: var(--ink);
   margin: 0;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .consent {
   margin-top: 70px;
@@ -579,7 +611,7 @@
     font-size: 17px;
   }
   .routes {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
   .routes > div {
@@ -598,7 +630,7 @@
     gap: 8px;
   }
   .clients {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .client,
   .client:nth-child(2n) {
@@ -617,7 +649,7 @@
     min-width: 140px;
   }
   .detailGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 28px;
   }
   .detailHero {

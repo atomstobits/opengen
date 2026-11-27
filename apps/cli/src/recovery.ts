@@ -9,10 +9,10 @@ import type { Job } from '@media-router/contracts';
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 export function recoveryCommand(args: string[], baseUrl?: string) {
   return {
-    command: `${baseUrl ? `MEDIA_ROUTER_URL=${quote(baseUrl)} ` : ''}opengen ${args.map(quote).join(' ')}`,
+    command: `${baseUrl ? `OPENGEN_API_URL=${quote(baseUrl)} ` : ''}opengen ${args.map(quote).join(' ')}`,
     executable: 'opengen',
     args,
-    ...(baseUrl ? { environment: { MEDIA_ROUTER_URL: baseUrl } } : {}),
+    ...(baseUrl ? { environment: { OPENGEN_API_URL: baseUrl, MEDIA_ROUTER_URL: baseUrl } } : {}),
   };
 }
 export function jobRecovery(job: Job, baseUrl?: string) {
