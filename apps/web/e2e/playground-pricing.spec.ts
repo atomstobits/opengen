@@ -359,3 +359,212 @@ test('a pinned route cannot show a published price when its provider is excluded
   await expect(pricing.locator('summary', { hasText: 'regional route prices' })).toHaveCount(0);
   expect(gateway.submissions).toEqual([]);
 });
+
+for (const viewport of [
+  { name: 'desktop', width: 1440, height: 1000 },
+  { name: 'phone', width: 390, height: 844 },
+]) {
+  test(`${viewport.name}: default playground places Prompt above Cost & Readiness with starter chips and honest flagship examples`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    const gateway = await stubGateway(page);
+    await page.goto('/playground');
+    await expect(page.getByLabel('Choose generation model')).toHaveValue(imageModelId);
+    await expect(page.getByRole('combobox', { name: 'Operation' })).toHaveValue('text-to-image');
+
+    const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
+    const pricing = page.getByRole('region', { name: 'GPT Image 2 pricing' });
+    const quoteButton = page.getByRole('button', { name: 'Get a quote', exact: true });
+    await expect(quoteButton).toBeDisabled();
+
+    const promptBox = await prompt.boundingBox();
+    const pricingBox = await pricing.boundingBox();
+    expect(promptBox).not.toBeNull();
+    expect(pricingBox).not.toBeNull();
+    expect(promptBox!.y).toBeLessThan(pricingBox!.y);
+
+    const starterGroup = page.getByRole('group', { name: 'Starter prompts' });
+    await starterGroup.getByRole('button', { name: 'Ceramic studio', exact: true }).click();
+    await expect(prompt).toHaveValue(/stoneware teapot/i);
+    await expect(quoteButton).toBeEnabled();
+    expect(gateway.quotes).toEqual([]);
+    expect(gateway.submissions).toEqual([]);
+
+    const imageExample = page
+      .locator('details')
+      .filter({ hasText: 'Architectural stoneware studio still life' });
+    await imageExample.locator('summary').click();
+    await expect(imageExample.locator('summary')).toContainText('Starter example');
+    await expect(imageExample.getByRole('img')).toHaveCount(0);
+    await expect(imageExample.locator('video')).toHaveCount(0);
+    await imageExample.getByRole('button', { name: 'Use example in draft' }).click();
+    await expect(prompt).toHaveValue(/travertine plinth/i);
+    await expect(quoteButton).toBeEnabled();
+    expect(gateway.submissions).toEqual([]);
+
+    for (const target of [
+      {
+        modelId: 'bytedance/seedream-5.0-pro',
+        title: 'Sunlit glass botanical conservatory',
+        expectedPrompt: /botanical conservatory/i,
+      },
+      {
+        modelId: 'bytedance/seedance-2.5',
+        title: 'Misty coastal cliff road at sunrise',
+        expectedPrompt: /coastal cliff road/i,
+      },
+      {
+        modelId: 'kling/kling-4.0',
+        title: 'Lantern-lit stone alley after rain',
+        expectedPrompt: /lantern-lit stone alley/i,
+      },
+    ]) {
+      await page.getByLabel('Choose generation model').selectOption(target.modelId);
+      const disclosure = page.locator('details').filter({ hasText: target.title });
+      await disclosure.locator('summary').click();
+      await expect(disclosure.getByRole('img')).toHaveCount(0);
+      await expect(disclosure.locator('video')).toHaveCount(0);
+      await disclosure.getByRole('button', { name: 'Use example in draft' }).click();
+      await expect(prompt).toHaveValue(target.expectedPrompt);
+      await expect(quoteButton).toBeEnabled();
+    }
+
+    expect(gateway.submissions).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport.width,
+    );
+  });
+}
+
+test('inline Add-Credit callout appears on $0.00 balance and after 402 insufficient_balance', async ({
+  page,
+}) => {
+  let availableMicros = 0;
+  await page.route('**/api/session', (route) =>
+    route.fulfill({
+      json: {
+        authenticated: true,
+        workspaceId: 'fixture-workspace',
+        recoveryScope: 'fixture-identity',
+        scopes: ['read', 'generate'],
+      },
+    }),
+  );
+  await page.route('**/api/balance', (route) =>
+    route.fulfill({ json: { availableMicros, reservedMicros: 0 } }),
+  );
+  await page.route('**/api/quotes', (route) => {
+    const input = route.request().postDataJSON() as GenerateInput;
+    return route.fulfill({
+      json: quote(input, { executableRouteIds: catalog.routes.map((entry) => entry.id) }),
+    });
+  });
+  await page.route('**/api/generations', (route) =>
+    route.fulfill({
+      status: 402,
+      json: {
+        error: {
+          code: 'insufficient_balance',
+          message: 'Workspace balance is insufficient for this reservation.',
+        },
+      },
+    }),
+  );
+
+  await page.goto('/playground');
+  const creditCallout = page.getByTestId('playground-credit-callout');
+  await expect(creditCallout).toBeVisible();
+  await expect(creditCallout).toContainText('$0.00 available credit');
+  await expect(
+    creditCallout.getByRole('link', { name: 'Add workspace credit →', exact: true }),
+  ).toHaveAttribute('href', '/billing');
+
+  await page.getByRole('combobox', { name: 'Pay with', exact: true }).selectOption('byok');
+  await expect(creditCallout).toHaveCount(0);
+
+  availableMicros = 25_000;
+  await page.reload();
+  await expect(creditCallout).toHaveCount(0);
+  await page
+    .getByRole('group', { name: 'Starter prompts' })
+    .getByRole('button', { name: 'Ceramic studio', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Generate', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(creditCallout).toBeVisible();
+  await expect(creditCallout).toContainText('Insufficient workspace credit');
+  await expect(
+    creditCallout.getByRole('link', { name: 'Add workspace credit →', exact: true }),
+  ).toHaveAttribute('href', '/billing');
+});
+
+test('signed-out sign-in CTA passes returnTo and restores the sanitized draft once without cross-identity leakage', async ({
+  page,
+}) => {
+  let session: Record<string, unknown> = {
+    authenticated: false,
+    oidcEnabled: true,
+  };
+  await page.route('**/api/session', (route) => {
+    if (route.request().method() === 'DELETE') {
+      session = { authenticated: false, oidcEnabled: true };
+    }
+    return route.fulfill({ json: session });
+  });
+
+  const targetHref = '/playground?model=openai%2Fgpt-image-2&operation=text-to-image';
+  const expectedLoginHref = `/auth/login?returnTo=${encodeURIComponent(targetHref)}`;
+  await page.goto(targetHref);
+  const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
+  await prompt.fill('Signed-out stoneware draft that should survive login.');
+
+  await expect(
+    page
+      .getByTestId('playground-signin-callout')
+      .getByRole('link', { name: /Sign in to generate/ }),
+  ).toHaveAttribute('href', expectedLoginHref);
+  await expect(
+    page.locator('#playground-account').getByRole('link', { name: 'Sign in or create account' }),
+  ).toHaveAttribute('href', expectedLoginHref);
+
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem('opengen.playground.v1:signin-handoff')))
+    .toContain('Signed-out stoneware draft that should survive login.');
+
+  const storageDump = await page.evaluate(() => JSON.stringify(sessionStorage));
+  expect(storageDump).not.toContain('og_sk_');
+  expect(storageDump).not.toContain('Bearer');
+
+  session = {
+    authenticated: true,
+    workspaceId: 'fixture-workspace-a',
+    recoveryScope: 'fixture-identity-a',
+    scopes: ['read', 'generate'],
+    oidcEnabled: true,
+  };
+  await page.goto(targetHref);
+  await expect(prompt).toHaveValue('Signed-out stoneware draft that should survive login.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'restored after sign-in' }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('opengen.playground.v1:signin-handoff')),
+  ).toBeNull();
+
+  await page
+    .locator('#playground-account')
+    .getByRole('button', { name: 'Sign out', exact: true })
+    .click();
+  await expect(prompt).toHaveValue('');
+  session = {
+    authenticated: true,
+    workspaceId: 'fixture-workspace-b',
+    recoveryScope: 'fixture-identity-b',
+    scopes: ['read', 'generate'],
+    oidcEnabled: true,
+  };
+  await page.reload();
+  await expect(prompt).toHaveValue('');
+});

@@ -617,6 +617,7 @@ export class Engine {
         '033.sql',
         '034.sql',
         '035.sql',
+        '036.sql',
       ].map((name, index) => {
         if (name !== `${String(index + 1).padStart(3, '0')}.sql`)
           throw new Error('Migration manifest must be unique and contiguous.');

@@ -45,6 +45,7 @@ import {
 import { operationalError } from './operational-error.js';
 import type { HumanTermsPolicy } from './terms-login.js';
 import type { PaymentsOptions } from './payments.js';
+import type { StarterTrialCreditStore, TrialCreditStatus } from './trial-credit.js';
 
 export const MANUAL_SELF_SERVE_OWNER_RAILS: Readonly<BillingDelegationRails> = Object.freeze({
   allowsEnabled: false,
@@ -661,7 +662,12 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
     payments,
     /** Runs known accepted retrieval even when automaticChargesEnabled is false. */
     workOnce: () => recharge.workOnce(options.rechargeTransport),
-    register: async (app: FastifyInstance, authenticate: Authenticate, publicUrl: string) => {
+    register: async (
+      app: FastifyInstance,
+      authenticate: Authenticate,
+      publicUrl: string,
+      extra: { trialCredit?: StarterTrialCreditStore } = {},
+    ) => {
       app.get('/v1/billing/access', async (request, reply) => {
         reply.header('Cache-Control', 'private, no-store');
         if (request.headers.authorization || !request.cookies?.og_session)
@@ -677,11 +683,30 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
           selfServeEnrollmentEnabled && (!read || !setup || automaticChargesEnabled)
             ? await ownerEnrollmentState(principal, read)
             : null;
+        let trialCredit: TrialCreditStatus | null = null;
+        if (extra.trialCredit?.enabled) {
+          try {
+            trialCredit = await extra.trialCredit.getStatus(principal);
+          } catch (err) {
+            request.log.error(
+              { err, workspaceId: principal.workspaceId },
+              'Starter trial credit status check failed; preserving billing access response.',
+            );
+            trialCredit = {
+              enabled: true,
+              amountMicros: extra.trialCredit.amountMicros,
+              claimed: false,
+              eligible: false,
+              reason: 'unavailable',
+            };
+          }
+        }
         return {
           workspaceId: principal.workspaceId,
           recoveryScope,
           capabilities: { read, manage, setup },
           ...(ownerEnrollment ? { ownerEnrollment } : {}),
+          ...(trialCredit ? { trialCredit } : {}),
         };
       });
       if (selfServeEnrollmentEnabled) {

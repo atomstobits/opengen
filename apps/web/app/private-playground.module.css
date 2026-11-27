@@ -241,6 +241,226 @@
   outline-offset: 2px;
 }
 
+.starterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 14px;
+}
+
+.starterLabel {
+  color: var(--subtle);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.starterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.starterChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--control-line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.starterChip:hover {
+  background: var(--raised);
+  border-color: var(--control-line-hover);
+}
+
+.starterChip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.starterChip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.secondaryOptions {
+  border-top: 1px solid var(--line-subtle);
+  padding-top: 18px;
+  margin-bottom: 22px;
+}
+
+.secondaryOptions > :global(.eyebrow) {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.codeTabs {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 5px 5px 0 rgba(4, 19, 14, 0.55);
+  margin: 0 0 24px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.codeTabsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 15px 16px 12px;
+}
+
+.codeTabsHeader h3 {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-family: var(--heading);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.codeTabList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.codeTabList button {
+  min-height: 36px;
+  padding: 6px 13px;
+  border-radius: 6px;
+  border: 1px solid var(--control-line);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.codeTabList button:hover:not([aria-selected='true']) {
+  background: var(--raised);
+  border-color: var(--control-line-hover);
+}
+
+.codeTabList button[aria-selected='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.codeTabList button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.codeTabPanel {
+  padding: 14px 16px 16px;
+  min-width: 0;
+}
+
+.codeSubBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.codeSubBar button {
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--control-line);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.codeSubBar button[aria-pressed='true'] {
+  background: var(--raised);
+  border-color: var(--control-line-hover);
+  color: var(--panel-stat);
+}
+
+.codeSubBar button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.codePlaceholder {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
+.codeBox {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-code);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.codeBoxBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-subtle);
+  background: color-mix(in srgb, var(--surface) 55%, var(--surface-code));
+  color: var(--subtle);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.codeBox pre {
+  margin: 0;
+  padding: 14px;
+  max-height: 300px;
+  overflow: auto;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.codeBox pre:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
 @media (max-width: 620px) {
   .jsonEditor textarea,
   .reuse select,
@@ -258,5 +478,8 @@
   }
   .selection {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .codeBox pre {
+    max-height: 260px;
   }
 }

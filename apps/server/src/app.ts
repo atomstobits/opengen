@@ -1,4 +1,5 @@
 import { operationalError } from './operational-error.js';
+import { parseTrustedProxies } from './client-ip.js';
 import { registerGovernance } from './governance.js';
 import {
   AccountGovernanceStore,
@@ -54,6 +55,11 @@ import { registerMcpAuthorization } from './mcp-authorization.js';
 import { registerCompatibility } from './compatibility.js';
 import { registerOperator, ledgerQuerySchema } from './operator.js';
 import { registerPendingEmailCredits } from './pending-email-credits.js';
+import {
+  readTrialCreditConfig,
+  registerTrialCreditRoutes,
+  StarterTrialCreditStore,
+} from './trial-credit.js';
 import type { Job } from '@media-router/contracts';
 import type { Reconciliation } from '@media-router/engine';
 import { openApiDocument } from './openapi.js';
@@ -134,6 +140,9 @@ export interface AppOptions {
   publicUrl?: string;
   env?: NodeJS.ProcessEnv;
   resolvePublicEndpoint?: import('@media-router/engine').PublicResolver;
+  githubFetch?: typeof fetch;
+  emailOtpTransport?: import('./email-otp.js').EmailOtpTransport;
+  emailOtpStore?: import('./email-otp.js').EmailOtpStore;
 }
 export async function buildApp(options: AppOptions = {}) {
   const publicUrl = new URL(
@@ -169,7 +178,10 @@ export async function buildApp(options: AppOptions = {}) {
         'Hosted human Terms composition requires scoped manual billing rather than unscoped payments.',
       );
   }
+  const runtimeEnv = options.env ?? process.env;
+  const trustProxy = parseTrustedProxies(runtimeEnv.OPENGEN_TRUSTED_PROXIES);
   const app = Fastify({
+    ...(trustProxy ? { trustProxy } : {}),
     logger: options.logger
       ? {
           serializers: {
@@ -262,7 +274,20 @@ export async function buildApp(options: AppOptions = {}) {
   await app.register(async (scoped) => {
     registerOwnedAssetRoutes(scoped, { assets: options.engine?.ownedAssets, authenticate });
   });
-  await billingRuntime?.register(app, authenticate, publicUrl);
+  const trialCreditConfig = readTrialCreditConfig(options.env ?? process.env);
+  const trialCreditStore = governancePool
+    ? new StarterTrialCreditStore(governancePool, {
+        amountMicros: trialCreditConfig.amountMicros,
+        humanTermsPolicy: options.humanTermsPolicy,
+      })
+    : undefined;
+  await billingRuntime?.register(app, authenticate, publicUrl, { trialCredit: trialCreditStore });
+  await registerTrialCreditRoutes(app, {
+    store: trialCreditStore,
+    authenticate,
+    publicUrl,
+    env: runtimeEnv,
+  });
   const paymentOptions = billingRuntime?.payments ?? {
     store: options.payments,
     ...(options.paymentConfig ?? paymentConfiguration(options.env ?? process.env)),

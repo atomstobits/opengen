@@ -1,5 +1,96 @@
+import { createHmac } from 'node:crypto';
+import { isIP } from 'node:net';
 import { createGcpTransport } from './gcp-transport';
 import { registeredBackendPath } from './registered-http';
+
+const CLIENT_IP_PROOF_HEADER = 'x-opengen-client-ip-proof';
+const TRUSTED_SINGLE_IP_HEADERS = new Set([
+  'x-vercel-forwarded-for',
+  'cf-connecting-ip',
+  'fly-client-ip',
+  'x-real-ip',
+]);
+
+function normalizeProxyClientIp(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 64 || /[\u0000-\u001f\u007f\s%]/.test(trimmed)) return null;
+  if (isIP(trimmed) === 4) return trimmed;
+  if (isIP(trimmed) !== 6) return null;
+  let canonical: string;
+  try {
+    const parsed = new URL(`http://[${trimmed.toLowerCase()}]/`).hostname;
+    if (!parsed.startsWith('[') || !parsed.endsWith(']')) return null;
+    canonical = parsed.slice(1, -1).toLowerCase();
+  } catch {
+    return null;
+  }
+  const mappedDotted = canonical.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mappedDotted && isIP(mappedDotted[1]!) === 4) return mappedDotted[1]!;
+  const mappedHex = canonical.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const hi = Number.parseInt(mappedHex[1]!, 16);
+    const lo = Number.parseInt(mappedHex[2]!, 16);
+    const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    if (isIP(ipv4) === 4) return ipv4;
+  }
+  return isIP(canonical) === 6 ? canonical : null;
+}
+
+function extractPlatformTrustedClientIp(
+  request: Request,
+  env: NodeJS.ProcessEnv,
+  injectedClientIp?: string | ((request: Request) => string | null),
+): string | null {
+  if (injectedClientIp !== undefined) {
+    const raw =
+      typeof injectedClientIp === 'function' ? injectedClientIp(request) : injectedClientIp;
+    return normalizeProxyClientIp(raw);
+  }
+  const explicitHeader = env.OPENGEN_TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase() ?? '';
+  if (explicitHeader) {
+    const raw = request.headers.get(explicitHeader);
+    if (!raw) return null;
+    if (TRUSTED_SINGLE_IP_HEADERS.has(explicitHeader)) {
+      return raw.includes(',') ? null : normalizeProxyClientIp(raw);
+    }
+    if (explicitHeader === 'x-forwarded-for') {
+      const parts = raw
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      return parts.length > 0 ? normalizeProxyClientIp(parts.at(-1)) : null;
+    }
+    return null;
+  }
+  if (env.VERCEL === '1') {
+    const vercelIp = request.headers.get('x-vercel-forwarded-for');
+    if (!vercelIp) return null;
+    const parts = vercelIp
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return parts.length > 0 ? normalizeProxyClientIp(parts.at(-1)) : null;
+  }
+  return null;
+}
+
+function signProxyClientIpProof(params: {
+  secret: string;
+  ip: string;
+  method: string;
+  pathname: string;
+  nowMs: number;
+}): string {
+  const timestampSec = Math.floor(params.nowMs / 1000);
+  const ipB64 = Buffer.from(params.ip, 'utf8').toString('base64url');
+  const sig = createHmac('sha256', params.secret)
+    .update(
+      `opengen-client-ip-v1\n${timestampSec}\n${params.ip}\n${params.method.toUpperCase()}\n${params.pathname}`,
+    )
+    .digest('base64url');
+  return `v1.${timestampSec}.${ipB64}.${sig}`;
+}
 
 const unavailable = () =>
   Response.json(
@@ -93,11 +184,14 @@ export function createForwarder(
     env?: NodeJS.ProcessEnv;
     request?: typeof fetch;
     transport?: (backend: string) => Promise<string | undefined>;
+    clientIp?: string | ((request: Request) => string | null);
+    now?: () => number;
   } = {},
 ) {
   const env = options.env ?? process.env;
   const requestBackend = options.request ?? fetch;
   const transport = options.transport ?? createGcpTransport({ env, request: requestBackend });
+  const now = options.now ?? Date.now;
   return async (request: Request, path: string): Promise<Response> => {
     if (!registeredBackendPath(path, request.method))
       return Response.json(
@@ -149,6 +243,26 @@ export function createForwarder(
       if (body !== undefined) headers.set('content-type', body.contentType);
       if (path === '/mcp' && !headers.has('accept'))
         headers.set('accept', 'application/json, text/event-stream');
+      const pathname = path.split('?')[0]!;
+      const proxyClientSecret = env.OPENGEN_PROXY_CLIENT_SECRET?.trim() ?? '';
+      if (
+        proxyClientSecret.length >= 32 &&
+        (loginNotice || loginCallback || pathname === '/v1/billing/trial-credit')
+      ) {
+        const trustedClientIp = extractPlatformTrustedClientIp(request, env, options.clientIp);
+        if (trustedClientIp) {
+          headers.set(
+            CLIENT_IP_PROOF_HEADER,
+            signProxyClientIpProof({
+              secret: proxyClientSecret,
+              ip: trustedClientIp,
+              method: request.method,
+              pathname,
+              nowMs: now(),
+            }),
+          );
+        }
+      }
       const identity = await transport(backend.origin);
       if (stripeWebhook && !identity) return unavailable();
       if (identity) headers.set('X-Serverless-Authorization', `Bearer ${identity}`);

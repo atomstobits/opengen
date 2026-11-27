@@ -1,18 +1,47 @@
 import {
   currentHumanTermsPolicy,
+  encodeEmailOtpCookie,
   humanLoginError,
-  sendOidcHandoff,
-  registerHumanLogin,
-  readHumanLoginTransaction,
   oidcHumanTransaction,
+  readHumanLoginTransaction,
+  registerHumanLogin,
+  renderEmailOtpTerminalNotice,
+  renderEmailOtpVerifyNotice,
+  renderHumanLoginNotice,
+  sendOidcHandoff,
   validateHumanLoginIntent,
+  validateSafeReturnTo,
+  type HumanLoginIntent,
   type HumanTermsPolicy,
 } from './terms-login.js';
-import { TermsReceiptStore } from '@media-router/engine';
+import {
+  buildGitHubAuthorizationUrl,
+  exchangeGitHubCode,
+  readGitHubOAuthConfiguration,
+} from './github-oauth.js';
+import {
+  deliverEmailOtpCode,
+  EMAIL_OTP_TTL_MS,
+  emailOtpRateLimitedError,
+  emailOtpSubject,
+  emailOtpUnavailableError,
+  generateOtpCode,
+  hashOtpEmail,
+  InMemoryEmailOtpStore,
+  maskEmailAddress,
+  normalizeOtpEmail,
+  PostgresEmailOtpStore,
+  readEmailOtpConfiguration,
+  type EmailOtpStore,
+  type EmailOtpTransport,
+} from './email-otp.js';
+import { resolveTrustedClientIp } from './client-ip.js';
+import rateLimit from '@fastify/rate-limit';
+import { TermsReceiptStore, type TermsVerificationMethod } from '@media-router/engine';
 import { governancePolicySchema } from './governance.js';
 import { sessionRecoveryScope } from './session-recovery.js';
 import { assertBrowserRecoveryScope } from './browser-recovery.js';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import { timingSafeEqual } from 'node:crypto';
 import * as oidc from 'openid-client';
@@ -36,7 +65,6 @@ import {
   type PendingEmailCreditStore,
 } from '@media-router/engine';
 import { catalog } from '@media-router/catalog';
-import { routingSchema } from './validation.js';
 import { createOAuthResource } from './oauth.js';
 import {
   teamCreateSchema,
@@ -44,6 +72,13 @@ import {
   memberRoleSchema,
   sessionWorkspaceSchema,
 } from './team-schemas.js';
+
+export interface AuthProvidersSummary {
+  oidc: boolean;
+  oidcLabel?: string;
+  github: boolean;
+  emailOtp: boolean;
+}
 
 export interface AccountsEngine {
   accounts?: AccountStore;
@@ -54,11 +89,29 @@ export interface AccountsEngine {
   ensureWorkspace?(id: string, balance?: number): Promise<unknown>;
   creditWorkspace?(id: string, amount: number, reference: string): Promise<unknown>;
 }
+
 const unauthorized = () =>
   Object.assign(new Error('A valid OpenGen session or bearer token is required.'), {
     statusCode: 401,
     code: 'unauthorized',
   });
+
+function deriveOidcLabel(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  const explicit = env.OPENGEN_OIDC_DISPLAY_NAME?.trim();
+  if (explicit && explicit.length <= 40 && !/[\u0000-\u001f\u007f]/.test(explicit)) return explicit;
+  const issuer = env.OIDC_ISSUER?.trim();
+  if (!issuer) return undefined;
+  try {
+    const host = new URL(issuer).hostname.toLowerCase();
+    if (host === 'accounts.google.com') return 'Google';
+    if (host === 'login.microsoftonline.com') return 'Microsoft';
+    if (host === 'appleid.apple.com') return 'Apple';
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 export async function registerAccounts(
   app: FastifyInstance,
   options: {
@@ -71,6 +124,12 @@ export async function registerAccounts(
     resolvePublicEndpoint?: PublicResolver;
     /** Internal fixture seam; hosted policy adoption is not enabled by environment flags. */
     humanTermsPolicy?: () => HumanTermsPolicy;
+    /** Optional fetch seam for GitHub OAuth tests. */
+    githubFetch?: typeof fetch;
+    /** Optional email transport seam for Email OTP tests. */
+    emailOtpTransport?: EmailOtpTransport;
+    /** Optional Email OTP challenge/rate-limit store seam. */
+    emailOtpStore?: EmailOtpStore;
   },
 ) {
   const env = options.env ?? process.env;
@@ -84,13 +143,29 @@ export async function registerAccounts(
     sameSite: 'lax' as const,
     maxAge: 43200,
   };
-  const oidcEnabled = Boolean(
+  const oidcProviderEnabled = Boolean(
     env.OIDC_ISSUER && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET && env.MR_SESSION_SECRET,
   );
+  const oidcLabel = oidcProviderEnabled ? deriveOidcLabel(env) : undefined;
+  const githubConfig = readGitHubOAuthConfiguration(env);
+  const githubEnabled = Boolean(githubConfig);
+  const emailOtpConfig = readEmailOtpConfiguration(env, {
+    publicUrl,
+    transport: options.emailOtpTransport,
+  });
+  const emailOtpEnabled = Boolean(emailOtpConfig);
+  const oidcEnabled = oidcProviderEnabled || githubEnabled || emailOtpEnabled;
+  const authProviders: AuthProvidersSummary = {
+    oidc: oidcProviderEnabled,
+    ...(oidcLabel ? { oidcLabel } : {}),
+    github: githubEnabled,
+    emailOtp: emailOtpEnabled,
+  };
+
   const oauth = createOAuthResource(env);
   if (oauth && oauth.metadata.resource !== new URL('/mcp', publicUrl).href)
     throw new Error('OIDC_API_AUDIENCE must match the canonical public /mcp URL.');
-  if (oidcEnabled && env.MR_SESSION_SECRET!.length < 32)
+  if (oidcProviderEnabled && env.MR_SESSION_SECRET!.length < 32)
     throw new Error('MR_SESSION_SECRET must contain at least 32 characters for OIDC.');
   const store = () => {
     if (!options.engine?.accounts)
@@ -192,9 +267,10 @@ export async function registerAccounts(
         canSwitchWorkspace: p.keyKind === 'browser',
         isOperator: p.bootstrap === true,
         oidcEnabled,
+        authProviders,
       };
     } catch {
-      return { authenticated: false, oidcEnabled };
+      return { authenticated: false, oidcEnabled, authProviders };
     }
   });
   app.post('/v1/session', async (request, reply) => {
@@ -236,13 +312,14 @@ export async function registerAccounts(
       membershipId: principal.membershipId,
       scopes: principal.scopes,
       oidcEnabled,
+      authProviders,
     };
   });
   app.delete('/v1/session', async (request, reply) => {
     if (request.cookies.og_session)
       await options.engine?.accounts?.deleteSession(request.cookies.og_session);
     reply.clearCookie('og_session', { path: '/' });
-    return { authenticated: false, oidcEnabled };
+    return { authenticated: false, oidcEnabled, authProviders };
   });
   app.get('/v1/workspaces', async (request) => ({
     data: await store().listWorkspaces(await authenticate(request)),
@@ -304,6 +381,7 @@ export async function registerAccounts(
       canSwitchWorkspace: true,
       isOperator: false,
       oidcEnabled,
+      authProviders,
     };
   });
   app.get('/v1/keys', async (request) => ({
@@ -464,6 +542,7 @@ export async function registerAccounts(
       ),
     }),
   );
+
   // Library handles issuer validation, code exchange, PKCE, nonce and ID-token verification.
   let oidcConfig: Promise<oidc.Configuration> | undefined;
   const config = () =>
@@ -472,66 +551,41 @@ export async function registerAccounts(
       env.OIDC_CLIENT_ID!,
       env.OIDC_CLIENT_SECRET!,
     ));
+  const accountPool = options.engine?.accounts?.pool;
+  const hasSqlPool = Boolean(
+    accountPool &&
+    typeof accountPool.connect === 'function' &&
+    typeof accountPool.query === 'function',
+  );
+  if (emailOtpConfig && !options.emailOtpStore && !hasSqlPool && env.NODE_ENV === 'production')
+    throw new Error(
+      'Email OTP requires a PostgreSQL-backed account store in production so challenges are shared across API instances.',
+    );
+  const emailOtpStore: EmailOtpStore =
+    options.emailOtpStore ??
+    (hasSqlPool ? new PostgresEmailOtpStore(accountPool!) : new InMemoryEmailOtpStore());
+  const resolveClientIp = (request: FastifyRequest) => resolveTrustedClientIp(request, env).ip;
+
   if (oidcEnabled) {
     const loginContext = {
       policy: options.humanTermsPolicy ?? currentHumanTermsPolicy,
       pendingAuthorization: async (id: string) =>
         options.engine?.mcpOAuth?.pendingAuthorization(id),
     };
-    await registerHumanLogin(app, {
-      ...loginContext,
-      publicOrigin: publicUrl.origin,
-      cookieOptions,
-      authorize: async (intent, reply) => {
-        const verifier = oidc.randomPKCECodeVerifier(),
-          state = oidc.randomState(),
-          nonce = oidc.randomNonce();
-        reply.setCookie('og_oidc', oidcHumanTransaction(intent, { verifier, state, nonce }), {
-          ...cookieOptions,
-          maxAge: 600,
-          signed: true,
-        });
-        return sendOidcHandoff(
-          reply,
-          oidc.buildAuthorizationUrl(await config(), {
-            redirect_uri: new URL('/auth/callback', publicUrl).href,
-            scope: 'openid profile email',
-            code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
-            code_challenge_method: 'S256',
-            state,
-            nonce,
-          }),
-        );
-      },
-    });
-    app.get('/auth/callback', { errorHandler: humanLoginError }, async (request, reply) => {
-      reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
-      reply.clearCookie('og_mcp_consent', { path: '/' });
-      reply.clearCookie('og_oidc', { path: '/' });
-      reply.clearCookie('og_login_intent', { path: '/' });
-      const transaction = await readHumanLoginTransaction(request, reply, loginContext);
-      const tokens = await oidc.authorizationCodeGrant(
-        await config(),
-        new URL(request.url, publicUrl),
-        {
-          pkceCodeVerifier: transaction.verifier,
-          expectedState: transaction.state,
-          expectedNonce: transaction.nonce,
-          idTokenExpected: true,
-        },
-      );
-      const claims = tokens.claims();
-      if (typeof claims?.sub !== 'string' || !claims.sub || typeof claims.iss !== 'string')
-        throw unauthorized();
-      await validateHumanLoginIntent(transaction.continueIntent, request, loginContext);
+
+    const completeHumanSignIn = async (
+      request: FastifyRequest,
+      reply: FastifyReply,
+      continueIntent: HumanLoginIntent,
+      claims: Record<string, unknown> & { iss: string; sub: string },
+      verificationMethod: TermsVerificationMethod,
+      redirectCode: 302 | 303 = 302,
+    ) => {
+      await validateHumanLoginIntent(continueIntent, request, loginContext);
       const principal = await store().identity(claims.iss, claims.sub);
-      // The library verified these signed email-scoped claims above. Never feed
-      // request JSON or an arbitrary bearer token's omitted email into this hook.
+      // Only verified server-authenticated identity claims enter this hook.
       if (options.engine?.notificationEmail && principal.membershipId) {
         const verifiedEmail = notificationEmailIdentityFromVerifiedOidcClaims(claims);
-        // identity() chooses the personal workspace. Bind the same freshly
-        // verified identity only to its currently accepted own memberships, so
-        // team email does not depend on guessing an address during switching.
         for (const membership of await store().listWorkspaces(principal)) {
           if (
             !membership.accepted_at ||
@@ -554,24 +608,27 @@ export async function registerAccounts(
               );
             else await options.engine.notificationEmail.clearVerifiedRecipient(recipientActor);
           } catch (error) {
-            // An unrelated team membership can be removed after enumeration.
-            // That member stays unavailable for email; it cannot block sign-in.
             if ((error as { code?: string }).code !== 'notification_member_required') throw error;
           }
         }
       }
-      await validateHumanLoginIntent(transaction.continueIntent, request, loginContext);
-      const policy = transaction.continueIntent.policy;
-      if (policy.status === 'active')
-        await new TermsReceiptStore(store().pool).recordVerifiedAcceptance({
+      await validateHumanLoginIntent(continueIntent, request, loginContext);
+      const policy = continueIntent.policy;
+      if (policy.status === 'active') {
+        const acceptance = {
           issuer: claims.iss,
           subject: claims.sub,
           policyVersion: policy.version,
           policyDigest: policy.digest,
-        });
-      // Claim any operator-queued email credits strictly after openid-client verified
-      // signature, nonce, issuer and boolean email_verified === true. A failed claim
-      // rolls back its transaction and leaves credits unclaimed without blocking sign-in.
+        };
+        if (verificationMethod === 'oidc-verified')
+          await new TermsReceiptStore(store().pool).recordVerifiedAcceptance(acceptance);
+        else
+          await new TermsReceiptStore(store().pool).recordVerifiedAcceptance(
+            acceptance,
+            verificationMethod,
+          );
+      }
       if (options.engine?.pendingEmailCredits) {
         const verifiedCreditEmail = pendingEmailCreditIdentityFromVerifiedOidcClaims(claims);
         if (verifiedCreditEmail) {
@@ -589,15 +646,302 @@ export async function registerAccounts(
         }
       }
       const session = await store().createSession(principal);
-      // Recheck after asynchronous account/receipt/session work, before any MCP return or cookie issuance.
-      await validateHumanLoginIntent(transaction.continueIntent, request, loginContext);
+      // Recheck after asynchronous account/receipt/session work, before any return or cookie issuance.
+      await validateHumanLoginIntent(continueIntent, request, loginContext);
+      reply.clearCookie('og_email_otp', { path: '/' });
+      reply.clearCookie('og_oidc', { path: '/' });
+      reply.clearCookie('og_login_intent', { path: '/' });
+      reply.clearCookie('og_mcp_consent', { path: '/' });
       reply.setCookie('og_session', session, cookieOptions);
-      const consentRequest = transaction.continueIntent.consentRequest;
+      const consentRequest = continueIntent.consentRequest;
       if (consentRequest)
         return reply.redirect(
           new URL(`/oauth/consent?request=${encodeURIComponent(consentRequest)}`, publicUrl).href,
+          redirectCode,
         );
-      return reply.redirect(new URL('/app#start', publicUrl).href);
+      const safeReturn =
+        continueIntent.returnTo && validateSafeReturnTo(continueIntent.returnTo)
+          ? continueIntent.returnTo
+          : '/app#start';
+      return reply.redirect(new URL(safeReturn, publicUrl).href, redirectCode);
+    };
+
+    await registerHumanLogin(app, {
+      ...loginContext,
+      publicOrigin: publicUrl.origin,
+      cookieOptions,
+      providers: authProviders,
+      resolveClientIp,
+      ...(oidcProviderEnabled
+        ? {
+            authorize: async (intent, reply) => {
+              const verifier = oidc.randomPKCECodeVerifier(),
+                state = oidc.randomState(),
+                nonce = oidc.randomNonce();
+              reply.setCookie('og_oidc', oidcHumanTransaction(intent, { verifier, state, nonce }), {
+                ...cookieOptions,
+                maxAge: 600,
+                signed: true,
+              });
+              return sendOidcHandoff(
+                reply,
+                oidc.buildAuthorizationUrl(await config(), {
+                  redirect_uri: new URL('/auth/callback', publicUrl).href,
+                  scope: 'openid profile email',
+                  code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
+                  code_challenge_method: 'S256',
+                  state,
+                  nonce,
+                }),
+              );
+            },
+          }
+        : {}),
+      ...(githubConfig
+        ? {
+            authorizeGitHub: async (intent, reply) => {
+              const verifier = oidc.randomPKCECodeVerifier(),
+                state = oidc.randomState(),
+                nonce = oidc.randomNonce();
+              reply.setCookie(
+                'og_oidc',
+                oidcHumanTransaction(intent, {
+                  provider: 'github',
+                  verifier,
+                  state,
+                  nonce,
+                }),
+                {
+                  ...cookieOptions,
+                  maxAge: 600,
+                  signed: true,
+                },
+              );
+              return sendOidcHandoff(
+                reply,
+                buildGitHubAuthorizationUrl(githubConfig, {
+                  redirectUri: new URL('/auth/callback', publicUrl).href,
+                  state,
+                  codeVerifier: verifier,
+                }),
+              );
+            },
+          }
+        : {}),
+      ...(emailOtpConfig
+        ? {
+            sendEmailOtp: async ({
+              intent,
+              email,
+              request,
+              reply,
+              makeActionToken,
+              makeVerifyActionToken,
+            }) => {
+              const normalized = normalizeOtpEmail(email);
+              if (!normalized) {
+                return reply
+                  .code(400)
+                  .type('text/html; charset=utf-8')
+                  .send(
+                    renderHumanLoginNotice(intent.policy, makeActionToken(intent), {
+                      providers: authProviders,
+                      returnTo: intent.consentRequest ? null : intent.returnTo,
+                      errorMessage: 'Enter a valid email address to receive a sign-in code.',
+                    }),
+                  );
+              }
+              const emailHash = hashOtpEmail(normalized);
+              const clientIp = resolveClientIp(request);
+              const limit = await emailOtpStore.checkSendLimit(emailHash, clientIp);
+              if (!limit.allowed) throw emailOtpRateLimitedError(limit.retryAfterSeconds);
+
+              const code = generateOtpCode();
+              const expires = Math.min(Date.now() + EMAIL_OTP_TTL_MS, intent.expires);
+              const created = await emailOtpStore.createChallenge({
+                emailHash,
+                code,
+                secret: emailOtpConfig.secret,
+                expiresAt: expires,
+              });
+              try {
+                await deliverEmailOtpCode(emailOtpConfig, {
+                  to: normalized,
+                  code,
+                  publicOrigin: publicUrl.origin,
+                });
+              } catch (error) {
+                await emailOtpStore.revokeChallenge(created.challengeId).catch(() => undefined);
+                throw error;
+              }
+              const challengeCookie = {
+                challengeId: created.challengeId,
+                email: normalized,
+                expires: created.expiresAt,
+                continueIntent: intent,
+              };
+              const maxAge = Math.max(1, Math.ceil((created.expiresAt - Date.now()) / 1000));
+              reply.clearCookie('og_login_intent', { path: '/' });
+              reply.setCookie('og_email_otp', encodeEmailOtpCookie(challengeCookie), {
+                ...cookieOptions,
+                maxAge,
+                signed: true,
+              });
+              return reply.type('text/html; charset=utf-8').send(
+                renderEmailOtpVerifyNotice({
+                  maskedEmail: maskEmailAddress(normalized),
+                  actionToken: makeVerifyActionToken(challengeCookie),
+                  returnTo: intent.consentRequest ? null : intent.returnTo,
+                }),
+              );
+            },
+            verifyEmailOtp: async ({ challenge, code, request, reply, makeVerifyActionToken }) => {
+              const verifyLimit = await emailOtpStore.checkVerifyLimit(resolveClientIp(request));
+              if (!verifyLimit.allowed)
+                throw emailOtpRateLimitedError(verifyLimit.retryAfterSeconds);
+              const normalizedEmail = normalizeOtpEmail(challenge.email);
+              if (!normalizedEmail) throw unauthorized();
+              const emailHash = hashOtpEmail(normalizedEmail);
+              const trimmedCode = code.replace(/\s+/g, '');
+              const result = /^\d{6}$/.test(trimmedCode)
+                ? await emailOtpStore.verifyAndConsume({
+                    challengeId: challenge.challengeId,
+                    emailHash,
+                    code: trimmedCode,
+                    secret: emailOtpConfig.secret,
+                  })
+                : await emailOtpStore.verifyAndConsume({
+                    challengeId: challenge.challengeId,
+                    emailHash,
+                    code: 'invalid-format',
+                    secret: emailOtpConfig.secret,
+                  });
+              if (result.status === 'invalid') {
+                return reply
+                  .code(401)
+                  .type('text/html; charset=utf-8')
+                  .send(
+                    renderEmailOtpVerifyNotice({
+                      maskedEmail: maskEmailAddress(normalizedEmail),
+                      actionToken: makeVerifyActionToken(challenge),
+                      returnTo: challenge.continueIntent.consentRequest
+                        ? null
+                        : challenge.continueIntent.returnTo,
+                      errorMessage:
+                        'That sign-in code is incorrect. Check your email and try again.',
+                    }),
+                  );
+              }
+              if (result.status !== 'ok') {
+                reply.clearCookie('og_email_otp', { path: '/' });
+                return reply
+                  .code(401)
+                  .type('text/html; charset=utf-8')
+                  .send(
+                    renderEmailOtpTerminalNotice({
+                      reason: result.status,
+                      consentRequest: challenge.continueIntent.consentRequest,
+                      returnTo: challenge.continueIntent.consentRequest
+                        ? null
+                        : challenge.continueIntent.returnTo,
+                    }),
+                  );
+              }
+              reply.header('Referrer-Policy', 'no-referrer');
+              return completeHumanSignIn(
+                request,
+                reply,
+                challenge.continueIntent,
+                {
+                  iss: emailOtpConfig.issuer,
+                  sub: emailOtpSubject(normalizedEmail),
+                  email: normalizedEmail,
+                  email_verified: true,
+                },
+                'email-otp-verified',
+                303,
+              );
+            },
+          }
+        : {}),
+    });
+
+    await app.register(async (authCallback) => {
+      await authCallback.register(rateLimit, {
+        global: true,
+        max: 60,
+        timeWindow: '1 minute',
+        keyGenerator: resolveClientIp,
+        errorResponseBuilder: (_request, context) =>
+          Object.assign(new Error('Too many sign-in attempts. Wait a few minutes and try again.'), {
+            statusCode: 429,
+            code: 'rate_limited',
+            retryAfterSeconds: Math.max(1, Math.ceil(context.ttl / 1000)),
+          }),
+      });
+      authCallback.get(
+        '/auth/callback',
+        { errorHandler: humanLoginError },
+        async (request, reply) => {
+          reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
+          reply.clearCookie('og_mcp_consent', { path: '/' });
+          reply.clearCookie('og_oidc', { path: '/' });
+          reply.clearCookie('og_login_intent', { path: '/' });
+          const transaction = await readHumanLoginTransaction(request, reply, loginContext);
+          const callbackUrl = new URL(request.url, publicUrl);
+
+          if (transaction.provider === 'github') {
+            if (!githubConfig) throw unauthorized();
+            const claims = await exchangeGitHubCode(githubConfig, {
+              callbackUrl,
+              redirectUri: new URL('/auth/callback', publicUrl).href,
+              expectedState: transaction.state,
+              codeVerifier: transaction.verifier,
+              fetchImpl: options.githubFetch,
+            });
+            return completeHumanSignIn(
+              request,
+              reply,
+              transaction.continueIntent,
+              { ...claims },
+              'github-oauth-verified',
+              302,
+            );
+          }
+
+          if (!oidcProviderEnabled) throw unauthorized();
+          const tokens = await oidc.authorizationCodeGrant(await config(), callbackUrl, {
+            pkceCodeVerifier: transaction.verifier,
+            expectedState: transaction.state,
+            expectedNonce: transaction.nonce,
+            idTokenExpected: true,
+          });
+          const claims = tokens.claims();
+          if (typeof claims?.sub !== 'string' || !claims.sub || typeof claims.iss !== 'string')
+            throw unauthorized();
+          return completeHumanSignIn(
+            request,
+            reply,
+            transaction.continueIntent,
+            claims as Record<string, unknown> & { iss: string; sub: string },
+            'oidc-verified',
+            302,
+          );
+        },
+      );
+    });
+  } else if (
+    env.OPENGEN_EMAIL_OTP_ENABLED?.trim().toLowerCase() === '1' ||
+    env.OPENGEN_EMAIL_OTP_ENABLED?.trim().toLowerCase() === 'true'
+  ) {
+    // Explicitly surface unavailable when Email OTP was requested without email delivery credentials.
+    app.route({
+      method: ['GET', 'POST'],
+      url: '/auth/login',
+      errorHandler: humanLoginError,
+      handler: async () => {
+        throw emailOtpUnavailableError();
+      },
     });
   }
   return {
@@ -606,5 +950,6 @@ export async function registerAccounts(
       authenticate({ headers: {}, cookies: request.cookies }, null),
     oauthEnabled: Boolean(options.engine?.mcpOAuth || oauth),
     oidcEnabled,
+    authProviders,
   };
 }

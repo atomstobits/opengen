@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createForwarder } from '../apps/web/app/proxy';
 import { registeredBackendPath, nativeRoute } from '../apps/web/app/registered-http';
 import { GET, POST } from '../apps/web/app/auth/login/route';
+import { CLIENT_IP_PROOF_HEADER, verifyClientIpProof } from '../apps/server/src/client-ip.js';
 
 const { routeForward } = vi.hoisted(() => ({ routeForward: vi.fn() }));
 vi.mock('../apps/web/app/proxy', async (importOriginal) => ({
@@ -367,5 +368,101 @@ describe('human Terms notice frontend transport', () => {
       expect((await f.forward(post(), path)).status).toBe(404);
     expect(f.request).not.toHaveBeenCalled();
     expect(f.transport).not.toHaveBeenCalled();
+  });
+
+  it('signs trusted client IP proofs for auth and trial-credit routes without trusting caller forwarding headers', async () => {
+    const secret = 'p'.repeat(40);
+    const fixedNow = 1_800_000_000_000;
+    const requestMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+    const vercelForward = createForwarder({
+      env: {
+        NODE_ENV: 'test',
+        MEDIA_ROUTER_API_URL: backend,
+        VERCEL: '1',
+        OPENGEN_PROXY_CLIENT_SECRET: secret,
+      },
+      request: requestMock,
+      transport: vi.fn(async () => 'service-identity-fixture'),
+      now: () => fixedNow,
+    });
+
+    // Caller spoofs x-forwarded-for & x-opengen-client-ip-proof; Vercel sets x-vercel-forwarded-for.
+    const res = await vercelForward(
+      post(sample, {
+        'x-forwarded-for': '203.0.113.99',
+        'x-opengen-client-ip-proof': 'v1.1800000000.Zm9yZ2Vk.forged',
+        'x-vercel-forwarded-for': '198.51.100.42',
+      }),
+      '/auth/login',
+    );
+    expect(res.status).toBe(204);
+    const sent = new Headers(requestMock.mock.calls[0]?.[1]?.headers);
+    expect(sent.has('x-forwarded-for')).toBe(false);
+    expect(sent.has('x-vercel-forwarded-for')).toBe(false);
+    const proof = sent.get(CLIENT_IP_PROOF_HEADER);
+    expect(proof).toBeTruthy();
+    expect(
+      verifyClientIpProof({
+        proof,
+        secret,
+        method: 'POST',
+        pathname: '/auth/login',
+        nowMs: fixedNow,
+      }),
+    ).toBe('198.51.100.42');
+    // Proof is bound to method and pathname: cannot be replayed on GET or another endpoint.
+    expect(
+      verifyClientIpProof({
+        proof,
+        secret,
+        method: 'GET',
+        pathname: '/auth/login',
+        nowMs: fixedNow,
+      }),
+    ).toBeNull();
+    expect(
+      verifyClientIpProof({
+        proof,
+        secret,
+        method: 'POST',
+        pathname: '/v1/billing/trial-credit',
+        nowMs: fixedNow,
+      }),
+    ).toBeNull();
+
+    // Non-Vercel env without OPENGEN_TRUSTED_CLIENT_IP_HEADER ignores caller forwarding headers entirely.
+    requestMock.mockClear();
+    const unconfiguredForward = createForwarder({
+      env: {
+        NODE_ENV: 'test',
+        MEDIA_ROUTER_API_URL: backend,
+        OPENGEN_PROXY_CLIENT_SECRET: secret,
+      },
+      request: requestMock,
+      transport: vi.fn(async () => 'service-identity-fixture'),
+      now: () => fixedNow,
+    });
+    await unconfiguredForward(
+      post(sample, {
+        'x-forwarded-for': '203.0.113.99',
+        'x-vercel-forwarded-for': '198.51.100.42',
+        'x-opengen-client-ip-proof': 'v1.1800000000.Zm9yZ2Vk.forged',
+      }),
+      '/auth/login',
+    );
+    const unconfiguredSent = new Headers(requestMock.mock.calls[0]?.[1]?.headers);
+    expect(unconfiguredSent.has(CLIENT_IP_PROOF_HEADER)).toBe(false);
+    expect(unconfiguredSent.has('x-forwarded-for')).toBe(false);
+
+    // Non-auth endpoints do not emit client-IP proof headers.
+    requestMock.mockClear();
+    await vercelForward(
+      new Request(`${publicOrigin}/health`, {
+        headers: { 'x-vercel-forwarded-for': '198.51.100.42' },
+      }),
+      '/health',
+    );
+    const healthSent = new Headers(requestMock.mock.calls[0]?.[1]?.headers);
+    expect(healthSent.has(CLIENT_IP_PROOF_HEADER)).toBe(false);
   });
 });

@@ -13,6 +13,7 @@ import {
   type LatencyPercentile,
 } from './ui';
 import { playgroundHref } from './links';
+import { usePublicOrigin } from './public-origin';
 
 export function SeriesProviders({
   catalog,
@@ -23,6 +24,8 @@ export function SeriesProviders({
   models: Model[];
   selectedVariant?: string;
 }) {
+  const publicOrigin = usePublicOrigin();
+  const llmsUrl = new URL('/llms.txt', publicOrigin).href;
   const metrics = useRouteMetrics();
   const [percentile, setPercentile] = useState<LatencyPercentile>('p50');
   const variants = models.map((model) => ({
@@ -48,6 +51,10 @@ export function SeriesProviders({
       </p>
       <div className="variant-sections">
         {variants.map(({ model, routes }) => {
+          const defaultOperation =
+            routes[0]?.operations[0] ??
+            (model.modality === 'video' ? 'text-to-video' : 'text-to-image');
+          const agentPrompt = `Set up OpenGen - ${llmsUrl}\nUse exact model "${model.id}" (${defaultOperation}). Inspect its schema with catalog_get / models.schema, quote my request first, and wait for my approval before generating.`;
           return (
             <section
               key={model.id}
@@ -78,9 +85,19 @@ export function SeriesProviders({
                     <CopyButton text={model.id} label="Copy model ID" />
                   </div>
                 </div>
-                <a className="button button-outline" href={playgroundHref(model.id)}>
-                  Try this variant <Icon name="arrow" size={14} />
-                </a>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <CopyButton text={agentPrompt} label="Copy for your agent" />
+                  <a className="button button-outline" href={playgroundHref(model.id)}>
+                    Try this variant <Icon name="arrow" size={14} />
+                  </a>
+                </div>
               </div>
               <p className="variant-description">{model.description}</p>
               <div className="variant-facts">

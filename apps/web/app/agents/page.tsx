@@ -66,12 +66,21 @@ export default function AgentsPage() {
           </div>
         </section>
         <section className={styles.notice} aria-labelledby="verification-note">
-          <strong id="verification-note">Setup guides, with the evidence attached.</strong>
+          <strong id="verification-note">
+            Hosted gateway is live; client verification stays explicit.
+          </strong>
           <p>
-            Reviewed {AGENT_REVIEW_DATE}. OpenGen’s authorization and CLI have local protocol
-            fixtures. Third-party client versions have not been verified end to end. Hosted sign-in
-            and generation need a configured deployment; a guide is not a claim that the public
-            service is ready.
+            Hosted sign-in, workspace billing, and live-verified official routes are live on{' '}
+            <code>https://opengen.dev</code> (self-hosted gateways need their own configured
+            identity and provider credentials). Third-party client guides were reviewed{' '}
+            {AGENT_REVIEW_DATE} from official documentation; OpenGen’s authorization and CLI are
+            covered by local protocol fixtures, while third-party client versions have not yet been
+            verified end to end.
+          </p>
+          <p>
+            New personal workspaces start with $0 managed credit — discovery and quotes are free.{' '}
+            <a href="/billing">Add workspace credit ↗</a> or connect your own provider keys when you
+            are ready to generate.
           </p>
           <a href="#support-matrix">See the support matrix ↓</a>
           <p>

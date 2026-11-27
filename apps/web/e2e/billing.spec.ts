@@ -22,15 +22,22 @@ const payment = (status: PaymentOrder['status'] = 'created'): PaymentOrder => ({
   creditedAt: status === 'credited' ? '2026-11-03T12:01:00Z' : null,
 });
 
-async function billingFixture(page: Page, baseURL: string | undefined) {
+async function billingFixture(
+  page: Page,
+  baseURL: string | undefined,
+  fixtureWorkspaceId = workspaceId,
+) {
   if (!baseURL) throw new Error('Billing browser fixtures require the local Playwright base URL.');
   const origin = new URL(baseURL).origin;
+  const fixtureRecoveryKey = `opengen.billing.v1:${fixtureWorkspaceId}`;
   const state = {
     authenticated: true,
     oidcEnabled: false,
     recoveryScope: undefined as string | undefined,
     capabilities: null as BillingCapabilities | null,
     accessReads: [] as string[],
+    ownerEnrolls: 0,
+    trialClaims: 0,
     privateReads: [] as string[],
     enabled: true,
     newFunding: undefined as BillingSummary['newFunding'],
@@ -80,9 +87,19 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
       await route.fulfill({
         json: {
           authenticated: state.authenticated,
-          workspaceId,
+          workspaceId: fixtureWorkspaceId,
           oidcEnabled: state.oidcEnabled,
           recoveryScope: state.recoveryScope,
+        },
+      });
+      return;
+    }
+    if (url.pathname === '/api/balance') {
+      await route.fulfill({
+        json: {
+          availableMicros: state.trialClaims > 0 ? 1_000_000 : 0,
+          reservedMicros: 0,
+          currency: 'USD',
         },
       });
       return;
@@ -101,7 +118,7 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
     }
     const headers = await request.allHeaders();
     expect(state.authenticated).toBe(true);
-    expect(headers['x-opengen-workspace']).toBe(workspaceId);
+    expect(headers['x-opengen-workspace']).toBe(fixtureWorkspaceId);
     expect(headers['cookie']).toContain('og_session=fixture-billing-session');
     expect(headers['authorization']).toBeUndefined();
     if (state.recoveryScope) expect(headers['x-opengen-recovery-scope']).toBe(state.recoveryScope);
@@ -111,7 +128,7 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
         state.capabilities
           ? {
               json: {
-                workspaceId,
+                workspaceId: fixtureWorkspaceId,
                 recoveryScope: state.recoveryScope,
                 capabilities: {
                   read: state.capabilities.read,
@@ -120,6 +137,9 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
                 },
                 ...(state.capabilities.ownerEnrollment
                   ? { ownerEnrollment: state.capabilities.ownerEnrollment }
+                  : {}),
+                ...(state.capabilities.trialCredit
+                  ? { trialCredit: state.capabilities.trialCredit }
                   : {}),
               },
             }
@@ -139,8 +159,49 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
         termsVersion: state.capabilities?.ownerEnrollment?.terms.version ?? '',
         acceptedTerms: true,
       });
-      state.capabilities = { read: true, manage: true, setup: true };
-      await route.fulfill({ json: { workspaceId, authorityVersion: 1 } });
+      state.ownerEnrolls++;
+      state.capabilities = {
+        read: true,
+        manage: true,
+        setup: true,
+        ...(state.capabilities?.trialCredit ? { trialCredit: state.capabilities.trialCredit } : {}),
+      };
+      await route.fulfill({ json: { workspaceId: fixtureWorkspaceId, authorityVersion: 1 } });
+      return;
+    }
+    if (url.pathname === '/api/billing/trial-credit' && request.method() === 'POST') {
+      expect(request.postDataJSON()).toEqual({});
+      state.trialClaims++;
+      const amountMicros = state.capabilities?.trialCredit?.amountMicros ?? 1_000_000;
+      const alreadyClaimed = state.trialClaims > 1;
+      if (state.capabilities?.trialCredit) {
+        state.capabilities = {
+          ...state.capabilities,
+          trialCredit: {
+            enabled: true,
+            amountMicros,
+            claimed: true,
+            eligible: false,
+            claimedAmountMicros: amountMicros,
+            claimedAt: '2026-11-27T00:00:00.000Z',
+            reason: 'already-claimed',
+          },
+        };
+      }
+      await route.fulfill({
+        status: alreadyClaimed ? 200 : 201,
+        json: {
+          workspaceId: fixtureWorkspaceId,
+          claimed: true,
+          alreadyClaimed,
+          amountMicros,
+          ledgerId: '24250436-0606-4da0-9877-b65fe61d78de',
+          reference: 'trial-credit:v1:fixture',
+          claimedAt: '2026-11-27T00:00:00.000Z',
+          promotional: true,
+          refundable: false,
+        },
+      });
       return;
     }
     if (
@@ -155,10 +216,10 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
         json:
           url.pathname === '/api/billing/policy'
             ? {
-                workspaceId,
+                workspaceId: fixtureWorkspaceId,
                 policy: {
                   ...BILLING_POLICY_DEFAULTS,
-                  workspaceId,
+                  workspaceId: fixtureWorkspaceId,
                   version: 0,
                   ownerAuthorityVersion: null,
                   updatedAt: null,
@@ -171,7 +232,7 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
                 terms: null,
                 mandate: null,
               }
-            : { workspaceId, data: [], nextCursor: null },
+            : { workspaceId: fixtureWorkspaceId, data: [], nextCursor: null },
       });
       return;
     }
@@ -180,7 +241,7 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
       const summary: BillingSummary = {
         enabled: state.enabled,
         newFunding: state.newFunding,
-        workspaceId,
+        workspaceId: fixtureWorkspaceId,
         currency: 'USD',
         minAmountCents: 500,
         maxAmountCents: 999900,
@@ -197,11 +258,11 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
       const persisted = (await page.evaluate((name) => {
         const value = localStorage.getItem(name);
         return value ? JSON.parse(value) : null;
-      }, recoveryKey)) as PendingTopUp | null;
+      }, fixtureRecoveryKey)) as PendingTopUp | null;
       // Observe real browser storage at request interception, before the server accepts anything.
       expect(persisted).toMatchObject({
         version: 1,
-        workspaceId,
+        workspaceId: fixtureWorkspaceId,
         amountCents,
         idempotencyKey: key,
       });
@@ -210,7 +271,13 @@ async function billingFixture(page: Page, baseURL: string | undefined) {
       if (!id) {
         id = `fb9b9f71-8a08-4df5-8888-${String(state.keys.size + 1).padStart(12, '0')}`;
         state.keys.set(key, id);
-        state.orders.set(id, { ...payment(), id, amountCents, creditMicros: amountCents * 10000 });
+        state.orders.set(id, {
+          ...payment(),
+          workspaceId: fixtureWorkspaceId,
+          id,
+          amountCents,
+          creditMicros: amountCents * 10000,
+        });
       }
       if (state.abortNextCreate) {
         state.abortNextCreate = false;
@@ -565,6 +632,154 @@ for (const viewport of [
       expect(f.creates[0]?.amountCents).toBe(2500);
       expect(f.hostedVisits).toBe(1);
       expect(f.unexpected).toEqual([]);
+    });
+
+    test('a solo personal workspace completes funding-owner consent and first Stripe checkout in one step', async ({
+      page,
+      baseURL,
+    }) => {
+      const personalWorkspace = 'user-personal-fixture';
+      const f = await billingFixture(page, baseURL, personalWorkspace);
+      f.recoveryScope = 'member-personal-fresh-v1';
+      f.capabilities = {
+        read: false,
+        manage: false,
+        setup: false,
+        ownerEnrollment: {
+          eligible: true,
+          expectedAuthorityVersion: 0,
+          terms: {
+            version: 'hosted-manual-prepaid-v1-2026-11-16',
+            text: 'Manual prepaid USD top-ups only; no automatic recurring charges.',
+          },
+        },
+      };
+      await page.goto('/billing');
+      await expect(page.getByRole('link', { name: '← Your workspace' })).toHaveAttribute(
+        'href',
+        '/app#start',
+      );
+      await expect(page.getByText('STARTER TRIAL CREDIT')).toHaveCount(0);
+      await page.getByRole('button', { name: '$10.00', exact: true }).click();
+      await expect(page.getByLabel('Payment breakdown')).toContainText('$0.61');
+      await expect(page.getByLabel('Payment breakdown')).toContainText('$10.61');
+      const cta = page.getByRole('button', {
+        name: /Enable prepaid billing & continue to Stripe · \$10\.61 ↗/,
+      });
+      await expect(cta).toBeDisabled();
+      await page.getByRole('checkbox').check();
+      await expect(cta).toBeEnabled();
+      await cta.click();
+      await expect(page).toHaveURL(checkoutUrl);
+      await expect(page.getByRole('heading', { name: 'Fixture hosted checkout' })).toBeVisible();
+      expect(f.ownerEnrolls).toBe(1);
+      expect(f.creates).toHaveLength(1);
+      expect(f.creates[0]?.amountCents).toBe(1000);
+      expect(f.checkouts).toHaveLength(1);
+      expect(f.hostedVisits).toBe(1);
+      expect(f.unexpected).toEqual([]);
+    });
+
+    test('a lost order create after 1-step personal enrollment transitions cleanly to recovery without re-enrolling', async ({
+      page,
+      baseURL,
+    }) => {
+      const personalWorkspace = 'user-personal-recovery';
+      const f = await billingFixture(page, baseURL, personalWorkspace);
+      f.recoveryScope = 'member-personal-recovery-v1';
+      f.abortNextCreate = true;
+      f.capabilities = {
+        read: false,
+        manage: false,
+        setup: false,
+        ownerEnrollment: {
+          eligible: true,
+          expectedAuthorityVersion: 0,
+          terms: {
+            version: 'hosted-manual-prepaid-v1-2026-11-16',
+            text: 'Manual prepaid USD top-ups only.',
+          },
+        },
+      };
+      await page.goto('/billing');
+      await page.getByRole('checkbox').check();
+      await page
+        .getByRole('button', { name: /Enable prepaid billing & continue to Stripe/ })
+        .click();
+      await expect(
+        page
+          .getByRole('alert')
+          .filter({ hasText: 'Resume or refresh this top-up before starting another.' }),
+      ).toBeVisible();
+      expect(f.ownerEnrolls).toBe(1);
+      expect(f.creates).toHaveLength(1);
+      const firstKey = f.creates[0]!.key;
+      await page.getByRole('button', { name: /Resume this top-up/ }).click();
+      await expect(page).toHaveURL(checkoutUrl);
+      expect(f.ownerEnrolls).toBe(1);
+      expect(f.creates).toHaveLength(2);
+      expect(f.creates[1]!.key).toBe(firstKey);
+      expect(f.hostedVisits).toBe(1);
+      expect(f.unexpected).toEqual([]);
+    });
+
+    test('enabled starter trial credit can be claimed once from /billing', async ({
+      page,
+      baseURL,
+    }) => {
+      const personalWorkspace = 'user-trial-fixture';
+      const f = await billingFixture(page, baseURL, personalWorkspace);
+      f.recoveryScope = 'member-trial-v1';
+      f.capabilities = {
+        read: false,
+        manage: false,
+        setup: false,
+        ownerEnrollment: {
+          eligible: true,
+          expectedAuthorityVersion: 0,
+          terms: {
+            version: 'hosted-manual-prepaid-v1-2026-11-16',
+            text: 'Manual prepaid USD top-ups only.',
+          },
+        },
+        trialCredit: {
+          enabled: true,
+          amountMicros: 1_000_000,
+          claimed: false,
+          eligible: true,
+        },
+      };
+      await page.goto('/billing');
+      const claimBtn = page.getByRole('button', { name: 'Claim $1.00 starter credit' });
+      await expect(claimBtn).toBeVisible();
+      await claimBtn.click();
+      await expect(page.getByText('$1.00 starter credit claimed')).toBeVisible();
+      await expect(
+        page.getByText('$1.00 starter credit added to your personal workspace.'),
+      ).toBeVisible();
+      expect(f.trialClaims).toBe(1);
+      expect(f.unexpected).toEqual([]);
+    });
+
+    test('public /pricing page renders transparent pricing without advertising disabled trial credit', async ({
+      page,
+    }) => {
+      await page.goto('/pricing');
+      await expect(page.getByRole('heading', { name: /Pay only for generation/i })).toBeVisible();
+      await expect(page.getByRole('columnheader', { name: 'US fee (2.9% + $0.30)' })).toBeVisible();
+      await expect(
+        page.getByRole('columnheader', { name: 'Intl saved card (4.4% + $0.30)' }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: /Quote → Hold → Actual settlement or release/ }),
+      ).toBeVisible();
+      await expect(page.getByText('Live-verified').first()).toBeVisible();
+      await expect(page.getByText('Documented').first()).toBeVisible();
+      await expect(page.getByText('STARTER TRIAL CREDIT')).toHaveCount(0);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth,
+      );
+      expect(overflow).toBe(false);
     });
   });
 }

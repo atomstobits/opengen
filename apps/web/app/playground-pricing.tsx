@@ -280,6 +280,8 @@ export function PlaygroundPricing({
   onGenerate,
   submissionLabel = 'Generate',
   error,
+  creditNotice,
+  signInNotice,
 }: {
   catalog: Catalog;
   model: Model;
@@ -296,6 +298,14 @@ export function PlaygroundPricing({
   onGenerate: () => void;
   submissionLabel?: string;
   error: string;
+  creditNotice?: {
+    kind: 'zero-balance' | 'insufficient-balance';
+    billingHref: string;
+  };
+  signInNotice?: {
+    loginHref: string;
+    onNavigate?: () => void;
+  };
 }) {
   const selected = quote?.candidates.find((entry) => entry.routeId === quote.selectedRouteId);
   const active = routes.find((entry) => entry.id === (selected?.routeId ?? draft.routeId));
@@ -494,6 +504,39 @@ export function PlaygroundPricing({
           {error}
         </p>
       )}
+      {creditNotice && (
+        <div
+          className={styles.creditCallout}
+          data-testid="playground-credit-callout"
+          aria-live="polite"
+        >
+          <p>
+            <strong>
+              {creditNotice.kind === 'insufficient-balance'
+                ? 'Insufficient workspace credit for this request.'
+                : 'Your workspace has $0.00 available credit.'}
+            </strong>{' '}
+            {creditNotice.kind === 'insufficient-balance'
+              ? 'Top up your workspace credit, then get a fresh quote to submit again.'
+              : 'Add prepaid credit to run managed generations, or switch Pay with to your own provider account.'}
+          </p>
+          <a className={styles.creditAction} href={creditNotice.billingHref}>
+            Add workspace credit →
+          </a>
+        </div>
+      )}
+      {signInNotice && (
+        <div className={styles.signInCallout} data-testid="playground-signin-callout">
+          <p>Sign in to generate and keep your current Playground draft when you return.</p>
+          <a
+            className={styles.signInAction}
+            href={signInNotice.loginHref}
+            onClick={signInNotice.onNavigate}
+          >
+            Sign in to generate →
+          </a>
+        </div>
+      )}
       <div className={styles.actionDock}>
         <p className={styles.desktopStatus} role="status" aria-atomic="true">
           {error ? 'Review the request error above.' : readiness}
@@ -521,8 +564,8 @@ export function PlaygroundPricing({
           </button>
         </div>
         <nav className={styles.jumps} aria-label="Playground sections">
-          <a href="#playground-pricing">Pricing</a>
           <a href="#playground-input">Input</a>
+          <a href="#playground-pricing">Pricing</a>
           <a href="#playground-account">Account</a>
           <a href="#playground-result">
             Result{job ? ` · ${job.status.replaceAll('-', ' ')}` : ''}

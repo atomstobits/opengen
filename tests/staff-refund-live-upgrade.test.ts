@@ -476,7 +476,7 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
     expect(journal.slice(0, 29)).toEqual(oldJournal);
     expect(journal.map((row) => row.name)).toEqual(
-      Array.from({ length: 35 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
+      Array.from({ length: 36 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
     );
     expect(journal[29].checksum).toBe(sha256(await sql(30)));
     for (let i = 0; i < 29; i++) {
@@ -505,12 +505,18 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
           'mr_billing_payment_ownership_amount_cents_check',
           'mr_staff_refund_cases_original_amount_cents_check',
           'mr_staff_refund_cases_eligible_micros_check',
+          'mr_terms_receipts_method_check',
         ].includes(row.conname),
     );
     const retainedNames = new Set(retainedConstraints.map((row) => row.conname));
     expect(constraints.filter((row) => retainedNames.has(row.conname))).toEqual(
       retainedConstraints,
     );
+    const termsReceiptMethods = constraints.find(
+      (row) => row.conname === 'mr_terms_receipts_method_check',
+    )!.definition;
+    for (const method of ['oidc-verified', 'github-oauth-verified', 'email-otp-verified'])
+      expect(termsReceiptMethods).toContain(`'${method}'`);
     const feeSettlementShape = constraints.find(
       (row) => row.conname === 'mr_jobs_fee_settlement_shape',
     )!.definition;

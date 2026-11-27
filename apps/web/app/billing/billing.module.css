@@ -370,6 +370,85 @@
   line-height: 1.58;
   color: var(--on-light);
 }
+.oneStepEnrollment {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-on-light-subtle);
+}
+.trialCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin: 0 0 24px;
+  padding: 22px 26px;
+  border-radius: 8px;
+  background: var(--panel-stat);
+  color: var(--on-light);
+  box-shadow: 5px 5px 0 rgba(4, 19, 14, 0.55);
+}
+.trialCard :focus-visible {
+  outline: 2px solid var(--on-light);
+  outline-offset: 3px;
+}
+.trialCard .eyebrow {
+  color: var(--muted-on-light);
+}
+.trialCard h2 {
+  margin: 8px 0 6px;
+  font-family: var(--heading);
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+}
+.trialCard p {
+  margin: 0;
+  color: var(--muted-on-light);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+.trialCard a:not(.primary) {
+  color: var(--on-light);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.trialCardMuted {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin: 0 0 24px;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.trialCardMuted h2 {
+  margin: 6px 0 4px;
+  font-family: var(--heading);
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.trialCardMuted p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 64ch;
+}
+.trialCardMuted a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.trialError {
+  margin: 10px 0 0 !important;
+  color: #7d0c32 !important;
+  font-weight: 600;
+}
 .explanation {
   display: flex;
   flex-direction: column;
@@ -742,6 +821,16 @@
   .current {
     padding: 24px;
     display: block;
+  }
+  .trialCard,
+  .trialCardMuted {
+    display: block;
+    padding: 20px;
+  }
+  .trialCard .primary,
+  .trialCardMuted .secondary {
+    margin-top: 14px;
+    width: 100%;
   }
   .current .secondary {
     margin-top: 16px;

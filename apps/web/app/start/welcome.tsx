@@ -1,12 +1,19 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GatewayAccess, type BrowserSession } from '../gateway-access';
 import { SiteHeader, Footer } from '../ui';
-import { FirstSteps } from '../onboarding/journey';
 import styles from '../onboarding/onboarding.module.css';
+
 export function Welcome() {
   const [authenticated, setAuthenticated] = useState(false);
   const [session, setSession] = useState<BrowserSession | null>(null);
+  const readyToRedirect = authenticated && !session?.checkingAuthority;
+
+  useEffect(() => {
+    if (!readyToRedirect || typeof window === 'undefined') return;
+    window.location.replace('/app#start');
+  }, [readyToRedirect]);
+
   return (
     <>
       <SiteHeader />
@@ -21,17 +28,20 @@ export function Welcome() {
           workspace that keeps your work together.
         </p>
         <GatewayAccess onChange={setAuthenticated} onSession={setSession} />
-        {authenticated ? (
-          <>
+        {readyToRedirect ? (
+          <section className={styles.journey} aria-live="polite">
+            <p role="status">
+              Signed in to <strong>{session?.workspaceId ?? 'your workspace'}</strong> — taking you
+              to your workspace…
+            </p>
             <nav className={styles.nav} aria-label="Your account">
               <a className="button button-dark" href="/app#start">
-                Open your workspace ↗
+                Continue to your workspace ↗
               </a>
-              <a href="/app#activity">View activity ↗</a>
-              <a href="/app#team">Manage team ↗</a>
+              <a href="/playground">Create in browser ↗</a>
+              <a href="/billing">Credit &amp; billing ↗</a>
             </nav>
-            <FirstSteps workspaceId={session?.workspaceId} />
-          </>
+          </section>
         ) : (
           <nav className={styles.nav} aria-label="Explore OpenGen">
             <a href="/agents">Agent / CLI / API setup ↗</a>

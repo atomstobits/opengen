@@ -10,6 +10,7 @@ import { onboardingOutputs } from '../scripts/build-onboarding.mjs';
 import { packageOnboarding } from '../scripts/package-onboarding.mjs';
 import { agentSkill, agentEntry, imageToVideoGuide } from '@media-router/contracts';
 import { GET as webSkill } from '../apps/web/app/skill.md/route';
+import { GET as webLlms } from '../apps/web/app/llms.txt/route';
 import { GET as webGuide } from '../apps/web/app/guides/image-to-video.md/route';
 import { siteOrigin } from '../apps/web/app/seo';
 import { buildApp } from '../apps/server/src/app';
@@ -64,6 +65,19 @@ describe('private checkout-free onboarding release', () => {
       expect(await webSkill().text()).toBe(agentSkill(siteOrigin()));
       expect(await webGuide().text()).toBe(imageToVideoGuide(siteOrigin()));
       expect(imageToVideoGuide(origin)).toContain(origin);
+      const renderedEntry = agentEntry(origin);
+      expect(renderedEntry).toContain('## First 60 seconds');
+      expect(renderedEntry).toContain('openai/gpt-image-2');
+      expect(renderedEntry).toContain('bytedance/seedance-2.5');
+      expect(renderedEntry).toContain(`${origin}/billing`);
+      expect(renderedEntry).toContain('OPENGEN_API_URL');
+      expect(renderedEntry).not.toContain('/absolute/private/client');
+      const webIndex = await webLlms().text();
+      expect(webIndex).toContain('## First 60 seconds');
+      expect(webIndex).toContain('/docs/api');
+      expect(webIndex).toContain('/openapi.json');
+      expect(webIndex).toContain('/pricing');
+      expect(webIndex).toContain('/billing');
     } finally {
       await app.close();
     }

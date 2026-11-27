@@ -141,9 +141,22 @@ test('the separate playground quotes comparison-only routes and preserves a sele
   await expect(
     page.getByRole('heading', { level: 1, name: 'Bring your idea to life.' }),
   ).toBeVisible();
-  await expect(page.getByLabel('Choose generation model')).toHaveValue('alibaba/wan-3.0');
+  await expect(page.getByLabel('Choose generation model')).toHaveValue('openai/gpt-image-2');
   await expect(cards(page)).toHaveCount(0);
   await expect(page.getByRole('tablist', { name: 'Model view' })).toHaveCount(0);
+  await page
+    .getByLabel('Prompt', { exact: true })
+    .fill('Hand-thrown stoneware pitcher in crisp morning studio light.');
+  await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
+  const imagePricing = page.getByRole('region', { name: 'GPT Image 2 pricing' });
+  await expect(imagePricing.getByText('Quote details · 5 routes')).toBeVisible();
+  await expect(imagePricing).toContainText(
+    'No qualified adapter and regional credentials are configured.',
+  );
+  await expect(page.getByRole('button', { name: 'Generate', exact: true })).toBeDisabled();
+
+  await page.goto('/playground?model=alibaba%2Fwan-3.0');
+  await expect(page.getByLabel('Choose generation model')).toHaveValue('alibaba/wan-3.0');
   await page
     .getByLabel('Prompt', { exact: true })
     .fill('A quiet coastal road at sunrise, filmed in a slow tracking shot.');
@@ -160,8 +173,9 @@ test('the separate playground quotes comparison-only routes and preserves a sele
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   await expect(pricing.getByText('Quote details · 1 route')).toBeVisible();
   await expect(pricing).toContainText('Singapore');
-  expect(inputs).toHaveLength(2);
-  expect(inputs[1]).toMatchObject({
+  expect(inputs).toHaveLength(3);
+  expect(inputs[0]).toMatchObject({ modelId: 'openai/gpt-image-2', operation: 'text-to-image' });
+  expect(inputs[2]).toMatchObject({
     modelId: 'alibaba/wan-3.0',
     routeId: 'alibaba/ap-southeast-1/wan-3.0',
   });

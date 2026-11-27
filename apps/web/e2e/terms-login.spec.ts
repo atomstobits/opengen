@@ -95,7 +95,12 @@ for (const viewport of [
         'href',
         '/privacy',
       );
-      await expect(page.locator('script, [onclick], [onsubmit]')).toHaveCount(0);
+      await expect(page.locator('script, [onclick], [onsubmit], [style]')).toHaveCount(0);
+      await expect(page.getByRole('link', { name: 'OpenGen', exact: true })).toHaveAttribute(
+        'href',
+        '/',
+      );
+      await expect(page.locator('details summary')).toHaveText('Policy fingerprint');
       const form = page.locator('form');
       await expect(form).toHaveAttribute('method', 'post');
       await expect(form).toHaveAttribute('action', '/auth/login');

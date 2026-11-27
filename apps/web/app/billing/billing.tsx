@@ -2,15 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Footer, SiteHeader } from '../ui';
+import { buildLoginHref, notifyHeaderBalanceChanged } from '../header-session';
 import { useLegalPresentation } from '../legal/presentation';
 import type { BrowserSession } from '../gateway-access';
 import { hasWorkspaceAuthority, privateWorkspaceHeaders } from '../dashboard/activity-view';
 import { BillingPolicyPanel } from './policy-panel';
 import {
+  claimStarterTrialCredit,
   enrollBillingOwner,
   readBillingAccess,
   type BillingCapabilities,
   type BillingOwnerEnrollment,
+  type TrialCreditClaimResult,
+  type TrialCreditStatus,
 } from './policy-client';
 import {
   billingRequest,
@@ -26,8 +30,30 @@ import {
 } from './billing-client';
 import styles from './billing.module.css';
 
+const billingLoginHref = buildLoginHref({ returnTo: '/billing' });
+
 const usd = (cents: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+const formatTrialUsd = (micros: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: micros % 10_000 === 0 ? 2 : 4,
+  }).format(micros / 1_000_000);
+const MIN_PERSONAL_TOPUP_CENTS = 500;
+const MAX_PERSONAL_TOPUP_CENTS = 999900;
+export function isPersonalOneStepEligible(
+  workspaceId: string,
+  enrollment?: BillingOwnerEnrollment,
+): enrollment is BillingOwnerEnrollment {
+  return Boolean(
+    enrollment &&
+    enrollment.eligible &&
+    workspaceId.startsWith('user-') &&
+    !enrollment.replaceExistingOwner,
+  );
+}
 const statusLabels: Record<PaymentOrder['status'], string> = {
   created: 'Ready for checkout',
   checkout_pending: 'Checking checkout',
@@ -107,7 +133,7 @@ export function BillingPage() {
     <>
       <SiteHeader active="dashboard" />
       <main className={styles.page}>
-        <a href="/dashboard" className={styles.back}>
+        <a href="/app#start" className={styles.back}>
           ← Your workspace
         </a>
         {session?.authenticated && session.workspaceId ? (
@@ -149,11 +175,11 @@ export function BillingPage() {
               </p>
             )}
             {session?.oidcEnabled ? (
-              <a className={styles.primary} href="/auth/login">
+              <a className={styles.primary} href={billingLoginHref}>
                 Sign in to OpenGen ↗
               </a>
             ) : session ? (
-              <a className={styles.secondary} href="/dashboard">
+              <a className={styles.secondary} href="/app#start">
                 Open your workspace
               </a>
             ) : null}
@@ -202,6 +228,14 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
   const mounted = useRef(true);
   const acting = useRef(false);
   const selection = useRef<string | null>(null);
+  const [oneStepStage, setOneStepStage] = useState<'idle' | 'enrolling' | 'checkout'>('idle');
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const scopedFetch = useCallback<typeof fetch>(
     (url, init) => {
@@ -359,6 +393,105 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
     }
   }
 
+  async function enrollAndCheckout(targetCents: number) {
+    if (acting.current || !recoveryScope) return;
+    const enrollment = capabilities?.ownerEnrollment;
+    if (!isPersonalOneStepEligible(workspaceId, enrollment)) return;
+    acting.current = true;
+    setBusy(true);
+    setOneStepStage('enrolling');
+    setError('');
+    setNotice('');
+    let enrolledAccess: BillingCapabilities | null = null;
+    try {
+      await enrollBillingOwner({
+        workspaceId,
+        recoveryScope,
+        expectedAuthorityVersion: enrollment.expectedAuthorityVersion,
+        termsVersion: enrollment.terms.version,
+      });
+      const nextAccess = await readBillingAccess({ workspaceId, recoveryScope });
+      if (!mounted.current) return;
+      if (!nextAccess?.read)
+        throw new Error(
+          'Prepaid billing was enabled, but your billing access could not be verified. Refresh this page before continuing.',
+        );
+      enrolledAccess = nextAccess;
+      setOneStepStage('checkout');
+      const order = await createOrRecoverOrder({
+        workspaceId,
+        amountCents: targetCents,
+        storage: window.localStorage,
+        request: scopedFetch,
+      });
+      if (!mounted.current) return;
+      selection.current = order.id;
+      setActive(order);
+      setRecovery(pendingTopUp(window.localStorage, workspaceId));
+      if (!resumable(order)) {
+        setNotice('Prepaid billing is enabled. Review your order status below.');
+        setCapabilities(nextAccess);
+        return;
+      }
+      const next = await billingRequest<PaymentOrder>(
+        workspaceId,
+        `/api/billing/orders/${encodeURIComponent(order.id)}/checkout`,
+        { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+        scopedFetch,
+      );
+      if (!mounted.current) return;
+      if (next.id !== order.id || next.amountCents !== order.amountCents)
+        throw new Error('The checkout does not match this order. Refresh its status.');
+      setActive(next);
+      if (next.status === 'checkout_open' && next.checkoutUrl) {
+        window.location.assign(stripeCheckoutUrl(next.checkoutUrl));
+      } else {
+        setNotice(
+          'Prepaid billing is enabled and your order is saved. Refresh its status while checkout or payment is being confirmed.',
+        );
+        setCapabilities(nextAccess);
+      }
+    } catch (cause) {
+      if (!mounted.current) return;
+      if (enrolledAccess) {
+        setCapabilities(enrolledAccess);
+        setNotice('Prepaid billing is enabled for this workspace.');
+        setError(`${message(cause)} Resume or refresh this top-up before starting another.`);
+        try {
+          setRecovery(pendingTopUp(window.localStorage, workspaceId));
+        } catch {
+          /* Surfaced by load() once enrolled view mounts. */
+        }
+      } else {
+        setError(message(cause));
+      }
+    } finally {
+      acting.current = false;
+      if (mounted.current) {
+        setBusy(false);
+        setOneStepStage('idle');
+      }
+    }
+  }
+
+  const handleTrialClaimed = useCallback(
+    async (result: TrialCreditClaimResult) => {
+      notifyHeaderBalanceChanged();
+      if (recoveryScope) {
+        const next = await readBillingAccess({ workspaceId, recoveryScope });
+        if (mounted.current) setCapabilities(next);
+      }
+      if (mounted.current) {
+        setNotice(
+          result.alreadyClaimed
+            ? `Your ${formatTrialUsd(result.amountMicros)} starter credit was already added to this personal workspace.`
+            : `${formatTrialUsd(result.amountMicros)} starter credit added to your personal workspace.`,
+        );
+      }
+    },
+    [workspaceId, recoveryScope],
+  );
+
   const cents = dollarsToCents(amount);
   const validAmount =
     cents !== null &&
@@ -381,30 +514,71 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
       </p>
     );
   if (capabilities?.read === false && recoveryScope) {
-    if (capabilities.ownerEnrollment)
-      return (
-        <BillingOwnerEnrollmentCard
-          workspaceId={workspaceId}
-          recoveryScope={recoveryScope}
-          enrollment={capabilities.ownerEnrollment}
-          legal={legal}
-          onEnrolled={async () => {
-            const next = await readBillingAccess({ workspaceId, recoveryScope });
-            if (mounted.current) {
-              setCapabilities(next);
-              setNotice(
-                'Prepaid billing is enabled for this workspace. Choose an amount below to add credit.',
-              );
-            }
-          }}
-        />
-      );
-    return (
-      <BillingPolicyPanel
+    const trialCard = capabilities.trialCredit?.enabled ? (
+      <StarterTrialCreditCard
         workspaceId={workspaceId}
         recoveryScope={recoveryScope}
-        capabilities={capabilities}
+        trialCredit={capabilities.trialCredit}
+        showPaymentRecoveryHint={false}
+        onClaimed={handleTrialClaimed}
       />
+    ) : null;
+    if (isPersonalOneStepEligible(workspaceId, capabilities.ownerEnrollment))
+      return (
+        <PersonalOneStepFundingCard
+          workspaceId={workspaceId}
+          enrollment={capabilities.ownerEnrollment}
+          legal={legal}
+          amount={amount}
+          onAmountChange={setAmount}
+          busy={busy}
+          stage={oneStepStage}
+          error={error}
+          notice={notice}
+          trialCard={trialCard}
+          onSubmit={enrollAndCheckout}
+        />
+      );
+    if (capabilities.ownerEnrollment)
+      return (
+        <>
+          {notice && (
+            <p className={styles.notice} role="status">
+              {notice}
+            </p>
+          )}
+          {trialCard}
+          <BillingOwnerEnrollmentCard
+            workspaceId={workspaceId}
+            recoveryScope={recoveryScope}
+            enrollment={capabilities.ownerEnrollment}
+            legal={legal}
+            onEnrolled={async () => {
+              const next = await readBillingAccess({ workspaceId, recoveryScope });
+              if (mounted.current) {
+                setCapabilities(next);
+                setNotice(
+                  'Prepaid billing is enabled for this workspace. Choose an amount below to add credit.',
+                );
+              }
+            }}
+          />
+        </>
+      );
+    return (
+      <>
+        {notice && (
+          <p className={styles.notice} role="status">
+            {notice}
+          </p>
+        )}
+        {trialCard}
+        <BillingPolicyPanel
+          workspaceId={workspaceId}
+          recoveryScope={recoveryScope}
+          capabilities={capabilities}
+        />
+      </>
     );
   }
 
@@ -457,12 +631,21 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
           {summary.newFunding.reason === 'terms-required' ? (
             <>
               Review the current Terms before starting a new top-up.{' '}
-              <a href="/auth/login">Review Terms and sign in</a>.
+              <a href={billingLoginHref}>Review Terms and sign in</a>.
             </>
           ) : (
             'New top-ups are unavailable until the current Terms are active. Your payment history remains available.'
           )}
         </p>
+      )}
+      {capabilities?.trialCredit?.enabled && recoveryScope && (
+        <StarterTrialCreditCard
+          workspaceId={workspaceId}
+          recoveryScope={recoveryScope}
+          trialCredit={capabilities.trialCredit}
+          showPaymentRecoveryHint={true}
+          onClaimed={handleTrialClaimed}
+        />
       )}
       <div className={styles.topUpGrid}>
         <form
@@ -582,8 +765,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
         <aside className={styles.explanation}>
           <span className={styles.eyebrow}>MAKE ROOM TO CREATE</span>
           <h2>
-            You choose when
-            <br />
+            You choose when <br />
             to add more.
           </h2>
           <p>
@@ -601,7 +783,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
               <span>3</span>See confirmed credit in your history.
             </li>
           </ol>
-          <a href="/dashboard">
+          <a href="/app#start">
             View your balance and usage ledger <span aria-hidden="true">↗</span>
           </a>
         </aside>
@@ -1072,7 +1254,7 @@ export function BillingOwnerEnrollmentCard({
                 )}
               </div>
               {enrollment.reason === 'terms-required' && (
-                <a className={styles.primary} href="/auth/login">
+                <a className={styles.primary} href={billingLoginHref}>
                   Review Terms and sign in ↗
                 </a>
               )}
@@ -1102,8 +1284,7 @@ export function BillingOwnerEnrollmentCard({
         <aside className={styles.explanation}>
           <span className={styles.eyebrow}>HOW PREPAID CREDIT WORKS</span>
           <h2>
-            Manual top-ups,
-            <br />
+            Manual top-ups, <br />
             clear boundaries.
           </h2>
           <p>
@@ -1121,11 +1302,353 @@ export function BillingOwnerEnrollmentCard({
               <span>3</span>Spend from your workspace balance across web, REST, MCP, or CLI.
             </li>
           </ol>
-          <a href="/dashboard">
+          <a href="/app#start">
             Use BYOK or view your workspace ledger <span aria-hidden="true">↗</span>
           </a>
         </aside>
       </div>
+    </section>
+  );
+}
+
+function PersonalOneStepFundingCard({
+  workspaceId,
+  enrollment,
+  legal,
+  amount,
+  onAmountChange,
+  busy,
+  stage,
+  error,
+  notice,
+  trialCard,
+  onSubmit,
+}: {
+  workspaceId: string;
+  enrollment: BillingOwnerEnrollment;
+  legal: ReturnType<typeof useLegalPresentation>;
+  amount: string;
+  onAmountChange: (next: string) => void;
+  busy: boolean;
+  stage: 'idle' | 'enrolling' | 'checkout';
+  error: string;
+  notice: string;
+  trialCard: React.ReactNode;
+  onSubmit: (amountCents: number) => Promise<void>;
+}) {
+  const [accepted, setAccepted] = useState(false);
+  const cents = dollarsToCents(amount);
+  const validAmount =
+    cents !== null && cents >= MIN_PERSONAL_TOPUP_CENTS && cents <= MAX_PERSONAL_TOPUP_CENTS;
+  const feePreview = cents !== null ? previewProcessingFee(cents, null) : null;
+
+  return (
+    <section className={styles.billing} aria-labelledby="personal-funding-title">
+      <header className={styles.heading}>
+        <div>
+          <span className={styles.eyebrow}>YOUR WORKSPACE / BILLING</span>
+          <h1 id="personal-funding-title">
+            A little credit.
+            <br />
+            <em>A lot of possibility.</em>
+          </h1>
+          <p>Choose your first prepaid USD top-up and enable workspace billing in a single step.</p>
+        </div>
+        <div className={styles.workspace}>
+          <span>Paying workspace</span>
+          <strong>{workspaceId}</strong>
+        </div>
+      </header>
+      {notice && (
+        <p className={styles.notice} role="status">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+      {trialCard}
+      <div className={styles.topUpGrid}>
+        <form
+          className={styles.topUp}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!accepted || !validAmount || cents === null || busy) return;
+            void onSubmit(cents);
+          }}
+        >
+          <div className={styles.cardTop}>
+            <span className={styles.eyebrow}>01 / ADD CREDIT</span>
+            <span className={styles.currency}>USD</span>
+          </div>
+          <label className={styles.amountLabel} htmlFor="personal-top-up-amount">
+            Choose your credit amount
+          </label>
+          <div className={styles.amountInput}>
+            <span aria-hidden="true">$</span>
+            <input
+              id="personal-top-up-amount"
+              aria-describedby="personal-amount-help"
+              inputMode="decimal"
+              autoComplete="off"
+              value={amount}
+              maxLength={9}
+              disabled={busy}
+              onChange={(event) => onAmountChange(event.target.value)}
+              required
+            />
+          </div>
+          <div className={styles.presets} aria-label="Suggested top-up amounts">
+            {[10, 25, 50, 100, 500].map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={cents === value * 100}
+                disabled={busy}
+                onClick={() => onAmountChange(String(value))}
+              >
+                {usd(value * 100)}
+              </button>
+            ))}
+          </div>
+          <p id="personal-amount-help" className={styles.help}>
+            {usd(MIN_PERSONAL_TOPUP_CENTS)}–{usd(MAX_PERSONAL_TOPUP_CENTS)} per top-up. 100% of your
+            selected USD credit is added after payment confirmation.
+          </p>
+          {feePreview && (
+            <dl className={styles.breakdown} aria-label="Payment breakdown">
+              <div>
+                <dt>Credit added</dt>
+                <dd>{usd(feePreview.creditCents)}</dd>
+              </div>
+              <div>
+                <dt>Processing fee (2.9% + $0.30)</dt>
+                <dd>{usd(feePreview.feeCents)}</dd>
+              </div>
+              <div className={styles.breakdownTotal}>
+                <dt>Total charged</dt>
+                <dd>{usd(feePreview.totalChargeCents)}</dd>
+              </div>
+            </dl>
+          )}
+          <div className={styles.oneStepEnrollment}>
+            <details className={styles.termsDisclosure}>
+              <summary>Payment terms</summary>
+              <p>{enrollment.terms.text}</p>
+            </details>
+            <label className={styles.consentLabel}>
+              <input
+                type="checkbox"
+                checked={accepted}
+                disabled={busy}
+                onChange={(event) => setAccepted(event.target.checked)}
+              />
+              <span>
+                {enrollment.allowsAutoRecharge ? (
+                  <>
+                    I am the owner of this personal workspace and agree to enable prepaid USD
+                    billing under the <a href="/terms">Terms of Service</a> (including{' '}
+                    <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
+                  </>
+                ) : (
+                  <>
+                    I am the owner of this personal workspace and agree to enable manual prepaid USD
+                    top-ups under the <a href="/terms">Terms of Service</a> (including{' '}
+                    <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
+                  </>
+                )}
+              </span>
+            </label>
+          </div>
+          <button
+            className={styles.primary}
+            type="submit"
+            disabled={!accepted || !validAmount || busy}
+          >
+            {busy
+              ? stage === 'checkout'
+                ? 'Continuing to Stripe…'
+                : 'Enabling prepaid billing…'
+              : feePreview
+                ? `Enable prepaid billing & continue to Stripe · ${usd(feePreview.totalChargeCents)} ↗`
+                : 'Enable prepaid billing & continue to Stripe ↗'}
+          </button>
+          <p className={styles.finePrint}>
+            {enrollment.allowsAutoRecharge
+              ? 'One-time hosted Stripe Checkout · Optional auto-recharge stays off unless you enable it'
+              : 'One-time hosted Stripe Checkout · No saved-card auto-recharge'}
+          </p>
+          <p className={`${styles.finePrint} legal-review-links`}>
+            {legal.mode === 'published' ? (
+              <>
+                Governed by the <a href="/terms">Terms of Service</a> (including{' '}
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>).
+              </>
+            ) : legal.mode === 'staged' ? (
+              <>
+                Review the <a href="/terms">Terms of Service</a> and{' '}
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>. Scheduled
+                effective {legal.effectiveAt} — not yet effective.
+              </>
+            ) : (
+              <>
+                Review the <a href="/terms">Terms draft</a> and{' '}
+                <a href="/terms#credits-and-refunds">credit &amp; refund terms</a>. Not yet
+                effective.
+              </>
+            )}
+          </p>
+        </form>
+        <aside className={styles.explanation}>
+          <span className={styles.eyebrow}>MAKE ROOM TO CREATE</span>
+          <h2>
+            You choose when <br />
+            to add more.
+          </h2>
+          <p>
+            Confirming records you as the funding owner for this personal workspace and opens Stripe
+            Checkout for the exact amount you select, with 0% model route markup.
+          </p>
+          <ol>
+            <li>
+              <span>1</span>Choose $5–$9,999 credit and check the billing terms once.
+            </li>
+            <li>
+              <span>2</span>Complete your payment on Stripe Checkout.
+            </li>
+            <li>
+              <span>3</span>Spend confirmed credit across Playground, REST, MCP, or CLI.
+            </li>
+          </ol>
+          <a href="/app#start">
+            Use BYOK or view your workspace ledger <span aria-hidden="true">↗</span>
+          </a>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function StarterTrialCreditCard({
+  workspaceId,
+  recoveryScope,
+  trialCredit,
+  showPaymentRecoveryHint = false,
+  onClaimed,
+}: {
+  workspaceId: string;
+  recoveryScope: string;
+  trialCredit: TrialCreditStatus;
+  showPaymentRecoveryHint?: boolean;
+  onClaimed: (result: TrialCreditClaimResult) => Promise<void>;
+}) {
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState('');
+
+  if (!trialCredit.enabled || trialCredit.amountMicros <= 0) return null;
+
+  const displayUsd = formatTrialUsd(trialCredit.claimedAmountMicros ?? trialCredit.amountMicros);
+
+  if (trialCredit.claimed) {
+    return (
+      <section className={styles.trialCardMuted} aria-labelledby="starter-trial-claimed">
+        <div>
+          <span className={styles.eyebrow}>STARTER TRIAL CREDIT</span>
+          <h2 id="starter-trial-claimed">{displayUsd} starter credit claimed</h2>
+          <p>
+            Your one-time non-refundable promotional starter credit has already been applied to your
+            personal workspace.
+          </p>
+        </div>
+        <span className={styles.status} data-status="credited">
+          Claimed
+        </span>
+      </section>
+    );
+  }
+
+  if (!trialCredit.eligible) {
+    const blockedHeading =
+      trialCredit.reason === 'unavailable'
+        ? 'Starter credit status unavailable'
+        : trialCredit.reason === 'terms-inactive'
+          ? `${displayUsd} starter credit pending Terms`
+          : trialCredit.reason === 'billing-hold'
+            ? `${displayUsd} starter credit paused`
+            : trialCredit.reason === 'terms-required'
+              ? `${displayUsd} starter credit requires Terms acceptance`
+              : trialCredit.reason === 'personal-workspace-required'
+                ? `${displayUsd} starter credit available on personal workspace`
+                : `${displayUsd} starter credit requires verified sign-in`;
+    return (
+      <section className={styles.trialCardMuted} aria-labelledby="starter-trial-status">
+        <div>
+          <span className={styles.eyebrow}>STARTER TRIAL CREDIT</span>
+          <h2 id="starter-trial-status">{blockedHeading}</h2>
+          <p>
+            {trialCredit.reason === 'unavailable' ? (
+              showPaymentRecoveryHint ? (
+                'Starter trial credit status could not be loaded right now. Your payment history and order recovery remain available below.'
+              ) : (
+                'Starter trial credit status could not be loaded right now. Please refresh or try again shortly.'
+              )
+            ) : trialCredit.reason === 'personal-workspace-required' ? (
+              'Switch to your personal workspace to claim your one-time non-refundable starter credit.'
+            ) : trialCredit.reason === 'terms-required' ? (
+              <>
+                Accept the active Terms of Service to claim your one-time non-refundable starter
+                credit. <a href={billingLoginHref}>Review Terms and sign in</a>.
+              </>
+            ) : trialCredit.reason === 'terms-inactive' ? (
+              'Starter trial credits open once the published Terms of Service take effect.'
+            ) : trialCredit.reason === 'billing-hold' ? (
+              'Starter trial credit claims are paused while this workspace has an active billing hold.'
+            ) : (
+              'Sign in with a verified personal browser account to claim your one-time starter credit.'
+            )}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className={styles.trialCard} aria-labelledby="starter-trial-offer">
+      <div>
+        <span className={styles.eyebrow}>STARTER TRIAL CREDIT</span>
+        <h2 id="starter-trial-offer">Claim {displayUsd} starter credit</h2>
+        <p>
+          One-time non-refundable promotional credit for your personal workspace. No card required
+          to start generating.
+        </p>
+        {claimError && (
+          <p className={styles.trialError} role="alert">
+            {claimError}
+          </p>
+        )}
+      </div>
+      <button
+        className={styles.primary}
+        type="button"
+        disabled={claiming}
+        onClick={() => {
+          if (claiming) return;
+          setClaiming(true);
+          setClaimError('');
+          void claimStarterTrialCredit({ workspaceId, recoveryScope })
+            .then((result) => onClaimed(result))
+            .catch((cause) => {
+              setClaimError(message(cause));
+            })
+            .finally(() => {
+              setClaiming(false);
+            });
+        }}
+      >
+        {claiming ? 'Claiming credit…' : `Claim ${displayUsd} starter credit`}
+      </button>
     </section>
   );
 }

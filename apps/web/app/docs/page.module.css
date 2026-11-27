@@ -71,7 +71,8 @@
     gap: 10px;
   }
 
-  .paths a {
+  .paths a,
+  .paths button {
     flex: 1 1 auto;
     justify-content: center;
   }

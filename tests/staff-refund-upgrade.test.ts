@@ -183,7 +183,7 @@ it.skipIf(!databaseUrl)(
       const afterJournal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
       expect(afterJournal.slice(0, 27)).toEqual(oldJournal);
       expect(afterJournal.map((row) => row.name)).toEqual(
-        Array.from({ length: 35 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
+        Array.from({ length: 36 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
       );
       expect(afterJournal[27].checksum).toBe(
         sha256(

@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { notifyBrowserSessionChanged, type BrowserSession } from './gateway-access';
+import {
+  buildLoginHref,
+  notifyBrowserSessionChanged,
+  safeReturnToPath,
+  type BrowserSession,
+} from './gateway-access';
 import { hasWorkspaceAuthority, privateWorkspaceHeaders } from './dashboard/activity-view';
+
+export { buildLoginHref, safeReturnToPath };
 
 export type WorkspaceBalance = {
   availableMicros: number;
@@ -39,14 +46,32 @@ export function notifyHeaderBalanceChanged(): void {
   window.dispatchEvent(new CustomEvent(balanceEvent));
 }
 
+const standardUsdFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const smallUsdFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+/**
+ * Formats workspace credit compactly: 2 decimal places when >= $0.01 (e.g. $94.26),
+ * up to 4 decimals when $0.0001 <= |balance| < $0.01, and '<$0.0001' for tiny positive
+ * balances so non-zero credit never rounds down to $0.00.
+ */
 export function formatRemainingUsd(micros: number | null | undefined): string {
   if (micros == null || !Number.isSafeInteger(micros)) return '—';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(micros / 1_000_000);
+  if (micros === 0) return '$0.00';
+  const abs = Math.abs(micros);
+  if (abs >= 10_000) return standardUsdFormatter.format(micros / 1_000_000);
+  if (abs >= 100) return smallUsdFormatter.format(micros / 1_000_000);
+  return micros > 0 ? '<$0.0001' : '>-$0.0001';
 }
 
 const sessionIdentity = (session: BrowserSession | null) =>
@@ -60,6 +85,10 @@ const sessionIdentity = (session: BrowserSession | null) =>
     session.isOperator,
     session.canSwitchWorkspace,
     session.oidcEnabled,
+    session.authProviders?.oidc ?? null,
+    session.authProviders?.oidcLabel ?? null,
+    session.authProviders?.github ?? null,
+    session.authProviders?.emailOtp ?? null,
   ]);
 
 function parseBalance(body: unknown): WorkspaceBalance | null {
@@ -353,7 +382,13 @@ async function signOut(): Promise<boolean> {
     if (!response.ok) throw new Error('Sign-out could not be completed. Please try again.');
     const body =
       response.status === 204
-        ? { authenticated: false, oidcEnabled: verifiedSession?.oidcEnabled }
+        ? {
+            authenticated: false,
+            oidcEnabled: verifiedSession?.oidcEnabled,
+            ...(verifiedSession?.authProviders
+              ? { authProviders: verifiedSession.authProviders }
+              : {}),
+          }
         : await response.json();
     if (version !== sessionVersion) return false;
     const current = (body.data ?? body) as BrowserSession;

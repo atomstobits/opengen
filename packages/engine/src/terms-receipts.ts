@@ -1,5 +1,14 @@
 import type { Pool } from 'pg';
 
+export type TermsVerificationMethod =
+  'oidc-verified' | 'github-oauth-verified' | 'email-otp-verified';
+
+const VALID_TERMS_METHODS = new Set<TermsVerificationMethod>([
+  'oidc-verified',
+  'github-oauth-verified',
+  'email-otp-verified',
+]);
+
 export interface VerifiedTermsAcceptance {
   issuer: string;
   subject: string;
@@ -10,7 +19,7 @@ export interface VerifiedTermsAcceptance {
 export interface TermsReceipt extends VerifiedTermsAcceptance {
   noticeVersion: 'human-terms-continue-v1';
   action: 'continue';
-  method: 'oidc-verified';
+  method: TermsVerificationMethod;
   acceptedAt: Date;
 }
 
@@ -90,14 +99,26 @@ const columns = `issuer,subject,policy_version AS "policyVersion",policy_digest 
 export class TermsReceiptStore {
   constructor(private readonly pool: Pool) {}
 
-  async recordVerifiedAcceptance(raw: VerifiedTermsAcceptance): Promise<TermsReceipt> {
+  async recordVerifiedAcceptance(
+    raw: VerifiedTermsAcceptance,
+    method?: TermsVerificationMethod,
+  ): Promise<TermsReceipt> {
     const input = validate(raw);
-    const inserted = await this.pool.query<TermsReceipt>(
-      `INSERT INTO mr_terms_receipts(issuer,subject,policy_version,policy_digest)
-       VALUES($1,$2,$3,$4) ON CONFLICT(issuer,subject,policy_version) DO NOTHING
-       RETURNING ${columns}`,
-      [input.issuer, input.subject, input.policyVersion, input.policyDigest],
-    );
+    if (method !== undefined && !VALID_TERMS_METHODS.has(method)) throw invalid();
+    const inserted =
+      !method || method === 'oidc-verified'
+        ? await this.pool.query<TermsReceipt>(
+            `INSERT INTO mr_terms_receipts(issuer,subject,policy_version,policy_digest)
+             VALUES($1,$2,$3,$4) ON CONFLICT(issuer,subject,policy_version) DO NOTHING
+             RETURNING ${columns}`,
+            [input.issuer, input.subject, input.policyVersion, input.policyDigest],
+          )
+        : await this.pool.query<TermsReceipt>(
+            `INSERT INTO mr_terms_receipts(issuer,subject,policy_version,policy_digest,method)
+             VALUES($1,$2,$3,$4,$5) ON CONFLICT(issuer,subject,policy_version) DO NOTHING
+             RETURNING ${columns}`,
+            [input.issuer, input.subject, input.policyVersion, input.policyDigest, method],
+          );
     if (inserted.rows[0]) return inserted.rows[0];
     // A separate READ COMMITTED statement observes a concurrent insert's committed winner.
     // No UPDATE (including a no-op update) is used: retries retain the first DB timestamp.

@@ -298,5 +298,17 @@ describe.skipIf(!databaseUrl)('immutable database Terms receipts', () => {
       expect(
         (await db.query('SELECT count(*)::integer AS n FROM mr_terms_receipts')).rows[0].n,
       ).toBe(1);
+
+      // Forward migration 036 allows explicit server-selected github-oauth-verified and email-otp-verified methods.
+      const githubReceipt = await store.recordVerifiedAcceptance(
+        { ...acceptance, issuer: 'https://github.com/login/oauth', subject: '424242' },
+        'github-oauth-verified',
+      );
+      expect(githubReceipt.method).toBe('github-oauth-verified');
+      const emailReceipt = await store.recordVerifiedAcceptance(
+        { ...acceptance, issuer: 'https://opengen.example/auth/email-otp', subject: 'email:abc' },
+        'email-otp-verified',
+      );
+      expect(emailReceipt.method).toBe('email-otp-verified');
     }));
 });

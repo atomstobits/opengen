@@ -11,14 +11,15 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/cors": "^11.1.0",
+    "@fastify/rate-limit": "^11.3.0",
     "@media-router/catalog": "*",
     "@media-router/contracts": "*",
     "@media-router/engine": "*",
     "@modelcontextprotocol/sdk": "1.32.2",
     "fastify": "5.12.8",
-    "openid-client": "^6.8.9",
-    "zod": "^4.1.12",
     "jose": "^6.2.15",
-    "stripe": "23.1.0"
+    "openid-client": "^6.8.9",
+    "stripe": "23.1.0",
+    "zod": "^4.1.12"
   }
 }

@@ -19,11 +19,41 @@ export interface BillingOwnerEnrollment {
   replaceExistingOwner?: boolean;
   reason?: BillingOwnerEnrollmentReason;
 }
+export type TrialCreditIneligibleReason =
+  | 'disabled'
+  | 'already-claimed'
+  | 'personal-workspace-required'
+  | 'verified-human-required'
+  | 'billing-hold'
+  | 'terms-required'
+  | 'terms-inactive'
+  | 'unavailable';
+export interface TrialCreditStatus {
+  enabled: boolean;
+  amountMicros: number;
+  claimed: boolean;
+  eligible: boolean;
+  claimedAt?: string;
+  claimedAmountMicros?: number;
+  reason?: TrialCreditIneligibleReason;
+}
+export interface TrialCreditClaimResult {
+  workspaceId: string;
+  claimed: true;
+  alreadyClaimed: boolean;
+  amountMicros: number;
+  ledgerId: string;
+  reference: string;
+  claimedAt: string;
+  promotional: true;
+  refundable: false;
+}
 export interface BillingCapabilities {
   read: boolean;
   manage: boolean;
   setup: boolean;
   ownerEnrollment?: BillingOwnerEnrollment;
+  trialCredit?: TrialCreditStatus;
 }
 export interface BillingPolicyState {
   workspaceId: string;
@@ -55,6 +85,52 @@ const enrollmentReasons = [
   'terms-required',
   'terms-inactive',
 ] as const;
+const trialCreditReasons = [
+  'disabled',
+  'already-claimed',
+  'personal-workspace-required',
+  'verified-human-required',
+  'billing-hold',
+  'terms-required',
+  'terms-inactive',
+  'unavailable',
+] as const;
+
+function parseTrialCredit(value: unknown): TrialCreditStatus | undefined {
+  if (value === undefined) return undefined;
+  const raw = value as Partial<TrialCreditStatus> | null;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof raw.enabled !== 'boolean' ||
+    typeof raw.amountMicros !== 'number' ||
+    !Number.isSafeInteger(raw.amountMicros) ||
+    raw.amountMicros < 0 ||
+    raw.amountMicros > 5_000_000 ||
+    typeof raw.claimed !== 'boolean' ||
+    typeof raw.eligible !== 'boolean' ||
+    (raw.claimedAt !== undefined && (typeof raw.claimedAt !== 'string' || !raw.claimedAt)) ||
+    (raw.claimedAmountMicros !== undefined &&
+      (typeof raw.claimedAmountMicros !== 'number' ||
+        !Number.isSafeInteger(raw.claimedAmountMicros) ||
+        raw.claimedAmountMicros <= 0 ||
+        raw.claimedAmountMicros > 5_000_000)) ||
+    (raw.reason !== undefined &&
+      !trialCreditReasons.includes(raw.reason as TrialCreditIneligibleReason))
+  )
+    throw new Error('Your billing access could not be verified.');
+  return {
+    enabled: raw.enabled,
+    amountMicros: raw.amountMicros,
+    claimed: raw.claimed,
+    eligible: raw.eligible,
+    ...(raw.claimedAt !== undefined ? { claimedAt: raw.claimedAt } : {}),
+    ...(raw.claimedAmountMicros !== undefined
+      ? { claimedAmountMicros: raw.claimedAmountMicros }
+      : {}),
+    ...(raw.reason ? { reason: raw.reason } : {}),
+  };
+}
 
 function parseOwnerEnrollment(value: unknown): BillingOwnerEnrollment | undefined {
   if (value === undefined) return undefined;
@@ -119,12 +195,47 @@ export async function readBillingAccess(
   )
     throw new Error('Your billing access could not be verified.');
   const ownerEnrollment = parseOwnerEnrollment(access.ownerEnrollment);
+  const trialCredit = parseTrialCredit(access.trialCredit);
   return {
     read: capabilities.read,
     manage: capabilities.manage,
     setup: capabilities.setup,
     ...(ownerEnrollment ? { ownerEnrollment } : {}),
+    ...(trialCredit ? { trialCredit } : {}),
   };
+}
+
+export async function claimStarterTrialCredit(input: {
+  workspaceId: string;
+  recoveryScope: string;
+  request?: typeof fetch;
+}): Promise<TrialCreditClaimResult> {
+  const result = await policyRequest<TrialCreditClaimResult>(
+    input.workspaceId,
+    '/api/billing/trial-credit',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-opengen-recovery-scope': input.recoveryScope,
+      },
+      body: '{}',
+    },
+    input.request,
+  );
+  if (
+    result.claimed !== true ||
+    result.promotional !== true ||
+    result.refundable !== false ||
+    typeof result.amountMicros !== 'number' ||
+    !Number.isSafeInteger(result.amountMicros) ||
+    result.amountMicros <= 0 ||
+    result.amountMicros > 5_000_000 ||
+    typeof result.ledgerId !== 'string' ||
+    !result.ledgerId
+  )
+    throw new Error('Your starter credit claim could not be verified. Refresh this page.');
+  return result;
 }
 
 export async function enrollBillingOwner(input: {

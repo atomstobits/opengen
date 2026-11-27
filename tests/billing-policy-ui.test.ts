@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  claimStarterTrialCredit,
   draftFromPolicy,
   enrollBillingOwner,
   finishSetupRecovery,
@@ -154,6 +155,94 @@ describe('private billing policy browser helpers', () => {
         expectedAuthorityVersion: 0,
         termsVersion: 'manual-terms-v1',
         request: async () => Response.json({ workspaceId: 'workspace-b', authorityVersion: 1 }),
+      }),
+    ).rejects.toThrow(/workspace changed/);
+
+    // Optional starter trial credit status parsing & claim helper
+    await expect(
+      readBillingAccess(authority, undefined, async () =>
+        Response.json({
+          ...authority,
+          capabilities: { read: false, manage: false, setup: false },
+          trialCredit: {
+            enabled: true,
+            amountMicros: 1_000_000,
+            claimed: false,
+            eligible: true,
+          },
+        }),
+      ),
+    ).resolves.toEqual({
+      read: false,
+      manage: false,
+      setup: false,
+      trialCredit: {
+        enabled: true,
+        amountMicros: 1_000_000,
+        claimed: false,
+        eligible: true,
+      },
+    });
+    for (const invalidTrial of [
+      { enabled: true, amountMicros: 5_000_001, claimed: false, eligible: true },
+      { enabled: true, amountMicros: -1, claimed: false, eligible: true },
+      { enabled: 'yes', amountMicros: 1_000_000, claimed: false, eligible: true },
+      { enabled: true, amountMicros: 1_000_000, claimed: false, eligible: false, reason: 'bogus' },
+    ])
+      await expect(
+        readBillingAccess(authority, undefined, async () =>
+          Response.json({
+            ...authority,
+            capabilities: { read: false, manage: false, setup: false },
+            trialCredit: invalidTrial,
+          }),
+        ),
+      ).rejects.toThrow(/could not be verified/);
+    await expect(
+      claimStarterTrialCredit({
+        ...authority,
+        request: async (url, init) => {
+          expect(url).toBe('/api/billing/trial-credit');
+          expect(init?.method).toBe('POST');
+          expect(new Headers(init?.headers).get('x-opengen-workspace')).toBe('workspace-a');
+          expect(new Headers(init?.headers).get('x-opengen-recovery-scope')).toBe('member-a-v1');
+          expect(init?.body).toBe('{}');
+          return Response.json({
+            workspaceId: 'workspace-a',
+            claimed: true,
+            alreadyClaimed: false,
+            amountMicros: 1_000_000,
+            ledgerId: '24250436-0606-4da0-9877-b65fe61d78de',
+            reference: 'trial-credit:v1:fixture',
+            claimedAt: '2026-11-27T00:00:00.000Z',
+            promotional: true,
+            refundable: false,
+          });
+        },
+      }),
+    ).resolves.toMatchObject({
+      workspaceId: 'workspace-a',
+      claimed: true,
+      alreadyClaimed: false,
+      amountMicros: 1_000_000,
+      promotional: true,
+      refundable: false,
+    });
+    await expect(
+      claimStarterTrialCredit({
+        ...authority,
+        request: async () =>
+          Response.json({
+            workspaceId: 'workspace-b',
+            claimed: true,
+            alreadyClaimed: false,
+            amountMicros: 1_000_000,
+            ledgerId: '24250436-0606-4da0-9877-b65fe61d78de',
+            reference: 'trial-credit:v1:fixture',
+            claimedAt: '2026-11-27T00:00:00.000Z',
+            promotional: true,
+            refundable: false,
+          }),
       }),
     ).rejects.toThrow(/workspace changed/);
   });
