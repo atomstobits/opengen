@@ -176,8 +176,11 @@ const result = settleVerifiedCost(snapshot, {
 ```
 
 A settled result records currency, policy ID/version, frozen rate and service,
-provider actual cost, customer provider debit, externally billed BYOK provider
-cost, nominal/collected/waived fee, customer total, operator overrun, released
+settlement cost basis (`providerCostMicros`: actual provider cost when verified,
+or the frozen published tariff when `costStatus` is `published-tariff`, with
+actual supplier invoice cost tracked separately in `upstream_cost_micros`),
+customer provider debit, externally billed BYOK provider cost,
+nominal/collected/waived fee, customer total, operator overrun, released
 reservation, outcome eligibility and whitelisted evidence. A policy rate is never
 presented as a fully collected fee when a cap caused a waiver.
 
@@ -192,9 +195,10 @@ For the explicit `provider-first` fixture rule:
 At USD1.02 verified provider cost, a USD1.05 accepted limit collects USD0.03 of the
 USD0.051 nominal fee and shows USD0.021 waived. At USD1.10 provider cost, that
 limit collects USD1.05, shows USD0.055 fee waived and USD0.05 operator overrun.
-For managed single-attempt work, exact conservation is:
+For managed single-attempt work, exact conservation against the settlement cost
+basis (`providerCostMicros`) is:
 
-`provider actual + nominal fee = customer total + waived fee + operator overrun`
+`settlement cost basis + nominal fee = customer total + waived fee + operator overrun`
 
 `customer total + released reservation = original reservation`
 

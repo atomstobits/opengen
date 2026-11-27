@@ -429,12 +429,13 @@ export function verifyProviderCostEvidence(
         typeof value.reason === 'string' ? value.reason.slice(0, 200) : 'provider-cost-unknown',
     });
   if (
+    typeof value.basis !== 'string' ||
     ![
       'provider-billed-usd',
       'qualified-actual-usage',
       'operator-audited',
       'verified-delivery-published-tariff',
-    ].includes(String(value.basis))
+    ].includes(value.basis)
   )
     return freeze({ verified: false, reason: 'unsupported-cost-basis' });
   for (const key of ['attemptId', 'providerId', 'deploymentId', 'upstreamReference'] as const) {
