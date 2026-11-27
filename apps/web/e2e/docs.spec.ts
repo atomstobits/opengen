@@ -115,7 +115,7 @@ test('interactive OpenAPI explorer filters live spec endpoints and stays inside 
     route.fulfill({
       json: {
         openapi: '3.1.0',
-        info: { title: 'OpenGen API', version: '0.1.1' },
+        info: { title: 'OpenGen API', version: '0.1.2' },
         paths: {
           '/v1/quotes': {
             post: {

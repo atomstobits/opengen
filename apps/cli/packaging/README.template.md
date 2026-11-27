@@ -5,28 +5,28 @@ Standalone `@opengen-dev/cli` package exposing the `opengen` command. OpenGen co
 Install from npm into an isolated prefix, or verify the release archive's SHA-256 against the supplied `.tgz.sha256` file before offline installation:
 
 ```sh
-npm install --prefix /absolute/private/opengen-client @opengen-dev/cli@{{VERSION}} --ignore-scripts --no-audit --no-fund
+npm install --prefix "$HOME/.opengen/cli" @opengen-dev/cli@{{VERSION}} --ignore-scripts --no-audit --no-fund
 # Offline from release bundle:
-npm install --prefix /absolute/private/opengen-client /absolute/path/opengen-cli-{{VERSION}}.tgz --ignore-scripts --no-audit --no-fund --offline
-/absolute/private/opengen-client/node_modules/.bin/opengen --help
+npm install --prefix "$HOME/.opengen/cli" /absolute/path/opengen-cli-{{VERSION}}.tgz --ignore-scripts --no-audit --no-fund --offline
+"$HOME/.opengen/cli/node_modules/.bin/opengen" --help
 ```
 
 The package has no install scripts, runtime package dependencies, binary downloads or automatic client configuration writes. Its executable can also run directly after extraction:
 
 ```sh
 node /absolute/path/package/bin/opengen.mjs --help
-node /absolute/path/package/bin/opengen.mjs status
+node /absolute/path/package/bin/opengen.mjs doctor
 ```
 
-The reviewed onboarding release bundle also includes a checksum-verified offline Node installer, the generated installable skill and a token-free Claude Code plugin. See the release bundle instructions for the checkout-free installation path. No public downloads are available until release review.
+The reviewed onboarding release bundle also includes a checksum-verified offline Node installer, the generated installable skill and a token-free Claude Code plugin. See the release bundle instructions for the checkout-free installation path.
 
-Set `MEDIA_ROUTER_URL` to your configured OpenGen gateway. Sign in through `opengen login`, review the permissions and paying workspace in your browser, then use catalog discovery and quotes before generation. Account sign-in needs a configured gateway/identity provider; no credit is granted by login. This package has not established live identity-provider/client compatibility.
+`opengen` defaults to `https://opengen.dev`. Set `OPENGEN_API_URL` (or legacy `MEDIA_ROUTER_URL`) when targeting a self-hosted gateway, and optionally `OPENGEN_API_KEY` (or legacy `OPENGEN_TOKEN` / `MEDIA_ROUTER_TOKEN`) for scoped API-key overrides. Sign in through `opengen login`, review the permissions and paying workspace in your browser, then run `opengen doctor`, catalog discovery, and quotes before generation. Account sign-in grants no managed credit; add workspace credit at `https://opengen.dev/billing` or connect BYOK credentials before paid generation.
 
 ```sh
-export MEDIA_ROUTER_URL=https://your-opengen.example
+# Defaults to https://opengen.dev (set OPENGEN_API_URL for a self-hosted gateway)
 opengen login
-opengen status
-opengen catalog search image
+opengen doctor
+opengen catalog search "gpt-image-2"
 opengen quote --input /absolute/private/request.json
 opengen logout
 ```

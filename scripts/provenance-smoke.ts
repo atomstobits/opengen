@@ -295,7 +295,7 @@ export async function provenanceSmoke() {
       JSON.stringify({
         claim_version: 2,
         title: 'OpenGen synthetic C2PA smoke',
-        claim_generator_info: [{ name: 'OpenGen integration fixture', version: '0.1.1' }],
+        claim_generator_info: [{ name: 'OpenGen integration fixture', version: '0.1.2' }],
         assertions: [
           {
             label: 'c2pa.actions.v2',

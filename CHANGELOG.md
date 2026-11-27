@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-11-27
+
+- **Onboarding overhaul & CLI defaults (`@opengen-dev/cli` `0.1.2`)**: Defaulted the portable CLI gateway origin to `https://opengen.dev` with standardized `OPENGEN_API_URL` and `OPENGEN_API_KEY` environment variables (retaining `MEDIA_ROUTER_URL` / `MEDIA_ROUTER_TOKEN` aliases), aligned bundled CLI error serialization with `OPENGEN_API_URL` / `https://opengen.dev`, and refreshed the packaged CLI README and onboarding skill bundle.
+- **Auth, Playground, Billing & Pricing**: Added validated `?returnTo=` preservation across `/auth/login` → `/auth/callback`, optional GitHub OAuth and PostgreSQL-backed Email OTP (`036.sql`), HMAC-signed proxy client-IP proof for rate-limited auth/trial routes, interactive `/docs/api` OpenAPI explorer, public `/pricing` overview, Playground starter prompts and raw-HTTP JS/Python tabs, single-step solo workspace funding checkout, and optional starter trial credit.
+- **Dated live MCP client evidence**: Recorded dated `2026-11-27` live read-only OAuth MCP verification for `codex-cli 0.155.1` (`catalog_search`, `catalog_get`, `balance`) and live DCR + PKCE consent redirect verification for `Claude Code 2.1.301` on `/agents`.
+
 ## 0.1.1 — 2026-11-11
 
 - **Saved-card automatic recharge & Customer Portal**: Opt-in saved-card setup, off-session automatic USD recharge within workspace ceilings, 3DS/SCA browser authentication recovery, Stripe Customer Portal management, and `POST /v1/operator/billing/work` scheduling behind explicit `OPENGEN_BILLING_RECHARGE=open` configuration.

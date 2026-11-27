@@ -377,7 +377,7 @@ export async function buildApp(options: AppOptions = {}) {
   const parseInput = (input: unknown): GenerateInput => parseGenerationRequest(input);
   app.get('/openapi.json', async () => openApiDocument(billingAvailable));
   app.get('/v1/operations', async () => ({ data: describeOperations(billingAvailable) }));
-  app.get('/health', async () => ({ status: 'ok', database: !!options.engine, version: '0.1.1' }));
+  app.get('/health', async () => ({ status: 'ok', database: !!options.engine, version: '0.1.2' }));
   const discoveredModels = catalog.models.map((model) => ({
     ...model,
     generationProfiles: generationProfiles(model.id),

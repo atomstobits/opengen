@@ -130,7 +130,9 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
             )}
           </section>
           <aside className={styles.aside} aria-label="Setup evidence and permissions">
-            <span className={styles.status}>VERIFICATION PENDING</span>
+            <span className={styles.status}>
+              {client.verification?.badge ?? 'VERIFICATION PENDING'}
+            </span>
             <h2>Know what you’re connecting.</h2>
             <p>{client.caution}</p>
             <p className={styles.creditNote}>
@@ -145,9 +147,10 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
               <div>
                 <dt>Actual client / version / test date</dt>
                 <dd>
-                  {client.slug === 'cli'
-                    ? 'Source CLI fixtures only. No deployed identity-provider test.'
-                    : 'None recorded. Not verified end to end.'}
+                  {client.verification?.detailEvidence ??
+                    (client.slug === 'cli'
+                      ? 'Source CLI fixtures only. No deployed identity-provider test.'
+                      : 'None recorded. Not verified end to end.')}
                 </dd>
               </div>
               <div>

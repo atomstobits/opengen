@@ -212,7 +212,7 @@ function parseOpenApiDocument(doc: JsonObject): {
   }
 
   return {
-    version: typeof info.version === 'string' ? info.version : '0.1.1',
+    version: typeof info.version === 'string' ? info.version : '0.1.2',
     specVersion: doc.openapi,
     description: typeof info.description === 'string' ? info.description : undefined,
     endpoints,
@@ -519,7 +519,7 @@ export function OpenApiExplorer({
             className={`${styles.specBadge} ${specState === 'live' ? styles.specBadgeLive : ''}`}
           >
             {specState === 'live'
-              ? `OpenAPI ${specMeta?.specVersion ?? '3.1.0'} · v${specMeta?.version ?? '0.1.1'}`
+              ? `OpenAPI ${specMeta?.specVersion ?? '3.1.0'} · v${specMeta?.version ?? '0.1.2'}`
               : 'Contract operation registry'}
           </span>
           <span>
