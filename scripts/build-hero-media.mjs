@@ -7,9 +7,9 @@
  *
  * Usage:
  *   node scripts/build-hero-media.mjs \
- *     --input /path/to/kling4-sample \
+ *     --input /path/to/hero-all-12-input \
  *     --out /path/to/hero-media-dist \
- *     --version v2 \
+ *     --version v3 \
  *     --base-url https://media.opengen.dev
  */
 
@@ -30,10 +30,30 @@ const DEFAULT_RIGHT_MODEL_ID = 'kling/kling-4.0';
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
 
 const DEFAULT_SUMMARIES = {
+  'case-01':
+    'Fantasy first-frame journey from @Image1 — shrinking inside a countertop popcorn machine kettle into a striped box.',
+  'case-03':
+    'Overhead ceiling-fan blade wipes across five streetwear outfits (@Image1–@Image5) in one continuous shot.',
+  'case-05':
+    'Chaotic messy-kitchen cooking vlog from @Image1 — smoking frying pan turning into an upbeat sauce product hook.',
+  'case-07':
+    'Two friends (@Image1–@Image2) attempt apartment selfies in a series of photobomb and synchronized sneeze mishaps.',
+  'case-13':
+    '1950s diner single take from @Image1 — a spilled tray freezes in mid-air and reverses behind a milkshake.',
   'case-17':
     'Hallway to luxury Miami villa match cut from @Image1 — casual sweatshirt to black mini dress and knee-high boots.',
+  'case-18':
+    'Christmas mansion payoff melodrama (@Image1–@Image4) revealed as a TV short drama watched on a living-room sofa.',
+  'case-22':
+    'Stylized 3D rom-com from @Image1–@Image2 — a first kiss triggers a shockwave launching him across the ocean.',
+  'case-23':
+    'Glamorous vintage vanity close-up from @Image1 — stirring a glass of rolled bills with a watching black cat.',
   'case-26':
     'Five street dancers from @Image1 perform synchronized night choreography in front of a warmly lit food stall.',
+  'case-27':
+    'Multi-level mall survival chase from @Image1 — stopped escalator slide, balcony drop to mattresses, red drape climb.',
+  'case-34':
+    'Five-member retro K-pop group from @Image1 — vintage bus aisle choreography wiping through red doors to a sunny lot.',
 };
 
 function modelFileSlug(modelId) {
@@ -142,7 +162,7 @@ function parseArgs(argv) {
   const args = {
     input: '',
     out: '',
-    version: 'v2',
+    version: 'v3',
     baseUrl: 'https://media.opengen.dev',
     cases: null,
     heroMaxSec: 10,
@@ -176,7 +196,7 @@ function parseArgs(argv) {
       args.skipExisting = true;
     } else if (flag === '--help' || flag === '-h') {
       console.log(
-        'Usage: node scripts/build-hero-media.mjs --input <dir> --out <dir> [--version v2] [--base-url https://media.opengen.dev] [--cases case-17,case-26] [--hero-max-sec 10] [--skip-existing]',
+        'Usage: node scripts/build-hero-media.mjs --input <dir> --out <dir> [--version v3] [--base-url https://media.opengen.dev] [--cases case-17,case-26] [--hero-max-sec 10] [--skip-existing]',
       );
       process.exit(0);
     } else {

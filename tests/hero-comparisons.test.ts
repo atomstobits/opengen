@@ -91,13 +91,14 @@ describe('hero comparison pricing and media configuration', () => {
       version: 'v1',
       nowDate: '2026-11-25',
     });
-    expect(clips).toHaveLength(2);
+    expect(clips).toHaveLength(12);
     expect(clips[0]).toMatchObject({
       id: 'case-17',
       resolution: '1080p',
       operation: 'reference-to-video',
       durationSec: 10,
       heroDurationSec: 10,
+      inputCount: 1,
     });
     expect(clips[0]?.left.discountLabel).toBe('-51%');
     expect(clips[0]?.right.discountLabel).toBe('-20%');
@@ -116,26 +117,50 @@ describe('hero comparison pricing and media configuration', () => {
     expect(clips[0]?.media.modalRightVideo).toBe(
       'https://media.opengen.dev/hero/v1/case-17/kling-4.0.mp4',
     );
-    expect(clips[1]).toMatchObject({
+    expect(clips.slice(0, 6).map((c) => c.right.modelId)).toEqual([
+      ...HERO_RIGHT_MODEL_ROTATION_ORDER,
+    ]);
+    for (let i = 0; i < clips.length; i += 1) {
+      const next = clips[(i + 1) % clips.length]!;
+      expect(clips[i]!.right.modelId).not.toBe(next.right.modelId);
+    }
+
+    const case26 = clips.find((c) => c.id === 'case-26');
+    expect(case26).toMatchObject({
       id: 'case-26',
       resolution: '720p',
       operation: 'image-to-video',
       durationSec: 30,
       heroDurationSec: 10,
+      inputCount: 1,
     });
-    expect(clips[1]?.left.discountLabel).toBe('-51%');
-    expect(clips[1]?.right.discountLabel).toBe('-20%');
+    expect(case26?.left.discountLabel).toBe('-51%');
+    expect(case26?.right.discountLabel).toBe('-20%');
+
+    const case03 = clips.find((c) => c.id === 'case-03');
+    expect(case03).toMatchObject({
+      id: 'case-03',
+      resolution: '1080p',
+      operation: 'reference-to-video',
+      durationSec: 15,
+      inputCount: 5,
+    });
+    expect(case03?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v1/case-03/gemini-omni-1.2-flash.mp4',
+    );
+    expect(case03?.media.inputImagesWebp).toHaveLength(5);
 
     vi.stubEnv('OPENGEN_HERO_MEDIA_VERSION', '');
     const defaultClips = getHeroComparisons({
       mediaBaseUrl: 'https://media.opengen.dev',
       nowDate: '2026-11-25',
     });
+    expect(defaultClips).toHaveLength(12);
     expect(defaultClips[0]?.media.heroPosterAvif).toBe(
-      'https://media.opengen.dev/hero/v2/case-17/hero-poster.avif',
+      'https://media.opengen.dev/hero/v3/case-17/hero-poster.avif',
     );
     expect(defaultClips[0]?.media.heroVideoAv1).toBe(
-      'https://media.opengen.dev/hero/v2/case-17/hero-split.av1.mp4',
+      'https://media.opengen.dev/hero/v3/case-17/hero-split.av1.mp4',
     );
   });
 
