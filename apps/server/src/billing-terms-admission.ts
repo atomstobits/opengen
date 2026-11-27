@@ -92,7 +92,8 @@ export async function verifyHumanIdentityTermsReceiptInTransaction(
   const receipt = await client.query(
     `SELECT 1 FROM mr_terms_receipts
      WHERE issuer=$1 AND subject=$2 AND policy_version=$3 AND policy_digest=$4
-       AND notice_version=$5 AND action='continue' AND method='oidc-verified'`,
+       AND notice_version=$5 AND action='continue'
+       AND method IN ('oidc-verified', 'github-oauth-verified', 'email-otp-verified')`,
     [identity.issuer, identity.subject, policy.version, policy.digest, HUMAN_TERMS_NOTICE_VERSION],
   );
   assertSamePolicy(policy, readPolicy);

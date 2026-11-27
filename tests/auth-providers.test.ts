@@ -17,7 +17,9 @@ import { registerMcpAuthorization } from '../apps/server/src/mcp-authorization.j
 import {
   CLIENT_IP_PROOF_HEADER,
   createClientIpProof,
+  normalizeClientIp,
   parseTrustedProxies,
+  verifyClientIpProof,
 } from '../apps/server/src/client-ip.js';
 import {
   HUMAN_TERMS_NOTICE_VERSION,
@@ -32,6 +34,7 @@ import {
   InMemoryEmailOtpStore,
   PostgresEmailOtpStore,
   emailOtpSubject,
+  readEmailOtpConfiguration,
   type EmailOtpDeliveryInput,
   type EmailOtpStore,
 } from '../apps/server/src/email-otp.js';
@@ -167,13 +170,13 @@ async function buildAuthFixture(options: {
   });
   const record = vi
     .spyOn(TermsReceiptStore.prototype, 'recordVerifiedAcceptance')
-    .mockImplementation(async (input) => {
-      events.push(`receipt:${input.issuer}`);
+    .mockImplementation(async (input, method = 'oidc-verified') => {
+      events.push(`receipt:${input.issuer}:${method}`);
       return {
         ...input,
         noticeVersion: HUMAN_TERMS_NOTICE_VERSION,
         action: 'continue',
-        method: 'oidc-verified',
+        method,
         acceptedAt: new Date(),
       };
     });
@@ -374,13 +377,16 @@ describe('GitHub OAuth sign-in', () => {
       createHash('sha256').update(observedTokenParams!.get('code_verifier')!).digest('base64url'),
     ).toBe(target.searchParams.get('code_challenge'));
     expect(f.identity).toHaveBeenCalledExactlyOnceWith(GITHUB_OAUTH_ISSUER, '424242');
-    expect(f.record).toHaveBeenCalledExactlyOnceWith({
-      issuer: GITHUB_OAUTH_ISSUER,
-      subject: '424242',
-      policyVersion: f.policy.version,
-      policyDigest: f.policy.digest,
-    });
-    expect(f.events.indexOf(`receipt:${GITHUB_OAUTH_ISSUER}`)).toBeLessThan(
+    expect(f.record).toHaveBeenCalledExactlyOnceWith(
+      {
+        issuer: GITHUB_OAUTH_ISSUER,
+        subject: '424242',
+        policyVersion: f.policy.version,
+        policyDigest: f.policy.digest,
+      },
+      'github-oauth-verified',
+    );
+    expect(f.events.indexOf(`receipt:${GITHUB_OAUTH_ISSUER}:github-oauth-verified`)).toBeLessThan(
       f.events.indexOf('session'),
     );
   });
@@ -419,9 +425,13 @@ describe('GitHub OAuth sign-in', () => {
 
     const badState = await f.app.inject({
       url: `/auth/callback?code=gh-auth-code&state=wrong-state`,
-      headers: { cookie: txCookie },
+      headers: { cookie: `${txCookie}; og_email_otp=keep-active-challenge` },
     });
     expect(badState.statusCode).toBe(401);
+    // A failed or stale OAuth callback must not clear an active Email OTP challenge cookie.
+    expect(cookieParts(badState.headers).some((item) => item.startsWith('og_email_otp='))).toBe(
+      false,
+    );
 
     const unverified = await f.app.inject({
       url: `/auth/callback?code=gh-auth-code&state=${encodeURIComponent(state)}`,
@@ -589,15 +599,20 @@ describe('Email OTP sign-in', () => {
     const expectedIssuer = `${origin}/auth/email-otp`;
     const expectedSubject = emailOtpSubject('producer@example.invalid');
     expect(f.identity).toHaveBeenCalledExactlyOnceWith(expectedIssuer, expectedSubject);
-    expect(f.record).toHaveBeenCalledExactlyOnceWith({
-      issuer: expectedIssuer,
-      subject: expectedSubject,
-      policyVersion: f.policy.version,
-      policyDigest: f.policy.digest,
-    });
-    expect(f.events.indexOf(`receipt:${expectedIssuer}`)).toBeLessThan(f.events.indexOf('session'));
+    expect(f.record).toHaveBeenCalledExactlyOnceWith(
+      {
+        issuer: expectedIssuer,
+        subject: expectedSubject,
+        policyVersion: f.policy.version,
+        policyDigest: f.policy.digest,
+      },
+      'email-otp-verified',
+    );
+    expect(f.events.indexOf(`receipt:${expectedIssuer}:email-otp-verified`)).toBeLessThan(
+      f.events.indexOf('session'),
+    );
 
-    // Replaying the exact same code + saved cookie must fail closed (single-use)
+    // Replaying the exact same code + saved cookie must fail closed (single-use) with a restart link preserving returnTo.
     const replay = await f.app.inject({
       method: 'POST',
       url: '/auth/login',
@@ -613,6 +628,8 @@ describe('Email OTP sign-in', () => {
       }).toString(),
     });
     expect(replay.statusCode).toBe(401);
+    expect(replay.headers['content-type']).toContain('text/html');
+    expect(replay.body).toContain('href="/auth/login?returnTo=%2Fbilling"');
     expect(f.createSession).toHaveBeenCalledOnce();
 
     // 2. Second send to same email succeeds; 3rd send hits strict 429 rate limit with Retry-After
@@ -674,7 +691,8 @@ describe('Email OTP sign-in', () => {
       });
       expect(attemptRes.statusCode).toBe(401);
     }
-    // Even the real code now fails because the challenge was permanently locked/burned
+    // Even the real code now fails because the challenge was permanently locked/burned,
+    // and renders a terminal HTML recovery page with a restart link.
     const afterLock = await f.app.inject({
       method: 'POST',
       url: '/auth/login',
@@ -690,6 +708,9 @@ describe('Email OTP sign-in', () => {
       }).toString(),
     });
     expect(afterLock.statusCode).toBe(401);
+    expect(afterLock.headers['content-type']).toContain('text/html');
+    expect(afterLock.body).toContain('Start sign-in over');
+    expect(afterLock.body).toContain('href="/auth/login"');
     expect(f.createSession).toHaveBeenCalledOnce();
   });
 
@@ -832,6 +853,10 @@ describe('Email OTP sign-in', () => {
     expect(spoof3.statusCode).toBe(429);
 
     // Verify limit is also isolated per signed client IP.
+    const aCode = delivered
+      .find((item) => item.to === 'alice1@example.invalid')!
+      .text.match(/\b(\d{6})\b/)![1]!;
+    const aWrongCode = aCode === '000000' ? '111111' : '000000';
     const aVerifyToken = extractFormToken(a1.body, 'email_otp_verify');
     const aCookie = cookieJar(cookieParts(a1.headers));
     for (let i = 0; i < 2; i++) {
@@ -847,7 +872,7 @@ describe('Email OTP sign-in', () => {
         payload: new URLSearchParams({
           action: 'email_otp_verify',
           actionToken: aVerifyToken,
-          code: '000000',
+          code: aWrongCode,
         }).toString(),
       });
       expect(failA.statusCode).toBe(401);
@@ -864,7 +889,7 @@ describe('Email OTP sign-in', () => {
       payload: new URLSearchParams({
         action: 'email_otp_verify',
         actionToken: aVerifyToken,
-        code: '000000',
+        code: aWrongCode,
       }).toString(),
     });
     expect(aVerifyLimited.statusCode).toBe(429);
@@ -898,6 +923,41 @@ describe('Email OTP sign-in', () => {
       '10.1.0.0/16',
       '2001:db8::/32',
     ]);
+    // Equivalent IPv6 and IPv4-mapped IPv6 representations canonicalize to one rate-limit key.
+    expect(normalizeClientIp('2001:0db8:0:0:0:0:0:1')).toBe('2001:db8::1');
+    expect(normalizeClientIp('2001:DB8::0001')).toBe('2001:db8::1');
+    expect(normalizeClientIp('::ffff:198.51.100.1')).toBe('198.51.100.1');
+    expect(normalizeClientIp('0:0:0:0:0:ffff:c633:6401')).toBe('198.51.100.1');
+    const proofSecret = 'k'.repeat(40);
+    const expandedProof = createClientIpProof({
+      secret: proofSecret,
+      ip: '2001:0db8:0:0:0:0:0:1',
+      method: 'POST',
+      pathname: '/auth/login',
+      nowMs: 1_800_000_000_000,
+    });
+    expect(
+      verifyClientIpProof({
+        proof: expandedProof,
+        secret: proofSecret,
+        method: 'POST',
+        pathname: '/auth/login',
+        nowMs: 1_800_000_000_000,
+      }),
+    ).toBe('2001:db8::1');
+    // Blank OPENGEN_EMAIL_OTP_FROM (e.g. Docker Compose empty default) falls back cleanly to RESEND_FROM_EMAIL.
+    const resendFallback = readEmailOtpConfiguration(
+      {
+        OPENGEN_EMAIL_OTP_FROM: '',
+        RESEND_API_KEY: 're_synthetic_fixture_key',
+        RESEND_FROM_EMAIL: 'OpenGen <auth@opengen.example>',
+        MR_SESSION_SECRET: 's'.repeat(32),
+      },
+      { publicUrl: new URL(origin) },
+    );
+    expect(resendFallback).not.toBeNull();
+    expect(resendFallback!.fromAddress).toBe('OpenGen <auth@opengen.example>');
+
     for (const unsafe of ['true', '*', '0.0.0.0/0', '::/0', '10.0.0.0/4', 'not-an-ip']) {
       expect(() => parseTrustedProxies(unsafe)).toThrow(/OPENGEN_TRUSTED_PROXIES/);
     }
@@ -1014,6 +1074,18 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
         expect(cookieParts(verifiedOnB.headers).some((c) => c.startsWith('og_session='))).toBe(
           true,
         );
+        // Confirm the immutable Terms receipt in PostgreSQL records the actual email-otp-verified method.
+        const receiptRow = (
+          await engine.pool.query<{ method: string }>(
+            'SELECT method FROM mr_terms_receipts WHERE issuer=$1 AND subject=$2 AND policy_version=$3',
+            [
+              `${origin}/auth/email-otp`,
+              emailOtpSubject('multi@example.invalid'),
+              activePolicy.version,
+            ],
+          )
+        ).rows[0];
+        expect(receiptRow).toEqual({ method: 'email-otp-verified' });
 
         // Replay on Instance A must fail closed (single-use atomic deletion in Postgres).
         const replayOnA = await instanceA.inject({

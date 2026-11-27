@@ -5,6 +5,7 @@ import {
   oidcHumanTransaction,
   readHumanLoginTransaction,
   registerHumanLogin,
+  renderEmailOtpTerminalNotice,
   renderEmailOtpVerifyNotice,
   renderHumanLoginNotice,
   sendOidcHandoff,
@@ -36,7 +37,7 @@ import {
 } from './email-otp.js';
 import { resolveTrustedClientIp } from './client-ip.js';
 import rateLimit from '@fastify/rate-limit';
-import { TermsReceiptStore } from '@media-router/engine';
+import { TermsReceiptStore, type TermsVerificationMethod } from '@media-router/engine';
 import { governancePolicySchema } from './governance.js';
 import { sessionRecoveryScope } from './session-recovery.js';
 import { assertBrowserRecoveryScope } from './browser-recovery.js';
@@ -577,6 +578,7 @@ export async function registerAccounts(
       reply: FastifyReply,
       continueIntent: HumanLoginIntent,
       claims: Record<string, unknown> & { iss: string; sub: string },
+      verificationMethod: TermsVerificationMethod,
       redirectCode: 302 | 303 = 302,
     ) => {
       await validateHumanLoginIntent(continueIntent, request, loginContext);
@@ -612,13 +614,21 @@ export async function registerAccounts(
       }
       await validateHumanLoginIntent(continueIntent, request, loginContext);
       const policy = continueIntent.policy;
-      if (policy.status === 'active')
-        await new TermsReceiptStore(store().pool).recordVerifiedAcceptance({
+      if (policy.status === 'active') {
+        const acceptance = {
           issuer: claims.iss,
           subject: claims.sub,
           policyVersion: policy.version,
           policyDigest: policy.digest,
-        });
+        };
+        if (verificationMethod === 'oidc-verified')
+          await new TermsReceiptStore(store().pool).recordVerifiedAcceptance(acceptance);
+        else
+          await new TermsReceiptStore(store().pool).recordVerifiedAcceptance(
+            acceptance,
+            verificationMethod,
+          );
+      }
       if (options.engine?.pendingEmailCredits) {
         const verifiedCreditEmail = pendingEmailCreditIdentityFromVerifiedOidcClaims(claims);
         if (verifiedCreditEmail) {
@@ -638,6 +648,10 @@ export async function registerAccounts(
       const session = await store().createSession(principal);
       // Recheck after asynchronous account/receipt/session work, before any return or cookie issuance.
       await validateHumanLoginIntent(continueIntent, request, loginContext);
+      reply.clearCookie('og_email_otp', { path: '/' });
+      reply.clearCookie('og_oidc', { path: '/' });
+      reply.clearCookie('og_login_intent', { path: '/' });
+      reply.clearCookie('og_mcp_consent', { path: '/' });
       reply.setCookie('og_session', session, cookieOptions);
       const consentRequest = continueIntent.consentRequest;
       if (consentRequest)
@@ -818,12 +832,22 @@ export async function registerAccounts(
                     }),
                   );
               }
-              if (result.status !== 'ok') throw unauthorized();
+              if (result.status !== 'ok') {
+                reply.clearCookie('og_email_otp', { path: '/' });
+                return reply
+                  .code(401)
+                  .type('text/html; charset=utf-8')
+                  .send(
+                    renderEmailOtpTerminalNotice({
+                      reason: result.status,
+                      consentRequest: challenge.continueIntent.consentRequest,
+                      returnTo: challenge.continueIntent.consentRequest
+                        ? null
+                        : challenge.continueIntent.returnTo,
+                    }),
+                  );
+              }
               reply.header('Referrer-Policy', 'no-referrer');
-              reply.clearCookie('og_email_otp', { path: '/' });
-              reply.clearCookie('og_mcp_consent', { path: '/' });
-              reply.clearCookie('og_oidc', { path: '/' });
-              reply.clearCookie('og_login_intent', { path: '/' });
               return completeHumanSignIn(
                 request,
                 reply,
@@ -834,6 +858,7 @@ export async function registerAccounts(
                   email: normalizedEmail,
                   email_verified: true,
                 },
+                'email-otp-verified',
                 303,
               );
             },
@@ -861,7 +886,6 @@ export async function registerAccounts(
           reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
           reply.clearCookie('og_mcp_consent', { path: '/' });
           reply.clearCookie('og_oidc', { path: '/' });
-          reply.clearCookie('og_email_otp', { path: '/' });
           reply.clearCookie('og_login_intent', { path: '/' });
           const transaction = await readHumanLoginTransaction(request, reply, loginContext);
           const callbackUrl = new URL(request.url, publicUrl);
@@ -880,6 +904,7 @@ export async function registerAccounts(
               reply,
               transaction.continueIntent,
               { ...claims },
+              'github-oauth-verified',
               302,
             );
           }
@@ -899,6 +924,7 @@ export async function registerAccounts(
             reply,
             transaction.continueIntent,
             claims as Record<string, unknown> & { iss: string; sub: string },
+            'oidc-verified',
             302,
           );
         },

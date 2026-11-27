@@ -155,7 +155,7 @@ const providerUnavailable = (code: 'email_otp_unavailable' | 'provider_unavailab
   });
 
 /** Redact malformed form, provider and receipt internals at this public identity boundary. */
-export function humanLoginError(error: unknown, _request: FastifyRequest, reply: FastifyReply) {
+export function humanLoginError(error: unknown, request: FastifyRequest, reply: FastifyReply) {
   const cause = error as { code?: string; statusCode?: number; retryAfterSeconds?: number };
   const status =
     cause.code === 'login_intent_invalid' || cause.code === 'unauthorized'
@@ -183,9 +183,15 @@ export function humanLoginError(error: unknown, _request: FastifyRequest, reply:
               : 'sign_in_unavailable';
   if (status === 401) {
     // A stale MCP or login cookie must not trap a signed-out user in repeated failed entry.
-    // Existing authenticated sessions and accepted-job recovery are untouched.
-    for (const name of ['og_login_intent', 'og_oidc', 'og_email_otp', 'og_mcp_consent'])
-      reply.clearCookie(name, { path: '/' });
+    // Scope cleanup to the failing flow so a stale OAuth callback does not drop an active
+    // Email OTP challenge in another tab. Existing sessions and recovery are untouched.
+    const isOAuthCallback =
+      request.routeOptions?.url === '/auth/callback' ||
+      request.url.split('?')[0] === '/auth/callback';
+    const cookiesToClear = isOAuthCallback
+      ? ['og_login_intent', 'og_oidc', 'og_mcp_consent']
+      : ['og_login_intent', 'og_oidc', 'og_email_otp', 'og_mcp_consent'];
+    for (const name of cookiesToClear) reply.clearCookie(name, { path: '/' });
   }
   if (
     status === 429 &&
@@ -408,6 +414,24 @@ export function renderEmailOtpVerifyNotice(params: {
       ? `/auth/login?returnTo=${encodeURIComponent(params.returnTo)}`
       : '/auth/login';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Enter sign-in code | OpenGen</title><style>${css}</style></head><body><main><div class="card"><a class="brand" href="/" aria-label="OpenGen">${wordmarkSvg}</a><h1>Check your email.</h1><p>We sent a 6-digit single-use sign-in code to <strong>${escapeHtml(params.maskedEmail)}</strong>. It expires in 10 minutes.</p>${errorBanner}<form method="post" action="/auth/login"><input type="hidden" name="action" value="email_otp_verify"><input type="hidden" name="actionToken" value="${escapeHtml(params.actionToken)}"><label for="email-otp-code">6-digit sign-in code</label><input id="email-otp-code" class="otp-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button type="submit">Verify and sign in</button></form><p class="back-row"><a class="back-link" href="${escapeHtml(startOverHref)}">Start sign-in over</a></p></div></main></body></html>`;
+}
+
+export function renderEmailOtpTerminalNotice(params: {
+  reason: 'locked' | 'missing_or_expired';
+  consentRequest?: string | null;
+  returnTo?: string | null;
+}): string {
+  const startOverHref = params.consentRequest
+    ? `/oauth/login?request=${encodeURIComponent(params.consentRequest)}`
+    : params.returnTo && validateSafeReturnTo(params.returnTo)
+      ? `/auth/login?returnTo=${encodeURIComponent(params.returnTo)}`
+      : '/auth/login';
+  const heading = params.reason === 'locked' ? 'Sign-in code locked.' : 'Sign-in code expired.';
+  const detail =
+    params.reason === 'locked'
+      ? 'Too many incorrect codes were entered for this challenge. Request a new sign-in code to continue.'
+      : 'This single-use sign-in code has expired or has already been used. Request a new sign-in code to continue.';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${heading} | OpenGen</title><style>${css}</style></head><body><main><div class="card"><a class="brand" href="/" aria-label="OpenGen">${wordmarkSvg}</a><h1>${heading}</h1><p class="alert" role="alert">${detail}</p><p class="back-row"><a class="back-link" href="${escapeHtml(startOverHref)}">Start sign-in over</a></p></div></main></body></html>`;
 }
 
 /** A form-action 'self' policy can block an IdP redirect chain. Finish the POST

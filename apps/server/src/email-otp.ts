@@ -411,70 +411,104 @@ export class PostgresEmailOtpStore implements EmailOtpStore {
       .digest('hex');
     const windowStart = Math.floor(now / this.sendWindowMs);
     const nowDate = new Date(now);
+    // Deterministic lock order ('send_client' then 'send_email') prevents deadlocks.
+    const keys: Array<{
+      scope: 'send_client' | 'send_email';
+      subjectHash: string;
+      limit: number;
+    }> = [
+      { scope: 'send_client', subjectHash: ipHash, limit: this.maxSendsPerIp },
+      { scope: 'send_email', subjectHash: emailHash, limit: this.maxSendsPerEmail },
+    ];
+    let result: EmailOtpRateLimitResult | null = null;
     const client = await this.pool.connect();
     try {
-      await client.query('BEGIN');
-      // Deterministic lock order ('send_client' then 'send_email') prevents deadlocks.
-      const keys: Array<{
-        scope: 'send_client' | 'send_email';
-        subjectHash: string;
-        limit: number;
-      }> = [
-        { scope: 'send_client', subjectHash: ipHash, limit: this.maxSendsPerIp },
-        { scope: 'send_email', subjectHash: emailHash, limit: this.maxSendsPerEmail },
-      ];
-      for (const entry of keys) {
-        await client.query(
-          `INSERT INTO mr_email_otp_rate_limits(scope, subject_hash, window_start, count, updated_at)
-           VALUES($1, $2, $3, 0, $4)
-           ON CONFLICT (scope, subject_hash) DO NOTHING`,
-          [entry.scope, entry.subjectHash, windowStart, nowDate],
-        );
-      }
-      const locked = (
-        await client.query<{ scope: string; window_start: string; count: number }>(
-          `SELECT scope, window_start, count
-           FROM mr_email_otp_rate_limits
-           WHERE (scope = 'send_client' AND subject_hash = $1)
-              OR (scope = 'send_email' AND subject_hash = $2)
-           ORDER BY scope ASC
-           FOR UPDATE`,
-          [ipHash, emailHash],
-        )
-      ).rows;
-      for (const entry of keys) {
-        const row = locked.find((item) => item.scope === entry.scope);
-        const storedWindow = row ? Number(row.window_start) : windowStart;
-        const effectiveCount = storedWindow < windowStart ? 0 : (row?.count ?? 0);
-        if (effectiveCount >= entry.limit) {
-          await client.query('ROLLBACK');
-          const activeWindow = Math.max(storedWindow, windowStart);
-          const retryAfterSeconds = Math.max(
-            1,
-            Math.ceil(((activeWindow + 1) * this.sendWindowMs - now) / 1000),
-          );
-          return { allowed: false, retryAfterSeconds };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await client.query('BEGIN');
+        try {
+          for (const entry of keys) {
+            await client.query(
+              `INSERT INTO mr_email_otp_rate_limits(scope, subject_hash, window_start, count, updated_at)
+               VALUES($1, $2, $3, 0, $4)
+               ON CONFLICT (scope, subject_hash) DO NOTHING`,
+              [entry.scope, entry.subjectHash, windowStart, nowDate],
+            );
+          }
+          const locked = (
+            await client.query<{ scope: string; window_start: string; count: number }>(
+              `SELECT scope, window_start, count
+               FROM mr_email_otp_rate_limits
+               WHERE (scope = 'send_client' AND subject_hash = $1)
+                  OR (scope = 'send_email' AND subject_hash = $2)
+               ORDER BY scope ASC
+               FOR UPDATE`,
+              [ipHash, emailHash],
+            )
+          ).rows;
+          // If concurrent pruning removed a bucket between DO NOTHING and FOR UPDATE, retry instead of granting uncharged.
+          if (locked.length !== keys.length) {
+            await client.query('ROLLBACK');
+            continue;
+          }
+          let denied: EmailOtpRateLimitResult | null = null;
+          for (const entry of keys) {
+            const row = locked.find((item) => item.scope === entry.scope);
+            if (!row) {
+              await client.query('ROLLBACK');
+              throw new Error('Missing locked OTP send rate-limit row.');
+            }
+            const storedWindow = Number(row.window_start);
+            const effectiveCount = storedWindow < windowStart ? 0 : row.count;
+            if (effectiveCount >= entry.limit) {
+              await client.query('ROLLBACK');
+              const activeWindow = Math.max(storedWindow, windowStart);
+              const retryAfterSeconds = Math.max(
+                1,
+                Math.ceil(((activeWindow + 1) * this.sendWindowMs - now) / 1000),
+              );
+              denied = { allowed: false, retryAfterSeconds };
+              break;
+            }
+          }
+          if (denied) return denied;
+          let chargedAll = true;
+          for (const entry of keys) {
+            const updated = await client.query(
+              `UPDATE mr_email_otp_rate_limits
+               SET window_start = CASE WHEN window_start < $3 THEN $3 ELSE window_start END,
+                   count = CASE WHEN window_start < $3 THEN 1 ELSE count + 1 END,
+                   updated_at = $4
+               WHERE scope = $1 AND subject_hash = $2`,
+              [entry.scope, entry.subjectHash, windowStart, nowDate],
+            );
+            if (updated.rowCount !== 1) {
+              chargedAll = false;
+              break;
+            }
+          }
+          if (!chargedAll) {
+            await client.query('ROLLBACK');
+            continue;
+          }
+          await client.query('COMMIT');
+          result = { allowed: true, retryAfterSeconds: 0 };
+          break;
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          throw error;
         }
       }
-      for (const entry of keys) {
-        await client.query(
-          `UPDATE mr_email_otp_rate_limits
-           SET window_start = CASE WHEN window_start < $3 THEN $3 ELSE window_start END,
-               count = CASE WHEN window_start < $3 THEN 1 ELSE count + 1 END,
-               updated_at = $4
-           WHERE scope = $1 AND subject_hash = $2`,
-          [entry.scope, entry.subjectHash, windowStart, nowDate],
-        );
-      }
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
     } finally {
       client.release();
     }
+    if (!result) {
+      throw Object.assign(new Error('Sign-in rate limiter could not charge quota; please retry.'), {
+        statusCode: 503,
+        code: 'sign_in_unavailable',
+      });
+    }
     await this.pruneStaleRateLimits(now);
-    return { allowed: true, retryAfterSeconds: 0 };
+    return result;
   }
 
   async checkVerifyLimit(ip: string, now = Date.now()): Promise<EmailOtpRateLimitResult> {
@@ -483,52 +517,73 @@ export class PostgresEmailOtpStore implements EmailOtpStore {
       .digest('hex');
     const windowStart = Math.floor(now / this.verifyWindowMs);
     const nowDate = new Date(now);
+    let result: EmailOtpRateLimitResult | null = null;
     const client = await this.pool.connect();
     try {
-      await client.query('BEGIN');
-      await client.query(
-        `INSERT INTO mr_email_otp_rate_limits(scope, subject_hash, window_start, count, updated_at)
-         VALUES('verify_client', $1, $2, 0, $3)
-         ON CONFLICT (scope, subject_hash) DO NOTHING`,
-        [ipHash, windowStart, nowDate],
-      );
-      const row = (
-        await client.query<{ window_start: string; count: number }>(
-          `SELECT window_start, count
-           FROM mr_email_otp_rate_limits
-           WHERE scope = 'verify_client' AND subject_hash = $1
-           FOR UPDATE`,
-          [ipHash],
-        )
-      ).rows[0];
-      const storedWindow = row ? Number(row.window_start) : windowStart;
-      const effectiveCount = storedWindow < windowStart ? 0 : (row?.count ?? 0);
-      if (effectiveCount >= this.maxVerifiesPerIp) {
-        await client.query('ROLLBACK');
-        const activeWindow = Math.max(storedWindow, windowStart);
-        const retryAfterSeconds = Math.max(
-          1,
-          Math.ceil(((activeWindow + 1) * this.verifyWindowMs - now) / 1000),
-        );
-        return { allowed: false, retryAfterSeconds };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await client.query('BEGIN');
+        try {
+          await client.query(
+            `INSERT INTO mr_email_otp_rate_limits(scope, subject_hash, window_start, count, updated_at)
+             VALUES('verify_client', $1, $2, 0, $3)
+             ON CONFLICT (scope, subject_hash) DO NOTHING`,
+            [ipHash, windowStart, nowDate],
+          );
+          const row = (
+            await client.query<{ window_start: string; count: number }>(
+              `SELECT window_start, count
+               FROM mr_email_otp_rate_limits
+               WHERE scope = 'verify_client' AND subject_hash = $1
+               FOR UPDATE`,
+              [ipHash],
+            )
+          ).rows[0];
+          if (!row) {
+            await client.query('ROLLBACK');
+            continue;
+          }
+          const storedWindow = Number(row.window_start);
+          const effectiveCount = storedWindow < windowStart ? 0 : row.count;
+          if (effectiveCount >= this.maxVerifiesPerIp) {
+            await client.query('ROLLBACK');
+            const activeWindow = Math.max(storedWindow, windowStart);
+            const retryAfterSeconds = Math.max(
+              1,
+              Math.ceil(((activeWindow + 1) * this.verifyWindowMs - now) / 1000),
+            );
+            return { allowed: false, retryAfterSeconds };
+          }
+          const updated = await client.query(
+            `UPDATE mr_email_otp_rate_limits
+             SET window_start = CASE WHEN window_start < $2 THEN $2 ELSE window_start END,
+                 count = CASE WHEN window_start < $2 THEN 1 ELSE count + 1 END,
+                 updated_at = $3
+             WHERE scope = 'verify_client' AND subject_hash = $1`,
+            [ipHash, windowStart, nowDate],
+          );
+          if (updated.rowCount !== 1) {
+            await client.query('ROLLBACK');
+            continue;
+          }
+          await client.query('COMMIT');
+          result = { allowed: true, retryAfterSeconds: 0 };
+          break;
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          throw error;
+        }
       }
-      await client.query(
-        `UPDATE mr_email_otp_rate_limits
-         SET window_start = CASE WHEN window_start < $2 THEN $2 ELSE window_start END,
-             count = CASE WHEN window_start < $2 THEN 1 ELSE count + 1 END,
-             updated_at = $3
-         WHERE scope = 'verify_client' AND subject_hash = $1`,
-        [ipHash, windowStart, nowDate],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
     } finally {
       client.release();
     }
+    if (!result) {
+      throw Object.assign(new Error('Sign-in rate limiter could not charge quota; please retry.'), {
+        statusCode: 503,
+        code: 'sign_in_unavailable',
+      });
+    }
     await this.pruneStaleRateLimits(now);
-    return { allowed: true, retryAfterSeconds: 0 };
+    return result;
   }
 
   async createChallenge(input: {
@@ -707,17 +762,16 @@ export function readEmailOtpConfiguration(
     return {
       secret,
       issuer,
-      fromAddress: (
-        env.OPENGEN_EMAIL_OTP_FROM ??
-        env.RESEND_FROM_EMAIL ??
-        'OpenGen <auth@opengen.dev>'
-      ).trim(),
+      fromAddress:
+        env.OPENGEN_EMAIL_OTP_FROM?.trim() ||
+        env.RESEND_FROM_EMAIL?.trim() ||
+        'OpenGen <auth@opengen.dev>',
       send: options.transport,
     };
   }
 
   const resendApiKey = env.RESEND_API_KEY?.trim() ?? '';
-  const fromAddress = (env.OPENGEN_EMAIL_OTP_FROM ?? env.RESEND_FROM_EMAIL ?? '').trim();
+  const fromAddress = env.OPENGEN_EMAIL_OTP_FROM?.trim() || env.RESEND_FROM_EMAIL?.trim() || '';
   const relayUrl = env.OPENGEN_EMAIL_OTP_RELAY_URL?.trim() ?? '';
 
   if (resendApiKey && fromAddress) {

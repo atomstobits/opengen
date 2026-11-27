@@ -209,70 +209,78 @@ function fixtureBillingRuntime(
 describe.skipIf(!databaseUrl)('database-backed opt-in bounded starter trial credit', () => {
   async function setup(env: NodeJS.ProcessEnv = {}, humanTermsPolicy?: () => HumanTermsPolicy) {
     const isolated = await isolatedEngineDatabase(databaseUrl!, 'trial_credit');
-    const engine = isolated.bind(
-      createEngine({
-        databaseUrl: isolated.databaseUrl,
-        publicUrl,
-        providerEnv: {},
-        poolSize: Number(process.env.MR_DATABASE_POOL_SIZE ?? 4),
-      }),
-    );
-    await engine.initialize();
-    const processorEnvironment = {
-      id: 'trial-runtime-fixture',
-      accountId: 'acct_trialfixture',
-      livemode: false,
-    };
-    await registerBillingProcessorEnvironmentInTransaction(engine.pool, processorEnvironment);
-    const app = await buildApp({
-      engine,
-      publicUrl,
-      env,
-      ...(humanTermsPolicy ? { humanTermsPolicy } : {}),
-      billingRuntime: fixtureBillingRuntime(processorEnvironment, humanTermsPolicy),
-    });
-    const issuer = 'https://accounts.google.com';
-    const subject = `trial-sub-${randomUUID()}`;
-    const identity = await engine.accounts.identity(issuer, subject);
-    const sessionToken = await engine.accounts.createSession(identity);
-    const principal = (await engine.accounts.session(sessionToken))!;
-    const recoveryScope = sessionRecoveryScope(principal);
-    const headers = {
-      cookie: `og_session=${sessionToken}`,
-      'x-opengen-workspace': principal.workspaceId,
-      'x-opengen-recovery-scope': recoveryScope,
-    };
-    const recordTermsReceipt = async (policy: HumanTermsPolicy = activeTermsPolicy) => {
-      await engine.pool.query(
-        `INSERT INTO mr_terms_receipts(issuer,subject,policy_version,policy_digest,notice_version,action,method)
-         VALUES($1,$2,$3,$4,'human-terms-continue-v1','continue','oidc-verified')
-         ON CONFLICT(issuer,subject,policy_version) DO NOTHING`,
-        [issuer, subject, policy.version, policy.digest],
-      );
-    };
+    let engine: ReturnType<typeof createEngine> | undefined;
+    let app: Awaited<ReturnType<typeof buildApp>> | undefined;
     const close = async () => {
       try {
-        await app.close();
+        await app?.close();
       } finally {
         try {
-          await engine.close();
+          await engine?.close();
         } finally {
           await isolated.close();
         }
       }
     };
-    return {
-      engine,
-      app,
-      issuer,
-      subject,
-      principal,
-      sessionToken,
-      recoveryScope,
-      headers,
-      recordTermsReceipt,
-      close,
-    };
+    try {
+      engine = isolated.bind(
+        createEngine({
+          databaseUrl: isolated.databaseUrl,
+          publicUrl,
+          providerEnv: {},
+          poolSize: Number(process.env.MR_DATABASE_POOL_SIZE ?? 4),
+        }),
+      );
+      await engine.initialize();
+      const processorEnvironment = {
+        id: 'trial-runtime-fixture',
+        accountId: 'acct_trialfixture',
+        livemode: false,
+      };
+      await registerBillingProcessorEnvironmentInTransaction(engine.pool, processorEnvironment);
+      app = await buildApp({
+        engine,
+        publicUrl,
+        env,
+        ...(humanTermsPolicy ? { humanTermsPolicy } : {}),
+        billingRuntime: fixtureBillingRuntime(processorEnvironment, humanTermsPolicy),
+      });
+      const issuer = 'https://accounts.google.com';
+      const subject = `trial-sub-${randomUUID()}`;
+      const identity = await engine.accounts.identity(issuer, subject);
+      const sessionToken = await engine.accounts.createSession(identity);
+      const principal = (await engine.accounts.session(sessionToken))!;
+      const recoveryScope = sessionRecoveryScope(principal);
+      const headers = {
+        cookie: `og_session=${sessionToken}`,
+        'x-opengen-workspace': principal.workspaceId,
+        'x-opengen-recovery-scope': recoveryScope,
+      };
+      const dbPool = engine.pool;
+      const recordTermsReceipt = async (policy: HumanTermsPolicy = activeTermsPolicy) => {
+        await dbPool.query(
+          `INSERT INTO mr_terms_receipts(issuer,subject,policy_version,policy_digest,notice_version,action,method)
+           VALUES($1,$2,$3,$4,'human-terms-continue-v1','continue','oidc-verified')
+           ON CONFLICT(issuer,subject,policy_version) DO NOTHING`,
+          [issuer, subject, policy.version, policy.digest],
+        );
+      };
+      return {
+        engine,
+        app,
+        issuer,
+        subject,
+        principal,
+        sessionToken,
+        recoveryScope,
+        headers,
+        recordTermsReceipt,
+        close,
+      };
+    } catch (cause) {
+      await close().catch(() => undefined);
+      throw cause;
+    }
   }
 
   it('stays completely disabled by default and omits trialCredit from /v1/billing/access', async () => {
@@ -679,10 +687,32 @@ describe.skipIf(!databaseUrl)('database-backed opt-in bounded starter trial cred
     }
   });
 
-  it('preserves verified payment capabilities on /v1/billing/access when trial-credit status fails and rate-limits trial-credit claims', async () => {
+  it('preserves granted payment capabilities on /v1/billing/access when trial-credit status fails and enforces exact claim rate-limit boundary', async () => {
     const f = await setup({ OPENGEN_TRIAL_CREDIT_MICROS: '1000000' }, () => activeTermsPolicy);
     try {
       await f.recordTermsReceipt(activeTermsPolicy);
+      // Establish an authorized funding owner so payment capabilities (read/manage/setup) are granted.
+      const membershipEpoch = (
+        await f.engine.pool.query<{ epoch: string }>(
+          'SELECT extract(epoch FROM accepted_at)::text AS epoch FROM mr_memberships WHERE id=$1',
+          [f.principal.membershipId],
+        )
+      ).rows[0]!.epoch;
+      await f.engine.pool.query(
+        `INSERT INTO mr_billing_owners(
+           workspace_id,membership_id,membership_epoch,authority_version,
+           processor_environment_id,livemode,rails,consent_reference,approval_reference
+         ) VALUES(
+           $1,$2,$3,1,'trial-runtime-fixture',false,
+           '{"allowsEnabled":true,"maxThresholdMicros":100000000,"maxAmountCents":10000,"maxMonthlyCapCents":100000,"maxAttemptsPerMonth":100,"minCooldownSeconds":60,"maxFailureLimit":10}',
+           'trial-owner-consent','trial-owner-approval'
+         )`,
+        [f.principal.workspaceId, f.principal.membershipId, membershipEpoch],
+      );
+      const before = await f.app.inject({ url: '/v1/billing/access', headers: f.headers });
+      expect(before.statusCode).toBe(200);
+      expect(before.json().capabilities).toEqual({ read: true, manage: true, setup: true });
+
       const statusSpy = vi
         .spyOn(StarterTrialCreditStore.prototype, 'getStatus')
         .mockRejectedValueOnce(new Error('transient trial credit lookup failure'));
@@ -693,7 +723,7 @@ describe.skipIf(!databaseUrl)('database-backed opt-in bounded starter trial cred
       expect(access.json()).toEqual({
         workspaceId: f.principal.workspaceId,
         recoveryScope: f.recoveryScope,
-        capabilities: { read: false, manage: false, setup: false },
+        capabilities: { read: true, manage: true, setup: true },
         trialCredit: {
           enabled: true,
           amountMicros: 1_000_000,
@@ -704,26 +734,25 @@ describe.skipIf(!databaseUrl)('database-backed opt-in bounded starter trial cred
       });
       statusSpy.mockRestore();
 
-      // Verify @fastify/rate-limit enforces bounded claim rate limiting (30/min on POST /v1/billing/trial-credit).
-      const statuses: number[] = [];
-      let retryAfter: string | undefined;
-      for (let i = 0; i < 32; i++) {
+      // Verify @fastify/rate-limit allows requests 1..30 and rejects request 31 with 429 + Retry-After.
+      for (let i = 1; i <= 30; i++) {
         const res = await f.app.inject({
           method: 'POST',
           url: '/v1/billing/trial-credit',
           headers: { ...f.headers, origin: publicUrl },
           payload: {},
         });
-        statuses.push(res.statusCode);
-        if (res.statusCode === 429) {
-          retryAfter = String(res.headers['retry-after'] ?? '');
-          expect(res.json().error.code).toBe('rate_limited');
-          break;
-        }
+        expect(res.statusCode).toBe(i === 1 ? 201 : 200);
       }
-      expect(statuses).toContain(201);
-      expect(statuses).toContain(429);
-      expect(Number(retryAfter)).toBeGreaterThan(0);
+      const overLimit = await f.app.inject({
+        method: 'POST',
+        url: '/v1/billing/trial-credit',
+        headers: { ...f.headers, origin: publicUrl },
+        payload: {},
+      });
+      expect(overLimit.statusCode).toBe(429);
+      expect(overLimit.json().error.code).toBe('rate_limited');
+      expect(Number(overLimit.headers['retry-after'])).toBeGreaterThan(0);
     } finally {
       await f.close();
     }

@@ -519,6 +519,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
         workspaceId={workspaceId}
         recoveryScope={recoveryScope}
         trialCredit={capabilities.trialCredit}
+        showPaymentRecoveryHint={false}
         onClaimed={handleTrialClaimed}
       />
     ) : null;
@@ -642,6 +643,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
           workspaceId={workspaceId}
           recoveryScope={recoveryScope}
           trialCredit={capabilities.trialCredit}
+          showPaymentRecoveryHint={true}
           onClaimed={handleTrialClaimed}
         />
       )}
@@ -1533,11 +1535,13 @@ function StarterTrialCreditCard({
   workspaceId,
   recoveryScope,
   trialCredit,
+  showPaymentRecoveryHint = false,
   onClaimed,
 }: {
   workspaceId: string;
   recoveryScope: string;
   trialCredit: TrialCreditStatus;
+  showPaymentRecoveryHint?: boolean;
   onClaimed: (result: TrialCreditClaimResult) => Promise<void>;
 }) {
   const [claiming, setClaiming] = useState(false);
@@ -1585,7 +1589,11 @@ function StarterTrialCreditCard({
           <h2 id="starter-trial-status">{blockedHeading}</h2>
           <p>
             {trialCredit.reason === 'unavailable' ? (
-              'Starter trial credit status could not be loaded right now. Your payment history and order recovery remain available below.'
+              showPaymentRecoveryHint ? (
+                'Starter trial credit status could not be loaded right now. Your payment history and order recovery remain available below.'
+              ) : (
+                'Starter trial credit status could not be loaded right now. Please refresh or try again shortly.'
+              )
             ) : trialCredit.reason === 'personal-workspace-required' ? (
               'Switch to your personal workspace to claim your one-time non-refundable starter credit.'
             ) : trialCredit.reason === 'terms-required' ? (

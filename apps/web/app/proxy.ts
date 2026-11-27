@@ -15,11 +15,26 @@ function normalizeProxyClientIp(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   if (!trimmed || trimmed.length > 64 || /[\u0000-\u001f\u007f\s%]/.test(trimmed)) return null;
-  const unmapped = /^::ffff:/i.test(trimmed) ? trimmed.slice(7) : trimmed;
-  if (isIP(unmapped) === 4) return unmapped;
-  const lower = trimmed.toLowerCase();
-  if (isIP(lower) === 6) return lower;
-  return null;
+  if (isIP(trimmed) === 4) return trimmed;
+  if (isIP(trimmed) !== 6) return null;
+  let canonical: string;
+  try {
+    const parsed = new URL(`http://[${trimmed.toLowerCase()}]/`).hostname;
+    if (!parsed.startsWith('[') || !parsed.endsWith(']')) return null;
+    canonical = parsed.slice(1, -1).toLowerCase();
+  } catch {
+    return null;
+  }
+  const mappedDotted = canonical.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mappedDotted && isIP(mappedDotted[1]!) === 4) return mappedDotted[1]!;
+  const mappedHex = canonical.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const hi = Number.parseInt(mappedHex[1]!, 16);
+    const lo = Number.parseInt(mappedHex[2]!, 16);
+    const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    if (isIP(ipv4) === 4) return ipv4;
+  }
+  return isIP(canonical) === 6 ? canonical : null;
 }
 
 function extractPlatformTrustedClientIp(

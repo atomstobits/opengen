@@ -170,6 +170,8 @@ services:
       OPENGEN_HERO_POSTER_URL: ${OPENGEN_HERO_POSTER_URL:-}
       OPENGEN_TRIAL_CREDIT_MICROS: ${OPENGEN_TRIAL_CREDIT_MICROS:-}
       OPENGEN_PROXY_CLIENT_SECRET: ${OPENGEN_PROXY_CLIENT_SECRET:-}
+      # Optional single-header selector for non-Vercel reverse proxies; the ingress MUST overwrite/replace this header.
+      OPENGEN_TRUSTED_CLIENT_IP_HEADER: ${OPENGEN_TRUSTED_CLIENT_IP_HEADER:-}
     ports: ['127.0.0.1:4320:4320']
     depends_on:
       api: { condition: service_healthy }

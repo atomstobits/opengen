@@ -12,18 +12,34 @@ export interface ResolvedClientIp {
 }
 
 /**
- * Validates and canonicalizes an IPv4 or IPv6 address literal.
- * Strips the IPv4-mapped IPv6 prefix (::ffff:) when wrapping a valid IPv4 address.
+ * Validates and canonicalizes an IPv4 or IPv6 address literal (RFC 5952 compressed IPv6).
+ * Unwraps IPv4-mapped IPv6 addresses (both ::ffff:a.b.c.d and ::ffff:xxxx:yyyy) to dotted IPv4
+ * so equivalent numeric representations share one canonical rate-limit key.
  */
 export function normalizeClientIp(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   if (!trimmed || trimmed.length > 64 || /[\u0000-\u001f\u007f\s%]/.test(trimmed)) return null;
-  const unmapped = /^::ffff:/i.test(trimmed) ? trimmed.slice(7) : trimmed;
-  if (isIP(unmapped) === 4) return unmapped;
-  const lower = trimmed.toLowerCase();
-  if (isIP(lower) === 6) return lower;
-  return null;
+  if (isIP(trimmed) === 4) return trimmed;
+  if (isIP(trimmed) !== 6) return null;
+  let canonical: string;
+  try {
+    const parsed = new URL(`http://[${trimmed.toLowerCase()}]/`).hostname;
+    if (!parsed.startsWith('[') || !parsed.endsWith(']')) return null;
+    canonical = parsed.slice(1, -1).toLowerCase();
+  } catch {
+    return null;
+  }
+  const mappedDotted = canonical.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mappedDotted && isIP(mappedDotted[1]!) === 4) return mappedDotted[1]!;
+  const mappedHex = canonical.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const hi = Number.parseInt(mappedHex[1]!, 16);
+    const lo = Number.parseInt(mappedHex[2]!, 16);
+    const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    if (isIP(ipv4) === 4) return ipv4;
+  }
+  return isIP(canonical) === 6 ? canonical : null;
 }
 
 function signMessage(
@@ -96,15 +112,12 @@ export function verifyClientIpProof(params: {
   } catch {
     return null;
   }
+  if (!decodedIp || decodedIp !== decodedIp.trim() || isIP(decodedIp) === 0) return null;
   const canonicalIp = normalizeClientIp(decodedIp);
-  if (!canonicalIp || canonicalIp !== decodedIp) return null;
-  const expectedSig = signMessage(
-    secret,
-    timestampSec,
-    canonicalIp,
-    params.method,
-    params.pathname,
-  );
+  if (!canonicalIp) return null;
+  // Verify the HMAC against the signed IP text first for compatibility with non-canonicalized
+  // proxy deployments, then return the canonicalized address for uniform rate-limit keying.
+  const expectedSig = signMessage(secret, timestampSec, decodedIp, params.method, params.pathname);
   const actualBuf = Buffer.from(sig, 'utf8');
   const expectedBuf = Buffer.from(expectedSig, 'utf8');
   if (actualBuf.length !== expectedBuf.length || !timingSafeEqual(actualBuf, expectedBuf))
