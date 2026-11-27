@@ -236,7 +236,7 @@ test('home keeps the agent-first hero and curated discovery while company pages 
   await mkdir(evidenceDir, { recursive: true });
   await hero.screenshot({ path: path.join(evidenceDir, 'hero-desktop.png') });
   await nav.getByRole('link', { name: 'Models', exact: true }).click();
-  await card(page, 'bytedance/seedance-2.5')
+  await seriesGroup(page, 'bytedance/seedance-2.5')
     .getByRole('link', { name: 'ByteDance', exact: true })
     .click();
   await expect(page).toHaveURL(/\/bytedance$/);
