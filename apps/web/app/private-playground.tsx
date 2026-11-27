@@ -16,7 +16,7 @@ import {
 } from '@media-router/contracts';
 import { collectGenerationAssets } from '@media-router/contracts/generation';
 import { GatewayAccess, type BrowserSession } from './gateway-access';
-import { notifyHeaderBalanceChanged, useHeaderSession } from './header-session';
+import { buildLoginHref, notifyHeaderBalanceChanged, useHeaderSession } from './header-session';
 import { PlaygroundAuthority } from './playground-authority';
 import { PlaygroundCodeTabs } from './playground-code-tabs';
 import { PlaygroundResult } from './playground-result';
@@ -1048,7 +1048,7 @@ export function Playground({
   const selectedRegion =
     requestedRegion && regions.includes(requestedRegion) ? requestedRegion : undefined;
   const selectionHref = playgroundHref(model.id, draft.routeId, draft.operation, selectedRegion);
-  const loginHref = `/auth/login?returnTo=${encodeURIComponent(selectionHref)}`;
+  const loginHref = buildLoginHref({ returnTo: selectionHref });
   const persistSignedOutDraft = () => {
     if (!session.authenticated && !authorityPending && signedOutEdited.current) {
       writeSignInHandoff(draft);

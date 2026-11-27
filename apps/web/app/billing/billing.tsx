@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Footer, SiteHeader } from '../ui';
-import { notifyHeaderBalanceChanged } from '../header-session';
+import { buildLoginHref, notifyHeaderBalanceChanged } from '../header-session';
 import { useLegalPresentation } from '../legal/presentation';
 import type { BrowserSession } from '../gateway-access';
 import { hasWorkspaceAuthority, privateWorkspaceHeaders } from '../dashboard/activity-view';
@@ -29,6 +29,8 @@ import {
   type PendingTopUp,
 } from './billing-client';
 import styles from './billing.module.css';
+
+const billingLoginHref = buildLoginHref({ returnTo: '/billing' });
 
 const usd = (cents: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -173,7 +175,7 @@ export function BillingPage() {
               </p>
             )}
             {session?.oidcEnabled ? (
-              <a className={styles.primary} href="/auth/login">
+              <a className={styles.primary} href={billingLoginHref}>
                 Sign in to OpenGen ↗
               </a>
             ) : session ? (
@@ -628,7 +630,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
           {summary.newFunding.reason === 'terms-required' ? (
             <>
               Review the current Terms before starting a new top-up.{' '}
-              <a href="/auth/login">Review Terms and sign in</a>.
+              <a href={billingLoginHref}>Review Terms and sign in</a>.
             </>
           ) : (
             'New top-ups are unavailable until the current Terms are active. Your payment history remains available.'
@@ -1250,7 +1252,7 @@ export function BillingOwnerEnrollmentCard({
                 )}
               </div>
               {enrollment.reason === 'terms-required' && (
-                <a className={styles.primary} href="/auth/login">
+                <a className={styles.primary} href={billingLoginHref}>
                   Review Terms and sign in ↗
                 </a>
               )}
@@ -1585,7 +1587,7 @@ function StarterTrialCreditCard({
             ) : trialCredit.reason === 'terms-required' ? (
               <>
                 Accept the active Terms of Service to claim your one-time non-refundable starter
-                credit. <a href="/auth/login">Review Terms and sign in</a>.
+                credit. <a href={billingLoginHref}>Review Terms and sign in</a>.
               </>
             ) : trialCredit.reason === 'terms-inactive' ? (
               'Starter trial credits open once the published Terms of Service take effect.'

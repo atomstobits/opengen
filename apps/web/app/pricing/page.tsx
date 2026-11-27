@@ -106,7 +106,7 @@ export default function PricingPage() {
   return (
     <>
       <JsonLd data={pricingStructuredData()} />
-      <SiteHeader />
+      <SiteHeader active="pricing" />
       <main className={styles.page}>
         <header className={styles.hero}>
           <div>
