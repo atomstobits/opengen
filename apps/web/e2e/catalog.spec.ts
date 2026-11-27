@@ -24,7 +24,7 @@ test('the model catalog filters discovery while model pages preserve every regio
   await expect(cards(page)).toHaveCount(catalog.models.length);
   await expect(
     seriesGroup(page, 'bytedance/seedance-2.5').locator('.model-directory-card'),
-  ).toHaveCount(1);
+  ).toHaveCount(2);
   await expect(
     seriesGroup(page, 'bytedance/seedance-2.0').locator('.model-directory-card'),
   ).toHaveCount(3);
@@ -223,7 +223,7 @@ test('home keeps the agent-first hero and curated discovery while company pages 
   await expect(nav.getByRole('link', { name: 'Companies', exact: true })).toHaveCount(0);
   await expect(page.locator('.home-discovery').getByTestId('series-card')).toHaveCount(3);
   const homeSeedance = page.locator('.home-discovery [data-series-id="bytedance/seedance-2.5"]');
-  await expect(homeSeedance.getByTestId('card-price')).toHaveText(/From\s*\$0\.1028\s*\/ sec/);
+  await expect(homeSeedance.getByTestId('card-price')).toHaveText(/From\s*≈\$0\.07\s*\/ sec/);
   await expect(homeSeedance.getByTestId('card-savings')).toHaveText('Up to 53% off');
   const homeNanoBanana = page.locator('.home-discovery [data-series-id="google/nano-banana-2.1"]');
   await expect(homeNanoBanana.getByTestId('card-price')).toHaveText(/From\s*\$0\.0336\s*\/ image/);
