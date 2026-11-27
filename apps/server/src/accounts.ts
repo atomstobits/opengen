@@ -29,10 +29,13 @@ import {
   InMemoryEmailOtpStore,
   maskEmailAddress,
   normalizeOtpEmail,
+  PostgresEmailOtpStore,
   readEmailOtpConfiguration,
   type EmailOtpStore,
   type EmailOtpTransport,
 } from './email-otp.js';
+import { resolveTrustedClientIp } from './client-ip.js';
+import rateLimit from '@fastify/rate-limit';
 import { TermsReceiptStore } from '@media-router/engine';
 import { governancePolicySchema } from './governance.js';
 import { sessionRecoveryScope } from './session-recovery.js';
@@ -547,7 +550,20 @@ export async function registerAccounts(
       env.OIDC_CLIENT_ID!,
       env.OIDC_CLIENT_SECRET!,
     ));
-  const emailOtpStore: EmailOtpStore = options.emailOtpStore ?? new InMemoryEmailOtpStore();
+  const accountPool = options.engine?.accounts?.pool;
+  const hasSqlPool = Boolean(
+    accountPool &&
+    typeof accountPool.connect === 'function' &&
+    typeof accountPool.query === 'function',
+  );
+  if (emailOtpConfig && !options.emailOtpStore && !hasSqlPool && env.NODE_ENV === 'production')
+    throw new Error(
+      'Email OTP requires a PostgreSQL-backed account store in production so challenges are shared across API instances.',
+    );
+  const emailOtpStore: EmailOtpStore =
+    options.emailOtpStore ??
+    (hasSqlPool ? new PostgresEmailOtpStore(accountPool!) : new InMemoryEmailOtpStore());
+  const resolveClientIp = (request: FastifyRequest) => resolveTrustedClientIp(request, env).ip;
 
   if (oidcEnabled) {
     const loginContext = {
@@ -641,6 +657,7 @@ export async function registerAccounts(
       publicOrigin: publicUrl.origin,
       cookieOptions,
       providers: authProviders,
+      resolveClientIp,
       ...(oidcProviderEnabled
         ? {
             authorize: async (intent, reply) => {
@@ -721,12 +738,13 @@ export async function registerAccounts(
                   );
               }
               const emailHash = hashOtpEmail(normalized);
-              const limit = emailOtpStore.checkSendLimit(emailHash, request.ip);
+              const clientIp = resolveClientIp(request);
+              const limit = await emailOtpStore.checkSendLimit(emailHash, clientIp);
               if (!limit.allowed) throw emailOtpRateLimitedError(limit.retryAfterSeconds);
 
               const code = generateOtpCode();
               const expires = Math.min(Date.now() + EMAIL_OTP_TTL_MS, intent.expires);
-              const created = emailOtpStore.createChallenge({
+              const created = await emailOtpStore.createChallenge({
                 emailHash,
                 code,
                 secret: emailOtpConfig.secret,
@@ -739,7 +757,7 @@ export async function registerAccounts(
                   publicOrigin: publicUrl.origin,
                 });
               } catch (error) {
-                emailOtpStore.revokeChallenge(created.challengeId);
+                await emailOtpStore.revokeChallenge(created.challengeId).catch(() => undefined);
                 throw error;
               }
               const challengeCookie = {
@@ -764,7 +782,7 @@ export async function registerAccounts(
               );
             },
             verifyEmailOtp: async ({ challenge, code, request, reply, makeVerifyActionToken }) => {
-              const verifyLimit = emailOtpStore.checkVerifyLimit(request.ip);
+              const verifyLimit = await emailOtpStore.checkVerifyLimit(resolveClientIp(request));
               if (!verifyLimit.allowed)
                 throw emailOtpRateLimitedError(verifyLimit.retryAfterSeconds);
               const normalizedEmail = normalizeOtpEmail(challenge.email);
@@ -772,13 +790,13 @@ export async function registerAccounts(
               const emailHash = hashOtpEmail(normalizedEmail);
               const trimmedCode = code.replace(/\s+/g, '');
               const result = /^\d{6}$/.test(trimmedCode)
-                ? emailOtpStore.verifyAndConsume({
+                ? await emailOtpStore.verifyAndConsume({
                     challengeId: challenge.challengeId,
                     emailHash,
                     code: trimmedCode,
                     secret: emailOtpConfig.secret,
                   })
-                : emailOtpStore.verifyAndConsume({
+                : await emailOtpStore.verifyAndConsume({
                     challengeId: challenge.challengeId,
                     emailHash,
                     code: 'invalid-format',
@@ -823,43 +841,67 @@ export async function registerAccounts(
         : {}),
     });
 
-    app.get('/auth/callback', { errorHandler: humanLoginError }, async (request, reply) => {
-      reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
-      reply.clearCookie('og_mcp_consent', { path: '/' });
-      reply.clearCookie('og_oidc', { path: '/' });
-      reply.clearCookie('og_email_otp', { path: '/' });
-      reply.clearCookie('og_login_intent', { path: '/' });
-      const transaction = await readHumanLoginTransaction(request, reply, loginContext);
-      const callbackUrl = new URL(request.url, publicUrl);
-
-      if (transaction.provider === 'github') {
-        if (!githubConfig) throw unauthorized();
-        const claims = await exchangeGitHubCode(githubConfig, {
-          callbackUrl,
-          redirectUri: new URL('/auth/callback', publicUrl).href,
-          expectedState: transaction.state,
-          codeVerifier: transaction.verifier,
-          fetchImpl: options.githubFetch,
-        });
-        return completeHumanSignIn(request, reply, transaction.continueIntent, { ...claims }, 302);
-      }
-
-      if (!oidcProviderEnabled) throw unauthorized();
-      const tokens = await oidc.authorizationCodeGrant(await config(), callbackUrl, {
-        pkceCodeVerifier: transaction.verifier,
-        expectedState: transaction.state,
-        expectedNonce: transaction.nonce,
-        idTokenExpected: true,
+    await app.register(async (authCallback) => {
+      await authCallback.register(rateLimit, {
+        global: true,
+        max: 60,
+        timeWindow: '1 minute',
+        keyGenerator: resolveClientIp,
+        errorResponseBuilder: (_request, context) =>
+          Object.assign(new Error('Too many sign-in attempts. Wait a few minutes and try again.'), {
+            statusCode: 429,
+            code: 'rate_limited',
+            retryAfterSeconds: Math.max(1, Math.ceil(context.ttl / 1000)),
+          }),
       });
-      const claims = tokens.claims();
-      if (typeof claims?.sub !== 'string' || !claims.sub || typeof claims.iss !== 'string')
-        throw unauthorized();
-      return completeHumanSignIn(
-        request,
-        reply,
-        transaction.continueIntent,
-        claims as Record<string, unknown> & { iss: string; sub: string },
-        302,
+      authCallback.get(
+        '/auth/callback',
+        { errorHandler: humanLoginError },
+        async (request, reply) => {
+          reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
+          reply.clearCookie('og_mcp_consent', { path: '/' });
+          reply.clearCookie('og_oidc', { path: '/' });
+          reply.clearCookie('og_email_otp', { path: '/' });
+          reply.clearCookie('og_login_intent', { path: '/' });
+          const transaction = await readHumanLoginTransaction(request, reply, loginContext);
+          const callbackUrl = new URL(request.url, publicUrl);
+
+          if (transaction.provider === 'github') {
+            if (!githubConfig) throw unauthorized();
+            const claims = await exchangeGitHubCode(githubConfig, {
+              callbackUrl,
+              redirectUri: new URL('/auth/callback', publicUrl).href,
+              expectedState: transaction.state,
+              codeVerifier: transaction.verifier,
+              fetchImpl: options.githubFetch,
+            });
+            return completeHumanSignIn(
+              request,
+              reply,
+              transaction.continueIntent,
+              { ...claims },
+              302,
+            );
+          }
+
+          if (!oidcProviderEnabled) throw unauthorized();
+          const tokens = await oidc.authorizationCodeGrant(await config(), callbackUrl, {
+            pkceCodeVerifier: transaction.verifier,
+            expectedState: transaction.state,
+            expectedNonce: transaction.nonce,
+            idTokenExpected: true,
+          });
+          const claims = tokens.claims();
+          if (typeof claims?.sub !== 'string' || !claims.sub || typeof claims.iss !== 'string')
+            throw unauthorized();
+          return completeHumanSignIn(
+            request,
+            reply,
+            transaction.continueIntent,
+            claims as Record<string, unknown> & { iss: string; sub: string },
+            302,
+          );
+        },
       );
     });
   } else if (

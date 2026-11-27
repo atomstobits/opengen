@@ -235,7 +235,7 @@ export const agentClients: AgentClient[] = [
     }),
     secondarySnippet: () => ({
       label: 'Quote first, then submit once with a persisted idempotency key',
-      code: `cat <<'EOF' > request.json\n{\n  "modelId": "openai/gpt-image-2",\n  "operation": "text-to-image",\n  "input": {\n    "prompt": "A matte ceramic teapot on dark slate, studio lighting",\n    "resolution": "1K",\n    "quality": "low"\n  },\n  "billing": "managed",\n  "maxCostMicros": 50000\n}\nEOF\nopengen quote --input request.json\n\n# After confirming route, estimate and balance:\nOPENGEN_IDEMPOTENCY_KEY="$(node -e 'console.log(crypto.randomUUID())')"\nopengen generate --input request.json --idempotency-key "$OPENGEN_IDEMPOTENCY_KEY"`,
+      code: `cat <<'EOF' > request.json\n{\n  "modelId": "openai/gpt-image-2",\n  "operation": "text-to-image",\n  "input": {\n    "prompt": "A matte ceramic teapot on dark slate, studio lighting",\n    "resolution": "1K",\n    "quality": "low"\n  },\n  "billing": "managed",\n  "maxCostMicros": 50000\n}\nEOF\nopengen quote --input request.json\n\n# After confirming route, estimate and balance (save OPENGEN_IDEMPOTENCY_KEY once and reuse it on retry):\nopengen generate --input request.json --idempotency-key "\${OPENGEN_IDEMPOTENCY_KEY:?Set and save a unique ID before submitting}"`,
     }),
   },
 ];

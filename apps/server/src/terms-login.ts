@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import {
   termsPolicy,
@@ -438,6 +439,7 @@ export async function registerHumanLogin(
     publicOrigin: string;
     cookieOptions: { path: string; httpOnly: boolean; secure: boolean; sameSite: 'lax' };
     providers?: LoginNoticeProviders;
+    resolveClientIp?: (request: FastifyRequest) => string;
     authorize?: (intent: HumanLoginIntent, reply: FastifyReply) => Promise<unknown>;
     authorizeGitHub?: (intent: HumanLoginIntent, reply: FastifyReply) => Promise<unknown>;
     sendEmailOtp?: (params: {
@@ -463,8 +465,20 @@ export async function registerHumanLogin(
     emailOtp: Boolean(options.sendEmailOtp && options.verifyEmailOtp),
   };
 
-  // Encapsulation prevents this intentionally raw parser from changing OAuth token/revoke forms.
+  // Encapsulation prevents this intentionally raw parser and rate limiter from changing sibling routes.
   await app.register(async (login) => {
+    await login.register(rateLimit, {
+      global: true,
+      max: 120,
+      timeWindow: '1 minute',
+      keyGenerator: (request) => options.resolveClientIp?.(request) ?? request.ip,
+      errorResponseBuilder: (_request, context) =>
+        Object.assign(new Error('Too many sign-in attempts. Wait a few minutes and try again.'), {
+          statusCode: 429,
+          code: 'rate_limited',
+          retryAfterSeconds: Math.max(1, Math.ceil(context.ttl / 1000)),
+        }),
+    });
     login.setErrorHandler(humanLoginError);
     login.addContentTypeParser(
       'application/x-www-form-urlencoded',

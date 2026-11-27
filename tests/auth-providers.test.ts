@@ -5,10 +5,20 @@ import { join } from 'node:path';
 import { build as buildEsbuild } from 'esbuild';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccountStore, McpOAuthStore, Principal } from '@media-router/engine';
+import {
+  createEngine,
+  type AccountStore,
+  type McpOAuthStore,
+  type Principal,
+} from '@media-router/engine';
 import { TermsReceiptStore } from '../packages/engine/src/terms-receipts.js';
 import { registerAccounts } from '../apps/server/src/accounts.js';
 import { registerMcpAuthorization } from '../apps/server/src/mcp-authorization.js';
+import {
+  CLIENT_IP_PROOF_HEADER,
+  createClientIpProof,
+  parseTrustedProxies,
+} from '../apps/server/src/client-ip.js';
 import {
   HUMAN_TERMS_NOTICE_VERSION,
   currentHumanTermsPolicy,
@@ -20,9 +30,12 @@ import {
 import { GITHUB_OAUTH_ISSUER } from '../apps/server/src/github-oauth.js';
 import {
   InMemoryEmailOtpStore,
+  PostgresEmailOtpStore,
   emailOtpSubject,
   type EmailOtpDeliveryInput,
+  type EmailOtpStore,
 } from '../apps/server/src/email-otp.js';
+import { isolatedEngineDatabase } from './helpers/isolated-engine.js';
 
 // Next preserves JSX in apps/web/tsconfig.json; bundle the real web helpers with esbuild.
 const tempWebDir = mkdtempSync(join(process.cwd(), 'node_modules/.auth-providers-web-'));
@@ -125,7 +138,7 @@ async function buildAuthFixture(options: {
   activeTerms?: boolean;
   githubFetch?: typeof fetch;
   emailOtpTransport?: (input: EmailOtpDeliveryInput) => Promise<{ statusCode: number }>;
-  emailOtpStore?: InMemoryEmailOtpStore;
+  emailOtpStore?: EmailOtpStore;
 }) {
   const app = Fastify();
   apps.push(app);
@@ -731,7 +744,413 @@ describe('Email OTP sign-in', () => {
     expect(verified.statusCode).toBe(303);
     expect(verified.headers.location).toBe(`${origin}/oauth/consent?request=${pendingId}`);
   });
+
+  it('isolates Email OTP rate limits per HMAC-authenticated proxy client IP and ignores spoofed forwarding headers', async () => {
+    const proxySecret = 'x'.repeat(40);
+    const store = new InMemoryEmailOtpStore({
+      maxSendsPerEmail: 10,
+      maxSendsPerIp: 2,
+      maxVerifiesPerIp: 2,
+    });
+    const delivered: EmailOtpDeliveryInput[] = [];
+    const f = await buildAuthFixture({
+      activeTerms: true,
+      env: {
+        OPENGEN_EMAIL_OTP_ENABLED: '1',
+        MR_SESSION_SECRET: 's'.repeat(32),
+        OPENGEN_PROXY_CLIENT_SECRET: proxySecret,
+      },
+      emailOtpTransport: async (input) => {
+        delivered.push(input);
+        return { statusCode: 200 };
+      },
+      emailOtpStore: store,
+    });
+
+    const proofFor = (ip: string) =>
+      createClientIpProof({
+        secret: proxySecret,
+        ip,
+        method: 'POST',
+        pathname: '/auth/login',
+      })!;
+
+    async function sendFromClient(email: string, extraHeaders: Record<string, string>) {
+      const start = await f.app.inject('/auth/login');
+      return f.app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        headers: {
+          origin,
+          cookie: cookieJar(cookieParts(start.headers)),
+          'content-type': 'application/x-www-form-urlencoded',
+          ...extraHeaders,
+        },
+        payload: new URLSearchParams({
+          action: 'email_otp_send',
+          actionToken: extractFormToken(start.body, 'email_otp_send'),
+          email,
+        }).toString(),
+      });
+    }
+
+    // Client A behind shared proxy peer IP (127.0.0.1) consumes its 2 sends.
+    const a1 = await sendFromClient('alice1@example.invalid', {
+      [CLIENT_IP_PROOF_HEADER]: proofFor('198.51.100.10'),
+    });
+    expect(a1.statusCode).toBe(200);
+    const a2 = await sendFromClient('alice2@example.invalid', {
+      [CLIENT_IP_PROOF_HEADER]: proofFor('198.51.100.10'),
+    });
+    expect(a2.statusCode).toBe(200);
+    const a3 = await sendFromClient('alice3@example.invalid', {
+      [CLIENT_IP_PROOF_HEADER]: proofFor('198.51.100.10'),
+    });
+    expect(a3.statusCode).toBe(429);
+
+    // Unrelated Client B reaching the exact same proxy peer IP (127.0.0.1) is NOT blocked.
+    const b1 = await sendFromClient('bob1@example.invalid', {
+      [CLIENT_IP_PROOF_HEADER]: proofFor('203.0.113.20'),
+    });
+    expect(b1.statusCode).toBe(200);
+
+    // Spoofed X-Forwarded-For or forged proofs fall back to the socket IP (127.0.0.1) and cannot bypass limits.
+    const spoof1 = await sendFromClient('spoof1@example.invalid', {
+      'x-forwarded-for': '192.0.2.1',
+      'x-vercel-forwarded-for': '192.0.2.2',
+      [CLIENT_IP_PROOF_HEADER]: 'v1.1800000000.MTkyLjAuMi4z.forged',
+    });
+    expect(spoof1.statusCode).toBe(200);
+    const spoof2 = await sendFromClient('spoof2@example.invalid', {
+      'x-forwarded-for': '192.0.2.4',
+      'x-vercel-forwarded-for': '192.0.2.5',
+    });
+    expect(spoof2.statusCode).toBe(200);
+    const spoof3 = await sendFromClient('spoof3@example.invalid', {
+      'x-forwarded-for': '192.0.2.6',
+    });
+    expect(spoof3.statusCode).toBe(429);
+
+    // Verify limit is also isolated per signed client IP.
+    const aVerifyToken = extractFormToken(a1.body, 'email_otp_verify');
+    const aCookie = cookieJar(cookieParts(a1.headers));
+    for (let i = 0; i < 2; i++) {
+      const failA = await f.app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        headers: {
+          origin,
+          cookie: aCookie,
+          'content-type': 'application/x-www-form-urlencoded',
+          [CLIENT_IP_PROOF_HEADER]: proofFor('198.51.100.10'),
+        },
+        payload: new URLSearchParams({
+          action: 'email_otp_verify',
+          actionToken: aVerifyToken,
+          code: '000000',
+        }).toString(),
+      });
+      expect(failA.statusCode).toBe(401);
+    }
+    const aVerifyLimited = await f.app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: {
+        origin,
+        cookie: aCookie,
+        'content-type': 'application/x-www-form-urlencoded',
+        [CLIENT_IP_PROOF_HEADER]: proofFor('198.51.100.10'),
+      },
+      payload: new URLSearchParams({
+        action: 'email_otp_verify',
+        actionToken: aVerifyToken,
+        code: '000000',
+      }).toString(),
+    });
+    expect(aVerifyLimited.statusCode).toBe(429);
+
+    // Client B can still verify its valid code cleanly.
+    const bCode = delivered
+      .find((item) => item.to === 'bob1@example.invalid')!
+      .text.match(/\b(\d{6})\b/)![1]!;
+    const bVerified = await f.app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: {
+        origin,
+        cookie: cookieJar(cookieParts(b1.headers)),
+        'content-type': 'application/x-www-form-urlencoded',
+        [CLIENT_IP_PROOF_HEADER]: proofFor('203.0.113.20'),
+      },
+      payload: new URLSearchParams({
+        action: 'email_otp_verify',
+        actionToken: extractFormToken(b1.body, 'email_otp_verify'),
+        code: bCode,
+      }).toString(),
+    });
+    expect(bVerified.statusCode).toBe(303);
+  });
+
+  it('rejects unsafe OPENGEN_TRUSTED_PROXIES values and refuses in-memory OTP fallback in production', async () => {
+    expect(parseTrustedProxies(undefined)).toBe(false);
+    expect(parseTrustedProxies('10.0.0.1, 10.1.0.0/16, 2001:db8::/32')).toEqual([
+      '10.0.0.1',
+      '10.1.0.0/16',
+      '2001:db8::/32',
+    ]);
+    for (const unsafe of ['true', '*', '0.0.0.0/0', '::/0', '10.0.0.0/4', 'not-an-ip']) {
+      expect(() => parseTrustedProxies(unsafe)).toThrow(/OPENGEN_TRUSTED_PROXIES/);
+    }
+
+    const app = Fastify();
+    apps.push(app);
+    await expect(
+      registerAccounts(app, {
+        publicUrl: origin,
+        env: {
+          NODE_ENV: 'production',
+          OPENGEN_EMAIL_OTP_ENABLED: '1',
+          MR_SESSION_SECRET: 's'.repeat(32),
+        },
+        emailOtpTransport: async () => ({ statusCode: 200 }),
+      }),
+    ).rejects.toThrow(/PostgreSQL-backed account store/);
+  });
 });
+
+describe.skipIf(!process.env.TEST_DATABASE_URL)(
+  'PostgreSQL-backed multi-instance Email OTP store (migration 036)',
+  () => {
+    it('shares challenges, atomic single-use consumption, attempt lockouts, and rate limits across independent API instances', async () => {
+      const isolated = await isolatedEngineDatabase(
+        process.env.TEST_DATABASE_URL!,
+        'email_otp_multi_instance',
+      );
+      const engine = isolated.bind(
+        createEngine({
+          databaseUrl: isolated.databaseUrl,
+          publicUrl: origin,
+          providerEnv: {},
+          poolSize: Number(process.env.MR_DATABASE_POOL_SIZE ?? 4),
+        }),
+      );
+      const instanceA = Fastify();
+      const instanceB = Fastify();
+      try {
+        await engine.initialize();
+        const delivered: EmailOtpDeliveryInput[] = [];
+        const activePolicy: HumanTermsPolicy = {
+          version: 'hosted-terms-2026-11-16',
+          digest: 'a'.repeat(64),
+          status: 'active',
+          effectiveAt: '2026-11-16T00:00:00.000Z',
+        };
+        const sharedEnv = {
+          NODE_ENV: 'test',
+          OPENGEN_EMAIL_OTP_ENABLED: '1',
+          MR_SESSION_SECRET: 's'.repeat(32),
+        };
+        // Neither instance receives an injected emailOtpStore: both must auto-wire PostgresEmailOtpStore.
+        await registerAccounts(instanceA, {
+          engine,
+          publicUrl: origin,
+          humanTermsPolicy: () => activePolicy,
+          env: sharedEnv,
+          emailOtpTransport: async (input) => {
+            delivered.push(input);
+            return { statusCode: 200 };
+          },
+        });
+        await registerAccounts(instanceB, {
+          engine,
+          publicUrl: origin,
+          humanTermsPolicy: () => activePolicy,
+          env: sharedEnv,
+          emailOtpTransport: async (input) => {
+            delivered.push(input);
+            return { statusCode: 200 };
+          },
+        });
+
+        // 1. Send on Instance A, verify on Instance B -> succeeds with Terms receipt and session.
+        const startA = await instanceA.inject('/auth/login?returnTo=%2Fbilling');
+        expect(startA.statusCode).toBe(200);
+        const sentA = await instanceA.inject({
+          method: 'POST',
+          url: '/auth/login',
+          headers: {
+            origin,
+            cookie: cookieJar(cookieParts(startA.headers)),
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          payload: new URLSearchParams({
+            action: 'email_otp_send',
+            actionToken: extractFormToken(startA.body, 'email_otp_send'),
+            email: 'multi@example.invalid',
+          }).toString(),
+        });
+        expect(sentA.statusCode).toBe(200);
+        const code1 = delivered[0]!.text.match(/\b(\d{6})\b/)![1]!;
+        const otpCookie1 = cookieJar(cookieParts(sentA.headers));
+        const verifyToken1 = extractFormToken(sentA.body, 'email_otp_verify');
+
+        // Verify on Instance B (different Fastify process, zero shared in-memory state).
+        const verifiedOnB = await instanceB.inject({
+          method: 'POST',
+          url: '/auth/login',
+          headers: {
+            origin,
+            cookie: otpCookie1,
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          payload: new URLSearchParams({
+            action: 'email_otp_verify',
+            actionToken: verifyToken1,
+            code: code1,
+          }).toString(),
+        });
+        expect(verifiedOnB.statusCode).toBe(303);
+        expect(verifiedOnB.headers.location).toBe(`${origin}/billing`);
+        expect(cookieParts(verifiedOnB.headers).some((c) => c.startsWith('og_session='))).toBe(
+          true,
+        );
+
+        // Replay on Instance A must fail closed (single-use atomic deletion in Postgres).
+        const replayOnA = await instanceA.inject({
+          method: 'POST',
+          url: '/auth/login',
+          headers: {
+            origin,
+            cookie: otpCookie1,
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          payload: new URLSearchParams({
+            action: 'email_otp_verify',
+            actionToken: verifyToken1,
+            code: code1,
+          }).toString(),
+        });
+        expect(replayOnA.statusCode).toBe(401);
+
+        // 2. Concurrent verification across Instance A & B -> at most ONE succeeds.
+        const start2 = await instanceA.inject('/auth/login');
+        const sent2 = await instanceA.inject({
+          method: 'POST',
+          url: '/auth/login',
+          headers: {
+            origin,
+            cookie: cookieJar(cookieParts(start2.headers)),
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          payload: new URLSearchParams({
+            action: 'email_otp_send',
+            actionToken: extractFormToken(start2.body, 'email_otp_send'),
+            email: 'race@example.invalid',
+          }).toString(),
+        });
+        expect(sent2.statusCode).toBe(200);
+        const code2 = delivered.at(-1)!.text.match(/\b(\d{6})\b/)![1]!;
+        const otpCookie2 = cookieJar(cookieParts(sent2.headers));
+        const verifyToken2 = extractFormToken(sent2.body, 'email_otp_verify');
+        const [raceA, raceB] = await Promise.all([
+          instanceA.inject({
+            method: 'POST',
+            url: '/auth/login',
+            headers: {
+              origin,
+              cookie: otpCookie2,
+              'content-type': 'application/x-www-form-urlencoded',
+            },
+            payload: new URLSearchParams({
+              action: 'email_otp_verify',
+              actionToken: verifyToken2,
+              code: code2,
+            }).toString(),
+          }),
+          instanceB.inject({
+            method: 'POST',
+            url: '/auth/login',
+            headers: {
+              origin,
+              cookie: otpCookie2,
+              'content-type': 'application/x-www-form-urlencoded',
+            },
+            payload: new URLSearchParams({
+              action: 'email_otp_verify',
+              actionToken: verifyToken2,
+              code: code2,
+            }).toString(),
+          }),
+        ]);
+        expect([raceA.statusCode, raceB.statusCode].sort()).toEqual([303, 401]);
+
+        // 3. Direct PostgresEmailOtpStore checks: shared attempt lockout & shared send rate limits across restarts.
+        const store1 = new PostgresEmailOtpStore(engine.pool, {
+          maxSendsPerEmail: 2,
+          maxSendsPerIp: 3,
+          maxVerifiesPerIp: 2,
+        });
+        const store2 = new PostgresEmailOtpStore(engine.pool, {
+          maxSendsPerEmail: 2,
+          maxSendsPerIp: 3,
+          maxVerifiesPerIp: 2,
+        });
+        const emailHash = createHash('sha256').update('lockout@example.invalid').digest('hex');
+        const now = 1_800_000_000_000;
+        const created = await store1.createChallenge({
+          emailHash,
+          code: '654321',
+          secret: sharedEnv.MR_SESSION_SECRET,
+          expiresAt: now + 600_000,
+          maxAttempts: 2,
+          now,
+        });
+        expect(
+          await store2.verifyAndConsume({
+            challengeId: created.challengeId,
+            emailHash,
+            code: '000000',
+            secret: sharedEnv.MR_SESSION_SECRET,
+            now: now + 1000,
+          }),
+        ).toEqual({ status: 'invalid', attemptsRemaining: 1 });
+        expect(
+          await store1.verifyAndConsume({
+            challengeId: created.challengeId,
+            emailHash,
+            code: '111111',
+            secret: sharedEnv.MR_SESSION_SECRET,
+            now: now + 2000,
+          }),
+        ).toEqual({ status: 'locked' });
+        // Even the correct code stays locked across instances.
+        expect(
+          await store2.verifyAndConsume({
+            challengeId: created.challengeId,
+            emailHash,
+            code: '654321',
+            secret: sharedEnv.MR_SESSION_SECRET,
+            now: now + 3000,
+          }),
+        ).toEqual({ status: 'locked' });
+
+        // Shared send rate limits across store1 and store2.
+        expect((await store1.checkSendLimit(emailHash, '198.51.100.77', now)).allowed).toBe(true);
+        expect((await store2.checkSendLimit(emailHash, '198.51.100.77', now + 1000)).allowed).toBe(
+          true,
+        );
+        const third = await store1.checkSendLimit(emailHash, '198.51.100.77', now + 2000);
+        expect(third.allowed).toBe(false);
+        expect(third.retryAfterSeconds).toBeGreaterThan(0);
+      } finally {
+        await instanceA.close();
+        await instanceB.close();
+        await engine.close();
+        await isolated.close();
+      }
+    });
+  },
+);
 
 describe('header balance formatting and client returnTo URL helpers', () => {
   it('formats balances cleanly to 2 decimals >= $0.01 and up to 4 decimals for small positive amounts without rounding down to $0.00', () => {

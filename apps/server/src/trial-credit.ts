@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import rateLimit from '@fastify/rate-limit';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@media-router/engine';
 import { requireBillingBrowserRecovery } from './billing.js';
 import { verifyHumanIdentityTermsReceiptInTransaction } from './billing-terms-admission.js';
+import { resolveTrustedClientIp } from './client-ip.js';
 import { currentHumanTermsPolicy, type HumanTermsPolicy } from './terms-login.js';
 
 /** Hard upper bound ($5.00) on operator-enabled starter promotional trial credit. */
@@ -34,7 +36,8 @@ export type TrialCreditIneligibleReason =
   | 'verified-human-required'
   | 'billing-hold'
   | 'terms-required'
-  | 'terms-inactive';
+  | 'terms-inactive'
+  | 'unavailable';
 
 export interface TrialCreditStatus {
   enabled: boolean;
@@ -470,75 +473,78 @@ export async function registerTrialCreditRoutes(
     store?: StarterTrialCreditStore;
     authenticate: Authenticate;
     publicUrl: string;
+    env?: NodeJS.ProcessEnv;
   },
 ): Promise<void> {
   const origin = new URL(options.publicUrl).origin;
-  let windowStart = 0;
-  let windowCount = 0;
-  const checkClaimRateLimit = () => {
-    const now = Date.now();
-    if (now - windowStart >= 60_000) {
-      windowStart = now;
-      windowCount = 0;
-    }
-    windowCount += 1;
-    if (windowCount > 60) {
-      throw Object.assign(new Error('Too many starter credit requests; wait a moment.'), {
-        code: 'rate_limited',
-        statusCode: 429,
-        retryAfterSeconds: Math.max(1, Math.ceil((60_000 - (now - windowStart)) / 1000)),
-      });
-    }
-  };
+  const env = options.env ?? process.env;
 
-  app.get('/v1/billing/trial-credit', async (request, reply) => {
-    reply.header('Cache-Control', 'private, no-store');
-    if (request.headers.authorization || !request.cookies?.og_session) {
-      throw error(
-        'browser_session_required',
-        'Sign in in your browser to view starter trial credit status.',
-        401,
-      );
-    }
-    const principal = await options.authenticate(request, null);
-    const recoveryScope = requireBillingBrowserRecovery(principal, request.headers);
-    if (!options.store) {
-      throw error('database_not_configured', 'Database is not configured.', 503);
-    }
-    const status = await options.store.getStatus(principal);
-    return {
-      workspaceId: principal.workspaceId,
-      recoveryScope,
-      ...(status ?? {
-        enabled: false,
-        amountMicros: 0,
-        claimed: false,
-        eligible: false,
-        reason: 'disabled' as const,
-      }),
-    };
-  });
+  await app.register(async (trialRoutes) => {
+    await trialRoutes.register(rateLimit, {
+      global: true,
+      max: 120,
+      timeWindow: '1 minute',
+      keyGenerator: (request) => resolveTrustedClientIp(request, env).ip,
+      errorResponseBuilder: (_request, context) =>
+        Object.assign(new Error('Too many starter credit requests; wait a moment.'), {
+          code: 'rate_limited',
+          statusCode: 429,
+          retryAfterSeconds: Math.max(1, Math.ceil(context.ttl / 1000)),
+        }),
+    });
 
-  app.post('/v1/billing/trial-credit', async (request, reply) => {
-    reply.header('Cache-Control', 'private, no-store');
-    checkClaimRateLimit();
-    if (request.headers.authorization || !request.cookies?.og_session) {
-      throw error(
-        'browser_session_required',
-        'Sign in in your browser to claim starter trial credit.',
-        401,
-      );
-    }
-    if (request.headers.origin !== origin) {
-      throw error('origin_denied', 'Billing mutations require the configured website origin.');
-    }
-    const principal = await options.authenticate(request, null);
-    requireBillingBrowserRecovery(principal, request.headers);
-    emptyBodySchema.parse(request.body ?? {});
-    if (!options.store) {
-      throw error('database_not_configured', 'Database is not configured.', 503);
-    }
-    const result = await options.store.claim(principal);
-    return reply.code(result.alreadyClaimed ? 200 : 201).send(result);
+    trialRoutes.get('/v1/billing/trial-credit', async (request, reply) => {
+      reply.header('Cache-Control', 'private, no-store');
+      if (request.headers.authorization || !request.cookies?.og_session) {
+        throw error(
+          'browser_session_required',
+          'Sign in in your browser to view starter trial credit status.',
+          401,
+        );
+      }
+      const principal = await options.authenticate(request, null);
+      const recoveryScope = requireBillingBrowserRecovery(principal, request.headers);
+      if (!options.store) {
+        throw error('database_not_configured', 'Database is not configured.', 503);
+      }
+      const status = await options.store.getStatus(principal);
+      return {
+        workspaceId: principal.workspaceId,
+        recoveryScope,
+        ...(status ?? {
+          enabled: false,
+          amountMicros: 0,
+          claimed: false,
+          eligible: false,
+          reason: 'disabled' as const,
+        }),
+      };
+    });
+
+    trialRoutes.post(
+      '/v1/billing/trial-credit',
+      { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+      async (request, reply) => {
+        reply.header('Cache-Control', 'private, no-store');
+        if (request.headers.authorization || !request.cookies?.og_session) {
+          throw error(
+            'browser_session_required',
+            'Sign in in your browser to claim starter trial credit.',
+            401,
+          );
+        }
+        if (request.headers.origin !== origin) {
+          throw error('origin_denied', 'Billing mutations require the configured website origin.');
+        }
+        const principal = await options.authenticate(request, null);
+        requireBillingBrowserRecovery(principal, request.headers);
+        emptyBodySchema.parse(request.body ?? {});
+        if (!options.store) {
+          throw error('database_not_configured', 'Database is not configured.', 503);
+        }
+        const result = await options.store.claim(principal);
+        return reply.code(result.alreadyClaimed ? 200 : 201).send(result);
+      },
+    );
   });
 }

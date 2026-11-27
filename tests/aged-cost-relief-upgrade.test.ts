@@ -263,7 +263,7 @@ it.skipIf(!databaseUrl)(
       await engine.initialize();
       const upgradedJournal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
       expect(upgradedJournal.slice(0, 30)).toEqual(journal);
-      expect(upgradedJournal).toHaveLength(35);
+      expect(upgradedJournal).toHaveLength(36);
       expect(upgradedJournal[30]).toMatchObject({
         name: '031.sql',
         checksum: sha256(await migration('031.sql')),

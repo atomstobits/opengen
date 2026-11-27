@@ -1567,22 +1567,26 @@ function StarterTrialCreditCard({
 
   if (!trialCredit.eligible) {
     const blockedHeading =
-      trialCredit.reason === 'terms-inactive'
-        ? `${displayUsd} starter credit pending Terms`
-        : trialCredit.reason === 'billing-hold'
-          ? `${displayUsd} starter credit paused`
-          : trialCredit.reason === 'terms-required'
-            ? `${displayUsd} starter credit requires Terms acceptance`
-            : trialCredit.reason === 'personal-workspace-required'
-              ? `${displayUsd} starter credit available on personal workspace`
-              : `${displayUsd} starter credit requires verified sign-in`;
+      trialCredit.reason === 'unavailable'
+        ? 'Starter credit status unavailable'
+        : trialCredit.reason === 'terms-inactive'
+          ? `${displayUsd} starter credit pending Terms`
+          : trialCredit.reason === 'billing-hold'
+            ? `${displayUsd} starter credit paused`
+            : trialCredit.reason === 'terms-required'
+              ? `${displayUsd} starter credit requires Terms acceptance`
+              : trialCredit.reason === 'personal-workspace-required'
+                ? `${displayUsd} starter credit available on personal workspace`
+                : `${displayUsd} starter credit requires verified sign-in`;
     return (
       <section className={styles.trialCardMuted} aria-labelledby="starter-trial-status">
         <div>
           <span className={styles.eyebrow}>STARTER TRIAL CREDIT</span>
           <h2 id="starter-trial-status">{blockedHeading}</h2>
           <p>
-            {trialCredit.reason === 'personal-workspace-required' ? (
+            {trialCredit.reason === 'unavailable' ? (
+              'Starter trial credit status could not be loaded right now. Your payment history and order recovery remain available below.'
+            ) : trialCredit.reason === 'personal-workspace-required' ? (
               'Switch to your personal workspace to claim your one-time non-refundable starter credit.'
             ) : trialCredit.reason === 'terms-required' ? (
               <>

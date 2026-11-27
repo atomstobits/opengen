@@ -678,4 +678,54 @@ describe.skipIf(!databaseUrl)('database-backed opt-in bounded starter trial cred
       await f.close();
     }
   });
+
+  it('preserves verified payment capabilities on /v1/billing/access when trial-credit status fails and rate-limits trial-credit claims', async () => {
+    const f = await setup({ OPENGEN_TRIAL_CREDIT_MICROS: '1000000' }, () => activeTermsPolicy);
+    try {
+      await f.recordTermsReceipt(activeTermsPolicy);
+      const statusSpy = vi
+        .spyOn(StarterTrialCreditStore.prototype, 'getStatus')
+        .mockRejectedValueOnce(new Error('transient trial credit lookup failure'));
+
+      const access = await f.app.inject({ url: '/v1/billing/access', headers: f.headers });
+      expect(statusSpy).toHaveBeenCalledTimes(1);
+      expect(access.statusCode).toBe(200);
+      expect(access.json()).toEqual({
+        workspaceId: f.principal.workspaceId,
+        recoveryScope: f.recoveryScope,
+        capabilities: { read: false, manage: false, setup: false },
+        trialCredit: {
+          enabled: true,
+          amountMicros: 1_000_000,
+          claimed: false,
+          eligible: false,
+          reason: 'unavailable',
+        },
+      });
+      statusSpy.mockRestore();
+
+      // Verify @fastify/rate-limit enforces bounded claim rate limiting (30/min on POST /v1/billing/trial-credit).
+      const statuses: number[] = [];
+      let retryAfter: string | undefined;
+      for (let i = 0; i < 32; i++) {
+        const res = await f.app.inject({
+          method: 'POST',
+          url: '/v1/billing/trial-credit',
+          headers: { ...f.headers, origin: publicUrl },
+          payload: {},
+        });
+        statuses.push(res.statusCode);
+        if (res.statusCode === 429) {
+          retryAfter = String(res.headers['retry-after'] ?? '');
+          expect(res.json().error.code).toBe('rate_limited');
+          break;
+        }
+      }
+      expect(statuses).toContain(201);
+      expect(statuses).toContain(429);
+      expect(Number(retryAfter)).toBeGreaterThan(0);
+    } finally {
+      await f.close();
+    }
+  });
 });

@@ -272,6 +272,8 @@ for (const viewport of [
     const jsCode = await codeTabs.locator('pre code').innerText();
     expect(jsCode).toContain('process.env.OPENGEN_API_URL');
     expect(jsCode).toContain('process.env.OPENGEN_API_KEY');
+    expect(jsCode).toContain('process.env.OPENGEN_REQUEST_ID');
+    expect(jsCode).not.toContain('randomUUID');
     expect(jsCode).toContain('await fetch(`${apiUrl}/v1/quotes`');
     expect(jsCode).toContain('await fetch(`${apiUrl}/v1/generations`');
     expect(jsCode).not.toMatch(/import\s+.*opengen/i);
@@ -283,6 +285,9 @@ for (const viewport of [
     expect(urllibCode).toContain('import urllib.request');
     expect(urllibCode).toContain('OPENGEN_API_URL');
     expect(urllibCode).toContain('OPENGEN_API_KEY');
+    expect(urllibCode).toContain('OPENGEN_REQUEST_ID');
+    expect(urllibCode).not.toContain('uuid4');
+    expect(urllibCode).not.toContain('import uuid');
     expect(urllibCode).not.toContain('import opengen');
 
     await codeTabs.getByRole('button', { name: 'httpx', exact: true }).click();
@@ -290,6 +295,9 @@ for (const viewport of [
     expect(httpxCode).toContain('import httpx');
     expect(httpxCode).toContain('OPENGEN_API_URL');
     expect(httpxCode).toContain('OPENGEN_API_KEY');
+    expect(httpxCode).toContain('OPENGEN_REQUEST_ID');
+    expect(httpxCode).not.toContain('uuid4');
+    expect(httpxCode).not.toContain('import uuid');
 
     await codeTabs.getByRole('tab', { name: 'Agent / MCP', exact: true }).click();
     const mcpCode = await codeTabs.locator('pre code').innerText();

@@ -26,7 +26,8 @@ export type TrialCreditIneligibleReason =
   | 'verified-human-required'
   | 'billing-hold'
   | 'terms-required'
-  | 'terms-inactive';
+  | 'terms-inactive'
+  | 'unavailable';
 export interface TrialCreditStatus {
   enabled: boolean;
   amountMicros: number;
@@ -92,6 +93,7 @@ const trialCreditReasons = [
   'billing-hold',
   'terms-required',
   'terms-inactive',
+  'unavailable',
 ] as const;
 
 function parseTrialCredit(value: unknown): TrialCreditStatus | undefined {

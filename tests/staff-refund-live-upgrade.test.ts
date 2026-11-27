@@ -476,7 +476,7 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
     expect(journal.slice(0, 29)).toEqual(oldJournal);
     expect(journal.map((row) => row.name)).toEqual(
-      Array.from({ length: 35 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
+      Array.from({ length: 36 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
     );
     expect(journal[29].checksum).toBe(sha256(await sql(30)));
     for (let i = 0; i < 29; i++) {

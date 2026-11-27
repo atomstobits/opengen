@@ -1,4 +1,5 @@
 import { operationalError } from './operational-error.js';
+import { parseTrustedProxies } from './client-ip.js';
 import { registerGovernance } from './governance.js';
 import {
   AccountGovernanceStore,
@@ -177,7 +178,10 @@ export async function buildApp(options: AppOptions = {}) {
         'Hosted human Terms composition requires scoped manual billing rather than unscoped payments.',
       );
   }
+  const runtimeEnv = options.env ?? process.env;
+  const trustProxy = parseTrustedProxies(runtimeEnv.OPENGEN_TRUSTED_PROXIES);
   const app = Fastify({
+    ...(trustProxy ? { trustProxy } : {}),
     logger: options.logger
       ? {
           serializers: {
@@ -282,6 +286,7 @@ export async function buildApp(options: AppOptions = {}) {
     store: trialCreditStore,
     authenticate,
     publicUrl,
+    env: runtimeEnv,
   });
   const paymentOptions = billingRuntime?.payments ?? {
     store: options.payments,

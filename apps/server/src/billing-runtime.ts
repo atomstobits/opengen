@@ -45,7 +45,7 @@ import {
 import { operationalError } from './operational-error.js';
 import type { HumanTermsPolicy } from './terms-login.js';
 import type { PaymentsOptions } from './payments.js';
-import type { StarterTrialCreditStore } from './trial-credit.js';
+import type { StarterTrialCreditStore, TrialCreditStatus } from './trial-credit.js';
 
 export const MANUAL_SELF_SERVE_OWNER_RAILS: Readonly<BillingDelegationRails> = Object.freeze({
   allowsEnabled: false,
@@ -683,9 +683,24 @@ export function createBillingFixtureRuntime(pool: Pool, options: BillingFixtureR
           selfServeEnrollmentEnabled && (!read || !setup || automaticChargesEnabled)
             ? await ownerEnrollmentState(principal, read)
             : null;
-        const trialCredit = extra.trialCredit?.enabled
-          ? await extra.trialCredit.getStatus(principal)
-          : null;
+        let trialCredit: TrialCreditStatus | null = null;
+        if (extra.trialCredit?.enabled) {
+          try {
+            trialCredit = await extra.trialCredit.getStatus(principal);
+          } catch (err) {
+            request.log.error(
+              { err, workspaceId: principal.workspaceId },
+              'Starter trial credit status check failed; preserving billing access response.',
+            );
+            trialCredit = {
+              enabled: true,
+              amountMicros: extra.trialCredit.amountMicros,
+              claimed: false,
+              eligible: false,
+              reason: 'unavailable',
+            };
+          }
+        }
         return {
           workspaceId: principal.workspaceId,
           recoveryScope,

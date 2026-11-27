@@ -6,6 +6,7 @@ import {
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto';
+import type { Pool } from 'pg';
 import { createResendHttpTransport, type ResendTransport } from './email-relay.js';
 
 export interface EmailOtpDeliveryInput {
@@ -45,9 +46,17 @@ export interface EmailOtpVerifyResult {
   attemptsRemaining?: number;
 }
 
+export interface EmailOtpStoreOptions {
+  maxSendsPerEmail?: number;
+  maxSendsPerIp?: number;
+  maxVerifiesPerIp?: number;
+  sendWindowMs?: number;
+  verifyWindowMs?: number;
+}
+
 export interface EmailOtpStore {
-  checkSendLimit(emailHash: string, ip: string, now?: number): EmailOtpRateLimitResult;
-  checkVerifyLimit(ip: string, now?: number): EmailOtpRateLimitResult;
+  checkSendLimit(emailHash: string, ip: string, now?: number): Promise<EmailOtpRateLimitResult>;
+  checkVerifyLimit(ip: string, now?: number): Promise<EmailOtpRateLimitResult>;
   createChallenge(input: {
     emailHash: string;
     code: string;
@@ -55,15 +64,15 @@ export interface EmailOtpStore {
     expiresAt: number;
     maxAttempts?: number;
     now?: number;
-  }): { challengeId: string; expiresAt: number };
-  revokeChallenge(challengeId: string): void;
+  }): Promise<{ challengeId: string; expiresAt: number }>;
+  revokeChallenge(challengeId: string): Promise<void>;
   verifyAndConsume(input: {
     challengeId: string;
     emailHash: string;
     code: string;
     secret: string;
     now?: number;
-  }): EmailOtpVerifyResult;
+  }): Promise<EmailOtpVerifyResult>;
 }
 
 const MAX_CHALLENGES = 10_000;
@@ -169,15 +178,7 @@ export class InMemoryEmailOtpStore implements EmailOtpStore {
   private readonly sendWindowMs: number;
   private readonly verifyWindowMs: number;
 
-  constructor(
-    options: {
-      maxSendsPerEmail?: number;
-      maxSendsPerIp?: number;
-      maxVerifiesPerIp?: number;
-      sendWindowMs?: number;
-      verifyWindowMs?: number;
-    } = {},
-  ) {
+  constructor(options: EmailOtpStoreOptions = {}) {
     this.maxSendsPerEmail = options.maxSendsPerEmail ?? MAX_SENDS_PER_EMAIL;
     this.maxSendsPerIp = options.maxSendsPerIp ?? MAX_SENDS_PER_IP;
     this.maxVerifiesPerIp = options.maxVerifiesPerIp ?? MAX_VERIFIES_PER_IP;
@@ -231,7 +232,11 @@ export class InMemoryEmailOtpStore implements EmailOtpStore {
     return { allowed: true, retryAfterSeconds: 0 };
   }
 
-  checkSendLimit(emailHash: string, ip: string, now = Date.now()): EmailOtpRateLimitResult {
+  async checkSendLimit(
+    emailHash: string,
+    ip: string,
+    now = Date.now(),
+  ): Promise<EmailOtpRateLimitResult> {
     const ipKey = createHash('sha256')
       .update(ip || 'unknown')
       .digest('hex');
@@ -265,7 +270,7 @@ export class InMemoryEmailOtpStore implements EmailOtpStore {
     return { allowed: true, retryAfterSeconds: 0 };
   }
 
-  checkVerifyLimit(ip: string, now = Date.now()): EmailOtpRateLimitResult {
+  async checkVerifyLimit(ip: string, now = Date.now()): Promise<EmailOtpRateLimitResult> {
     const ipKey = createHash('sha256')
       .update(ip || 'unknown')
       .digest('hex');
@@ -278,14 +283,14 @@ export class InMemoryEmailOtpStore implements EmailOtpStore {
     );
   }
 
-  createChallenge(input: {
+  async createChallenge(input: {
     emailHash: string;
     code: string;
     secret: string;
     expiresAt: number;
     maxAttempts?: number;
     now?: number;
-  }): { challengeId: string; expiresAt: number } {
+  }): Promise<{ challengeId: string; expiresAt: number }> {
     const now = input.now ?? Date.now();
     this.pruneChallenges(now);
     const challengeId = randomBytes(24).toString('base64url');
@@ -304,17 +309,17 @@ export class InMemoryEmailOtpStore implements EmailOtpStore {
     return { challengeId, expiresAt: input.expiresAt };
   }
 
-  revokeChallenge(challengeId: string): void {
+  async revokeChallenge(challengeId: string): Promise<void> {
     this.challenges.delete(challengeId);
   }
 
-  verifyAndConsume(input: {
+  async verifyAndConsume(input: {
     challengeId: string;
     emailHash: string;
     code: string;
     secret: string;
     now?: number;
-  }): EmailOtpVerifyResult {
+  }): Promise<EmailOtpVerifyResult> {
     const now = input.now ?? Date.now();
     const challenge = this.challenges.get(input.challengeId);
     if (!challenge || challenge.expiresAt <= now || challenge.usedAt !== null) {
@@ -354,6 +359,296 @@ export class InMemoryEmailOtpStore implements EmailOtpStore {
       return { status: 'locked' };
     }
     return { status: 'invalid', attemptsRemaining: challenge.maxAttempts - challenge.attempts };
+  }
+}
+
+/**
+ * PostgreSQL-backed Email OTP challenge and rate-limit store (migration 036).
+ * Shares state across API instances with transactional single-use consumption and attempt limits.
+ */
+export class PostgresEmailOtpStore implements EmailOtpStore {
+  private readonly maxSendsPerEmail: number;
+  private readonly maxSendsPerIp: number;
+  private readonly maxVerifiesPerIp: number;
+  private readonly sendWindowMs: number;
+  private readonly verifyWindowMs: number;
+
+  constructor(
+    private readonly pool: Pick<Pool, 'connect' | 'query'>,
+    options: EmailOtpStoreOptions = {},
+  ) {
+    this.maxSendsPerEmail = options.maxSendsPerEmail ?? MAX_SENDS_PER_EMAIL;
+    this.maxSendsPerIp = options.maxSendsPerIp ?? MAX_SENDS_PER_IP;
+    this.maxVerifiesPerIp = options.maxVerifiesPerIp ?? MAX_VERIFIES_PER_IP;
+    this.sendWindowMs = options.sendWindowMs ?? SEND_WINDOW_MS;
+    this.verifyWindowMs = options.verifyWindowMs ?? VERIFY_WINDOW_MS;
+  }
+
+  private async pruneStaleRateLimits(now: number): Promise<void> {
+    const cutoff = new Date(now - Math.max(this.sendWindowMs, this.verifyWindowMs) * 2);
+    await this.pool
+      .query(
+        `DELETE FROM mr_email_otp_rate_limits
+         WHERE (scope, subject_hash) IN (
+           SELECT scope, subject_hash
+           FROM mr_email_otp_rate_limits
+           WHERE updated_at < $1
+           LIMIT 50
+           FOR UPDATE SKIP LOCKED
+         )`,
+        [cutoff],
+      )
+      .catch(() => undefined);
+  }
+
+  async checkSendLimit(
+    emailHash: string,
+    ip: string,
+    now = Date.now(),
+  ): Promise<EmailOtpRateLimitResult> {
+    const ipHash = createHash('sha256')
+      .update(ip || 'unknown')
+      .digest('hex');
+    const windowStart = Math.floor(now / this.sendWindowMs);
+    const nowDate = new Date(now);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Deterministic lock order ('send_client' then 'send_email') prevents deadlocks.
+      const keys: Array<{
+        scope: 'send_client' | 'send_email';
+        subjectHash: string;
+        limit: number;
+      }> = [
+        { scope: 'send_client', subjectHash: ipHash, limit: this.maxSendsPerIp },
+        { scope: 'send_email', subjectHash: emailHash, limit: this.maxSendsPerEmail },
+      ];
+      for (const entry of keys) {
+        await client.query(
+          `INSERT INTO mr_email_otp_rate_limits(scope, subject_hash, window_start, count, updated_at)
+           VALUES($1, $2, $3, 0, $4)
+           ON CONFLICT (scope, subject_hash) DO NOTHING`,
+          [entry.scope, entry.subjectHash, windowStart, nowDate],
+        );
+      }
+      const locked = (
+        await client.query<{ scope: string; window_start: string; count: number }>(
+          `SELECT scope, window_start, count
+           FROM mr_email_otp_rate_limits
+           WHERE (scope = 'send_client' AND subject_hash = $1)
+              OR (scope = 'send_email' AND subject_hash = $2)
+           ORDER BY scope ASC
+           FOR UPDATE`,
+          [ipHash, emailHash],
+        )
+      ).rows;
+      for (const entry of keys) {
+        const row = locked.find((item) => item.scope === entry.scope);
+        const storedWindow = row ? Number(row.window_start) : windowStart;
+        const effectiveCount = storedWindow < windowStart ? 0 : (row?.count ?? 0);
+        if (effectiveCount >= entry.limit) {
+          await client.query('ROLLBACK');
+          const activeWindow = Math.max(storedWindow, windowStart);
+          const retryAfterSeconds = Math.max(
+            1,
+            Math.ceil(((activeWindow + 1) * this.sendWindowMs - now) / 1000),
+          );
+          return { allowed: false, retryAfterSeconds };
+        }
+      }
+      for (const entry of keys) {
+        await client.query(
+          `UPDATE mr_email_otp_rate_limits
+           SET window_start = CASE WHEN window_start < $3 THEN $3 ELSE window_start END,
+               count = CASE WHEN window_start < $3 THEN 1 ELSE count + 1 END,
+               updated_at = $4
+           WHERE scope = $1 AND subject_hash = $2`,
+          [entry.scope, entry.subjectHash, windowStart, nowDate],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    await this.pruneStaleRateLimits(now);
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  async checkVerifyLimit(ip: string, now = Date.now()): Promise<EmailOtpRateLimitResult> {
+    const ipHash = createHash('sha256')
+      .update(ip || 'unknown')
+      .digest('hex');
+    const windowStart = Math.floor(now / this.verifyWindowMs);
+    const nowDate = new Date(now);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO mr_email_otp_rate_limits(scope, subject_hash, window_start, count, updated_at)
+         VALUES('verify_client', $1, $2, 0, $3)
+         ON CONFLICT (scope, subject_hash) DO NOTHING`,
+        [ipHash, windowStart, nowDate],
+      );
+      const row = (
+        await client.query<{ window_start: string; count: number }>(
+          `SELECT window_start, count
+           FROM mr_email_otp_rate_limits
+           WHERE scope = 'verify_client' AND subject_hash = $1
+           FOR UPDATE`,
+          [ipHash],
+        )
+      ).rows[0];
+      const storedWindow = row ? Number(row.window_start) : windowStart;
+      const effectiveCount = storedWindow < windowStart ? 0 : (row?.count ?? 0);
+      if (effectiveCount >= this.maxVerifiesPerIp) {
+        await client.query('ROLLBACK');
+        const activeWindow = Math.max(storedWindow, windowStart);
+        const retryAfterSeconds = Math.max(
+          1,
+          Math.ceil(((activeWindow + 1) * this.verifyWindowMs - now) / 1000),
+        );
+        return { allowed: false, retryAfterSeconds };
+      }
+      await client.query(
+        `UPDATE mr_email_otp_rate_limits
+         SET window_start = CASE WHEN window_start < $2 THEN $2 ELSE window_start END,
+             count = CASE WHEN window_start < $2 THEN 1 ELSE count + 1 END,
+             updated_at = $3
+         WHERE scope = 'verify_client' AND subject_hash = $1`,
+        [ipHash, windowStart, nowDate],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    await this.pruneStaleRateLimits(now);
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  async createChallenge(input: {
+    emailHash: string;
+    code: string;
+    secret: string;
+    expiresAt: number;
+    maxAttempts?: number;
+    now?: number;
+  }): Promise<{ challengeId: string; expiresAt: number }> {
+    const now = input.now ?? Date.now();
+    const challengeId = randomBytes(24).toString('base64url');
+    const salt = randomBytes(16).toString('hex');
+    const codeHash = digestOtpCode(input.secret, challengeId, salt, input.emailHash, input.code);
+    const maxAttempts = input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    await this.pool
+      .query(
+        `DELETE FROM mr_email_otp_challenges
+         WHERE id IN (
+           SELECT id FROM mr_email_otp_challenges
+           WHERE expires_at <= $1
+           LIMIT 100
+           FOR UPDATE SKIP LOCKED
+         )`,
+        [new Date(now)],
+      )
+      .catch(() => undefined);
+    await this.pool.query(
+      `INSERT INTO mr_email_otp_challenges(id, email_hash, salt, code_hash, expires_at, attempts, max_attempts, created_at)
+       VALUES($1, $2, $3, $4, $5, 0, $6, $7)`,
+      [
+        challengeId,
+        input.emailHash,
+        salt,
+        codeHash,
+        new Date(input.expiresAt),
+        maxAttempts,
+        new Date(now),
+      ],
+    );
+    return { challengeId, expiresAt: input.expiresAt };
+  }
+
+  async revokeChallenge(challengeId: string): Promise<void> {
+    await this.pool.query('DELETE FROM mr_email_otp_challenges WHERE id = $1', [challengeId]);
+  }
+
+  async verifyAndConsume(input: {
+    challengeId: string;
+    emailHash: string;
+    code: string;
+    secret: string;
+    now?: number;
+  }): Promise<EmailOtpVerifyResult> {
+    const now = input.now ?? Date.now();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const row = (
+        await client.query<{
+          id: string;
+          email_hash: string;
+          salt: string;
+          code_hash: string;
+          expires_at: Date;
+          attempts: number;
+          max_attempts: number;
+        }>(
+          `SELECT id, email_hash, salt, code_hash, expires_at, attempts, max_attempts
+           FROM mr_email_otp_challenges
+           WHERE id = $1
+           FOR UPDATE`,
+          [input.challengeId],
+        )
+      ).rows[0];
+      if (!row) {
+        await client.query('COMMIT');
+        return { status: 'missing_or_expired' };
+      }
+      if (row.expires_at.getTime() <= now) {
+        await client.query('DELETE FROM mr_email_otp_challenges WHERE id = $1', [row.id]);
+        await client.query('COMMIT');
+        return { status: 'missing_or_expired' };
+      }
+      if (row.attempts >= row.max_attempts) {
+        await client.query('COMMIT');
+        return { status: 'locked' };
+      }
+      const candidateHash = digestOtpCode(
+        input.secret,
+        row.id,
+        row.salt,
+        input.emailHash,
+        input.code,
+      );
+      const expected = Buffer.from(row.code_hash, 'hex');
+      const presented = Buffer.from(candidateHash, 'hex');
+      const sameEmail =
+        row.email_hash.length === input.emailHash.length &&
+        timingSafeEqual(Buffer.from(row.email_hash, 'utf8'), Buffer.from(input.emailHash, 'utf8'));
+      const sameCode = expected.length === presented.length && timingSafeEqual(expected, presented);
+      if (sameEmail && sameCode) {
+        await client.query('DELETE FROM mr_email_otp_challenges WHERE id = $1', [row.id]);
+        await client.query('COMMIT');
+        return { status: 'ok' };
+      }
+      const nextAttempts = row.attempts + 1;
+      await client.query('UPDATE mr_email_otp_challenges SET attempts = $2 WHERE id = $1', [
+        row.id,
+        nextAttempts,
+      ]);
+      await client.query('COMMIT');
+      if (nextAttempts >= row.max_attempts) return { status: 'locked' };
+      return { status: 'invalid', attemptsRemaining: row.max_attempts - nextAttempts };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 

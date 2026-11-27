@@ -104,8 +104,9 @@ export function buildJavaScriptSnippet(gatewayOrigin: string, request: GenerateI
     'const quote = await quoteResponse.json();',
     "console.log('Quote:', quote);",
     '',
-    '// 2. Submit when ready (billable — reuse the same idempotency key on retry)',
-    'const idempotencyKey = process.env.OPENGEN_REQUEST_ID ?? crypto.randomUUID();',
+    '// 2. Submit when ready (billable — generate and persist OPENGEN_REQUEST_ID before running)',
+    'const idempotencyKey = process.env.OPENGEN_REQUEST_ID?.trim();',
+    "if (!idempotencyKey) throw new Error('Set and save a unique OPENGEN_REQUEST_ID before submitting.');",
     'const jobResponse = await fetch(`${apiUrl}/v1/generations`, {',
     "  method: 'POST',",
     '  headers: {',
@@ -131,7 +132,6 @@ export function buildPythonSnippet(
   if (client === 'httpx') {
     return [
       'import os',
-      'import uuid',
       'import httpx',
       '',
       `api_url = os.environ.get("OPENGEN_API_URL", ${JSON.stringify(origin)}).rstrip("/")`,
@@ -146,8 +146,10 @@ export function buildPythonSnippet(
       '    quote_res.raise_for_status()',
       '    print("Quote:", quote_res.json())',
       '',
-      '    # 2. Submit when ready (billable — keep idempotency_key for retries)',
-      '    idempotency_key = os.environ.get("OPENGEN_REQUEST_ID") or str(uuid.uuid4())',
+      '    # 2. Submit when ready (billable — generate and persist OPENGEN_REQUEST_ID before running)',
+      '    idempotency_key = os.environ.get("OPENGEN_REQUEST_ID", "").strip()',
+      '    if not idempotency_key:',
+      '        raise SystemExit("Set and save a unique OPENGEN_REQUEST_ID before submitting.")',
       '    job_res = client.post(',
       '        f"{api_url}/v1/generations",',
       '        headers={**headers, "Idempotency-Key": idempotency_key},',
@@ -162,7 +164,6 @@ export function buildPythonSnippet(
     'import json',
     'import os',
     'import urllib.request',
-    'import uuid',
     '',
     `api_url = os.environ.get("OPENGEN_API_URL", ${JSON.stringify(origin)}).rstrip("/")`,
     'api_key = os.environ["OPENGEN_API_KEY"]',
@@ -183,8 +184,10 @@ export function buildPythonSnippet(
     'with urllib.request.urlopen(quote_req, timeout=60) as response:',
     '    print("Quote:", json.loads(response.read().decode("utf-8")))',
     '',
-    '# 2. Submit when ready (billable — keep idempotency_key for retries)',
-    'idempotency_key = os.environ.get("OPENGEN_REQUEST_ID") or str(uuid.uuid4())',
+    '# 2. Submit when ready (billable — generate and persist OPENGEN_REQUEST_ID before running)',
+    'idempotency_key = os.environ.get("OPENGEN_REQUEST_ID", "").strip()',
+    'if not idempotency_key:',
+    '    raise SystemExit("Set and save a unique OPENGEN_REQUEST_ID before submitting.")',
     'job_req = urllib.request.Request(',
     '    f"{api_url}/v1/generations",',
     '    data=body,',
@@ -342,7 +345,7 @@ export function PlaygroundCodeTabs({
               <span>
                 {activeTab === 'mcp'
                   ? 'MCP Streamable HTTP · quote then call (media.generate)'
-                  : 'Uses OPENGEN_API_URL and OPENGEN_API_KEY env vars'}
+                  : 'Uses OPENGEN_API_URL, OPENGEN_API_KEY, and saved OPENGEN_REQUEST_ID'}
               </span>
               <CopyButton text={code} label={copyLabel} />
             </div>
