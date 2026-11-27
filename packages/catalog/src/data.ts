@@ -963,8 +963,8 @@ route(
     ),
     source: source(
       'https://dev.runwayml.com/learn/kling-4-0-api',
-      'Runway API for Kling 4.0 (kling_4); hosted live-verified on 2026-11-19 for 720p 3s text-to-video (managed hold retained pending promo/list credit reconciliation); other operations, resolutions and durations remain documented.',
-      '2026-11-19',
+      'Runway API for Kling 4.0 (kling_4); hosted live-verified on 2026-11-19 for 720p 3s text-to-video (initial smoke hold audited and settled on 2026-11-27 against Runway usage API); other operations, resolutions and durations remain documented.',
+      '2026-11-27',
     ),
   },
 );
@@ -2214,7 +2214,7 @@ route(
     },
     source: source(
       'https://aistudio.google.com/docs/image-generation',
-      'Official Google Interactions API (gemini-3.1-flash-lite-image, JPEG output only); hosted live-verified on 2026-11-27 for 1K 1:1 minimal-thinking JPEG text-to-image (managed hold retained pending reconciliation of unclassified output tokens); image editing and other options remain documented.',
+      'Official Google Interactions API (gemini-3.1-flash-lite-image, JPEG output only); hosted live-verified on 2026-11-27 for 1K 1:1 minimal-thinking JPEG text-to-image (initial smoke hold audited and settled on 2026-11-27 against Google Cloud Billing live SKU data); image editing and other options remain documented.',
       '2026-11-27',
     ),
   },
@@ -2493,7 +2493,7 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
       source: source(
         `https://fal.ai/models/${upstream}/api`,
         isVerifiedFalQwen
-          ? 'Exact reseller endpoint and schema checked. Hosted live-verified on 2026-11-27 for 1K 1:1 PNG text-to-image (fal queue poll omits billing, leaving managed settlement pending reconciliation); image editing and 2K remain documented.'
+          ? 'Exact reseller endpoint and schema checked. Hosted live-verified on 2026-11-27 for 1K 1:1 PNG text-to-image (initial smoke hold audited and settled on 2026-11-27 against fal request billing); image editing and 2K remain documented.'
           : 'Exact reseller endpoint and schema checked. Single-image output; references preserve order. Actual account access and settled charges remain reconciled separately.',
         isVerifiedFalQwen ? '2026-11-27' : undefined,
       ),
@@ -2599,7 +2599,7 @@ route(
     ),
     source: source(
       'https://docs.bfl.ai/flux_3/flux3_image_generate',
-      'Official Black Forest Labs FLUX 3 Image API (/v1/flux-3-image) for text-to-image and multi-reference editing (1–10 images). Hosted live-verified on 2026-11-27 for 768sq text-to-image (BFL image poll omits cost, leaving managed settlement pending reconciliation); other tiers and image-edit remain documented.',
+      'Official Black Forest Labs FLUX 3 Image API (/v1/flux-3-image) for text-to-image and multi-reference editing (1–10 images). Hosted live-verified on 2026-11-27 for 768sq text-to-image (initial smoke hold audited and settled on 2026-11-27 against BFL usage CSV); other tiers and image-edit remain documented.',
       officialCheckedAt,
     ),
   },
@@ -2642,7 +2642,7 @@ route(
     ),
     source: source(
       'https://docs.bfl.ai/flux_3/flux3_image_klein',
-      'Official Black Forest Labs FLUX 3 Image Klein API (/v1/flux-3-image-klein, distilled 5.6B) for text-to-image and multi-reference editing (1–10 images). Hosted live-verified on 2026-11-27 for 768sq text-to-image (BFL image poll omits cost, leaving managed settlement pending reconciliation); other tiers and image-edit remain documented.',
+      'Official Black Forest Labs FLUX 3 Image Klein API (/v1/flux-3-image-klein, distilled 5.6B) for text-to-image and multi-reference editing (1–10 images). Hosted live-verified on 2026-11-27 for 768sq text-to-image (initial smoke hold audited and settled on 2026-11-27 against BFL usage CSV); other tiers and image-edit remain documented.',
       officialCheckedAt,
     ),
   },
