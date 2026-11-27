@@ -934,6 +934,13 @@ route(
   durations(3, 30),
   {
     adapter: 'runway',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-19',
+      operation: 'text-to-video',
+      resolution: '720p',
+      duration: 3,
+    },
     rates: ['text-to-video', 'image-to-video'].flatMap((operation) => [
       {
         operation: operation as Operation,
@@ -953,6 +960,11 @@ route(
     pricingSource: source(
       'https://dev.runwayml.com/learn/kling-4-0-api',
       'Standard output-only generation list tariff including generated sound; 20% promotional discount ($0.1256/$0.188 per second) runs through November 30, 2026 UTC. Video input/edit operations have separate input billing and are not priced by this formula.',
+    ),
+    source: source(
+      'https://dev.runwayml.com/learn/kling-4-0-api',
+      'Runway API for Kling 4.0 (kling_4); hosted live-verified on 2026-11-19 for 720p 3s text-to-video (managed hold retained pending promo/list credit reconciliation); other operations, resolutions and durations remain documented.',
+      '2026-11-19',
     ),
   },
 );
@@ -1618,6 +1630,13 @@ route(
   durations(5, 15),
   {
     adapter: 'pika',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-video',
+      resolution: '480p',
+      duration: 5,
+    },
     rates: ['480p', '768p', '1080p', '2K', '4K'].map((resolution, index) => ({
       operation: 'text-to-video' as const,
       resolution,
@@ -1627,6 +1646,11 @@ route(
     pricingSource: source(
       'https://dev.pika.art/models/pika/pika-h3-flex/text-to-video/pricing',
       'Single video output with rewriting disabled; no audio stems. Above 768p uses upscaling. The settled charge comes from provider billing, not this estimate.',
+    ),
+    source: source(
+      'https://dev.pika.art/models/pika/pika-h3-flex/text-to-video',
+      'Official Pika H3 Flex API; hosted live-verified on 2026-11-27 for 480p 5s 16:9 text-to-video with prompt expansion disabled; image-to-video, reference-to-video and other resolutions/durations remain documented.',
+      '2026-11-27',
     ),
   },
 );
@@ -2113,6 +2137,7 @@ for (const [operation, suffix, minDuration, maxDuration] of [
 const imageOps: Operation[] = ['text-to-image', 'image-edit'];
 for (const suffix of ['2.6-sunburst', '2.6-flare', '2.5-sunburst', '2.5-flare', '2']) {
   const id = `gpt-image-${suffix}`;
+  const isVerifiedGptImage2 = suffix === '2';
   route(
     `openai/${id}`,
     'openai-undisclosed',
@@ -2121,7 +2146,24 @@ for (const suffix of ['2.6-sunburst', '2.6-flare', '2.5-sunburst', '2.5-flare', 
     imageOps,
     ['1K', '2K', '4K'],
     [],
-    { adapter: 'openai' },
+    {
+      adapter: 'openai',
+      ...(isVerifiedGptImage2
+        ? {
+            status: 'live-verified' as const,
+            liveVerification: {
+              checkedAt: '2026-11-19',
+              operation: 'text-to-image' as const,
+              resolution: '1K',
+            },
+            source: source(
+              `https://developers.openai.com/api/docs/models/${id}`,
+              'Official OpenAI Images API; hosted live-verified on 2026-11-19 for 1K low-quality 1:1 PNG text-to-image; image editing, other resolutions and quality tiers remain documented.',
+              '2026-11-19',
+            ),
+          }
+        : {}),
+    },
   );
 }
 route(
@@ -2162,12 +2204,26 @@ route(
   imageOps,
   ['1K'],
   [],
-  { adapter: 'google' },
+  {
+    adapter: 'google',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-image',
+      resolution: '1K',
+    },
+    source: source(
+      'https://aistudio.google.com/docs/image-generation',
+      'Official Google Interactions API (gemini-3.1-flash-lite-image, JPEG output only); hosted live-verified on 2026-11-27 for 1K 1:1 minimal-thinking JPEG text-to-image (managed hold retained pending reconciliation of unclassified output tokens); image editing and other options remain documented.',
+      '2026-11-27',
+    ),
+  },
 );
 for (const [modelId, upstream] of [
   ['minimax/h3-image', 'MiniMax-H3-Image'],
   ['minimax/h3-image-highspeed', 'MiniMax-H3-Image-Highspeed'],
 ] as const) {
+  const isVerifiedHighspeed = modelId === 'minimax/h3-image-highspeed';
   route(
     modelId,
     'minimax-undisclosed',
@@ -2176,7 +2232,24 @@ for (const [modelId, upstream] of [
     imageOps,
     ['1K', '2K', '4K'],
     [],
-    { adapter: 'minimax' },
+    {
+      adapter: 'minimax',
+      ...(isVerifiedHighspeed
+        ? {
+            status: 'live-verified' as const,
+            liveVerification: {
+              checkedAt: '2026-11-27',
+              operation: 'text-to-image' as const,
+              resolution: '1K',
+            },
+            source: source(
+              'https://platform.minimax.io/docs/api-reference/image-generation-h3-generations',
+              'Official MiniMax H3 Image Highspeed API; hosted live-verified on 2026-11-27 for 1K 1:1 PNG text-to-image with prompt expansion disabled; image editing and other resolutions remain documented.',
+              '2026-11-27',
+            ),
+          }
+        : {}),
+    },
   );
 }
 route(
@@ -2253,6 +2326,7 @@ for (const [modelId, upstream, docUrl, resolutions, prices, pricingNote] of [
     'Single-image text-to-image list tariff: flat $0.03 across 1K, 2K and 4K.',
   ],
 ] as const) {
+  const isVerifiedSeedreamFlash = modelId === 'bytedance/seedream-5.0-flash';
   route(
     modelId,
     'byteplus-modelark-ap-southeast-1',
@@ -2263,6 +2337,21 @@ for (const [modelId, upstream, docUrl, resolutions, prices, pricingNote] of [
     [],
     {
       adapter: 'byteplus',
+      ...(isVerifiedSeedreamFlash
+        ? {
+            status: 'live-verified' as const,
+            liveVerification: {
+              checkedAt: '2026-11-27',
+              operation: 'text-to-image' as const,
+              resolution: '1K',
+            },
+            source: source(
+              docUrl,
+              'Official BytePlus ModelArk Singapore API (dola-seedream-5-0-flash-260915); hosted live-verified on 2026-11-27 for 1K 1:1 PNG text-to-image; image editing and other resolutions remain documented.',
+              '2026-11-27',
+            ),
+          }
+        : {}),
       pricingSource: source(
         'https://console.byteplus.com/ark/region%3Aap-southeast-1/docs/model-pricing',
         pricingNote,
@@ -2284,7 +2373,20 @@ route(
   imageOps,
   ['1K', '2K'],
   [],
-  { adapter: 'replicate' },
+  {
+    adapter: 'replicate',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-image',
+      resolution: '1K',
+    },
+    source: source(
+      'https://replicate.com/bytedance/seedream-5-pro/readme',
+      'Replicate API (bytedance/seedream-5-pro); hosted BYOK live-verified on 2026-11-27 for 1K 1:1 PNG text-to-image; image editing, 2K and managed pricing remain documented/unpriced.',
+      '2026-11-27',
+    ),
+  },
 );
 // Verified fal reseller endpoints preserve the upstream exact model identity.
 for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
@@ -2355,6 +2457,7 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
           ? prefix
           : `${prefix}/text-to-image`;
     const priced = operation === 'text-to-image' && t2iPrices !== null;
+    const isVerifiedFalQwen = modelId === 'fal/qwen-image-3' && operation === 'text-to-image';
     routes.push({
       id: `fal-undisclosed/${upstream}`,
       modelId,
@@ -2365,7 +2468,16 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
       durations: [],
       fidelity: 'unknown',
       adapter: 'fal',
-      status: 'documented',
+      status: isVerifiedFalQwen ? 'live-verified' : 'documented',
+      ...(isVerifiedFalQwen
+        ? {
+            liveVerification: {
+              checkedAt: '2026-11-27',
+              operation: 'text-to-image' as const,
+              resolution: '1K',
+            },
+          }
+        : {}),
       rates: priced
         ? resolutions.map((resolution, index) => ({
             operation: 'text-to-image' as const,
@@ -2380,7 +2492,10 @@ for (const [modelId, prefix, resolutions, t2iPrices, priceNote] of [
           : unknownPrice(`https://fal.ai/models/${upstream}`),
       source: source(
         `https://fal.ai/models/${upstream}/api`,
-        'Exact reseller endpoint and schema checked. Single-image output; references preserve order. Actual account access and settled charges remain reconciled separately.',
+        isVerifiedFalQwen
+          ? 'Exact reseller endpoint and schema checked. Hosted live-verified on 2026-11-27 for 1K 1:1 PNG text-to-image (fal queue poll omits billing, leaving managed settlement pending reconciliation); image editing and 2K remain documented.'
+          : 'Exact reseller endpoint and schema checked. Single-image output; references preserve order. Actual account access and settled charges remain reconciled separately.',
+        isVerifiedFalQwen ? '2026-11-27' : undefined,
       ),
     });
   }

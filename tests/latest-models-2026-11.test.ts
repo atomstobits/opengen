@@ -267,7 +267,7 @@ describe('November 2026 frontier models & provider routes', () => {
         }),
       ),
     ).toBeNull();
-    // Nano Banana 2 Lite forbids search grounding
+    // Nano Banana 2 Lite forbids search grounding and supports JPEG output only on Google Interactions
     expect(
       google.preflight!(
         ctx('google-undisclosed/gemini-3.1-flash-lite-image', 'text-to-image', {
@@ -277,6 +277,76 @@ describe('November 2026 frontier models & provider routes', () => {
         }),
       ),
     ).toBeTruthy();
+    expect(
+      google.preflight!(
+        ctx('google-undisclosed/gemini-3.1-flash-lite-image', 'text-to-image', {
+          prompt: 'Sticker icon',
+          resolution: '1K',
+          outputFormat: 'png',
+        }),
+      ),
+    ).toContain('JPEG');
+    expect(
+      routeEstimate({
+        modelId: 'google/nano-banana-2-lite',
+        operation: 'text-to-image',
+        routeId: 'google-undisclosed/google-nano-banana-2-lite',
+        input: { prompt: 'Sticker icon', resolution: '1K', outputFormat: 'png' },
+      }),
+    ).toBeNull();
+    expect(
+      routeEstimate({
+        modelId: 'google/nano-banana-2-lite',
+        operation: 'text-to-image',
+        routeId: 'google-undisclosed/google-nano-banana-2-lite',
+        input: { prompt: 'Sticker icon', resolution: '1K', outputFormat: 'jpeg' },
+      }),
+    ).toBeGreaterThan(0);
+    let liteGooglePayload: Record<string, unknown> | undefined;
+    const liteGoogle = createGoogleMediaAdapter({
+      env: { GEMINI_API_KEY: 'google-test' },
+      storeOutput: async ({ mediaType }) => ({
+        url: 'https://assets.example.com/google-lite-output',
+        mediaType,
+        fidelity: 'unverified' as const,
+      }),
+      fetch: vi.fn(async (_url, init) => {
+        if (init?.method === 'POST') {
+          liteGooglePayload = JSON.parse(String(init.body));
+          return Response.json({ id: 'google-lite-1' });
+        }
+        return Response.json({
+          status: 'completed',
+          steps: [
+            {
+              type: 'model_output',
+              content: [
+                {
+                  type: 'image',
+                  mime_type: 'image/jpeg',
+                  data: Buffer.from('ffd8ff00000000', 'hex').toString('base64'),
+                },
+              ],
+            },
+          ],
+        });
+      }),
+    });
+    const liteCtx = ctx('google-undisclosed/gemini-3.1-flash-lite-image', 'text-to-image', {
+      prompt: 'Sticker icon',
+      resolution: '1K',
+      thinkingLevel: 'minimal',
+    });
+    expect(await liteGoogle.submit(liteCtx)).toEqual({ upstreamId: 'google-lite-1' });
+    expect(liteGooglePayload?.response_format).toEqual({
+      type: 'image',
+      mime_type: 'image/jpeg',
+      image_size: '1K',
+    });
+    expect(await liteGoogle.poll({ ...liteCtx, upstreamId: 'google-lite-1' })).toMatchObject({
+      status: 'succeeded',
+      outputs: [{ mediaType: 'image/jpeg' }],
+    });
 
     const usageBody = {
       usage: {

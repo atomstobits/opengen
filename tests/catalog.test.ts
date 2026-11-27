@@ -447,6 +447,138 @@ describe('regional quote selection', () => {
     }
   });
 
+  it('covers all 12 providers with scoped hosted live verification while leaving sibling routes documented', () => {
+    const deployments = new Map(
+      catalog.deployments.map((deployment) => [deployment.id, deployment]),
+    );
+    const liveRoutes = catalog.routes.filter((route) => route.status === 'live-verified');
+    expect(liveRoutes).toHaveLength(19);
+    const verifiedProviders = new Set(
+      liveRoutes.map((route) => deployments.get(route.deploymentId)?.providerId),
+    );
+    expect(verifiedProviders).toEqual(new Set(catalog.providers.map((provider) => provider.id)));
+    expect(verifiedProviders.size).toBe(12);
+
+    const providerCoverage: Array<{
+      id: string;
+      checkedAt: string;
+      operation: GenerateInput['operation'];
+      resolution: string;
+      duration?: number;
+      billing?: 'byok';
+      outputFormat?: 'jpeg';
+      expectedNotice: string;
+    }> = [
+      {
+        id: 'openai-undisclosed/openai-gpt-image-2',
+        checkedAt: '2026-11-19',
+        operation: 'text-to-image',
+        resolution: '1K',
+        expectedNotice: 'Live verification covered text-to-image at 1K.',
+      },
+      {
+        id: 'runway-undisclosed/kling-kling-4.0',
+        checkedAt: '2026-11-19',
+        operation: 'text-to-video',
+        resolution: '720p',
+        duration: 3,
+        expectedNotice: 'Live verification covered text-to-video at 720p for 3s.',
+      },
+      {
+        id: 'google-undisclosed/google-nano-banana-2-lite',
+        checkedAt: '2026-11-27',
+        operation: 'text-to-image',
+        resolution: '1K',
+        outputFormat: 'jpeg',
+        expectedNotice: 'Live verification covered text-to-image at 1K.',
+      },
+      {
+        id: 'minimax-undisclosed/minimax-h3-image-highspeed',
+        checkedAt: '2026-11-27',
+        operation: 'text-to-image',
+        resolution: '1K',
+        expectedNotice: 'Live verification covered text-to-image at 1K.',
+      },
+      {
+        id: 'byteplus-modelark-ap-southeast-1/bytedance-seedream-5.0-flash',
+        checkedAt: '2026-11-27',
+        operation: 'text-to-image',
+        resolution: '1K',
+        expectedNotice: 'Live verification covered text-to-image at 1K.',
+      },
+      {
+        id: 'pika-undisclosed/pika-h3-flex',
+        checkedAt: '2026-11-27',
+        operation: 'text-to-video',
+        resolution: '480p',
+        duration: 5,
+        expectedNotice: 'Live verification covered text-to-video at 480p for 5s.',
+      },
+      {
+        id: 'replicate-undisclosed/bytedance-seedream-5.0-pro',
+        checkedAt: '2026-11-27',
+        operation: 'text-to-image',
+        resolution: '1K',
+        billing: 'byok',
+        expectedNotice: 'Live verification covered text-to-image at 1K.',
+      },
+      {
+        id: 'fal-undisclosed/fal-qwen-image-3',
+        checkedAt: '2026-11-27',
+        operation: 'text-to-image',
+        resolution: '1K',
+        expectedNotice: 'Live verification covered text-to-image at 1K.',
+      },
+    ];
+
+    for (const item of providerCoverage) {
+      const route = catalog.routes.find((entry) => entry.id === item.id)!;
+      expect(route.status).toBe('live-verified');
+      expect(route.liveVerification).toEqual({
+        checkedAt: item.checkedAt,
+        operation: item.operation,
+        resolution: item.resolution,
+        ...(item.duration === undefined ? {} : { duration: item.duration }),
+      });
+      expect(route.source.note).not.toContain('not live-verified');
+      const req: GenerateInput =
+        item.operation === 'text-to-image'
+          ? {
+              modelId: route.modelId,
+              routeId: route.id,
+              operation: 'text-to-image',
+              ...(item.billing ? { billing: item.billing } : {}),
+              input: {
+                prompt: 'Test',
+                resolution: item.resolution,
+                ...(item.outputFormat ? { outputFormat: item.outputFormat } : {}),
+              },
+            }
+          : {
+              modelId: route.modelId,
+              routeId: route.id,
+              operation: 'text-to-video',
+              input: { prompt: 'Test', resolution: item.resolution, duration: item.duration },
+            };
+      const result = quote(req, { executableRouteIds: [route.id] });
+      expect(result.candidates[0]!.notices).toContain(item.expectedNotice);
+    }
+
+    for (const unverifiedSibling of [
+      'openai-undisclosed/openai-gpt-image-2.5-flare',
+      'runway-undisclosed/kling-kling-4.0-flash',
+      'google-undisclosed/google-nano-banana-2.1',
+      'minimax-undisclosed/minimax-h3-image',
+      'byteplus-modelark-ap-southeast-1/bytedance-seedream-5.5',
+      'replicate-undisclosed/bytedance-seedance-2.5',
+      'fal-undisclosed/fal-flux-3-max-video',
+    ]) {
+      const route = catalog.routes.find((entry) => entry.id === unverifiedSibling)!;
+      expect(route.status).toBe('documented');
+      expect(route.liveVerification).toBeUndefined();
+    }
+  });
+
   it('quotes both H3 Max providers under one exact identity and accepts the legacy alias', () => {
     const canonical: GenerateInput = {
       modelId: 'minimax/h3-max',
