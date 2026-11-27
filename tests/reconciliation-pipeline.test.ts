@@ -34,6 +34,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
         {
           billing_events: [{ request_id: 'req-1', cost_estimate_nano_usd: 25_000_000 }],
           has_more: false,
+          next_cursor: null,
         },
         'req-1',
       ),
@@ -49,6 +50,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
             { request_id: 'other-req', cost_estimate_nano_usd: 999_999_999 },
           ],
           has_more: false,
+          next_cursor: null,
         },
         'req-1',
       ),
@@ -60,18 +62,44 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
         {
           billing_events: [{ request_id: 'req-zero', cost_estimate_nano_usd: 0 }],
           has_more: false,
+          next_cursor: null,
         },
         'req-zero',
       ),
     ).toBe(0);
 
-    // Fail-closed cases
-    expect(observedFalBillingEventCostMicros({ billing_events: [] }, 'req-1')).toBeNull();
+    // Fail-closed cases (missing has_more, paginated, non-null next_cursor, missing match, negative, non-integer)
+    expect(
+      observedFalBillingEventCostMicros(
+        {
+          billing_events: [{ request_id: 'req-1', cost_estimate_nano_usd: 10_000 }],
+          next_cursor: null,
+        },
+        'req-1',
+      ),
+    ).toBeNull();
+    expect(
+      observedFalBillingEventCostMicros(
+        {
+          billing_events: [{ request_id: 'req-1', cost_estimate_nano_usd: 10_000 }],
+          has_more: false,
+          next_cursor: 'cursor-page-2',
+        },
+        'req-1',
+      ),
+    ).toBeNull();
+    expect(
+      observedFalBillingEventCostMicros(
+        { billing_events: [], has_more: false, next_cursor: null },
+        'req-1',
+      ),
+    ).toBeNull();
     expect(
       observedFalBillingEventCostMicros(
         {
           billing_events: [{ request_id: 'req-1', cost_estimate_nano_usd: 10_000 }],
           has_more: true,
+          next_cursor: 'cursor-page-2',
         },
         'req-1',
       ),
@@ -81,6 +109,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
         {
           billing_events: [{ request_id: 'other', cost_estimate_nano_usd: 10_000 }],
           has_more: false,
+          next_cursor: null,
         },
         'req-1',
       ),
@@ -90,6 +119,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
         {
           billing_events: [{ request_id: 'req-1', cost_estimate_nano_usd: -1 }],
           has_more: false,
+          next_cursor: null,
         },
         'req-1',
       ),
@@ -99,6 +129,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
         {
           billing_events: [{ request_id: 'req-1', cost_estimate_nano_usd: 12.5 }],
           has_more: false,
+          next_cursor: null,
         },
         'req-1',
       ),
@@ -157,6 +188,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
               ? [{ request_id: 'fal-req-42', cost_estimate_nano_usd: 87_500_000 }]
               : [],
             has_more: false,
+            next_cursor: null,
           });
         }
         if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
@@ -188,6 +220,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
           return Response.json({
             billing_events: [{ request_id: 'fal-req-42', cost_estimate_nano_usd: 0 }],
             has_more: false,
+            next_cursor: null,
           });
         }
         return Response.json({ status: 'COMPLETED', error: 'Upstream failure' });
@@ -230,6 +263,7 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
           return Response.json({
             billing_events: [{ request_id: 'fal-aged-1', cost_estimate_nano_usd: 91_000_000 }],
             has_more: false,
+            next_cursor: null,
           });
         }
         if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
@@ -867,6 +901,7 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
               ? [{ request_id: 'fal-deferred-1', cost_estimate_nano_usd: 87_500_000 }]
               : [],
             has_more: false,
+            next_cursor: null,
           });
         }
         if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
@@ -943,7 +978,7 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
           }),
       ).toThrow();
 
-      // 57 minutes (< 1 hour) rejected; 65 minutes (>= 1 hour) accepted and granted
+      // 57 minutes (< 1 hour) rejected by store AND by migration 034 SQL CHECK & trigger (SQLSTATE 23514)
       const job = await f.admit({ hours: 0.95 });
       await expect(f.store.review(f.target(job), f.context)).rejects.toThrow();
 
@@ -957,8 +992,99 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
       });
       await expect(customStore.review(f.target(job), f.context)).rejects.toThrow();
 
-      const { input } = await f.packet(job);
-      const granted = await f.store.grant(input, f.context);
+      const { input, reviewed } = await f.packet(job);
+
+      // Direct SQL enforcement check bypassing the store at 57 minutes (< 1 hour)
+      await f.engine.pool.query(
+        "UPDATE mr_attempts SET started_at=clock_timestamp()-interval '57 minutes' WHERE job_id=$1",
+        [job.id],
+      );
+      const subHourLiability = (
+        await f.engine.pool.query<{ started_at: Date }>(
+          'SELECT min(started_at) AS started_at FROM mr_attempts WHERE job_id=$1',
+          [job.id],
+        )
+      ).rows[0]!.started_at;
+      const creditLedgerId = randomUUID();
+      const client = await f.engine.pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `INSERT INTO mr_ledger(id,workspace_id,kind,amount_micros,available_delta_micros,reserved_delta_micros,reference)
+           VALUES($1,$2,'credit',$3,$3,0,$4)`,
+          [creditLedgerId, job.workspaceId, job.reservedMicros, `aged-cost-relief:${job.id}`],
+        );
+        // 1) CHECK constraint mr_aged_cost_reliefs_min_age_check rejects created_at < liability_since + 1h
+        await client.query('SAVEPOINT sp_check');
+        await expect(
+          client.query(
+            `INSERT INTO mr_aged_cost_reliefs(
+               job_id,workspace_id,reference,request_hash,policy_version,snapshot_hash,snapshot,
+               allocation,amount_micros,credit_ledger_id,approval_reference,approval_hash,actor,
+               note,evidence_url,liability_since
+             ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$4,$12,$13,$14,$15)`,
+            [
+              job.id,
+              job.workspaceId,
+              'sql-subhour-1',
+              '0'.repeat(64),
+              reviewed.policyVersion,
+              input.snapshotHash,
+              JSON.stringify(reviewed.snapshot),
+              JSON.stringify(reviewed.allocation),
+              job.reservedMicros,
+              creditLedgerId,
+              'sql-approval',
+              JSON.stringify({ id: 'staff-1', kind: 'installation-operator' }),
+              input.note,
+              input.evidenceUrl,
+              subHourLiability,
+            ],
+          ),
+        ).rejects.toMatchObject({ code: '23514' });
+        await client.query('ROLLBACK TO SAVEPOINT sp_check');
+
+        // 2) Admission guard trigger rejects clock_timestamp() < first_liability + 1h even with future created_at
+        await client.query('SAVEPOINT sp_trigger');
+        await expect(
+          client.query(
+            `INSERT INTO mr_aged_cost_reliefs(
+               job_id,workspace_id,reference,request_hash,policy_version,snapshot_hash,snapshot,
+               allocation,amount_micros,credit_ledger_id,approval_reference,approval_hash,actor,
+               note,evidence_url,liability_since,created_at
+             ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$4,$12,$13,$14,$15,$16)`,
+            [
+              job.id,
+              job.workspaceId,
+              'sql-subhour-2',
+              '0'.repeat(64),
+              reviewed.policyVersion,
+              input.snapshotHash,
+              JSON.stringify(reviewed.snapshot),
+              JSON.stringify(reviewed.allocation),
+              job.reservedMicros,
+              creditLedgerId,
+              'sql-approval',
+              JSON.stringify({ id: 'staff-1', kind: 'installation-operator' }),
+              input.note,
+              input.evidenceUrl,
+              subHourLiability,
+              new Date(subHourLiability.getTime() + 2 * 60 * 60_000),
+            ],
+          ),
+        ).rejects.toMatchObject({ code: '23514' });
+        await client.query('ROLLBACK TO SAVEPOINT sp_trigger');
+        await client.query('ROLLBACK');
+      } finally {
+        client.release();
+      }
+
+      // Restore to 65 minutes (>= 1 hour) and grant cleanly as positive control
+      await f.engine.pool.query(
+        "UPDATE mr_attempts SET started_at=clock_timestamp()-interval '65 minutes' WHERE job_id=$1",
+        [job.id],
+      );
+      const granted = await f.store.grant((await f.packet(job)).input, f.context);
       expect(granted.amountMicros).toBe(job.reservedMicros);
     } finally {
       await f.close();
@@ -1192,6 +1318,8 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
         resolveRouteUpstreamModelId(r, 'text-to-video') === 'minimax/h3-max-turbo/text-to-video',
     )!;
     let submitSeq = 0;
+    let expireQueueResults = false;
+    const queueReadsAfterExpiry: string[] = [];
     const billingUrls: string[] = [];
     const billingAuths: Array<string | null> = [];
     const indexedCosts = new Map<string, number>();
@@ -1225,7 +1353,12 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
               billing_events:
                 nano === undefined ? [] : [{ request_id: reqId, cost_estimate_nano_usd: nano }],
               has_more: false,
+              next_cursor: null,
             });
+          }
+          if (expireQueueResults) {
+            queueReadsAfterExpiry.push(u);
+            return new Response('Result expired under X-Fal-Store-IO: 0', { status: 404 });
           }
           if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
           return Response.json({ video: { url: 'https://v3b.fal.media/files/b/fixture/out.mp4' } });
@@ -1333,13 +1466,16 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
         billing_poll_pending: true,
       });
 
-      // Once fal billing-events indexes exact cost (82_000 != tariff 125_000), deferred poll settles it
+      // Simulate X-Fal-Store-IO: 0 queue result expiry (404 on /status and queue result):
+      // terminal billing_poll_pending follow-up MUST use pollBilling() and settle exact nano-USD without re-reading output!
+      expireQueueResults = true;
       indexedCosts.set('fal-default-2', 82_000_000);
       await engine.pool.query(
         "UPDATE mr_jobs SET next_poll_at=clock_timestamp()-interval '1 second' WHERE id=$1",
         [job2.id],
       );
       await workUntilJob(engine, ws, job2.id, (j) => j.settledMicros !== null);
+      expect(queueReadsAfterExpiry).toEqual([]);
       expect(
         (
           await engine.pool.query(

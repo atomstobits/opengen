@@ -1059,12 +1059,21 @@ export class Engine {
         ],
       );
       if (result.deliveryStatus === 'available' && row.settled_micros === null) {
-        await this.trySettleOpaqueVerifiedDelivery(
-          client,
-          row,
-          result.deliveryStatus,
-          row.billing_poll_pending || deferredBilling !== 'disabled',
-        );
+        if (deferredBilling === 'unknown' && row.upstream_id && !row.billing_poll_pending) {
+          // Keep tariff/exact billing retryable once the credential store recovers,
+          // without leaving delivery_updated_at stale or starving other receipts.
+          await client.query(
+            "UPDATE mr_jobs SET billing_poll_pending=true,next_poll_at=now()+interval '30 seconds',updated_at=now() WHERE id=$1",
+            [row.id],
+          );
+        } else {
+          await this.trySettleOpaqueVerifiedDelivery(
+            client,
+            row,
+            result.deliveryStatus,
+            row.billing_poll_pending || deferredBilling !== 'disabled',
+          );
+        }
       }
     });
     return true;
@@ -3091,7 +3100,7 @@ export class Engine {
         );
     }
     const deferredBilling =
-      !terminal.has(existing.status) &&
+      existing.settled_micros === null &&
       result.status === 'succeeded' &&
       (result.billedCostMicros === undefined || result.billedCostMicros === null)
         ? await this.attemptDeferredBillingIntent(existing)
@@ -3263,6 +3272,25 @@ export class Engine {
             "UPDATE mr_jobs SET lease_until=NULL,next_poll_at=now()+($2 * interval '1 millisecond') WHERE id=$1",
             [row.id, Math.max(15000, Math.min(3600000, result.retryAfterMs))],
           );
+        } else if (
+          result.status === 'succeeded' &&
+          row.status === 'succeeded' &&
+          row.settled_micros === null &&
+          (result.billedCostMicros === undefined || result.billedCostMicros === null) &&
+          !result.retryAfterMs
+        ) {
+          if (deferredBilling === 'disabled') {
+            await this.trySettleOpaqueVerifiedDelivery(client, row, row.delivery_status, false);
+            const refreshed = await client.query<JobRow>(
+              'UPDATE mr_jobs SET billing_poll_pending=false,lease_until=NULL,updated_at=now() WHERE id=$1 RETURNING *',
+              [row.id],
+            );
+            return job(refreshed.rows[0]!);
+          }
+          await client.query(
+            "UPDATE mr_jobs SET billing_poll_pending=true,lease_until=NULL,next_poll_at=now()+interval '30 seconds',updated_at=now() WHERE id=$1",
+            [row.id],
+          );
         }
         return job(row);
       }
@@ -3354,7 +3382,7 @@ export class Engine {
       const needsDeferredBillingPoll = Boolean(
         isTerminal &&
         (result.retryAfterMs ||
-          (status === 'succeeded' && deferredBilling === 'enabled' && row.upstream_id)) &&
+          (status === 'succeeded' && deferredBilling !== 'disabled' && row.upstream_id)) &&
         (row.fee_admission
           ? !feeSettled && row.upstream_id
           : (result.billedCostMicros === undefined || result.billedCostMicros === null) &&
@@ -4121,12 +4149,19 @@ export class Engine {
           : null;
         const attemptStartedAt = await this.attemptStartedAt(row);
         this.assertProviderExecutionEnabled();
-        const result = await adapter.poll({
+        const pollContext = {
           ...context,
           upstreamId: row.upstream_id,
           attemptStartedAt,
           ...(costEvidenceScope ? { costEvidenceScope } : {}),
-        });
+        };
+        const result: ProviderResult =
+          terminal.has(row.status) && row.billing_poll_pending && adapter.pollBilling
+            ? {
+                status: row.status as 'succeeded' | 'failed' | 'cancelled',
+                ...(await adapter.pollBilling(pollContext)),
+              }
+            : await adapter.poll(pollContext);
         await this.applyProviderResult(row.workspace_id, row.id, result, undefined, {
           ...this.resultAttempt(row),
           leaseUntil: row.lease_until,

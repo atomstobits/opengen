@@ -64,6 +64,12 @@ export interface ProviderAdapter {
   preflight?(context: Omit<AdapterContext, 'jobId'>): string | null;
   submit(context: AdapterContext): Promise<ProviderSubmission>;
   poll(context: AdapterContext & { upstreamId: string }): Promise<ProviderResult>;
+  /** Billing-only follow-up for durably terminal jobs whose provider results may expire before billing indexes. */
+  pollBilling?(context: AdapterContext & { upstreamId: string }): Promise<{
+    billedCostMicros: number | null;
+    retryAfterMs?: number;
+    costEvidence?: import('./generation-billing.js').GenerationCostEvidence;
+  }>;
 }
 
 export function adapterInputIssue(

@@ -51,7 +51,12 @@ export function observedFalBillingEventCostMicros(
   body: Record<string, unknown>,
   expectedRequestId: string,
 ): number | null {
-  if (!expectedRequestId || body.has_more === true || !Array.isArray(body.billing_events))
+  if (
+    !expectedRequestId ||
+    body.has_more !== false ||
+    body.next_cursor !== null ||
+    !Array.isArray(body.billing_events)
+  )
     return null;
   let totalNanoUsd = 0n;
   let matched = 0;
@@ -1405,6 +1410,9 @@ export function createFalAdapter(
           fidelity: 'unverified' as const,
         })),
       };
+    },
+    async pollBilling(context) {
+      return lookupBillingCost(context.upstreamId, context.attemptStartedAt);
     },
   };
 }

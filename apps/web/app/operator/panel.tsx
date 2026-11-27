@@ -23,6 +23,7 @@ export function OperatorPanel() {
   const [connected, setConnected] = useState(false),
     [operator, setOperator] = useState(false);
   const [workspace, setWorkspace] = useState('local'),
+    [queueWorkspaceFilter, setQueueWorkspaceFilter] = useState(''),
     [id, setId] = useState('');
   const [record, setRecord] = useState<{ key: string; job: Job } | null>(null);
   const [pendingHolds, setPendingHolds] = useState<PendingHold[] | null>(null);
@@ -43,6 +44,7 @@ export function OperatorPanel() {
     setOperator(false);
     setRecord(null);
     setPendingHolds(null);
+    setError('');
     if (!connected) return;
     const controller = new AbortController();
     fetch('/api/session', { signal: controller.signal, cache: 'no-store' })
@@ -60,19 +62,20 @@ export function OperatorPanel() {
     setBusy(true);
     setError('');
     try {
-      const response = await fetch(
-        `/api/operator/reconciliations/pending?kind=${encodeURIComponent(kind)}&limit=50`,
-        {
-          cache: 'no-store',
-        },
-      );
+      const params = new URLSearchParams({ kind, limit: '50' });
+      const trimmedWorkspace = queueWorkspaceFilter.trim();
+      if (trimmedWorkspace) params.set('workspaceId', trimmedWorkspace);
+      const response = await fetch(`/api/operator/reconciliations/pending?${params.toString()}`, {
+        cache: 'no-store',
+      });
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error?.message ?? 'Pending holds could not be loaded.');
       if (version === identityVersion.current)
         setPendingHolds(Array.isArray(data.data) ? data.data : []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Pending holds could not be loaded.');
+      if (version === identityVersion.current)
+        setError(cause instanceof Error ? cause.message : 'Pending holds could not be loaded.');
     } finally {
       setBusy(false);
     }
@@ -152,6 +155,14 @@ export function OperatorPanel() {
       {operator && (
         <section className="workspace-settings operator-form">
           <div>
+            <label>
+              Queue workspace filter (optional)
+              <input
+                value={queueWorkspaceFilter}
+                placeholder="All workspaces"
+                onChange={(e) => setQueueWorkspaceFilter(e.target.value)}
+              />
+            </label>
             <button
               className="button button-outline"
               onClick={() => void loadPending('customer-hold')}
@@ -259,7 +270,10 @@ export function OperatorPanel() {
                   Final status
                   <select
                     value={terminalStatus}
-                    onChange={(e) => setTerminalStatus(e.target.value as 'failed' | 'cancelled')}
+                    onChange={(e) => {
+                      setTerminalStatus(e.target.value as 'failed' | 'cancelled');
+                      setConfirmed(false);
+                    }}
                   >
                     <option value="failed">Failed</option>
                     <option value="cancelled">Cancelled</option>

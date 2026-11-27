@@ -626,6 +626,7 @@ describe('relay forwarder registration, traversal rejection, and no-store guaran
       ['POST', `/v1/keys/${id}/rotate`, '{"expectedSecretVersion":1}'],
       ['PATCH', `/v1/policies/${id}`, '{"expectedRevision":1,"name":"Updated"}'],
       ['POST', `/v1/policies/${id}/archive`, '{"expectedRevision":1}'],
+      ['GET', '/v1/operator/reconciliations/pending?kind=supplier-cost&limit=50'],
     ];
     for (const [method, path, body] of cases) {
       expect(registeredBackendPath(path, method), `${method} ${path}`).toBe(true);
