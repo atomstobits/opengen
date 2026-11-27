@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { usePublicOrigin } from './public-origin';
+import { formatRemainingUsd, useHeaderSession } from './header-session';
 import { useLegalPresentation } from './legal/presentation';
 import { HeroMedia, HeroSplitMedia } from './hero-media';
 import { HeroComparisonModal } from './hero-comparison-modal';
@@ -71,7 +72,11 @@ export function Icon({
     | 'users'
     | 'key'
     | 'link'
-    | 'wallet';
+    | 'wallet'
+    | 'plus'
+    | 'logout'
+    | 'spark'
+    | 'menu';
   size?: number;
 }) {
   const paths: Record<typeof name, React.ReactNode> = {
@@ -125,6 +130,10 @@ export function Icon({
       <path d="M10 14l4-4m-7 7-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m4 6a3.5 3.5 0 0 0 5 0l4-4a3.5 3.5 0 0 0-5-5l-1 1" />
     ),
     wallet: <path d="M20 8V6H5a2 2 0 0 0 0 4h16v10H5a2 2 0 0 1-2-2V8m18 6h-5v3h5" />,
+    plus: <path d="M12 5v14M5 12h14" />,
+    logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />,
+    spark: <path d="M12 3v18M4.5 7.5l15 9M19.5 7.5l-15 9" />,
+    menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   };
   return (
     <svg
@@ -220,14 +229,77 @@ export function SiteHeader({
   overlay?: boolean;
 }) {
   const [setup, setSetup] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement | null>(null);
+  const mobileNavRef = useRef<HTMLDetailsElement | null>(null);
+  const headerSession = useHeaderSession();
+  const session = headerSession?.session ?? null;
+  const signedIn = Boolean(session?.authenticated);
+  const balance = headerSession?.balance ?? null;
+  const balanceStatus = headerSession?.balanceStatus ?? 'idle';
+  const signInHref = session?.oidcEnabled ? '/auth/login' : '/start';
+  const workspaceLabel = session?.workspaceId?.trim() || 'Workspace';
+  const workspaceMonogram = (workspaceLabel.match(/[A-Za-z0-9]/)?.[0] ?? 'O').toUpperCase();
+
+  let balanceText = '—';
+  let balanceTone = 'header-balance-unknown';
+  let balanceTitle = 'Remaining credit unavailable with current permissions. Open billing.';
+  let balanceAriaLabel = 'Remaining credit unavailable. Open billing';
+  if (balanceStatus === 'ready' && balance) {
+    balanceText = formatRemainingUsd(balance.availableMicros);
+    balanceTone = balance.availableMicros === 0 ? 'header-balance-zero' : 'header-balance-funded';
+    const reservedNote =
+      balance.reservedMicros > 0
+        ? ` · Reserved for jobs: ${formatRemainingUsd(balance.reservedMicros)}`
+        : '';
+    balanceTitle = `Remaining credit: ${balanceText}${reservedNote}. Open billing to add credit.`;
+    balanceAriaLabel = `Remaining credit ${balanceText}. Open billing`;
+  } else if (balanceStatus === 'loading') {
+    balanceText = '…';
+    balanceTone = 'header-balance-pending';
+    balanceTitle = 'Checking remaining credit';
+    balanceAriaLabel = 'Checking remaining credit. Open billing';
+  }
+
+  const closeMobileNav = () => {
+    if (mobileNavRef.current) mobileNavRef.current.open = false;
+  };
+
+  useEffect(() => {
+    if (!signedIn) setAccountOpen(false);
+  }, [signedIn]);
+
   useEffect(() => {
     if (!setup) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSetup(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = previous;
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, [setup]);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node))
+        setAccountOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAccountOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [accountOpen]);
+
   return (
     <>
       <header className={`site-header ${overlay ? 'site-header-overlay' : ''}`}>
@@ -236,44 +308,243 @@ export function SiteHeader({
             <img src="/brand/opengen-wordmark-on-dark.svg" width="142" height="34" alt="OpenGen" />
           </a>
           <nav aria-label="Main navigation">
-            <a
-              className={active === 'catalog' || active === 'companies' ? 'nav-active' : ''}
-              href="/models"
-            >
-              Models
-            </a>
-            <a
-              className={active === 'playground' ? 'nav-playground nav-active' : 'nav-playground'}
-              href="/playground"
-            >
-              Playground
-            </a>
-            <a className="nav-docs" href="/docs">
-              Docs
-            </a>
-            <a
-              className={active === 'dashboard' ? 'nav-active nav-dashboard' : 'nav-dashboard'}
-              href="/app#start"
-            >
-              Workspace
-            </a>
-            <details className="mobile-nav">
-              <summary>
-                More <Icon name="chevron" size={11} />
-              </summary>
-              <div>
-                <a href="/playground">Playground</a>
-                <a href="/app#start">Workspace</a>
-                <a href="/start">Get started</a>
-                <a href="/docs">Documentation</a>
-                <a href="/docs#self-host">Self-host</a>
-                <a href="/feedback">Private feedback</a>
-                <button onClick={() => setSetup(true)}>Connect an agent</button>
-              </div>
-            </details>
-            <button className="button button-dark button-sm" onClick={() => setSetup(true)}>
-              Connect an agent <Icon name="arrow" size={15} />
-            </button>
+            <div className="header-links">
+              <a
+                className={active === 'catalog' || active === 'companies' ? 'nav-active' : ''}
+                href="/models"
+              >
+                Models
+              </a>
+              <a
+                className={active === 'playground' ? 'nav-playground nav-active' : 'nav-playground'}
+                href="/playground"
+              >
+                Playground
+              </a>
+              <a className="nav-docs" href="/docs">
+                Docs
+              </a>
+              <a
+                className={active === 'dashboard' ? 'nav-active nav-dashboard' : 'nav-dashboard'}
+                href="/app#start"
+              >
+                Workspace
+              </a>
+            </div>
+            <div className="header-actions">
+              <button
+                type="button"
+                className={`header-action header-connect ${signedIn ? 'header-connect-compact' : ''}`}
+                aria-label="Connect an agent"
+                title="Connect an agent"
+                onClick={() => {
+                  setAccountOpen(false);
+                  closeMobileNav();
+                  setSetup(true);
+                }}
+              >
+                <span className="header-connect-icon" aria-hidden="true">
+                  <Icon name="spark" size={14} />
+                </span>
+                <span className="header-connect-full">Connect an agent</span>
+                <span className="header-connect-short" aria-hidden="true">
+                  Agent
+                </span>
+              </button>
+              {signedIn ? (
+                <>
+                  <a
+                    href="/billing"
+                    className={`header-action header-balance ${balanceTone}`}
+                    data-testid="header-balance"
+                    title={balanceTitle}
+                    aria-label={balanceAriaLabel}
+                  >
+                    <span className="header-balance-readout">
+                      <span className="header-balance-icon" aria-hidden="true">
+                        <Icon name="wallet" size={14} />
+                      </span>
+                      <span className="header-balance-amount">{balanceText}</span>
+                    </span>
+                    <span className="header-balance-add" aria-hidden="true">
+                      <Icon name="plus" size={12} />
+                    </span>
+                  </a>
+                  <div className="header-account" ref={accountRef}>
+                    <button
+                      type="button"
+                      className="header-action header-account-trigger"
+                      aria-haspopup="menu"
+                      aria-expanded={accountOpen}
+                      aria-label={`Account menu for ${workspaceLabel}`}
+                      onClick={() => {
+                        closeMobileNav();
+                        setAccountOpen((open) => !open);
+                      }}
+                    >
+                      <span className="header-account-mark" aria-hidden="true">
+                        {workspaceMonogram}
+                      </span>
+                      <span className="header-account-name">{workspaceLabel}</span>
+                      <span className="header-account-chevron" aria-hidden="true">
+                        <Icon name="chevron" size={11} />
+                      </span>
+                    </button>
+                    {accountOpen && (
+                      <div
+                        className="header-account-menu"
+                        role="menu"
+                        aria-label="Workspace account"
+                      >
+                        <div className="header-menu-section header-menu-identity">
+                          <div className="header-menu-kicker">
+                            <span className="eyebrow">WORKSPACE</span>
+                            {session?.role && (
+                              <span className="header-role-pill">{session.role}</span>
+                            )}
+                          </div>
+                          <strong className="header-menu-workspace">{workspaceLabel}</strong>
+                        </div>
+                        <div className="header-menu-section header-menu-balance">
+                          <div className="header-menu-row">
+                            <span>Remaining credit</span>
+                            <strong className={balanceTone}>{balanceText}</strong>
+                          </div>
+                          {balance && balance.reservedMicros > 0 && (
+                            <div className="header-menu-row header-menu-row-sub">
+                              <span>Reserved for jobs</span>
+                              <span>{formatRemainingUsd(balance.reservedMicros)}</span>
+                            </div>
+                          )}
+                          <a
+                            className="button button-dark button-sm header-menu-topup"
+                            href="/billing"
+                            role="menuitem"
+                            onClick={() => setAccountOpen(false)}
+                          >
+                            <Icon name="plus" size={13} />
+                            <span>Add credit</span>
+                          </a>
+                        </div>
+                        <div className="header-menu-section header-menu-links">
+                          <a
+                            href="/app#start"
+                            role="menuitem"
+                            onClick={() => setAccountOpen(false)}
+                          >
+                            <Icon name="grid" size={14} />
+                            <span>Workspace</span>
+                          </a>
+                          <a
+                            href="/app#activity"
+                            role="menuitem"
+                            onClick={() => setAccountOpen(false)}
+                          >
+                            <Icon name="activity" size={14} />
+                            <span>Activity</span>
+                          </a>
+                          <a href="/app#keys" role="menuitem" onClick={() => setAccountOpen(false)}>
+                            <Icon name="key" size={14} />
+                            <span>API keys</span>
+                          </a>
+                          <a href="/app#apps" role="menuitem" onClick={() => setAccountOpen(false)}>
+                            <Icon name="link" size={14} />
+                            <span>Connected apps</span>
+                          </a>
+                          <a href="/app#team" role="menuitem" onClick={() => setAccountOpen(false)}>
+                            <Icon name="users" size={14} />
+                            <span>Team &amp; settings</span>
+                          </a>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setAccountOpen(false);
+                              setSetup(true);
+                            }}
+                          >
+                            <Icon name="spark" size={14} />
+                            <span>Agent setup</span>
+                          </button>
+                        </div>
+                        <div className="header-menu-section header-menu-footer">
+                          {headerSession?.signOutError && (
+                            <p className="header-menu-error" role="alert">
+                              {headerSession.signOutError}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="header-menu-signout"
+                            disabled={headerSession?.signingOut}
+                            onClick={async () => {
+                              const ok = await headerSession?.signOut();
+                              if (ok) setAccountOpen(false);
+                            }}
+                          >
+                            <Icon name="logout" size={14} />
+                            <span>{headerSession?.signingOut ? 'Signing out…' : 'Sign out'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <a className="header-action header-signin" href={signInHref}>
+                  Sign in
+                </a>
+              )}
+              <details className="mobile-nav" ref={mobileNavRef}>
+                <summary aria-label="Navigation menu">
+                  <span className="mobile-nav-label">More</span>
+                  <span className="mobile-nav-chevron" aria-hidden="true">
+                    <Icon name="chevron" size={11} />
+                  </span>
+                  <span className="mobile-nav-burger" aria-hidden="true">
+                    <Icon name="menu" size={15} />
+                  </span>
+                </summary>
+                <div>
+                  <a href="/models" onClick={closeMobileNav}>
+                    Models
+                  </a>
+                  <a href="/playground" onClick={closeMobileNav}>
+                    Playground
+                  </a>
+                  <a href="/app#start" onClick={closeMobileNav}>
+                    Workspace
+                  </a>
+                  <a href="/billing" onClick={closeMobileNav}>
+                    Credit &amp; billing
+                  </a>
+                  <a href="/docs" onClick={closeMobileNav}>
+                    Documentation
+                  </a>
+                  <a href="/docs#self-host" onClick={closeMobileNav}>
+                    Self-host
+                  </a>
+                  <a href="/feedback" onClick={closeMobileNav}>
+                    Private feedback
+                  </a>
+                  {!signedIn && (
+                    <a href={signInHref} onClick={closeMobileNav}>
+                      Sign in
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMobileNav();
+                      setSetup(true);
+                    }}
+                  >
+                    Connect an agent
+                  </button>
+                </div>
+              </details>
+            </div>
           </nav>
         </div>
       </header>
@@ -305,7 +576,7 @@ export function SiteHeader({
             </h2>
             <ConnectCard />
             <p className="setup-note">
-              Discovery is public. Connect your workspace when you are ready to create.
+              Discovery is public. Connect your workspace when you are ready to create.{' '}
               <a href="/agents">Choose your agent setup ↗</a>
             </p>
           </section>
