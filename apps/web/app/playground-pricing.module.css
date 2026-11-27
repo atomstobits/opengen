@@ -3,7 +3,7 @@
   border-radius: 8px;
   background: var(--surface);
   box-shadow: 5px 5px 0 rgba(4, 19, 14, 0.55);
-  margin-bottom: 24px;
+  margin: 18px 0 24px;
   scroll-margin-block: 16px;
 }
 .pricing a {
@@ -138,6 +138,11 @@
   gap: 12px;
   margin: 0;
 }
+@media (min-width: 720px) {
+  .facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 .facts dd {
   color: var(--ink);
   font-size: 15px;
@@ -253,4 +258,88 @@
   line-height: 1.55;
   max-width: 68ch;
   overflow-wrap: anywhere;
+}
+
+.creditCallout,
+.signInCallout {
+  margin: 0 16px 14px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--canvas);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.creditCallout {
+  border: 1px solid var(--warning-line);
+  border-left: 3px solid var(--warning);
+}
+
+.signInCallout {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+}
+
+.creditCallout p,
+.signInCallout p {
+  margin: 0;
+  flex: 1 1 240px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 68ch;
+}
+
+.creditCallout strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pricing a.creditAction,
+.pricing a.signInAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pricing a.creditAction {
+  background: var(--panel-stat);
+  color: var(--on-light);
+  border: 1px solid var(--line-on-light);
+  box-shadow: 3px 3px 0 rgba(4, 19, 14, 0.55);
+}
+
+.pricing a.creditAction:hover {
+  background: #f0faad;
+  color: var(--on-light);
+}
+
+.pricing a.creditAction:focus-visible,
+.pricing a.signInAction:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.pricing a.signInAction {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
+  box-shadow: 3px 3px 0 rgba(4, 19, 14, 0.55);
+}
+
+.pricing a.signInAction:hover {
+  background: var(--accent-hover);
+  color: var(--on-accent);
 }

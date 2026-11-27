@@ -237,3 +237,90 @@ test('phone users can switch API and agent instructions without losing their inp
   });
   expect(gateway.submissions).toEqual([]);
 });
+
+for (const viewport of [
+  { name: 'desktop', width: 1440, height: 1000 },
+  { name: 'phone', width: 390, height: 844 },
+]) {
+  test(`${viewport.name}: zero-SDK raw-HTTP and Agent/MCP code tabs stay synced with the validated request`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    const gateway = await stubGateway(page);
+    await page.goto('/playground?model=openai%2Fgpt-image-2');
+    const codeTabs = page.getByTestId('playground-code-tabs');
+    await expect(codeTabs).toContainText('requires a nonempty prompt');
+
+    const prompt = "A ceramicist's teapot: $(touch /tmp/never-run); `id`\nMorning light.";
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt);
+
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
+    const publicOrigin = new URL(canonical!).origin;
+
+    const curlCode = await codeTabs.locator('pre code').innerText();
+    expect(curlCode).toContain(`OPENGEN_API_URL="\${OPENGEN_API_URL:-${publicOrigin}}"`);
+    expect(curlCode).toContain('OPENGEN_API_KEY');
+    expect(curlCode).toContain("<<'OPENGEN_REQUEST'");
+    expect(curlCode).toContain('/v1/quotes');
+    expect(curlCode).toContain('/v1/generations');
+    expect(curlCode).toContain('Idempotency-Key');
+    expect(curlCode).not.toContain('MEDIA_ROUTER_API_URL');
+    await codeTabs.getByRole('button', { name: 'Copy cURL', exact: true }).click();
+    await expect.poll(() => copiedText(page)).toBe(curlCode);
+
+    await codeTabs.getByRole('tab', { name: 'JavaScript', exact: true }).click();
+    const jsCode = await codeTabs.locator('pre code').innerText();
+    expect(jsCode).toContain('process.env.OPENGEN_API_URL');
+    expect(jsCode).toContain('process.env.OPENGEN_API_KEY');
+    expect(jsCode).toContain('await fetch(`${apiUrl}/v1/quotes`');
+    expect(jsCode).toContain('await fetch(`${apiUrl}/v1/generations`');
+    expect(jsCode).not.toMatch(/import\s+.*opengen/i);
+    await codeTabs.getByRole('button', { name: 'Copy JavaScript', exact: true }).click();
+    await expect.poll(() => copiedText(page)).toBe(jsCode);
+
+    await codeTabs.getByRole('tab', { name: 'Python', exact: true }).click();
+    const urllibCode = await codeTabs.locator('pre code').innerText();
+    expect(urllibCode).toContain('import urllib.request');
+    expect(urllibCode).toContain('OPENGEN_API_URL');
+    expect(urllibCode).toContain('OPENGEN_API_KEY');
+    expect(urllibCode).not.toContain('import opengen');
+
+    await codeTabs.getByRole('button', { name: 'httpx', exact: true }).click();
+    const httpxCode = await codeTabs.locator('pre code').innerText();
+    expect(httpxCode).toContain('import httpx');
+    expect(httpxCode).toContain('OPENGEN_API_URL');
+    expect(httpxCode).toContain('OPENGEN_API_KEY');
+
+    await codeTabs.getByRole('tab', { name: 'Agent / MCP', exact: true }).click();
+    const mcpCode = await codeTabs.locator('pre code').innerText();
+    const parsedMcp = JSON.parse(mcpCode) as {
+      mcpEndpoint: string;
+      steps: Array<{ tool: string; arguments: Record<string, unknown> }>;
+    };
+    expect(parsedMcp.mcpEndpoint).toBe(`${publicOrigin}/mcp`);
+    expect(parsedMcp.steps).toHaveLength(2);
+    expect(parsedMcp.steps[0]?.tool).toBe('quote');
+    expect(parsedMcp.steps[0]?.arguments.input).toMatchObject({
+      modelId: 'openai/gpt-image-2',
+      operation: 'text-to-image',
+      input: { prompt },
+    });
+    expect(parsedMcp.steps[1]?.tool).toBe('call');
+    expect(parsedMcp.steps[1]?.arguments).toMatchObject({
+      operationId: 'media.generate',
+      input: {
+        modelId: 'openai/gpt-image-2',
+        operation: 'text-to-image',
+        input: { prompt },
+      },
+    });
+    expect(typeof parsedMcp.steps[1]?.arguments.idempotencyKey).toBe('string');
+    await codeTabs.getByRole('button', { name: 'Copy MCP JSON', exact: true }).click();
+    await expect.poll(() => copiedText(page)).toBe(mcpCode);
+
+    expect(gateway.submissions).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport.width,
+    );
+  });
+}

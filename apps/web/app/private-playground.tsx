@@ -16,7 +16,9 @@ import {
 } from '@media-router/contracts';
 import { collectGenerationAssets } from '@media-router/contracts/generation';
 import { GatewayAccess, type BrowserSession } from './gateway-access';
+import { notifyHeaderBalanceChanged, useHeaderSession } from './header-session';
 import { PlaygroundAuthority } from './playground-authority';
+import { PlaygroundCodeTabs } from './playground-code-tabs';
 import { PlaygroundResult } from './playground-result';
 import { CanonicalControls } from './playground-controls';
 import { PlaygroundExample } from './playground-example';
@@ -52,12 +54,207 @@ const names = operationLabels;
 const singleRegion = (request: GenerateInput) =>
   request.routing?.endpointRegions?.length === 1 ? request.routing.endpointRegions[0] : undefined;
 
-const isSensitiveMediaUrl = (value: string) => {
-  const url = new URL(value);
-  return (
-    !!(url.search || url.hash || url.username || url.password) || url.pathname.startsWith('/api/')
-  );
+const SIGNIN_HANDOFF_KEY = 'opengen.playground.v1:signin-handoff';
+const SIGNIN_HANDOFF_TTL_MS = 30 * 60 * 1000;
+
+const starterPromptsByOperation: Record<Operation, readonly { label: string; prompt: string }[]> = {
+  'text-to-image': [
+    {
+      label: 'Ceramic studio',
+      prompt:
+        'Hand-thrown matte stoneware teapot on a travertine plinth in soft morning window light, crisp shadows, editorial studio photography.',
+    },
+    {
+      label: 'Sunlit courtyard',
+      prompt:
+        'Minimalist concrete courtyard with a still reflecting pool and olive tree shadows across warm plaster walls, medium-format architectural photography.',
+    },
+    {
+      label: 'Botanical print',
+      prompt:
+        'Risograph art print of coastal pine branches and tide lines in deep emerald, warm cream and viva magenta ink on textured cotton paper.',
+    },
+  ],
+  'image-edit': [
+    {
+      label: 'Golden hour relight',
+      prompt:
+        'Relight the scene in warm late-afternoon golden hour sun with long soft shadows while keeping the subject and composition unchanged.',
+    },
+    {
+      label: 'Sandstone backdrop',
+      prompt:
+        'Replace the background with a clean matte sandstone studio sweep and balanced softbox rim lighting while preserving the subject.',
+    },
+    {
+      label: 'Winter snowfall',
+      prompt:
+        'Transform the weather into a crisp twilight winter evening with gentle falling snow and cool ambient light.',
+    },
+  ],
+  'text-to-video': [
+    {
+      label: 'Coastal road glide',
+      prompt:
+        'Slow cinematic tracking shot along a misty coastal cliff road at sunrise as ocean waves break below and warm light clears the fog.',
+    },
+    {
+      label: 'Espresso macro',
+      prompt:
+        'Close-up macro shot of rich espresso pouring into a warm ceramic cup in soft morning cafe light with delicate steam rising.',
+    },
+    {
+      label: 'Lantern alley rain',
+      prompt:
+        'Steady handheld dolly through a quiet lantern-lit stone alley after rain with warm reflections shimmering across wet cobblestones.',
+    },
+  ],
+  'image-to-video': [
+    {
+      label: 'Gentle camera push',
+      prompt:
+        'Slowly dolly forward into the frame while foliage and fabric stir in a light breeze, preserving the subject and lighting.',
+    },
+    {
+      label: 'Subtle parallax pan',
+      prompt:
+        'Smooth horizontal parallax pan across the scene with natural depth movement and steady ambient light.',
+    },
+    {
+      label: 'Atmospheric motion',
+      prompt:
+        'Keep the camera steady while soft clouds drift, light shifts gently across surfaces and subtle natural motion brings the image alive.',
+    },
+  ],
+  'reference-to-video': [
+    {
+      label: 'Consistent walk-through',
+      prompt:
+        'Follow the reference subject walking calmly through a sunlit architectural gallery in a single continuous medium tracking shot.',
+    },
+    {
+      label: 'Editorial orbit',
+      prompt:
+        'Slow 180-degree studio camera orbit around the referenced subject under soft directional key light with crisp shallow depth of field.',
+    },
+    {
+      label: 'Rainy window beat',
+      prompt:
+        'Quiet close-up of the referenced subject beside a rain-streaked glass window at dusk as warm city lights drift out of focus behind them.',
+    },
+  ],
+  'video-edit': [
+    {
+      label: 'Blue-hour grade',
+      prompt:
+        'Shift the lighting smoothly into crisp blue-hour twilight with warm glowing windows while keeping all camera and subject motion intact.',
+    },
+    {
+      label: 'Light rainfall',
+      prompt:
+        'Add gentle falling rain and damp reflective surfaces across the scene while preserving the original framing and camera path.',
+    },
+    {
+      label: 'Warm film stock',
+      prompt:
+        'Re-grade the clip with subtle warm 35mm daylight film tones and soft highlight roll-off while preserving original motion.',
+    },
+  ],
+  'video-extend': [
+    {
+      label: 'Continue camera glide',
+      prompt:
+        'Continue the existing camera glide smoothly into the surrounding space with consistent lighting, pace and natural motion.',
+    },
+    {
+      label: 'Settle on wide frame',
+      prompt:
+        'Ease the camera back gradually to reveal the wider environment while ambient movement continues naturally.',
+    },
+    {
+      label: 'Soft light shift',
+      prompt:
+        'Extend the scene seamlessly as sunlight warms across the frame and background details continue moving naturally.',
+    },
+  ],
 };
+
+const isSensitiveMediaUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return (
+      !!(url.search || url.hash || url.username || url.password) || url.pathname.startsWith('/api/')
+    );
+  } catch {
+    return true;
+  }
+};
+
+function sanitizeSignedOutDraft(draft: GenerateInput): GenerateInput | null {
+  const { previousJobId: _omittedJob, ...withoutPrivateJob } = draft;
+  if (!isPlaygroundDraft(withoutPrivateJob)) return null;
+  if (
+    collectGenerationAssets(withoutPrivateJob.input).some(
+      ({ asset }) => !!asset.assetKey || (!!asset.url && isSensitiveMediaUrl(asset.url)),
+    )
+  ) {
+    return null;
+  }
+  const hasContent =
+    Boolean(withoutPrivateJob.input.prompt?.trim()) ||
+    collectGenerationAssets(withoutPrivateJob.input).length > 0;
+  return hasContent ? withoutPrivateJob : null;
+}
+
+function clearSignInHandoff() {
+  try {
+    sessionStorage.removeItem(SIGNIN_HANDOFF_KEY);
+  } catch {
+    /* Storage is optional. */
+  }
+}
+
+function writeSignInHandoff(draft: GenerateInput) {
+  try {
+    const sanitized = sanitizeSignedOutDraft(draft);
+    if (!sanitized) {
+      sessionStorage.removeItem(SIGNIN_HANDOFF_KEY);
+      return;
+    }
+    sessionStorage.setItem(
+      SIGNIN_HANDOFF_KEY,
+      JSON.stringify({ version: 1, savedAt: Date.now(), draft: sanitized }),
+    );
+  } catch {
+    /* Storage is optional for signed-out handoff. */
+  }
+}
+
+function consumeSignInHandoff(modelId: string, operation: Operation): GenerateInput | null {
+  try {
+    const raw = sessionStorage.getItem(SIGNIN_HANDOFF_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(SIGNIN_HANDOFF_KEY);
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      (parsed as { version?: unknown }).version !== 1 ||
+      typeof (parsed as { savedAt?: unknown }).savedAt !== 'number'
+    ) {
+      return null;
+    }
+    const age = Date.now() - (parsed as { savedAt: number }).savedAt;
+    if (age < 0 || age > SIGNIN_HANDOFF_TTL_MS) return null;
+    const candidate = (parsed as { draft?: unknown }).draft;
+    if (!isPlaygroundDraft(candidate)) return null;
+    if (candidate.modelId !== modelId || candidate.operation !== operation) return null;
+    return sanitizeSignedOutDraft(candidate);
+  } catch {
+    clearSignInHandoff();
+    return null;
+  }
+}
 const message = (body: any) =>
   typeof body.error === 'string'
     ? body.error
@@ -183,6 +380,11 @@ export function Playground({
   const [draft, setDraft] = useState<GenerateInput>(initial);
   const [authorityPending, setAuthorityPending] = useState(false);
   const [session, setSession] = useState<BrowserSession>({ authenticated: false });
+  const [sessionResolved, setSessionResolved] = useState(false);
+  const [insufficientBalance, setInsufficientBalance] = useState(false);
+  const headerSession = useHeaderSession();
+  const wasAuthenticated = useRef(false);
+  const signedOutEdited = useRef(false);
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [json, setJson] = useState('');
   const [jsonDirty, setJsonDirty] = useState(false);
@@ -246,12 +448,21 @@ export function Playground({
         live.current.version++;
         resultEpoch.current++;
         setAuthorityPending(true);
+        setInsufficientBalance(false);
         setQuote(null);
         setJob(null);
         setBusy(null);
         return;
       }
       setAuthorityPending(false);
+      if (wasAuthenticated.current && !next.authenticated) {
+        clearSignInHandoff();
+        signedOutEdited.current = false;
+      } else if (next.authenticated) {
+        signedOutEdited.current = false;
+      }
+      wasAuthenticated.current = next.authenticated;
+      setSessionResolved(true);
       const nextBoundary = JSON.stringify([
         next.authenticated,
         next.workspaceId,
@@ -278,6 +489,7 @@ export function Playground({
         setNotice('');
         setResultError('');
         setNewAttempt(null);
+        setInsufficientBalance(false);
       }
       setSession(next);
     },
@@ -285,6 +497,7 @@ export function Playground({
   );
 
   function update(next: GenerateInput, restoreOperationDraft = false) {
+    if (!session.authenticated && !authorityPending) signedOutEdited.current = true;
     if (
       next.operation !== draft.operation ||
       next.routeId !== draft.routeId ||
@@ -301,6 +514,7 @@ export function Playground({
     setQuote(null);
     setError('');
     setNotice('');
+    setInsufficientBalance(false);
   }
   function buildRequest() {
     if (jsonDirty) throw new Error('Apply or discard your JSON edits before continuing.');
@@ -351,7 +565,9 @@ export function Playground({
     let restoredNotice = '';
     if (context && !explicit) {
       try {
-        const rawSaved = readRecovery(sessionStorage, context, 'draft', isPlaygroundDraft);
+        const handoff = consumeSignInHandoff(model.id, draft.operation);
+        const rawSaved =
+          handoff ?? readRecovery(sessionStorage, context, 'draft', isPlaygroundDraft);
         if (rawSaved && rawSaved.modelId === model.id && rawSaved.operation === draft.operation) {
           let saved = rawSaved;
           if (rawSaved.routeId) {
@@ -413,8 +629,9 @@ export function Playground({
               },
             };
           }
-          restoredNotice =
-            'Your private draft was restored for this identity, workspace and operation. Nothing has been submitted.';
+          restoredNotice = handoff
+            ? 'Your Playground draft was restored after sign-in. Review settings and get a quote.'
+            : 'Your private draft was restored for this identity, workspace and operation. Nothing has been submitted.';
         }
       } catch {
         setStorageReady(false);
@@ -484,6 +701,12 @@ export function Playground({
       setStorageReady(false);
     }
   }, [draft, contextKey, loadedKey]);
+
+  useEffect(() => {
+    if (!sessionResolved || session.authenticated || authorityPending || !signedOutEdited.current)
+      return;
+    writeSignInHandoff(draft);
+  }, [draft, sessionResolved, session.authenticated, authorityPending]);
 
   useEffect(() => {
     if (authorityPending || !context || !context.scopes.includes('read')) return;
@@ -610,6 +833,7 @@ export function Playground({
     const requestHash = requestFingerprint(data);
     setBusy(kind);
     setError('');
+    setInsufficientBalance(false);
     let submissionSent = false;
     try {
       if (kind === 'quote') {
@@ -683,9 +907,14 @@ export function Playground({
       });
       const body = await response.json();
       if (!response.ok) {
+        const rejectionKey = `${response.status}:${body.error?.code}`;
+        if (!recover && rejectionKey === '402:insufficient_balance') {
+          if (snapshot.version === live.current.version) setInsufficientBalance(true);
+          notifyHeaderBalanceChanged();
+        }
         if (
           !recover &&
-          admissionRejections.has(`${response.status}:${body.error?.code}`) &&
+          admissionRejections.has(rejectionKey) &&
           recordSubmissionRejection(sessionStorage, context, receipt)
         ) {
           submissionSent = false;
@@ -697,6 +926,7 @@ export function Playground({
         }
         throw new Error(message(body));
       }
+      if (!recover) notifyHeaderBalanceChanged();
       const next = checkJob(body, context, {
         id: receipt.jobId,
         modelId: data.modelId,
@@ -818,11 +1048,38 @@ export function Playground({
   const selectedRegion =
     requestedRegion && regions.includes(requestedRegion) ? requestedRegion : undefined;
   const selectionHref = playgroundHref(model.id, draft.routeId, draft.operation, selectedRegion);
+  const loginHref = `/auth/login?returnTo=${encodeURIComponent(selectionHref)}`;
+  const persistSignedOutDraft = () => {
+    if (!session.authenticated && !authorityPending && signedOutEdited.current) {
+      writeSignInHandoff(draft);
+    }
+  };
   useEffect(() => {
     if (authorityPending || loadedKey !== contextKey) return;
     if (window.location.pathname + window.location.search !== selectionHref)
       window.history.replaceState(null, '', selectionHref);
   }, [selectionHref, authorityPending, loadedKey, contextKey]);
+  const verifiedAvailableMicros =
+    !authorityPending &&
+    !headerSession.checkingAuthority &&
+    context?.scopes.includes('read') &&
+    headerSession.session?.authenticated &&
+    headerSession.session.workspaceId === context.workspaceId &&
+    headerSession.session.recoveryScope === context.recoveryScope &&
+    headerSession.balanceStatus === 'ready' &&
+    headerSession.balance
+      ? headerSession.balance.availableMicros
+      : null;
+  const creditNotice = insufficientBalance
+    ? ({ kind: 'insufficient-balance', billingHref: '/billing' } as const)
+    : verifiedAvailableMicros === 0 && draft.billing !== 'byok'
+      ? ({ kind: 'zero-balance', billingHref: '/billing' } as const)
+      : undefined;
+  const signInNotice =
+    !authorityPending && sessionResolved && !session.authenticated && session.oidcEnabled
+      ? { loginHref, onNavigate: persistSignedOutDraft }
+      : undefined;
+  const starterPrompts = starterPromptsByOperation[draft.operation] ?? [];
   const currentQuote = quote?.fingerprint === fingerprint ? quote.value : null;
   const selectedQuote = currentQuote?.candidates.find(
     (candidate) => candidate.routeId === currentQuote.selectedRouteId && candidate.executable,
@@ -1056,23 +1313,6 @@ export function Playground({
               <CopyButton text={`${gatewayOrigin}${selectionHref}`} label="Copy setup link" />
             </div>
           </div>
-          <PlaygroundPricing
-            catalog={catalog}
-            model={model}
-            routes={routes}
-            draft={draft}
-            quote={currentQuote}
-            job={session.authenticated ? job : null}
-            readiness={readiness}
-            mobileStatus={mobileStatus}
-            busy={busy}
-            ready={ready}
-            canGenerate={canGenerate || canRecoverSubmission}
-            submissionLabel={submissionLabel}
-            error={error}
-            onQuote={() => void request('quote')}
-            onGenerate={() => void request('generate')}
-          />
           <div className={styles.modeBar} id="playground-input" tabIndex={-1}>
             <p>One private request. Every setting stays explicit.</p>
             <div aria-label="Input mode">
@@ -1200,37 +1440,27 @@ export function Playground({
             </div>
           ) : (
             <>
-              <label className="fallback-setting">
-                <input
-                  type="checkbox"
-                  checked={draft.routing?.fallback ?? false}
-                  disabled={!!draft.routeId}
-                  onChange={(event) =>
-                    update({
-                      ...draft,
-                      routing: { ...draft.routing, fallback: event.target.checked },
-                    })
-                  }
-                />
-                <span>Try another eligible provider after a confirmed, unbilled rejection</span>
-              </label>
-              <p className="fallback-note">
-                {draft.routeId
-                  ? 'Your exact regional route is pinned.'
-                  : 'The exact variant and regional restrictions stay the same. A timeout never starts another paid attempt.'}
-              </p>
-              <PlaygroundExample
-                modelId={model.id}
-                operation={draft.operation}
-                onLoad={(input) => {
-                  const { previousJobId: _, ...fresh } = draft;
-                  update({ ...fresh, input });
-                  setJsonDirty(false);
-                  setControlsRevision((revision) => revision + 1);
-                  setControlsValid(true);
-                  setNotice('Example loaded into the draft. Review its settings and get a quote.');
-                }}
-              />
+              {starterPrompts.length > 0 && (
+                <div className={styles.starterBar} role="group" aria-label="Starter prompts">
+                  <span className={styles.starterLabel}>Try a prompt:</span>
+                  <div className={styles.starterChips}>
+                    {starterPrompts.map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        className={styles.starterChip}
+                        aria-pressed={draft.input.prompt === chip.prompt}
+                        onClick={() => {
+                          update({ ...draft, input: { ...draft.input, prompt: chip.prompt } });
+                          setNotice('Starter prompt loaded. Review settings and get a quote.');
+                        }}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <PlaygroundAuthority
                 value={
                   context
@@ -1252,22 +1482,55 @@ export function Playground({
                   onValidityChange={setControlsValid}
                 />
               </PlaygroundAuthority>
-              <label>
-                Owned continuation job ID{' '}
-                <span className="optional">
-                  optional · original model and deployment remain pinned
-                </span>
-                <input
-                  value={draft.previousJobId ?? ''}
-                  onChange={(event) => {
-                    const { previousJobId: _, ...rest } = draft;
-                    update({
-                      ...rest,
-                      ...(event.target.value ? { previousJobId: event.target.value } : {}),
-                    });
-                  }}
-                />
-              </label>
+              <PlaygroundExample
+                modelId={model.id}
+                operation={draft.operation}
+                onLoad={(input) => {
+                  const { previousJobId: _, ...fresh } = draft;
+                  update({ ...fresh, input });
+                  setJsonDirty(false);
+                  setControlsRevision((revision) => revision + 1);
+                  setControlsValid(true);
+                  setNotice('Example loaded into the draft. Review its settings and get a quote.');
+                }}
+              />
+            </>
+          )}
+          {validationError && (
+            <p className={styles.incompatibility}>Review settings: {validationError}</p>
+          )}
+          {!controlsValid && (
+            <p className={styles.incompatibility}>
+              Apply or discard the structured field edits before quoting or generating.
+            </p>
+          )}
+          {jsonDirty && mode === 'form' && (
+            <p className={styles.incompatibility}>
+              You have unapplied JSON edits. Return to JSON to apply or discard them.
+            </p>
+          )}
+          <PlaygroundPricing
+            catalog={catalog}
+            model={model}
+            routes={routes}
+            draft={draft}
+            quote={currentQuote}
+            job={session.authenticated ? job : null}
+            readiness={readiness}
+            mobileStatus={mobileStatus}
+            busy={busy}
+            ready={ready}
+            canGenerate={canGenerate || canRecoverSubmission}
+            submissionLabel={submissionLabel}
+            error={error}
+            creditNotice={creditNotice}
+            signInNotice={signInNotice}
+            onQuote={() => void request('quote')}
+            onGenerate={() => void request('generate')}
+          />
+          {mode === 'form' && (
+            <div className={styles.secondaryOptions}>
+              <span className="eyebrow">BILLING &amp; ROUTING OPTIONS</span>
               {!draft.routeId || draft.maxCostMicros !== undefined ? (
                 <>
                   <div className="field-grid">
@@ -1336,23 +1599,46 @@ export function Playground({
                     : ''}
                 </p>
               )}
-            </>
+              <label className="fallback-setting">
+                <input
+                  type="checkbox"
+                  checked={draft.routing?.fallback ?? false}
+                  disabled={!!draft.routeId}
+                  onChange={(event) =>
+                    update({
+                      ...draft,
+                      routing: { ...draft.routing, fallback: event.target.checked },
+                    })
+                  }
+                />
+                <span>Try another eligible provider after a confirmed, unbilled rejection</span>
+              </label>
+              <p className="fallback-note">
+                {draft.routeId
+                  ? 'Your exact regional route is pinned.'
+                  : 'The exact variant and regional restrictions stay the same. A timeout never starts another paid attempt.'}
+              </p>
+              <label>
+                Owned continuation job ID{' '}
+                <span className="optional">
+                  optional · original model and deployment remain pinned
+                </span>
+                <input
+                  value={draft.previousJobId ?? ''}
+                  onChange={(event) => {
+                    const { previousJobId: _, ...rest } = draft;
+                    update({
+                      ...rest,
+                      ...(event.target.value ? { previousJobId: event.target.value } : {}),
+                    });
+                  }}
+                />
+              </label>
+            </div>
           )}
-          {validationError && (
-            <p className={styles.incompatibility}>Review settings: {validationError}</p>
-          )}
-          {!controlsValid && (
-            <p className={styles.incompatibility}>
-              Apply or discard the structured field edits before quoting or generating.
-            </p>
-          )}
-          {jsonDirty && mode === 'form' && (
-            <p className={styles.incompatibility}>
-              You have unapplied JSON edits. Return to JSON to apply or discard them.
-            </p>
-          )}
-          <div id="playground-account" tabIndex={-1}>
-            <GatewayAccess onChange={authChange} onSession={sessionChange} />
+          <PlaygroundCodeTabs gatewayOrigin={gatewayOrigin} buildRequest={buildExportRequest} />
+          <div id="playground-account" tabIndex={-1} onClickCapture={persistSignedOutDraft}>
+            <GatewayAccess onChange={authChange} onSession={sessionChange} loginUrl={loginHref} />
           </div>
           {session.authenticated && !context && (
             <p className="detail-note">

@@ -364,7 +364,7 @@ export function PlaygroundApp({
 }) {
   const defaultModel =
     catalog.models.find((model) => model.id === initialModelId) ??
-    catalog.models.find((model) => model.id === 'alibaba/wan-3.0') ??
+    catalog.models.find((model) => model.id === 'openai/gpt-image-2') ??
     catalog.models[0]!;
   const [selection, setSelection] = useState({
     modelId: defaultModel.id,

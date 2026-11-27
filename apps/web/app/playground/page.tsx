@@ -7,6 +7,8 @@ import { PlaygroundApp } from '../catalog-browser';
 import { Footer, SiteHeader } from '../ui';
 import { pageMetadata, siteOrigin } from '../seo';
 
+const DEFAULT_PLAYGROUND_MODEL_ID = 'openai/gpt-image-2';
+
 export const metadata = pageMetadata({
   title: 'Image & video playground | OpenGen',
   description:
@@ -48,7 +50,8 @@ export default async function PlaygroundPage({
   const routes = route
     ? [route]
     : catalog.routes.filter(
-        (item) => item.modelId === (modelId ?? 'alibaba/wan-3.0') && item.status !== 'retired',
+        (item) =>
+          item.modelId === (modelId ?? DEFAULT_PLAYGROUND_MODEL_ID) && item.status !== 'retired',
       );
   if (effectiveOperation !== undefined || regionQuery !== undefined) {
     if (
@@ -77,7 +80,7 @@ export default async function PlaygroundPage({
           <div>
             <span className="eyebrow">THE PLAYGROUND</span>
             <h1>Bring your idea to life.</h1>
-            <p>Choose a model, add your inputs and get a quote before you create.</p>
+            <p>Choose a model, describe your result and get a quote before you create.</p>
             <p>
               <a className="text-link" href="/guides/image-to-video">
                 Image-to-video guide ↗
@@ -95,7 +98,7 @@ export default async function PlaygroundPage({
         </header>
         <PlaygroundApp
           catalog={catalog}
-          initialModelId={modelId}
+          initialModelId={modelId ?? DEFAULT_PLAYGROUND_MODEL_ID}
           initialRouteId={route?.id}
           initialOperation={effectiveOperation}
           initialRegion={route ? undefined : region}
