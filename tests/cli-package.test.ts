@@ -212,6 +212,16 @@ describe('portable private OpenGen CLI package', () => {
             error: { code: 'unauthorized', message: 'Sign in to diagnose access.' },
           }),
         );
+      } else if (request.method === 'GET' && path === '/v1/jobs/job_wait_base_url') {
+        response.end(
+          JSON.stringify({
+            id: 'job_wait_base_url',
+            status: 'queued',
+            reservedMicros: 0,
+            settledMicros: null,
+            deliveryStatus: 'pending',
+          }),
+        );
       } else {
         fixtureErrors.push(`${request.method} ${path}`);
         response.statusCode = 500;
@@ -399,6 +409,53 @@ describe('portable private OpenGen CLI package', () => {
     expect(requests.length).toBe(before);
   });
 
+  it('honors OPENGEN_API_URL in bundled recovery errors and defaults to https://opengen.dev', async () => {
+    const code = await readFile(executable, 'utf8');
+    expect(code).not.toContain('http://127.0.0.1:4310');
+    const envWithCanonicalUrl: NodeJS.ProcessEnv = {
+      ...environment(),
+      OPENGEN_API_URL: baseUrl,
+    };
+    delete envWithCanonicalUrl.MEDIA_ROUTER_URL;
+    const waitResult = await new Promise<{ stderr: string; code: number }>(
+      (resolveResult, reject) => {
+        const child = execFile(
+          process.execPath,
+          [
+            '--disallow-code-generation-from-strings',
+            executable,
+            'job',
+            'wait',
+            'job_wait_base_url',
+            '--timeout-ms',
+            '40',
+            '--poll-interval-ms',
+            '10',
+          ],
+          { cwd, env: envWithCanonicalUrl, timeout: 15000 },
+        );
+        let stderr = '';
+        child.stderr!.setEncoding('utf8').on('data', (chunk) => {
+          stderr += chunk;
+        });
+        child.once('error', reject);
+        child.once('close', (code) => resolveResult({ stderr, code: code ?? -1 }));
+      },
+    );
+    expect(waitResult.code).toBe(1);
+    expect(JSON.parse(waitResult.stderr)).toMatchObject({
+      error: {
+        code: 'wait_timeout',
+        jobId: 'job_wait_base_url',
+        resume: {
+          environment: {
+            OPENGEN_API_URL: baseUrl,
+          },
+        },
+      },
+    });
+  });
+
   it('packs exactly the allowed regular files and supplies verifiable SHA-256 evidence', async () => {
     const archive = await readFile(artifact.tarballPath);
     const entries = unpackTar(archive);
@@ -412,13 +469,13 @@ describe('portable private OpenGen CLI package', () => {
       expect(entry.mode).toBe(entry.name === 'package/bin/opengen.mjs' ? 0o755 : 0o644);
     }
     const checksum = await readFile(artifact.sha256Path, 'utf8');
-    expect(checksum.trim().split(/\s+/)).toEqual([digest(archive), 'opengen-cli-0.1.1.tgz']);
+    expect(checksum.trim().split(/\s+/)).toEqual([digest(archive), 'opengen-cli-0.1.2.tgz']);
     const manifest = JSON.parse(await readFile(artifact.manifestPath, 'utf8'));
     expect(manifest).toMatchObject({
       schemaVersion: 1,
       name: '@opengen-dev/cli',
-      version: '0.1.1',
-      tarball: { file: 'opengen-cli-0.1.1.tgz', sha256: digest(archive), size: archive.length },
+      version: '0.1.2',
+      tarball: { file: 'opengen-cli-0.1.2.tgz', sha256: digest(archive), size: archive.length },
     });
     expect(manifest.buildManifestSha256).toBe(
       digest(await readFile(join(artifact.packageDirectory, 'BUILD-MANIFEST.json'))),

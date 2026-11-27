@@ -228,7 +228,7 @@ export async function buildEmailRelayApp(options: {
     await options.pool.query('SELECT 1');
     return reply
       .header('Cache-Control', 'no-store')
-      .send({ status: 'ok', database: true, version: '0.1.1' });
+      .send({ status: 'ok', database: true, version: '0.1.2' });
   });
 
   app.post('/v1/send', async (request, reply) => {

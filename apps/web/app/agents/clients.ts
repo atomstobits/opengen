@@ -10,6 +10,12 @@ export type AgentClient = {
   steps: string[];
   caution: string;
   source: { label: string; url: string };
+  verification?: {
+    cardLabel: string;
+    badge: string;
+    matrixEvidence: string;
+    detailEvidence: string;
+  };
   snippet?: (origin: string) => { label: string; code: string };
   secondarySnippet?: (origin: string) => { label: string; code: string };
 };
@@ -66,7 +72,15 @@ export const agentClients: AgentClient[] = [
       'Check connection status and ask for catalog discovery before requesting a generation.',
     ],
     caution:
-      'OpenGen accepts registered localhost callbacks with explicit ports, as documented by Claude Code. The complete callback URI must match registration. No Claude Code version has been tested with OpenGen.',
+      'OpenGen accepts registered localhost callbacks with explicit ports, as documented by Claude Code. The complete callback URI must match registration. Claude Code 2.1.301 completed live DCR + S256 PKCE redirect through OpenGen’s consent screen on 2026-11-27; post-consent tool execution and billable generation remain pending.',
+    verification: {
+      cardLabel: 'Live DCR + consent preflight verified',
+      badge: 'OAUTH PREFLIGHT VERIFIED',
+      matrixEvidence:
+        'Claude Code 2.1.301 (2026-11-27): live DCR + S256 PKCE reached workspace consent; post-consent tool calls pending',
+      detailEvidence:
+        'Claude Code 2.1.301 (2026-11-27): live DCR + S256 PKCE against https://opengen.dev/mcp reached OpenGen workspace consent. Post-consent tool execution and paid generation are pending.',
+    },
     source: { label: 'Claude Code MCP documentation', url: 'https://code.claude.com/docs/en/mcp' },
     snippet: (origin) => ({
       label: 'Client configuration command · review before running',
@@ -106,7 +120,15 @@ export const agentClients: AgentClient[] = [
       'Inspect MCP status and ask for catalog discovery. A saved server definition alone does not establish a successful connection.',
     ],
     caution:
-      'These commands follow current official documentation. The installed client’s command options and OAuth callback must be checked; no Codex version has completed an OpenGen interoperability test.',
+      'codex-cli 0.155.1 completed live OAuth Streamable HTTP MCP read-only verification (catalog_search, catalog_get, balance) against https://opengen.dev/mcp on 2026-11-27. Billable generation and other Codex versions remain separately unverified.',
+    verification: {
+      cardLabel: 'Live read-only OAuth MCP verified',
+      badge: 'LIVE READ-ONLY VERIFIED',
+      matrixEvidence:
+        'codex-cli 0.155.1 (2026-11-27): live OAuth MCP read-only verified (catalog_search, catalog_get, balance); generation not run',
+      detailEvidence:
+        'codex-cli 0.155.1 (2026-11-27): verified live OAuth Streamable HTTP MCP catalog_search, catalog_get, and balance against https://opengen.dev/mcp. Billable generation not exercised.',
+    },
     source: {
       label: 'Official OpenAI command reference',
       url: 'https://learn.chatgpt.com/docs/developer-commands',

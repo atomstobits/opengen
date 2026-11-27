@@ -1,6 +1,6 @@
 {
   "name": "opengen",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "An open-source, region-aware image and video API router.",
   "license": "Apache-2.0",

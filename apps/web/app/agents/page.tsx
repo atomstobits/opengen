@@ -73,9 +73,10 @@ export default function AgentsPage() {
             Hosted sign-in, workspace billing, and live-verified official routes are live on{' '}
             <code>https://opengen.dev</code> (self-hosted gateways need their own configured
             identity and provider credentials). Third-party client guides were reviewed{' '}
-            {AGENT_REVIEW_DATE} from official documentation; OpenGen’s authorization and CLI are
-            covered by local protocol fixtures, while third-party client versions have not yet been
-            verified end to end.
+            {AGENT_REVIEW_DATE} from official documentation; live read-only OAuth MCP checks on
+            2026-11-27 verified <code>codex-cli 0.155.1</code> and reached consent in{' '}
+            <code>Claude Code 2.1.301</code>, while other client versions and end-to-end billable
+            agent runs remain unverified.
           </p>
           <p>
             New personal workspaces start with $0 managed credit — discovery and quotes are free.{' '}
@@ -104,9 +105,10 @@ export default function AgentsPage() {
                   <h3>{client.name}</h3>
                   <p>{client.summary}</p>
                   <span className={styles.clientStatus}>
-                    {client.slug === 'cli'
-                      ? 'Local protocol fixtures'
-                      : 'Client verification pending'}
+                    {client.verification?.cardLabel ??
+                      (client.slug === 'cli'
+                        ? 'Local protocol fixtures'
+                        : 'Client verification pending')}
                   </span>
                 </div>
                 <span className={styles.arrow} aria-hidden="true">
@@ -148,9 +150,10 @@ export default function AgentsPage() {
                       <a href={client.source.url}>{client.source.label} ↗</a>
                     </td>
                     <td>
-                      {client.slug === 'cli'
-                        ? 'Local fixtures only; deployed login unverified'
-                        : 'None recorded — unverified'}
+                      {client.verification?.matrixEvidence ??
+                        (client.slug === 'cli'
+                          ? 'Local fixtures only; deployed login unverified'
+                          : 'None recorded — unverified')}
                     </td>
                   </tr>
                 ))}

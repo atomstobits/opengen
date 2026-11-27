@@ -116,7 +116,7 @@ try {
     console.log(output);
   }
 } catch (error) {
-  console.error(JSON.stringify(serializeCommandError(error, { baseUrl: process.env.MEDIA_ROUTER_URL ?? 'http://127.0.0.1:4310' }), null, 2));
+  console.error(JSON.stringify(serializeCommandError(error, { baseUrl: process.env.OPENGEN_API_URL?.trim() || process.env.MEDIA_ROUTER_URL?.trim() || 'https://opengen.dev' }), null, 2));
   process.exitCode = controller.signal.aborted ? 130 : 1;
 } finally { process.removeListener('SIGINT', stop); }
 `;
