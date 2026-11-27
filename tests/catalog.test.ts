@@ -305,6 +305,139 @@ describe('regional quote selection', () => {
     }
   });
 
+  it('discloses scoped 2026-11-27 hosted live verification across official routes without claiming unverified regions', () => {
+    const verifiedOfficial: Array<{
+      id: string;
+      operation: GenerateInput['operation'];
+      resolution: string;
+      duration?: number;
+      expectedNotice: string;
+    }> = [
+      {
+        id: 'kling-ap-southeast-1/kling-kling-4.0',
+        operation: 'text-to-video',
+        resolution: '720p',
+        duration: 3,
+        expectedNotice: 'Live verification covered text-to-video at 720p for 3s.',
+      },
+      {
+        id: 'kling-ap-southeast-1/kling-kling-4.0-flash',
+        operation: 'text-to-video',
+        resolution: '720p',
+        duration: 3,
+        expectedNotice: 'Live verification covered text-to-video at 720p for 3s.',
+      },
+      {
+        id: 'bfl-undisclosed/bfl-flux-3-video',
+        operation: 'text-to-video',
+        resolution: '720p',
+        duration: 5,
+        expectedNotice: 'Live verification covered text-to-video at 720p for 5s.',
+      },
+      {
+        id: 'bfl-undisclosed/bfl-flux-3-image',
+        operation: 'text-to-image',
+        resolution: '768sq',
+        expectedNotice: 'Live verification covered text-to-image at 768sq.',
+      },
+      {
+        id: 'bfl-undisclosed/bfl-flux-3-klein',
+        operation: 'text-to-image',
+        resolution: '768sq',
+        expectedNotice: 'Live verification covered text-to-image at 768sq.',
+      },
+      {
+        id: 'alibaba-model-studio-ap-southeast-1/alibaba-happy-horse-1.1',
+        operation: 'text-to-video',
+        resolution: '480p',
+        duration: 3,
+        expectedNotice: 'Live verification covered text-to-video at 480p for 3s.',
+      },
+      {
+        id: 'alibaba-model-studio-ap-northeast-1/alibaba-happy-horse-1.1',
+        operation: 'text-to-video',
+        resolution: '480p',
+        duration: 3,
+        expectedNotice: 'Live verification covered text-to-video at 480p for 3s.',
+      },
+      {
+        id: 'alibaba-model-studio-us-east-1/alibaba-happy-horse-1.1',
+        operation: 'text-to-video',
+        resolution: '480p',
+        duration: 3,
+        expectedNotice: 'Live verification covered text-to-video at 480p for 3s.',
+      },
+      {
+        id: 'xai-undisclosed/xai-grok-imagine-video',
+        operation: 'video-edit',
+        resolution: '720p',
+        duration: 3,
+        expectedNotice: 'Live verification covered video-edit at 720p for 3s.',
+      },
+    ];
+    for (const item of verifiedOfficial) {
+      const route = catalog.routes.find((entry) => entry.id === item.id)!;
+      expect(route.status).toBe('live-verified');
+      expect(route.liveVerification).toEqual({
+        checkedAt: '2026-11-27',
+        operation: item.operation,
+        resolution: item.resolution,
+        ...(item.duration === undefined ? {} : { duration: item.duration }),
+      });
+      const req: GenerateInput =
+        item.operation === 'text-to-image'
+          ? {
+              modelId: route.modelId,
+              routeId: route.id,
+              operation: 'text-to-image',
+              input: { prompt: 'Test', resolution: item.resolution },
+            }
+          : item.operation === 'video-edit'
+            ? {
+                modelId: route.modelId,
+                routeId: route.id,
+                operation: 'video-edit',
+                billing: 'byok',
+                input: {
+                  prompt: 'Test',
+                  sourceVideo: { url: 'https://media.example.com/clip.mp4' },
+                },
+              }
+            : {
+                modelId: route.modelId,
+                routeId: route.id,
+                operation: 'text-to-video',
+                input: { prompt: 'Test', resolution: item.resolution, duration: item.duration },
+              };
+      const result = quote(req, { executableRouteIds: [route.id] });
+      expect(result.candidates[0]!.notices).toContain(item.expectedNotice);
+    }
+    for (const unverifiedId of [
+      'alibaba-model-studio-cn-beijing/alibaba-happy-horse-1.1',
+      'alibaba-model-studio-eu-central-1/alibaba-happy-horse-1.1',
+    ]) {
+      const route = catalog.routes.find((entry) => entry.id === unverifiedId)!;
+      expect(route.status).toBe('documented');
+      expect(route.liveVerification).toBeUndefined();
+    }
+
+    const sample = catalog.routes.find((entry) => entry.id === 'bfl-undisclosed/bfl-flux-3-video')!;
+    const original = sample.liveVerification;
+    try {
+      sample.liveVerification = {
+        checkedAt: '2026-11-27',
+        operation: 'text-to-video',
+        resolution: '720p',
+        duration: 0,
+      };
+      expect(validateCatalog()).toContain(
+        'Live verification lists invalid duration for bfl-undisclosed/bfl-flux-3-video',
+      );
+    } finally {
+      sample.liveVerification = original;
+    }
+  });
+
   it('quotes both H3 Max providers under one exact identity and accepts the legacy alias', () => {
     const canonical: GenerateInput = {
       modelId: 'minimax/h3-max',

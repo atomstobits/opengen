@@ -1342,7 +1342,7 @@ export function ProviderTable({
                   : null;
               const verification = route.liveVerification;
               const statusTooltip = verification
-                ? `Verified on ${verification.checkedAt} for ${(verification.operations ?? [verification.operation]).map((operation) => operationNames[operation].toLowerCase()).join(' and ')} at ${verification.resolution} and ${verification.duration}s.`
+                ? `Verified on ${verification.checkedAt} for ${(verification.operations ?? [verification.operation]).map((operation) => operationNames[operation].toLowerCase()).join(' and ')} at ${verification.resolution}${verification.duration === undefined ? '' : ` and ${verification.duration}s`}.`
                 : route.status === 'documented'
                   ? 'Documented by the provider.'
                   : null;
