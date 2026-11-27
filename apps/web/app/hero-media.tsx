@@ -88,8 +88,9 @@ export function HeroMedia({
 
 /**
  * Single-stream 50/50 split comparison background player optimized for LCP and SEO:
- * - Immediate static AVIF/WebP poster rendered in SSR HTML (~25-45 KB LCP, zero CLS)
- * - Single muted AV1 + H.264 split stream mounted only after hydration on capable connections
+ * - Immediate static 1080p AVIF/WebP poster rendered in SSR HTML (fast LCP, zero CLS)
+ * - Single muted 1080p AV1 + H.264 split stream mounted only after hydration and initial poster paint
+ *   on capable connections so video bytes never compete with LCP
  * - Never preloads the full sequence up front; prefetches only the next poster once playing
  * - Auto-pauses when offscreen, tab-hidden, or while the comparison modal is open
  */
@@ -109,12 +110,32 @@ export function HeroSplitMedia({
   onProgress: (percent: number) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const posterImg = useRef<HTMLImageElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const [posterReady, setPosterReady] = useState(false);
   const [readyClipId, setReadyClipId] = useState<string | null>(null);
   const [avifFailedClipId, setAvifFailedClipId] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
   const prefetchedPosters = useRef(new Set<string>());
   const enabled = useHeroVideoAllowed({ skipNarrowMobile: true });
+
+  const isVideoReady = readyClipId === clip.id;
+  const showAvifSource = Boolean(clip.media.heroPosterAvif) && avifFailedClipId !== clip.id;
+
+  // Keep the background video gated until the initial LCP poster either loads or reaches a
+  // terminal error so 1080p video bytes never compete with a pending poster on slow links.
+  useEffect(() => {
+    if (posterReady) return;
+    const img = posterImg.current;
+    if (!img || !img.complete) return;
+    if (img.naturalWidth > 0) {
+      setPosterReady(true);
+    } else if (showAvifSource) {
+      setAvifFailedClipId(clip.id);
+    } else {
+      setPosterReady(true);
+    }
+  }, [posterReady, showAvifSource, clip.id]);
 
   useEffect(() => {
     if (!container.current) return;
@@ -126,7 +147,7 @@ export function HeroSplitMedia({
   }, []);
 
   useEffect(() => {
-    if (!enabled || !video.current) return;
+    if (!enabled || !posterReady || !video.current) return;
     const player = video.current;
 
     const syncPlayback = () => {
@@ -143,7 +164,7 @@ export function HeroSplitMedia({
       document.removeEventListener('visibilitychange', syncPlayback);
       player.pause();
     };
-  }, [enabled, clip.id, isVisible, paused]);
+  }, [enabled, posterReady, clip.id, isVisible, paused]);
 
   const handlePlaying = () => {
     setReadyClipId(clip.id);
@@ -165,9 +186,6 @@ export function HeroSplitMedia({
     onProgress(Math.min(100, (player.currentTime / duration) * 100));
   };
 
-  const isVideoReady = readyClipId === clip.id;
-  const showAvifSource = Boolean(clip.media.heroPosterAvif) && avifFailedClipId !== clip.id;
-
   return (
     <div className="hero-media hero-media-split" ref={container} aria-hidden="true">
       <picture className="hero-split-poster" key={`${clip.id}-${showAvifSource ? 'avif' : 'webp'}`}>
@@ -175,16 +193,22 @@ export function HeroSplitMedia({
           <source srcSet={clip.media.heroPosterAvif} type="image/avif" />
         )}
         <img
+          ref={posterImg}
           src={clip.media.heroPosterWebp}
           alt=""
           fetchPriority="high"
           decoding="sync"
+          onLoad={() => setPosterReady(true)}
           onError={() => {
-            if (showAvifSource) setAvifFailedClipId(clip.id);
+            if (showAvifSource) {
+              setAvifFailedClipId(clip.id);
+            } else {
+              setPosterReady(true);
+            }
           }}
         />
       </picture>
-      {enabled && (
+      {enabled && posterReady && (
         <video
           key={clip.id}
           ref={video}
@@ -200,7 +224,7 @@ export function HeroSplitMedia({
           onEnded={loopSingle ? undefined : onEnded}
         >
           {clip.media.heroVideoAv1 && (
-            <source src={clip.media.heroVideoAv1} type='video/mp4; codecs="av01.0.04M.08"' />
+            <source src={clip.media.heroVideoAv1} type='video/mp4; codecs="av01.0.08M.08"' />
           )}
           <source src={clip.media.heroVideoH264} type="video/mp4" />
         </video>

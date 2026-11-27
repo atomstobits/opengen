@@ -120,6 +120,18 @@ describe('hero comparison pricing and media configuration', () => {
     });
     expect(clips[1]?.left.discountLabel).toBe('-51%');
     expect(clips[1]?.right.discountLabel).toBe('-20%');
+
+    vi.stubEnv('OPENGEN_HERO_MEDIA_VERSION', '');
+    const defaultClips = getHeroComparisons({
+      mediaBaseUrl: 'https://media.opengen.dev',
+      nowDate: '2026-11-25',
+    });
+    expect(defaultClips[0]?.media.heroPosterAvif).toBe(
+      'https://media.opengen.dev/hero/v2/case-17/hero-poster.avif',
+    );
+    expect(defaultClips[0]?.media.heroVideoAv1).toBe(
+      'https://media.opengen.dev/hero/v2/case-17/hero-split.av1.mp4',
+    );
   });
 
   it('falls back safely to an empty comparison list when optional hero media URL is malformed', () => {
