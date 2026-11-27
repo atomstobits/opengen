@@ -280,7 +280,9 @@ function googleNanoBananaBoundedQuote(
   const args = input.input;
   if (args.size || args.grounding) return null;
   if ((args.count ?? 1) !== 1) return null;
-  if (args.outputFormat && !['png', 'jpeg'].includes(args.outputFormat)) return null;
+  const allowedOutputFormats =
+    route.upstreamModelId === 'gemini-3.1-flash-lite-image' ? ['jpeg'] : ['png', 'jpeg'];
+  if (args.outputFormat && !allowedOutputFormats.includes(args.outputFormat)) return null;
   if (args.aspectRatio && !googleImageRatios.has(args.aspectRatio)) return null;
 
   const tier = (args.resolution ?? '').toUpperCase() as '0.5K' | '1K' | '2K' | '4K';

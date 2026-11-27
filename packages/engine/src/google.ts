@@ -20,27 +20,37 @@ const googleImageModels: Record<
     resolutions: readonly string[];
     thinkingLevels: readonly string[];
     allowGrounding: boolean;
+    outputFormats: readonly ('png' | 'jpeg')[];
+    defaultOutputFormat: 'png' | 'jpeg';
   }
 > = {
   'gemini-nano-banana-2.1': {
     resolutions: ['1K', '2K', '4K'],
     thinkingLevels: ['minimal', 'medium', 'high'],
     allowGrounding: true,
+    outputFormats: ['png', 'jpeg'],
+    defaultOutputFormat: 'png',
   },
   'gemini-3-pro-image': {
     resolutions: ['1K', '2K', '4K'],
     thinkingLevels: ['high'],
     allowGrounding: true,
+    outputFormats: ['png', 'jpeg'],
+    defaultOutputFormat: 'png',
   },
   'gemini-3.1-flash-image': {
     resolutions: ['0.5K', '1K', '2K', '4K'],
     thinkingLevels: ['minimal', 'high'],
     allowGrounding: true,
+    outputFormats: ['png', 'jpeg'],
+    defaultOutputFormat: 'png',
   },
   'gemini-3.1-flash-lite-image': {
     resolutions: ['1K'],
     thinkingLevels: ['minimal', 'high'],
     allowGrounding: false,
+    outputFormats: ['jpeg'],
+    defaultOutputFormat: 'jpeg',
   },
 };
 const ratios = new Set([
@@ -115,8 +125,10 @@ export function createGoogleImageAdapter(
       return 'Unsupported Nano Banana aspect ratio.';
     if (args.count !== undefined && args.count !== 1)
       return 'This Google adapter produces one image; prompt-requested counts are not guaranteed.';
-    if (args.outputFormat && !['png', 'jpeg'].includes(args.outputFormat))
-      return 'This Google adapter supports documented PNG and JPEG output only.';
+    if (args.outputFormat && !spec.outputFormats.includes(args.outputFormat as 'png' | 'jpeg'))
+      return spec.outputFormats.length === 1 && spec.outputFormats[0] === 'jpeg'
+        ? 'Google Nano Banana 2 Lite supports JPEG output only.'
+        : 'This Google adapter supports documented PNG and JPEG output only.';
     if (args.grounding)
       return 'Google Search grounding requires downstream citation delivery, which is not implemented by this adapter.';
     return null;
@@ -168,6 +180,8 @@ export function createGoogleImageAdapter(
         }
       }
       const args = context.input.input;
+      const spec = googleImageModels[context.route.upstreamModelId]!;
+      const outputFormat = args.outputFormat ?? spec.defaultOutputFormat;
       const body = await submitProviderJson(
         request,
         'Google',
@@ -191,7 +205,7 @@ export function createGoogleImageAdapter(
           store: true,
           response_format: {
             type: 'image',
-            mime_type: args.outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+            mime_type: outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
             image_size: (args.resolution ?? '').toUpperCase(),
             ...(args.aspectRatio && args.aspectRatio !== 'source'
               ? { aspect_ratio: args.aspectRatio }
@@ -229,7 +243,11 @@ export function createGoogleImageAdapter(
           : [];
       });
       const image = images[0];
-      const expectedType = context.input.input.outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const spec = googleImageModels[context.route.upstreamModelId];
+      const expectedType =
+        (context.input.input.outputFormat ?? spec?.defaultOutputFormat) === 'jpeg'
+          ? 'image/jpeg'
+          : 'image/png';
       if (
         images.length !== 1 ||
         image?.mime_type !== expectedType ||
