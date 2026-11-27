@@ -54,6 +54,11 @@ import { registerMcpAuthorization } from './mcp-authorization.js';
 import { registerCompatibility } from './compatibility.js';
 import { registerOperator, ledgerQuerySchema } from './operator.js';
 import { registerPendingEmailCredits } from './pending-email-credits.js';
+import {
+  readTrialCreditConfig,
+  registerTrialCreditRoutes,
+  StarterTrialCreditStore,
+} from './trial-credit.js';
 import type { Job } from '@media-router/contracts';
 import type { Reconciliation } from '@media-router/engine';
 import { openApiDocument } from './openapi.js';
@@ -265,7 +270,19 @@ export async function buildApp(options: AppOptions = {}) {
   await app.register(async (scoped) => {
     registerOwnedAssetRoutes(scoped, { assets: options.engine?.ownedAssets, authenticate });
   });
-  await billingRuntime?.register(app, authenticate, publicUrl);
+  const trialCreditConfig = readTrialCreditConfig(options.env ?? process.env);
+  const trialCreditStore = governancePool
+    ? new StarterTrialCreditStore(governancePool, {
+        amountMicros: trialCreditConfig.amountMicros,
+        humanTermsPolicy: options.humanTermsPolicy,
+      })
+    : undefined;
+  await billingRuntime?.register(app, authenticate, publicUrl, { trialCredit: trialCreditStore });
+  await registerTrialCreditRoutes(app, {
+    store: trialCreditStore,
+    authenticate,
+    publicUrl,
+  });
   const paymentOptions = billingRuntime?.payments ?? {
     store: options.payments,
     ...(options.paymentConfig ?? paymentConfiguration(options.env ?? process.env)),
