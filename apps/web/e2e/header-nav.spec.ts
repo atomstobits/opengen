@@ -281,6 +281,8 @@ test('preserves sign-out error across session revalidation until a new attempt s
         return;
       }
       authenticated = false;
+      await route.fulfill({ status: 204 });
+      return;
     } else {
       sessionGets++;
     }
@@ -303,15 +305,15 @@ test('preserves sign-out error across session revalidation until a new attempt s
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('alert')).toContainText('Sign-out could not be completed.');
 
-  // Retrying sign-out clears the error and signs out cleanly.
+  // Retrying sign-out with HTTP 204 clears the error and preserves the OIDC Sign in target.
   failDelete = false;
   await menu.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
   await expect(page.getByTestId('header-balance')).toHaveCount(0);
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('link', { name: 'Sign in', exact: true }),
-  ).toBeVisible();
+  const signIn = page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Sign in', exact: true });
+  await expect(signIn).toBeVisible();
+  await expect(signIn).toHaveAttribute('href', '/auth/login');
 });
 
 test('refreshes remaining credit via bounded visible-page polling without session-change events', async ({

@@ -351,7 +351,10 @@ async function signOut(): Promise<boolean> {
   try {
     const response = await fetch('/api/session', { method: 'DELETE' });
     if (!response.ok) throw new Error('Sign-out could not be completed. Please try again.');
-    const body = response.status === 204 ? { authenticated: false } : await response.json();
+    const body =
+      response.status === 204
+        ? { authenticated: false, oidcEnabled: verifiedSession?.oidcEnabled }
+        : await response.json();
     if (version !== sessionVersion) return false;
     const current = (body.data ?? body) as BrowserSession;
     verifiedSession = current;
