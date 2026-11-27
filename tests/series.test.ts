@@ -29,7 +29,10 @@ describe('public company and model-series identity', () => {
   });
 
   it('groups complete versions without merging different Seedance releases', () => {
-    expect(getSeries('bytedance/seedance-2.5')?.modelIds).toEqual(['bytedance/seedance-2.5']);
+    expect(getSeries('bytedance/seedance-2.5')?.modelIds).toEqual([
+      'bytedance/seedance-2.5',
+      'bytedance/seedance-2.5-flash',
+    ]);
     expect(getSeries('bytedance/seedance-2.0')?.modelIds).toEqual([
       'bytedance/seedance-2.0',
       'bytedance/seedance-2.0-fast',
@@ -39,7 +42,7 @@ describe('public company and model-series identity', () => {
       'bytedance/seedance-1.0-pro',
       'bytedance/seedance-1.0-pro-fast',
     ]);
-    expect(getCompanyModels('bytedance')).toHaveLength(12);
+    expect(getCompanyModels('bytedance')).toHaveLength(13);
   });
 
   it('combines the two H3 Max provider labels and preserves Turbo/Pika identities', () => {
@@ -88,6 +91,9 @@ describe('public company and model-series identity', () => {
 
   it('preserves exact variant selection in canonical links', () => {
     expect(seriesHref('bytedance/seedance-2.5')).toBe('/bytedance/seedance-2.5');
+    expect(seriesHref('bytedance/seedance-2.5-flash')).toBe(
+      '/bytedance/seedance-2.5?variant=bytedance%2Fseedance-2.5-flash',
+    );
     expect(seriesHref('fal/h3-max')).toBe('/minimax/h3?variant=minimax%2Fh3-max');
     expect(seriesHref('minimax/h3-max')).toBe('/minimax/h3?variant=minimax%2Fh3-max');
     expect(seriesHref('openai/gpt-image-2.5-flare')).toBe(
@@ -140,7 +146,10 @@ describe('models page variant grouping', () => {
     const seedance25 = groups.find((group) => group.id === 'bytedance/seedance-2.5')!;
     const seedance20 = groups.find((group) => group.id === 'bytedance/seedance-2.0')!;
     const seedance10 = groups.find((group) => group.id === 'bytedance/seedance-1.0')!;
-    expect(seedance25.entries.map((entry) => entry.model.id)).toEqual(['bytedance/seedance-2.5']);
+    expect(seedance25.entries.map((entry) => entry.model.id)).toEqual([
+      'bytedance/seedance-2.5',
+      'bytedance/seedance-2.5-flash',
+    ]);
     expect(seedance20.entries.map((entry) => entry.model.id)).toEqual([
       'bytedance/seedance-2.0',
       'bytedance/seedance-2.0-fast',

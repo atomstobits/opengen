@@ -108,6 +108,24 @@ describe('model card pricing and % off summaries', () => {
       label: 'Up to 53% off',
     });
 
+    const seedanceFlash = summarizeVariantCardPricing(
+      getModel('bytedance/seedance-2.5-flash')!,
+      getModelRoutes('bytedance/seedance-2.5-flash', catalog),
+      catalog,
+    );
+    expect(seedanceFlash.lowest).toMatchObject({
+      modelId: 'bytedance/seedance-2.5-flash',
+      resolution: '480p',
+      unit: 'output-second',
+      usdMicros: 70_000,
+      approximate: true,
+    });
+    expect(seedanceFlash.savings).toMatchObject({
+      modelId: 'bytedance/seedance-2.5-flash',
+      maxPercentOff: 50,
+      label: 'Up to 50% off',
+    });
+
     const nanoBanana = summarizeSeriesCardPricing([getModel('google/nano-banana-2.1')!], catalog);
     expect(nanoBanana.lowest).toMatchObject({
       modelId: 'google/nano-banana-2.1',
@@ -442,7 +460,7 @@ describe('model card pricing and % off summaries', () => {
     const homeHtml = renderToStaticMarkup(
       createElement(SeriesCards, { series: featured, compact: true }),
     );
-    expect(homeHtml).toContain('$0.1028');
+    expect(homeHtml).toContain('≈$0.07');
     expect(homeHtml).toContain('Up to 53% off');
     expect(homeHtml).toContain('$0.0336');
     expect(homeHtml).toContain('Up to 16% off');

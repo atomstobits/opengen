@@ -74,8 +74,9 @@ export const modelSeries: ModelSeries[] = [
     id: 'bytedance/seedance-2.5',
     companyId: 'bytedance',
     name: 'Seedance 2.5',
-    description: 'Compare serving providers for ByteDance’s Seedance 2.5 release.',
-    modelIds: ['bytedance/seedance-2.5'],
+    description:
+      'Seedance 2.5 and Seedance 2.5 Flash are separate variants in ByteDance’s Seedance 2.5 series.',
+    modelIds: ['bytedance/seedance-2.5', 'bytedance/seedance-2.5-flash'],
   },
   {
     id: 'bytedance/seedance-2.0',

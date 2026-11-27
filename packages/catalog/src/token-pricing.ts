@@ -167,6 +167,8 @@ function byteplusNonVideoNanoPerToken(
   switch (upstreamModelId) {
     case 'dreamina-seedance-2-5-260628':
       return resolution === '4k' ? null : resolution === '1080p' ? 11_700n : 10_700n;
+    case 'dreamina-seedance-2-5-flash-261115':
+      return resolution === '480p' || resolution === '720p' ? 7_000n : null;
     case 'dreamina-seedance-2-0-260128':
       return resolution === '4k' ? 4_000n : resolution === '1080p' ? 7_700n : 7_000n;
     case 'dreamina-seedance-2-0-fast-260128':
@@ -506,7 +508,10 @@ function byteplusVideoBoundedQuote(route: Route, input: GenerateInput): BoundedT
     estimatedCostMicros,
     source: {
       url: 'https://docs.byteplus.com/en/docs/modelark/model-pricing',
-      checkedAt: '2026-11-06',
+      checkedAt:
+        route.upstreamModelId === 'dreamina-seedance-2-5-flash-261115'
+          ? '2026-11-27'
+          : '2026-11-06',
       note: `Conservative bounded max-token reservation for non-video-input ModelArk Seedance generation ($${perMillionUsd}/1M tokens at ${normalizedRes}). Video-reference tasks incur variable input-video token charges and remain unpriced.`,
     },
     notices: [

@@ -17,6 +17,7 @@ import {
   observedMiniMaxImageCostMicros,
 } from '../packages/engine/src/minimax-image.js';
 import { createFalAdapter } from '../packages/engine/src/fal.js';
+import { createBytePlusAdapter } from '../packages/engine/src/byteplus.js';
 import { createRunwayAdapter } from '../packages/engine/src/runway.js';
 import { createPikaAdapter } from '../packages/engine/src/pika.js';
 
@@ -54,13 +55,14 @@ function ctx(routeKey: string, operation: Operation, input: GenerationArguments)
 }
 
 describe('November 2026 frontier models & provider routes', () => {
-  it('catalogs 49 exact variants, 12 companies, 20 deployments and 174 unified documented/live routes without merging derivatives', () => {
-    expect(catalog.models).toHaveLength(49);
+  it('catalogs 50 exact variants, 12 companies, 20 deployments and 178 unified documented/live routes without merging derivatives', () => {
+    expect(catalog.models).toHaveLength(50);
     expect(catalog.providers).toHaveLength(12);
     expect(catalog.deployments).toHaveLength(20);
-    expect(catalog.routes).toHaveLength(174);
+    expect(catalog.routes).toHaveLength(178);
 
     for (const distinctPair of [
+      ['bytedance/seedance-2.5', 'bytedance/seedance-2.5-flash'],
       ['openai/gpt-image-2.6-sunburst', 'openai/gpt-image-2.6-flare'],
       ['openai/gpt-image-2.6-sunburst', 'openai/gpt-image-2.5-sunburst'],
       ['google/gemini-omni-1.2-flash', 'google/gemini-omni-1.1-flash'],
@@ -624,5 +626,263 @@ describe('November 2026 frontier models & provider routes', () => {
       }),
     );
     expect(pikaUrl).toContain('pika/pika-h3-flex/image-to-video');
+  });
+
+  it('validates and executes Seedance 2.5 Flash on BytePlus ModelArk and fal with strict 480p/720p, no-draft, 10/5/5/20 reference and token-settlement bounds', async () => {
+    // Canonical schema accepts 4–30s, 480p/720p, audio-only references, and max 10/5/5/20 assets.
+    const valid20 = parseGenerationRequest({
+      modelId: 'bytedance/seedance-2.5-flash',
+      operation: 'reference-to-video',
+      input: {
+        prompt: 'Fast rhythmic edit across scenes.',
+        resolution: '720p',
+        duration: 30,
+        references: [
+          ...Array.from({ length: 10 }, (_, i) => ({
+            type: 'image' as const,
+            asset: { url: `https://example.com/img-${i}.png` },
+          })),
+          ...Array.from({ length: 5 }, (_, i) => ({
+            type: 'video' as const,
+            asset: { url: `https://example.com/vid-${i}.mp4` },
+          })),
+          ...Array.from({ length: 5 }, (_, i) => ({
+            type: 'audio' as const,
+            asset: { url: `https://example.com/aud-${i}.mp3` },
+          })),
+        ],
+      },
+    });
+    expect(valid20.input.references).toHaveLength(20);
+
+    const audioOnly = parseGenerationRequest({
+      modelId: 'bytedance/seedance-2.5-flash',
+      operation: 'reference-to-video',
+      input: {
+        prompt: 'Visuals synced to narration.',
+        resolution: '480p',
+        duration: 6,
+        references: [{ type: 'audio', asset: { url: 'https://example.com/voice.mp3' } }],
+      },
+    });
+    expect(audioOnly.input.references).toHaveLength(1);
+
+    // Rejects 1080p, 4K, draft, draftJobId, out-of-range duration, and >10 images / >5 videos / >5 audios.
+    for (const bad of [
+      { prompt: 'HD', resolution: '1080p', duration: 5 },
+      { prompt: '4K', resolution: '4K', duration: 5 },
+      { prompt: 'Draft', resolution: '480p', duration: 5, draft: true },
+      { prompt: 'Too short', resolution: '720p', duration: 3 },
+      { prompt: 'Too long', resolution: '720p', duration: 31 },
+    ]) {
+      expect(() =>
+        parseGenerationRequest({
+          modelId: 'bytedance/seedance-2.5-flash',
+          operation: 'text-to-video',
+          input: bad,
+        }),
+      ).toThrow(GenerationValidationError);
+    }
+    expect(() =>
+      parseGenerationRequest({
+        modelId: 'bytedance/seedance-2.5-flash',
+        operation: 'reference-to-video',
+        input: {
+          prompt: 'Too many images',
+          resolution: '720p',
+          duration: 5,
+          references: Array.from({ length: 11 }, (_, i) => ({
+            type: 'image' as const,
+            asset: { url: `https://example.com/img-${i}.png` },
+          })),
+        },
+      }),
+    ).toThrow(GenerationValidationError);
+    expect(() =>
+      parseGenerationRequest({
+        modelId: 'bytedance/seedance-2.5-flash',
+        operation: 'reference-to-video',
+        input: {
+          prompt: 'Too many videos',
+          resolution: '720p',
+          duration: 5,
+          references: Array.from({ length: 6 }, (_, i) => ({
+            type: 'video' as const,
+            asset: { url: `https://example.com/vid-${i}.mp4` },
+          })),
+        },
+      }),
+    ).toThrow(GenerationValidationError);
+
+    // BytePlus ModelArk: bounded quote for non-video-input (720p & 480p), null for video-input,
+    // exact $7.00/1M (no video input) & $4.30/1M (with video input) settlement, and strict preflight.
+    const bpRoute = findRoute('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5-flash');
+    expect(bpRoute.upstreamModelId).toBe('dreamina-seedance-2-5-flash-261115');
+    expect(bpRoute.status).toBe('documented');
+    expect(bpRoute.rates).toEqual([]);
+    const bpQuote720 = routeEstimate({
+      modelId: 'bytedance/seedance-2.5-flash',
+      operation: 'text-to-video',
+      routeId: bpRoute.id,
+      input: { prompt: 'Ocean spray at golden hour.', resolution: '720p', duration: 5 },
+    });
+    expect(bpQuote720).toBe(798_560);
+    const bpQuoteVideoIn = routeEstimate({
+      modelId: 'bytedance/seedance-2.5-flash',
+      operation: 'reference-to-video',
+      routeId: bpRoute.id,
+      input: {
+        prompt: 'Continue motion from @Video1.',
+        resolution: '720p',
+        duration: 5,
+        references: [{ type: 'video', asset: { url: 'https://example.com/in.mp4' } }],
+      },
+    });
+    expect(bpQuoteVideoIn).toBeNull();
+
+    const bpBodies: Record<string, unknown>[] = [];
+    const byteplus = createBytePlusAdapter({
+      env: { BYTEPLUS_API_KEY: 'bp-test' },
+      fetch: vi.fn(async (_url, init) => {
+        if (init?.method === 'POST') {
+          bpBodies.push(JSON.parse(String(init.body)));
+          return Response.json({ id: 'cgt-flash-1' });
+        }
+        return Response.json({
+          status: 'succeeded',
+          resolution: '720p',
+          content: { video_url: 'https://assets.example.com/flash.mp4' },
+          usage: { completion_tokens: 100_000 },
+        });
+      }),
+    });
+    expect(
+      byteplus.preflight!(
+        ctx(bpRoute.id, 'text-to-video', { prompt: 'Bad res', resolution: '1080p', duration: 5 }),
+      ),
+    ).toContain('does not support this resolution');
+    expect(
+      byteplus.preflight!(
+        ctx(bpRoute.id, 'text-to-video', {
+          prompt: 'No draft',
+          resolution: '480p',
+          duration: 5,
+          draft: true,
+        }),
+      ),
+    ).toContain('draft');
+    expect(
+      byteplus.preflight!(
+        ctx(bpRoute.id, 'reference-to-video', {
+          prompt: 'Audio only ok',
+          resolution: '480p',
+          duration: 6,
+          references: [{ type: 'audio', asset: { url: 'https://example.com/aud.mp3' } }],
+        }),
+      ),
+    ).toBeNull();
+    const bpVideoRefCtx = ctx(bpRoute.id, 'reference-to-video', {
+      prompt: 'Follow @Video1',
+      resolution: '720p',
+      duration: 5,
+      references: [{ type: 'video', asset: { url: 'https://example.com/ref.mp4' } }],
+    });
+    await byteplus.submit(bpVideoRefCtx);
+    expect(bpBodies[0]).toMatchObject({
+      model: 'dreamina-seedance-2-5-flash-261115',
+      resolution: '720p',
+      duration: 5,
+      omni_reference_task_type: 'reference',
+    });
+    // Video-input settlement uses $4.30/1M tokens -> 100,000 tokens = 430,000 micro-USD.
+    expect(await byteplus.poll({ ...bpVideoRefCtx, upstreamId: 'cgt-flash-1' })).toMatchObject({
+      status: 'succeeded',
+      billedCostMicros: 430_000,
+    });
+
+    // fal Seedance 2.5 Flash: T2V/I2V/R2V endpoints, no draft, seed on R2V only, 10/5/5/20 reference limits.
+    const falRequests: { url: string; body: Record<string, unknown> }[] = [];
+    const fal = createFalAdapter({
+      env: { FAL_KEY: 'fal-test' },
+      fetch: vi.fn(async (url, init) => {
+        falRequests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+        return Response.json({ request_id: `fal-flash-${falRequests.length}` });
+      }),
+    });
+    expect(
+      fal.preflight!(
+        ctx('fal-undisclosed/bytedance/seedance-2.5/flash/text-to-video', 'text-to-video', {
+          prompt: 'No draft',
+          resolution: '480p',
+          duration: 5,
+          draft: true,
+        }),
+      ),
+    ).toContain('draft');
+    expect(
+      fal.preflight!(
+        ctx('fal-undisclosed/bytedance/seedance-2.5/flash/text-to-video', 'text-to-video', {
+          prompt: 'No seed on T2V',
+          resolution: '720p',
+          duration: 5,
+          seed: 42,
+        }),
+      ),
+    ).toContain('seed');
+    expect(
+      fal.preflight!(
+        ctx('fal-undisclosed/bytedance/seedance-2.5/flash/text-to-video', 'text-to-video', {
+          prompt: 'No 1080p',
+          resolution: '1080p',
+          duration: 5,
+        }),
+      ),
+    ).toContain('Unsupported fal Seedance resolution');
+    expect(
+      fal.preflight!(
+        ctx(
+          'fal-undisclosed/bytedance/seedance-2.5/flash/reference-to-video',
+          'reference-to-video',
+          {
+            prompt: 'Too many images',
+            resolution: '720p',
+            duration: 5,
+            references: Array.from({ length: 11 }, (_, i) => ({
+              type: 'image' as const,
+              asset: { url: `https://example.com/i-${i}.png` },
+            })),
+          },
+        ),
+      ),
+    ).toContain('Too many image references');
+
+    await fal.submit(
+      ctx('fal-undisclosed/bytedance/seedance-2.5/flash/reference-to-video', 'reference-to-video', {
+        prompt: '@Image1 moves swiftly',
+        resolution: '720p',
+        duration: 12,
+        aspectRatio: '16:9',
+        codec: 'H265',
+        bitrateMode: 'high',
+        seed: 77,
+        references: [{ type: 'image', asset: { url: 'https://example.com/ref.png' } }],
+      }),
+    );
+    expect(falRequests[0]).toMatchObject({
+      url: 'https://queue.fal.run/bytedance/seedance-2.5/flash/reference-to-video',
+      body: {
+        prompt: '@Image1 moves swiftly',
+        duration: '12',
+        resolution: '720p',
+        aspect_ratio: '16:9',
+        codec: 'H265',
+        bitrate_mode: 'high',
+        seed: 77,
+        image_urls: ['https://example.com/ref.png'],
+        video_urls: [],
+        audio_urls: [],
+        task: 'reference',
+      },
+    });
   });
 });
