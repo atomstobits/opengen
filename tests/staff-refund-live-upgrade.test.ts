@@ -476,7 +476,7 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
     expect(journal.slice(0, 29)).toEqual(oldJournal);
     expect(journal.map((row) => row.name)).toEqual(
-      Array.from({ length: 34 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
+      Array.from({ length: 35 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
     );
     expect(journal[29].checksum).toBe(sha256(await sql(30)));
     for (let i = 0; i < 29; i++) {
@@ -492,6 +492,8 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const retainedConstraints = oldConstraints.filter(
       (row) =>
         ![
+          'mr_jobs_fee_settlement_shape',
+          'mr_jobs_fee_evidence_shape',
           'mr_reconciliations_action_check',
           'mr_staff_refund_cases_livemode_check',
           'mr_ledger_kind_check',
@@ -509,6 +511,16 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     expect(constraints.filter((row) => retainedNames.has(row.conname))).toEqual(
       retainedConstraints,
     );
+    const feeSettlementShape = constraints.find(
+      (row) => row.conname === 'mr_jobs_fee_settlement_shape',
+    )!.definition;
+    for (const status of ['verified', 'published-tariff', 'no-upstream-charge'])
+      expect(feeSettlementShape).toContain(`'${status}'`);
+    const feeEvidenceShape = constraints.find(
+      (row) => row.conname === 'mr_jobs_fee_evidence_shape',
+    )!.definition;
+    for (const status of ['verified', 'published-tariff'])
+      expect(feeEvidenceShape).toContain(`'${status}'`);
     const reconciliationActions = constraints.find(
       (row) => row.conname === 'mr_reconciliations_action_check',
     )!.definition;

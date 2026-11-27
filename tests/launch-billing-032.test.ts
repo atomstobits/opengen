@@ -263,7 +263,7 @@ describe.skipIf(!databaseUrl)('migration 032 upgrade and launch billing domain c
           'SELECT name,checksum FROM mr_migrations ORDER BY name',
         )
       ).rows;
-      expect(applied).toHaveLength(34);
+      expect(applied).toHaveLength(35);
       expect(applied.slice(0, 31)).toEqual(priorChecksums);
       expect(applied[31]).toEqual({
         name: '032.sql',

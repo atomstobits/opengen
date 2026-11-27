@@ -154,7 +154,7 @@ const generationFeeView = {
     object({ ...feeTermsProperties, costStatus: { const: 'pending' } }),
     object({
       ...feeTermsProperties,
-      costStatus: { enum: ['verified', 'no-upstream-charge'] },
+      costStatus: { enum: ['verified', 'published-tariff', 'no-upstream-charge'] },
       providerCostMicros: money,
       customerProviderDebitMicros: money,
       nominalFeeMicros: money,

@@ -136,6 +136,15 @@ bounded evidence reference. Supported bases are:
    actual bill.
 3. `operator-audited`: USD `amountMicros`, durable `auditReference` and authenticated
    `operatorId` from the existing audited reconciliation path.
+4. `verified-delivery-published-tariff`: explicit engine-produced tariff evidence for
+   qualified opaque-provider routes (`runway`, `replicate`, `minimax` video, `bfl` image
+   routes `flux-3-image` / `flux-3-image-klein`, and `fal` without `FAL_BILLING_KEY`)
+   whose private output delivery reached `available`. Requires `deliveryVerified: true`,
+   USD, exact frozen `tariffRouteId`, `operation`, `unit` (`output-second` or `image`),
+   `unitRateMicros`, positive integer `quantity`, and exact `unitRateMicros * quantity = amountMicros`.
+   Fee settlements on this basis record `costStatus: 'published-tariff'` (distinct from
+   `verified`) under migration `035.sql` and retain `upstream_cost_micros = null` for
+   independent supplier-invoice reconciliation via `record-supplier-cost`.
 
 The evidence producer must be trusted and reviewed. This pure validator cannot
 prove provider signatures, account tariffs or operator authority; never map a

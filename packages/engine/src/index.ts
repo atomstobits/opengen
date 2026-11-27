@@ -102,7 +102,12 @@ import { KeyBudgetStore } from './key-budgets.js';
 import { AssetStore } from './storage.js';
 import { EventStore } from './events.js';
 import { McpOAuthStore } from './mcp-oauth.js';
-import { createFeePolicy, settleVerifiedCost, type FeePolicy } from './billing-fees.js';
+import {
+  createFeePolicy,
+  settleVerifiedCost,
+  type FeePolicy,
+  type ProviderCostEvidence,
+} from './billing-fees.js';
 import { quoteWithGenerationFee } from './generation-billing-quote.js';
 import {
   generationFeeTerms,
@@ -120,7 +125,7 @@ export * from './execution-telemetry.js';
 export * from './execution-scope.js';
 export * from './job-status.js';
 export * from './byteplus.js';
-import { isOpaqueBillingRoute, opaquePublishedTariffChargeMicros } from './opaque-tariff.js';
+import { isOpaqueBillingRoute, opaquePublishedTariffQuote } from './opaque-tariff.js';
 export * from './opaque-tariff.js';
 export * from './providers.js';
 export * from './accounts.js';
@@ -611,6 +616,7 @@ export class Engine {
         '032.sql',
         '033.sql',
         '034.sql',
+        '035.sql',
       ].map((name, index) => {
         if (name !== `${String(index + 1).padStart(3, '0')}.sql`)
           throw new Error('Migration manifest must be unique and contiguous.');
@@ -2755,7 +2761,9 @@ export class Engine {
     if (
       feeSettlement &&
       (charge !== feeSettlement.customerTotalMicros ||
-        upstreamCostMicros !== feeSettlement.providerCostMicros)
+        (feeSettlement.costStatus === 'published-tariff'
+          ? upstreamCostMicros !== null
+          : upstreamCostMicros !== feeSettlement.providerCostMicros))
     )
       throw new EngineError(
         'invalid_fee_settlement',
@@ -2868,9 +2876,10 @@ export class Engine {
   }
 
   /**
-   * For opaque providers (e.g. Runway, Replicate, MiniMax video, fal without billing key) that
-   * do not report per-request USD charges, settle the customer wallet once output delivery is
-   * verified (`delivery_status === 'available'`) using the frozen published tariff, while keeping
+   * For opaque providers (e.g. Runway, Replicate, MiniMax video, BFL image, fal without billing
+   * key) that do not report per-request USD charges, settle the customer wallet once output
+   * delivery is verified (`delivery_status === 'available'`) using the frozen published tariff
+   * (including composed routing fees when `fee_admission` is present), while keeping
    * `upstream_cost_micros = null` for independent supplier-invoice reconciliation.
    */
   private async trySettleOpaqueVerifiedDelivery(
@@ -2881,15 +2890,14 @@ export class Engine {
   ): Promise<boolean> {
     if (
       row.settled_micros !== null ||
-      row.fee_admission !== null ||
       (row.input.billing ?? 'managed') !== 'managed' ||
       deliveryStatus !== 'available' ||
       hasBillingPollPending ||
       !isOpaqueBillingRoute(row.route_snapshot)
     )
       return false;
-    const tariffMicros = opaquePublishedTariffChargeMicros(row.route_snapshot, row.input);
-    if (tariffMicros === null) return false;
+    const tariff = opaquePublishedTariffQuote(row.route_snapshot, row.input);
+    if (!tariff) return false;
     // Never bypass aged-cost-relief's verified-upstream-cost settlement guard.
     const reliefSchema = (await client.query("SELECT to_regclass('mr_aged_cost_reliefs') AS name"))
       .rows[0]?.name;
@@ -2902,10 +2910,77 @@ export class Engine {
       ).rowCount;
       if (hasRelief) return false;
     }
-    await this.settle(client, row, tariffMicros, null, undefined, undefined, {
+    const tariffDetails = {
       settlementBasis: 'verified-delivery-published-tariff',
       supplierReconciliationPending: true,
+    };
+    if (!row.fee_admission) {
+      await this.settle(
+        client,
+        row,
+        tariff.amountMicros,
+        null,
+        undefined,
+        undefined,
+        tariffDetails,
+      );
+      return true;
+    }
+    const scope = await this.generationCostScope(row, client);
+    if (!scope) return false;
+    const evidence: ProviderCostEvidence = {
+      attemptId: scope.attemptId,
+      providerId: scope.providerId,
+      deploymentId: scope.deploymentId,
+      upstreamReference: scope.upstreamReference,
+      reference: `published-tariff:${row.id}:${row.attempt_count}`,
+      basis: 'verified-delivery-published-tariff',
+      deliveryVerified: true,
+      currency: 'USD',
+      tariffRouteId: tariff.routeId,
+      operation: tariff.operation,
+      ...(tariff.resolution ? { resolution: tariff.resolution } : {}),
+      unit: tariff.unit,
+      unitRateMicros: tariff.unitRateMicros,
+      quantity: tariff.quantity,
+      amountMicros: tariff.amountMicros,
+    };
+    const decision = settleVerifiedCost(row.fee_admission.snapshot, {
+      reservedMicros: micros(row.reserved_micros),
+      customerCeilingMicros: row.fee_admission.customerCeilingMicros,
+      evidence,
+      expected: scope,
+      outcome: 'succeeded',
+      billableAttemptCount: row.attempt_count,
     });
+    if (decision.status !== 'settled') return false;
+    const amount = decision.statement;
+    const view = generationFeeSettlementView({
+      ...generationFeeTerms(row.fee_admission.snapshot),
+      costStatus: 'published-tariff',
+      providerCostMicros: amount.providerCostMicros,
+      customerProviderDebitMicros: amount.customerProviderDebitMicros,
+      nominalFeeMicros: amount.nominalFeeMicros,
+      collectedFeeMicros: amount.collectedFeeMicros,
+      waivedFeeMicros: amount.waivedFeeMicros,
+      operatorOverrunMicros: amount.operatorOverrunMicros,
+      customerTotalMicros: amount.customerTotalMicros,
+    });
+    await this.settle(
+      client,
+      row,
+      view.customerTotalMicros,
+      null,
+      view,
+      {
+        workspaceId: scope.workspaceId,
+        jobId: scope.jobId,
+        routeId: scope.routeId,
+        credentialIdentity: scope.credentialIdentity,
+        evidence: amount.evidence,
+      },
+      tariffDetails,
+    );
     return true;
   }
 
@@ -3241,8 +3316,32 @@ export class Engine {
             return job(refreshed.rows[0]!);
           }
           if (
+            !reconciliation &&
+            !result.costEvidence &&
+            result.status === 'succeeded' &&
+            row.status === 'succeeded' &&
+            (result.billedCostMicros === undefined || result.billedCostMicros === null) &&
+            !result.retryAfterMs &&
+            isOpaqueBillingRoute(row.route_snapshot) &&
+            deferredBilling === 'disabled'
+          ) {
+            await this.trySettleOpaqueVerifiedDelivery(client, row, row.delivery_status, false);
+            const refreshed = await client.query<JobRow>(
+              'UPDATE mr_jobs SET billing_poll_pending=false,lease_until=NULL,updated_at=now() WHERE id=$1 RETURNING *',
+              [row.id],
+            );
+            return job(refreshed.rows[0]!);
+          }
+          if (
             row.upstream_id &&
-            (row.billing_poll_pending || result.retryAfterMs) &&
+            (row.billing_poll_pending ||
+              result.retryAfterMs ||
+              (!reconciliation &&
+                !result.costEvidence &&
+                result.status === 'succeeded' &&
+                row.status === 'succeeded' &&
+                (result.billedCostMicros === undefined || result.billedCostMicros === null) &&
+                deferredBilling !== 'disabled')) &&
             (!row.lease_until ||
               row.lease_until.getTime() === expectedAttempt?.leaseUntil?.getTime())
           )
@@ -3252,7 +3351,9 @@ export class Engine {
                 row.id,
                 result.retryAfterMs
                   ? Math.max(15000, Math.min(3600000, result.retryAfterMs))
-                  : this.pollIntervalMs,
+                  : deferredBilling !== 'disabled'
+                    ? 30_000
+                    : this.pollIntervalMs,
               ],
             );
           return job(row);
@@ -3359,6 +3460,20 @@ export class Engine {
           reconciliation,
           authority,
         );
+        if (
+          !feeSettled &&
+          !reconciliation &&
+          !result.costEvidence &&
+          status === 'succeeded' &&
+          (result.billedCostMicros === undefined || result.billedCostMicros === null)
+        ) {
+          feeSettled = await this.trySettleOpaqueVerifiedDelivery(
+            client,
+            row,
+            delivery?.deliveryStatus,
+            Boolean(result.retryAfterMs) || deferredBilling !== 'disabled',
+          );
+        }
       } else if (row.input.billing === 'byok' && isTerminal) {
         await this.settle(client, row, 0, result.billedCostMicros ?? null);
       } else if (
