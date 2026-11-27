@@ -43,14 +43,18 @@ export function resolveDisplayedRouteRate(
 ): DisplayedRouteRate | null {
   const unit: Rate['unit'] = modality === 'video' ? 'output-second' : 'image';
   if (selectedOperation && !route.operations.includes(selectedOperation)) return null;
-  const allowedResolutions = routeResolutionsForOperation(route, selectedOperation);
+  const explicitOpResolutions = selectedOperation
+    ? route.operationCapabilities?.[selectedOperation]?.resolutions
+    : undefined;
+  const allowedResolutions = explicitOpResolutions ?? route.resolutions;
   if (
     resolution &&
     allowedResolutions.length > 0 &&
     !allowedResolutions.some((item) => item.toLowerCase() === resolution.toLowerCase())
   )
     return null;
-  if (resolution && selectedOperation && allowedResolutions.length === 0) return null;
+  if (resolution && explicitOpResolutions !== undefined && explicitOpResolutions.length === 0)
+    return null;
   const effectiveOperation =
     selectedOperation ?? (route.operations.length === 1 ? route.operations[0] : undefined);
   const matches = (rate: Rate) =>
@@ -169,20 +173,20 @@ export function computeCheapestRouteHighlights(
     ? [selectedOperation]
     : sortOperations(activeRoutes.flatMap((route) => route.operations));
 
-  const resolutions = new Map<string, string>();
-  for (const route of activeRoutes) {
-    for (const resolution of routeResolutionsForOperation(route, selectedOperation)) {
-      const key = resolution.toLowerCase();
-      if (!resolutions.has(key)) resolutions.set(key, resolution);
-    }
-  }
-
   const rawByRoute = new Map<
     string,
     Array<Omit<CheapestComparisonEntry, 'operations'> & { operation: Operation }>
   >();
 
   for (const operation of operations) {
+    const resolutions = new Map<string, string>();
+    for (const route of activeRoutes) {
+      if (!route.operations.includes(operation)) continue;
+      for (const resolution of operationResolutions(route, operation, unit)) {
+        const key = resolution.toLowerCase();
+        if (!resolutions.has(key)) resolutions.set(key, resolution);
+      }
+    }
     for (const [, resolution] of resolutions) {
       const cohortsByQuality = new Map<
         string,
@@ -426,7 +430,7 @@ function isBetterCardSavings(candidate: CardSavingsSummary, current: CardSavings
 }
 
 function operationResolutions(route: Route, operation: Operation, unit: Rate['unit']): string[] {
-  const declared = routeResolutionsForOperation(route, operation);
+  const explicitOpResolutions = route.operationCapabilities?.[operation]?.resolutions;
   const seen = new Set<string>();
   const result: string[] = [];
   const add = (resolution: string) => {
@@ -435,6 +439,11 @@ function operationResolutions(route: Route, operation: Operation, unit: Rate['un
     seen.add(key);
     result.push(resolution);
   };
+  if (explicitOpResolutions !== undefined) {
+    for (const resolution of explicitOpResolutions) add(resolution);
+    return result;
+  }
+  const declared = routeResolutionsForOperation(route, operation);
   if (declared.length) {
     for (const resolution of declared) add(resolution);
     return result;

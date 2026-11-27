@@ -330,6 +330,111 @@ describe('model card pricing and % off summaries', () => {
     });
   });
 
+  it('supports rate-derived resolutions when declarations are empty and honors operation-specific overrides', () => {
+    const testModel: Model = {
+      ...getModel('alibaba/wan-3.0')!,
+      id: 'test/overrides',
+      name: 'Test Overrides',
+    };
+
+    // Empty route resolutions with a valid published output rate still resolve starting price.
+    const emptyDeclRoute = makeRoute({
+      id: 'r-empty-decl',
+      modelId: 'test/overrides',
+      resolutions: [],
+      publishedPricing: {
+        summary: '$0.03 / sec at 480p',
+        source,
+        conditions: ['Output-only rate.'],
+        outputRates: [
+          {
+            operation: 'text-to-video',
+            resolution: '480p',
+            unit: 'output-second',
+            usdMicros: 30_000,
+          },
+        ],
+      },
+    });
+    const emptyDeclSummary = summarizeVariantCardPricing(testModel, [emptyDeclRoute], catalog);
+    expect(emptyDeclSummary.lowest).toMatchObject({
+      routeId: 'r-empty-decl',
+      resolution: '480p',
+      usdMicros: 30_000,
+    });
+    expect(emptyDeclSummary.savings).toBeNull();
+
+    // An explicitly empty operation resolution override keeps unsupported resolutions excluded.
+    const explicitEmptyOpRoute = makeRoute({
+      id: 'r-explicit-empty-op',
+      modelId: 'test/overrides',
+      resolutions: ['480p'],
+      operationCapabilities: {
+        'text-to-video': { resolutions: [] },
+      },
+      rates: [
+        {
+          operation: 'text-to-video',
+          resolution: '480p',
+          unit: 'output-second',
+          usdMicros: 30_000,
+        },
+      ],
+    });
+    expect(summarizeVariantCardPricing(testModel, [explicitEmptyOpRoute], catalog)).toEqual({
+      lowest: null,
+      savings: null,
+    });
+
+    // Operation-specific resolution overrides (global 720p, text-to-video 480p) participate in savings.
+    const overrideRoutes = [
+      makeRoute({
+        id: 'r-op-cheap',
+        modelId: 'test/overrides',
+        deploymentId: 'fal-undisclosed',
+        resolutions: ['720p'],
+        operationCapabilities: {
+          'text-to-video': { resolutions: ['480p'] },
+        },
+        rates: [
+          {
+            operation: 'text-to-video',
+            resolution: '480p',
+            unit: 'output-second',
+            usdMicros: 20_000,
+          },
+        ],
+      }),
+      makeRoute({
+        id: 'r-op-expensive',
+        modelId: 'test/overrides',
+        deploymentId: 'replicate-undisclosed',
+        resolutions: ['720p'],
+        operationCapabilities: {
+          'text-to-video': { resolutions: ['480p'] },
+        },
+        rates: [
+          {
+            operation: 'text-to-video',
+            resolution: '480p',
+            unit: 'output-second',
+            usdMicros: 40_000,
+          },
+        ],
+      }),
+    ];
+    const overrideSummary = summarizeVariantCardPricing(testModel, overrideRoutes, catalog);
+    expect(overrideSummary.lowest).toMatchObject({
+      routeId: 'r-op-cheap',
+      resolution: '480p',
+      usdMicros: 20_000,
+    });
+    expect(overrideSummary.savings).toMatchObject({
+      maxPercentOff: 50,
+      label: 'Up to 50% off',
+    });
+  });
+
   it('renders crawlable price and % off markup on SeriesCards and ModelsCatalog', () => {
     const featured = ['bytedance/seedance-2.5', 'google/nano-banana-2.1', 'minimax/h3'].map((id) =>
       getSeries(id)!,
