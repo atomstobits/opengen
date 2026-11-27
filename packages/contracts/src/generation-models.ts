@@ -237,11 +237,12 @@ video('bytedance/seedance-1.0-pro-fast', {
 defs['bytedance/seedance-1.0-pro-fast']!.capabilities.frames.last = false;
 video('kling/kling-4.0', {
   sources: [
+    'https://kling.ai/document-api/api/usage-guide/kling-4-0',
     'https://dev.runwayml.com/learn/kling-4-0-api',
     'https://fal.ai/models/kling/v4/text-to-video/api',
     'https://runware.ai/docs/models/klingai-video-4-0',
   ],
-  resolutions: ['720p', '1080p'],
+  resolutions: ['720p', '1080p', '4K'],
   minimum: 3,
   maximum: 30,
   referenceMaximum: { image: 10, video: 5, audio: 3 },
@@ -253,11 +254,12 @@ video('kling/kling-4.0', {
   extra: ['keyframes', 'elements', 'shots'],
   promptMax: 26000,
   notices: [
-    'Native detailed payload remains unresolved; qualified wrappers are independent contracts. Keyframes and reference images can share one combined image budget. Timed placement is not inferred from ordered middle frames. Native 4K availability is not assumed from consumer marketing.',
+    'Official Kling 4.0 API (api-singapore.klingai.com) documents 720p/1080p/4K (plus optional HDR at 1080p/4K), 3–30s duration and up to 15 combined assets; reseller wrappers expose independent resolution and feature subsets. Keyframes and reference images share one combined ten-image budget. Timed placement is not inferred from ordered middle frames.',
   ],
 });
 video('kling/kling-4.0-flash', {
   sources: [
+    'https://kling.ai/document-api/api/video/4-0-flash/text-to-video',
     'https://fal.ai/models/kling/v4/flash/text-to-video/api',
     'https://docs.dev.runwayml.com/guides/pricing/',
   ],
@@ -280,10 +282,11 @@ video('kling/kling-4.0-flash', {
 defs['kling/kling-4.0-flash']!.capabilities.frames.last = false;
 video('alibaba/happy-horse-1.1', {
   sources: [
+    'https://www.alibabacloud.com/help/en/model-studio/happyhorse-api-reference/',
     'https://fal.ai/models/alibaba/happy-horse/v1.1/text-to-video/api',
     'https://fal.ai/models/alibaba/happy-horse/v1.1/reference-to-video/api',
   ],
-  resolutions: ['720p', '1080p'],
+  resolutions: ['480p', '720p', '1080p'],
   defaultResolution: '1080p',
   minimum: 3,
   maximum: 15,
@@ -291,7 +294,7 @@ video('alibaba/happy-horse-1.1', {
   audio: 'always-on',
   aspectRatios: ['source', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21', '5:4', '4:5'],
   notices: [
-    'HappyHorse 1.1 generates 720p/1080p video with native synchronized audio and up to nine reference images; end-frame interpolation is not exposed.',
+    'HappyHorse 1.1 generates video with native synchronized audio and up to nine reference images across 480p/720p/1080p on Alibaba Model Studio (720p/1080p on fal); end-frame interpolation is not exposed.',
   ],
 });
 defs['alibaba/happy-horse-1.1']!.capabilities.frames.last = false;
@@ -682,13 +685,13 @@ image('bfl/flux-3-klein', {
     'https://docs.bfl.ai/flux_3/flux3_image_klein',
     'https://fal.ai/models/blackforestlabs/flux-3/klein/text-to-image/api',
   ],
-  resolutions: ['1K', '2K', '4K'],
+  resolutions: ['768sq', '1K', '1.5K', '2K', '4K'],
   defaultResolution: '1K',
   maxReferences: 10,
   countMaximum: 4,
   extra: ['promptExpansion'],
   notices: [
-    'FLUX 3 Klein is a distinct 5.6B open-weights variant supporting 1–4 outputs, custom dimensions and up to 10 edit references.',
+    'FLUX 3 Klein is a distinct 5.6B open-weights variant supporting 768sq–4K on official BFL (1K–4K on fal), 1–4 outputs, custom dimensions and up to 10 edit references.',
   ],
 });
 image('xai/grok-imagine-image-2.0', {

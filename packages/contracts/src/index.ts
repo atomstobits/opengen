@@ -160,6 +160,8 @@ export interface Route {
     | 'google'
     | 'runway'
     | 'pika'
+    | 'kling'
+    | 'bfl'
     | null;
   status: 'documented' | 'live-verified' | 'retired';
   /** Configuration covered by a live generation and delivery test. */

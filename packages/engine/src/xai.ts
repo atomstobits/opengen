@@ -5,6 +5,7 @@ import {
   referenceUrls,
   referenceTypeIssue,
   frameUrl,
+  sourceVideoUrl,
   numericDuration,
   SubmissionRejected,
   SubmissionUnknown,
@@ -15,7 +16,11 @@ import {
 import { pollProviderJson, providerObject, submitProviderJson } from './provider-http.js';
 
 const imageModel = 'grok-imagine-image-2.0';
-const videoModels = new Set(['grok-imagine-video-1.5', 'grok-imagine-video-1.5-lite']);
+const videoModels = new Set([
+  'grok-imagine-video-1.5',
+  'grok-imagine-video-1.5-lite',
+  'grok-imagine-video',
+]);
 const videoRatios = new Set(['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9', '5:2']);
 const imageRatios = new Set([
   ...videoRatios,
@@ -47,21 +52,36 @@ export function createXaiAdapter(
   const fields = (context: Omit<AdapterContext, 'jobId'>): (keyof GenerationArguments)[] =>
     isImage(context.input.operation)
       ? ['prompt', 'resolution', 'aspectRatio', 'references', 'quality', 'count']
-      : [
-          'prompt',
-          'resolution',
-          'duration',
-          'aspectRatio',
-          'references',
-          'firstFrame',
-          'audio',
-          'count',
-          'outputFormat',
-        ];
+      : context.input.operation === 'video-edit' || context.input.operation === 'video-extend'
+        ? [
+            'prompt',
+            'sourceVideo',
+            ...(context.input.operation === 'video-extend' ? (['duration'] as const) : []),
+            'aspectRatio',
+            'audio',
+            'count',
+            'outputFormat',
+          ]
+        : [
+            'prompt',
+            'resolution',
+            'duration',
+            'aspectRatio',
+            'references',
+            'firstFrame',
+            'audio',
+            'count',
+            'outputFormat',
+          ];
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     const { input, route, deployment } = context;
     if (deployment.providerId !== 'xai') return 'Unsupported xAI deployment.';
     const args = input.input;
+    if (
+      (input.operation === 'video-edit' || input.operation === 'video-extend') &&
+      args.resolution !== undefined
+    )
+      return 'xAI video edit/extend inherits source dimensions up to 720p; do not request a resolution override.';
     const issue = adapterInputIssue(context, fields(context)) ?? referenceTypeIssue(input);
     if (issue) return issue;
     if (args.count !== undefined && args.count !== 1)
@@ -91,7 +111,26 @@ export function createXaiAdapter(
       return null;
     }
     if (!videoModels.has(route.upstreamModelId))
-      return 'This adapter supports Grok Imagine Video 1.5 and 1.5 Lite generation only.';
+      return 'This adapter supports Grok Imagine Video, 1.5, and 1.5 Lite only.';
+    if (input.operation === 'video-edit' || input.operation === 'video-extend') {
+      if (route.upstreamModelId !== 'grok-imagine-video')
+        return 'Video editing/extension requires Grok Imagine Video.';
+      if (!args.sourceVideo) return 'xAI video edit/extend requires sourceVideo.';
+      if (!(args.prompt ?? '').trim()) return 'xAI video edit/extend requires a prompt.';
+      if (args.outputFormat !== undefined && args.outputFormat !== 'mp4')
+        return 'xAI video output is MP4.';
+      if (args.audio === false) return 'xAI video edit/extend does not expose an audio-off toggle.';
+      if (args.aspectRatio && args.aspectRatio !== 'source')
+        return 'xAI video edit/extend inherits source aspect ratio; omit aspectRatio or use source.';
+      if (input.operation === 'video-extend' && args.duration !== undefined) {
+        const d = numericDuration(input);
+        if (!Number.isInteger(d) || d < 2 || d > 10)
+          return 'xAI video extension duration must be an integer from 2 through 10 seconds.';
+      }
+      return null;
+    }
+    if (route.upstreamModelId === 'grok-imagine-video')
+      return 'Grok Imagine Video route supports video-edit and video-extend only; use 1.5 or 1.5 Lite for generation.';
     if (!['text-to-video', 'image-to-video', 'reference-to-video'].includes(input.operation))
       return 'Video editing/extension requires source-derived sizing and is not executed by this adapter.';
     if (!['480p', '720p', '1080p'].includes((input.input.resolution ?? '').toLowerCase()))
@@ -144,6 +183,8 @@ export function createXaiAdapter(
       'text-to-video',
       'image-to-video',
       'reference-to-video',
+      'video-edit',
+      'video-extend',
     ],
     inputFields: fields,
     preflight,
@@ -159,6 +200,26 @@ export function createXaiAdapter(
       const references = referenceUrls(input);
       const args = input.input;
       const image = isImage(input.operation);
+      if (input.operation === 'video-edit' || input.operation === 'video-extend') {
+        const videoEndpoint =
+          input.operation === 'video-edit' ? 'videos/edits' : 'videos/extensions';
+        const body = await submitProviderJson(
+          request,
+          'xAI',
+          `https://api.x.ai/v1/${videoEndpoint}`,
+          auth(),
+          {
+            model: route.upstreamModelId,
+            prompt: args.prompt,
+            video: { url: sourceVideoUrl(input) },
+            ...(input.operation === 'video-extend' && args.duration !== undefined
+              ? { duration: args.duration }
+              : {}),
+          },
+        );
+        if (typeof body.request_id !== 'string' || !body.request_id) throw new SubmissionUnknown();
+        return { upstreamId: body.request_id };
+      }
       const endpoint = image
         ? input.operation === 'image-edit'
           ? 'images/edits'

@@ -261,6 +261,7 @@ function operationDefinition(
             : true,
   );
   const omniVideoEdit = isGoogleOmni(modelId) && operation === 'video-edit';
+  const xaiVideoEdit = modelId === 'xai/grok-imagine-video' && operation === 'video-edit';
   return {
     ...structuredClone(model),
     modelId,
@@ -273,7 +274,9 @@ function operationDefinition(
       (operation === 'video-edit' &&
         (modelId === 'bfl/flux-3-video' || modelId.startsWith('kling/kling-4.0'))),
     defaults: {
-      ...(forbidden.has('resolution') ? {} : { resolution: model.defaults.resolution }),
+      ...(forbidden.has('resolution') || xaiVideoEdit
+        ? {}
+        : { resolution: model.defaults.resolution }),
       ...(video && !forbidden.has('duration') && !omniVideoEdit ? { duration: 5 } : {}),
       ...(operation === 'image-edit' || omniVideoEdit || forbidden.has('aspectRatio')
         ? {}

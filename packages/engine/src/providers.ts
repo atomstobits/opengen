@@ -17,10 +17,13 @@ import {
 } from './minimax-image.js';
 import { createGoogleImageAdapter } from './google.js';
 import { createQwenImageAdapter, isQwenImageModel } from './qwen.js';
+import { createHappyHorseAdapter, isHappyHorseModel } from './happyhorse.js';
 import { createReplicateAdapter } from './replicate.js';
 import { createGoogleVideoAdapter } from './google-video.js';
 import { createRunwayAdapter } from './runway.js';
 import { createPikaAdapter } from './pika.js';
+import { createKlingAdapter } from './kling.js';
+import { createBflAdapter } from './bfl.js';
 
 export {
   createFalAdapter,
@@ -31,21 +34,29 @@ export {
   observedMiniMaxImageCostMicros,
   createGoogleImageAdapter,
   createQwenImageAdapter,
+  createHappyHorseAdapter,
   createReplicateAdapter,
   createGoogleVideoAdapter,
   createRunwayAdapter,
   createPikaAdapter,
+  createKlingAdapter,
+  createBflAdapter,
 };
 export { openAIImageSize, type StoreProviderImage, type StoreProviderOutput } from './openai.js';
 
-/** One public Alibaba adapter ID, with explicit Wan-video and Qwen-image protocol branches. */
+/** One public Alibaba adapter ID, with explicit Wan-video, HappyHorse-video, and Qwen-image protocol branches. */
 export function createAlibabaMediaAdapter(
   options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; resolve?: PublicResolver } = {},
 ): ProviderAdapter {
   const wan = createAlibabaAdapter(options);
+  const happyHorse = createHappyHorseAdapter(options);
   const qwen = createQwenImageAdapter(options);
   const forRoute = (route: Parameters<ProviderAdapter['isConfigured']>[0]) =>
-    isQwenImageModel(route.upstreamModelId) ? qwen : wan;
+    isQwenImageModel(route.upstreamModelId)
+      ? qwen
+      : isHappyHorseModel(route.upstreamModelId)
+        ? happyHorse
+        : wan;
   return {
     id: 'alibaba',
     supportedOperations: [
@@ -145,5 +156,7 @@ export function createDefaultAdapters(
     createReplicateAdapter(options),
     createRunwayAdapter(options),
     createPikaAdapter(options),
+    createKlingAdapter(options),
+    createBflAdapter(options),
   ];
 }

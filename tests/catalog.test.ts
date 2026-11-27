@@ -63,7 +63,7 @@ describe('source-backed catalog', () => {
       ]),
     );
     expect(catalog.models).toHaveLength(49);
-    expect(catalog.routes).toHaveLength(164);
+    expect(catalog.routes).toHaveLength(174);
   });
   it('resolves Omni Flash as a search alias without creating duplicate live releases', () => {
     expect(searchCatalog('Gemini Omni Flash').map((model) => model.id)).toEqual([
@@ -139,6 +139,68 @@ describe('source-backed catalog', () => {
     expect(getSeriesDetail('bytedance/seedance-2.5')?.providers[0]?.id).toBe('byteplus');
     expect(getSeriesDetail('openai/gpt-image-2.5')?.providers[0]?.id).toBe('openai');
     expect(getSeriesDetail('google/nano-banana-2.1')?.providers[0]?.id).toBe('google');
+    expect(getSeriesDetail('kling/kling-4.0')?.providers[0]?.id).toBe('kling');
+    expect(getSeriesDetail('alibaba/happy-horse-1.1')?.providers[0]?.id).toBe('alibaba');
+    expect(getSeriesDetail('bfl/flux-3-video')?.providers[0]?.id).toBe('bfl');
+    expect(getSeriesDetail('bfl/flux-3-image')?.providers[0]?.id).toBe('bfl');
+  });
+  it('provides an official author-operated route for every closed model and verified official hosts', () => {
+    const deployments = new Map(
+      catalog.deployments.map((deployment) => [deployment.id, deployment]),
+    );
+    const missingOfficial = catalog.models.filter((model) => {
+      const routes = getModelRoutes(model.id);
+      return !routes.some((route) =>
+        model.authorProviderIds.includes(deployments.get(route.deploymentId)?.providerId ?? ''),
+      );
+    });
+    // Every closed model must carry at least one official route; only weights-only qwen/image-2.1 lacks one.
+    expect(missingOfficial.filter((model) => model.openness === 'closed')).toEqual([]);
+    expect(missingOfficial.map((model) => model.id)).toEqual(['qwen/image-2.1']);
+
+    expect(getModelRoutes('kling/kling-4.0')[0]).toMatchObject({
+      id: 'kling-ap-southeast-1/kling-kling-4.0',
+      resolutions: ['720p', '1080p', '4K'],
+      adapter: 'kling',
+    });
+    expect(getModelRoutes('kling/kling-4.0-flash')[0]).toMatchObject({
+      id: 'kling-ap-southeast-1/kling-kling-4.0-flash',
+      resolutions: ['720p'],
+      adapter: 'kling',
+    });
+
+    const happyHorseOfficial = getModelRoutes('alibaba/happy-horse-1.1').filter(
+      (route) => deployments.get(route.deploymentId)?.providerId === 'alibaba',
+    );
+    expect(happyHorseOfficial).toHaveLength(5);
+    expect(happyHorseOfficial.every((route) => route.adapter === 'alibaba')).toBe(true);
+    expect(happyHorseOfficial.map((route) => route.deploymentId).sort()).toEqual([
+      'alibaba-model-studio-ap-northeast-1',
+      'alibaba-model-studio-ap-southeast-1',
+      'alibaba-model-studio-cn-beijing',
+      'alibaba-model-studio-eu-central-1',
+      'alibaba-model-studio-us-east-1',
+    ]);
+
+    expect(getModelRoutes('bfl/flux-3-video')[0]).toMatchObject({
+      id: 'bfl-undisclosed/bfl-flux-3-video',
+      resolutions: ['720p', '1080p', '1440p', '2160p'],
+      adapter: 'bfl',
+    });
+    expect(getModelRoutes('bfl/flux-3-image')[0]).toMatchObject({
+      id: 'bfl-undisclosed/bfl-flux-3-image',
+      resolutions: ['768sq', '1K', '1.5K', '2K', '4K'],
+      adapter: 'bfl',
+    });
+    expect(getModelRoutes('bfl/flux-3-klein')[0]).toMatchObject({
+      id: 'bfl-undisclosed/bfl-flux-3-klein',
+      resolutions: ['768sq', '1K', '1.5K', '2K', '4K'],
+      adapter: 'bfl',
+    });
+    expect(getModelRoutes('xai/grok-imagine-video')[0]).toMatchObject({
+      id: 'xai-undisclosed/xai-grok-imagine-video',
+      adapter: 'xai',
+    });
   });
   it('rejects catalog ordering when a third-party route precedes an official route', () => {
     const original = [...catalog.routes];
@@ -191,6 +253,7 @@ describe('source-backed catalog', () => {
     }
     for (const id of [
       'byteplus-modelark-ap-southeast-1',
+      'kling-ap-southeast-1',
       'fal-undisclosed',
       'openai-undisclosed',
       'xai-undisclosed',
