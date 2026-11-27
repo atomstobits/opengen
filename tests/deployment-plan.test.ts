@@ -592,4 +592,56 @@ describe('review-only GCP deployment plans', () => {
     for (const line of alibabaPlan.stdout.split('\n').filter((item) => item.startsWith('gcloud ')))
       expect(line).toContain('ALIBABA_AP_SOUTHEAST_1_ENDPOINT=alibaba-sg-endpoint:2');
   });
+
+  it('binds GitHub OAuth, Email OTP, starter credit, and trusted-proxy settings to the API only and blocks sharing them with the worker', () => {
+    const onboardingApiBindings = [
+      'OPENGEN_PROXY_CLIENT_SECRET=proxy-client-secret:1',
+      'OPENGEN_TRUSTED_PROXIES=trusted-proxies:1',
+      'OPENGEN_OIDC_DISPLAY_NAME=oidc-label:1',
+      'OPENGEN_GITHUB_CLIENT_ID=gh-client-id:1',
+      'OPENGEN_GITHUB_CLIENT_SECRET=gh-client-secret:1',
+      'OPENGEN_EMAIL_OTP_ENABLED=email-otp-enabled:1',
+      'OPENGEN_EMAIL_OTP_FROM=email-otp-from:1',
+      'OPENGEN_EMAIL_OTP_RELAY_URL=email-otp-relay-url:1',
+      'OPENGEN_EMAIL_OTP_RELAY_AUTH_TOKEN=email-otp-relay-token:1',
+      'RESEND_API_KEY=resend-api-key:1',
+      'RESEND_FROM_EMAIL=resend-from-email:1',
+      'OPENGEN_TRIAL_CREDIT_MICROS=trial-credit-micros:1',
+    ];
+    const ok = plan({
+      OPENGEN_API_SECRET_BINDINGS: [
+        'MR_SESSION_SECRET=session-only:7',
+        ...onboardingApiBindings,
+      ].join(','),
+    });
+    expect(ok.status).toBe(0);
+    expect(ok.stderr).toBe('');
+    const lines = ok.stdout.split('\n');
+    const api = lines.find((line) => line.startsWith('gcloud run deploy opengen-api'))!;
+    const worker = lines.find((line) =>
+      line.startsWith('gcloud run worker-pools deploy opengen-worker'),
+    )!;
+    for (const binding of onboardingApiBindings) {
+      expect(api).toContain(binding);
+      expect(worker).not.toContain(binding.split('=')[0]!);
+    }
+
+    for (const forbiddenShared of [
+      'OPENGEN_PROXY_CLIENT_SECRET=shared-proxy:1',
+      'OPENGEN_TRUSTED_PROXIES=shared-proxies:1',
+      'OPENGEN_OIDC_DISPLAY_NAME=shared-oidc-label:1',
+      'OPENGEN_GITHUB_CLIENT_ID=shared-gh-id:1',
+      'OPENGEN_GITHUB_CLIENT_SECRET=shared-gh-secret:1',
+      'OPENGEN_EMAIL_OTP_ENABLED=shared-otp:1',
+      'OPENGEN_EMAIL_OTP_RELAY_AUTH_TOKEN=shared-otp-token:1',
+      'RESEND_API_KEY=shared-resend:1',
+      'OPENGEN_TRIAL_CREDIT_MICROS=shared-trial:1',
+    ]) {
+      const rejected = plan({
+        OPENGEN_PROVIDER_SECRET_BINDINGS: `MR_VAULT_KEY=vault-master:3,${forbiddenShared}`,
+      });
+      expect(rejected.status).toBe(2);
+      expect(rejected.stderr).toContain('cannot be shared with the worker');
+    }
+  });
 });
