@@ -5442,6 +5442,44 @@ select option {
   position: relative;
   z-index: 10;
 }
+.hero-has-comparisons h1 {
+  text-shadow:
+    0 2px 20px color-mix(in srgb, var(--canvas) 90%, transparent),
+    0 1px 4px color-mix(in srgb, var(--canvas) 88%, transparent);
+}
+.hero-has-comparisons .hero-copy > p {
+  text-shadow:
+    0 1px 16px color-mix(in srgb, var(--canvas) 92%, transparent),
+    0 1px 4px color-mix(in srgb, var(--canvas) 90%, transparent);
+}
+.hero-has-comparisons .hero-setup-links {
+  color: color-mix(in srgb, var(--ink) 90%, transparent);
+  text-shadow:
+    0 1px 12px color-mix(in srgb, var(--canvas) 95%, transparent),
+    0 1px 3px color-mix(in srgb, var(--canvas) 92%, transparent);
+}
+.hero-has-comparisons .hero-create-link {
+  text-shadow:
+    0 1px 14px color-mix(in srgb, var(--canvas) 95%, transparent),
+    0 1px 3px color-mix(in srgb, var(--canvas) 92%, transparent);
+}
+.hero-media-split .hero-scrim {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--canvas) 28%, transparent) 0%,
+      transparent 18%,
+      transparent 76%,
+      color-mix(in srgb, var(--canvas) 44%, transparent) 91%,
+      var(--canvas) 100%
+    ),
+    radial-gradient(
+      ellipse 38% 36% at 50% 47%,
+      color-mix(in srgb, var(--canvas) 42%, transparent) 0%,
+      color-mix(in srgb, var(--canvas) 18%, transparent) 58%,
+      transparent 100%
+    );
+}
 .hero-media-split .hero-split-poster,
 .hero-media-split .hero-split-poster > img,
 .hero-media-split .hero-split-video {
@@ -5912,6 +5950,23 @@ select option {
 @media (max-width: 620px) {
   .hero-has-comparisons {
     padding: 146px 18px 94px;
+  }
+  .hero-media-split .hero-scrim {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--canvas) 32%, transparent) 0%,
+        transparent 18%,
+        transparent 76%,
+        color-mix(in srgb, var(--canvas) 48%, transparent) 91%,
+        var(--canvas) 100%
+      ),
+      radial-gradient(
+        ellipse 78% 38% at 50% 47%,
+        color-mix(in srgb, var(--canvas) 44%, transparent) 0%,
+        color-mix(in srgb, var(--canvas) 18%, transparent) 60%,
+        transparent 100%
+      );
   }
   .hero-model-badge {
     top: 82px;
