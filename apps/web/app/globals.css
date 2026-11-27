@@ -257,17 +257,17 @@ p {
 .site-header-overlay .header-inner {
   padding: 0 24px;
   max-width: none;
-  gap: 34px;
+  gap: 28px;
 }
 .site-header-overlay .brand {
-  padding-right: 34px;
+  padding-right: 28px;
   border-right: 1px solid var(--line);
 }
 .site-header-overlay .header-links {
   color: var(--ink);
   font-size: 15px;
   font-weight: 500;
-  gap: 34px;
+  gap: 26px;
 }
 .header-actions {
   display: flex;
@@ -322,6 +322,14 @@ p {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   box-shadow: 3px 3px 0 rgba(250, 248, 242, 0.22);
+}
+.header-checking {
+  padding: 0 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--subtle);
+  border: 1px solid var(--line-subtle);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
 }
 .header-balance {
   padding: 0;
@@ -3080,25 +3088,24 @@ select option {
     width: calc(100% - 64px);
   }
   .header-inner {
-    padding-inline: 32px;
-    gap: 24px;
+    padding-inline: 28px;
+    gap: 20px;
   }
-  .site-header .brand {
+  .site-header .brand,
+  .site-header-overlay .brand {
     padding-right: 20px;
   }
-  .header-links {
-    gap: 20px;
+  .site-header nav {
+    gap: 16px;
+  }
+  .header-links,
+  .site-header-overlay .header-links {
+    gap: 18px;
     font-size: 14px;
   }
   .site-header-overlay .header-inner {
-    gap: 24px;
-  }
-  .site-header-overlay .brand {
-    padding-right: 24px;
-  }
-  .site-header-overlay .header-links {
-    gap: 24px;
-    font-size: 14.5px;
+    padding: 0 20px;
+    gap: 20px;
   }
   .header-account-name {
     display: none;
@@ -3171,25 +3178,6 @@ select option {
   }
 }
 @media (max-width: 850px) {
-  .site-header .brand,
-  .site-header-overlay .brand {
-    border-right: 0;
-    padding-right: 0;
-  }
-  .header-links .nav-docs,
-  .header-links .nav-dashboard {
-    display: none;
-  }
-  .header-connect.header-connect-compact {
-    width: 36px;
-    padding: 0;
-  }
-  .header-connect.header-connect-compact .header-connect-full {
-    display: none;
-  }
-  .mobile-nav {
-    display: block;
-  }
   .hero {
     min-height: 770px;
   }
@@ -3364,7 +3352,7 @@ select option {
     gap: 10px;
   }
   .brand img {
-    height: 24px;
+    height: 22px;
   }
   .site-header nav {
     gap: 10px;
@@ -3380,11 +3368,11 @@ select option {
     border-radius: 8px;
   }
   .site-header-overlay .header-inner {
-    padding: 0 10px 0 12px;
-    gap: 8px;
+    padding: 0 10px;
+    gap: 6px;
   }
   .header-actions {
-    gap: 6px;
+    gap: 5px;
   }
   .header-action {
     height: 34px;
@@ -3402,7 +3390,7 @@ select option {
     display: inline;
   }
   .header-connect.header-connect-compact {
-    width: 34px;
+    width: 32px;
     padding: 0;
   }
   .header-connect.header-connect-compact .header-connect-short {
@@ -3415,17 +3403,17 @@ select option {
     display: none;
   }
   .header-balance-readout {
-    padding: 0 8px;
+    padding: 0 7px;
   }
   .header-balance-amount {
     font-size: 12px;
   }
   .header-balance-add {
-    width: 24px;
+    width: 22px;
   }
   .header-account-trigger {
-    padding: 0 6px 0 4px;
-    gap: 4px;
+    padding: 0 5px 0 4px;
+    gap: 3px;
   }
   .header-account-mark {
     width: 22px;
@@ -4522,14 +4510,35 @@ select option {
 .mobile-nav > div button:hover {
   background: var(--raised);
 }
-@media (max-width: 850px) {
+@media (max-width: 960px) {
+  .site-header .brand,
+  .site-header-overlay .brand {
+    border-right: 0;
+    padding-right: 0;
+  }
+  .header-links .nav-docs,
+  .header-links .nav-dashboard {
+    display: none;
+  }
+  .header-connect.header-connect-compact {
+    width: 36px;
+    padding: 0;
+  }
+  .header-connect.header-connect-compact .header-connect-full {
+    display: none;
+  }
   .mobile-nav {
     display: block;
   }
 }
+@media (max-width: 760px) {
+  .header-links {
+    display: none;
+  }
+}
 @media (max-width: 620px) {
   .mobile-nav summary {
-    width: 34px;
+    width: 32px;
     height: 34px;
     padding: 0;
     justify-content: center;
@@ -4541,6 +4550,37 @@ select option {
   }
   .mobile-nav-burger {
     display: inline-flex;
+  }
+}
+@media (max-width: 380px) {
+  .site-header .brand img {
+    height: 19px;
+  }
+  .site-header-overlay {
+    left: 10px;
+    right: 10px;
+  }
+  .site-header-overlay .header-inner {
+    padding: 0 8px;
+  }
+  .header-actions {
+    gap: 4px;
+  }
+  .header-balance-readout {
+    padding: 0 5px;
+  }
+  .header-balance-amount {
+    font-size: 11px;
+  }
+  .header-balance-add {
+    width: 20px;
+  }
+  .header-account-chevron {
+    display: none;
+  }
+  .header-account-trigger {
+    width: 32px;
+    padding: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {

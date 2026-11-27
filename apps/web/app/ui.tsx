@@ -231,10 +231,19 @@ export function SiteHeader({
   const [setup, setSetup] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const menuFocusRef = useRef<'first' | 'last' | null>(null);
+  const setupOpenerRef = useRef<HTMLElement | null>(null);
+  const lastAccountIdentityRef = useRef<string | null>(null);
   const mobileNavRef = useRef<HTMLDetailsElement | null>(null);
   const headerSession = useHeaderSession();
   const session = headerSession?.session ?? null;
-  const signedIn = Boolean(session?.authenticated);
+  const checkingAuthority = Boolean(headerSession?.checkingAuthority);
+  const signedIn = Boolean(session?.authenticated && !checkingAuthority);
+  const accountIdentity = signedIn
+    ? `${session?.workspaceId ?? ''}:${session?.recoveryScope ?? ''}`
+    : null;
   const balance = headerSession?.balance ?? null;
   const balanceStatus = headerSession?.balanceStatus ?? 'idle';
   const signInHref = session?.oidcEnabled ? '/auth/login' : '/start';
@@ -265,16 +274,43 @@ export function SiteHeader({
     if (mobileNavRef.current) mobileNavRef.current.open = false;
   };
 
+  const openSetup = (opener: HTMLElement | null) => {
+    setupOpenerRef.current = opener;
+    setAccountOpen(false);
+    closeMobileNav();
+    setSetup(true);
+  };
+
+  const closeSetup = () => {
+    setSetup(false);
+    const opener = setupOpenerRef.current;
+    setupOpenerRef.current = null;
+    if (opener && opener.isConnected) opener.focus();
+  };
+
   useEffect(() => {
-    if (!signedIn) setAccountOpen(false);
-  }, [signedIn]);
+    if (!signedIn && !checkingAuthority) {
+      lastAccountIdentityRef.current = null;
+      setAccountOpen(false);
+      return;
+    }
+    if (accountIdentity) {
+      if (lastAccountIdentityRef.current && lastAccountIdentityRef.current !== accountIdentity) {
+        setAccountOpen(false);
+      }
+      lastAccountIdentityRef.current = accountIdentity;
+    }
+  }, [signedIn, checkingAuthority, accountIdentity]);
 
   useEffect(() => {
     if (!setup) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSetup(false);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeSetup();
+      }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
@@ -284,21 +320,63 @@ export function SiteHeader({
   }, [setup]);
 
   useEffect(() => {
-    if (!accountOpen) return;
+    if (!accountOpen || !signedIn) return;
+    const getItems = () =>
+      Array.from(
+        accountMenuRef.current?.querySelectorAll<HTMLElement>(
+          '[role="menuitem"]:not([disabled])',
+        ) ?? [],
+      );
+    if (menuFocusRef.current) {
+      const items = getItems();
+      const target = menuFocusRef.current === 'last' ? items[items.length - 1] : items[0];
+      menuFocusRef.current = null;
+      target?.focus();
+    }
     const onPointerDown = (event: PointerEvent) => {
       if (accountRef.current && !accountRef.current.contains(event.target as Node))
         setAccountOpen(false);
     };
+    const onVisibilityChange = () => {
+      if (document.hidden) setAccountOpen(false);
+    };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAccountOpen(false);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setAccountOpen(false);
+        accountTriggerRef.current?.focus();
+        return;
+      }
+      if (event.key === 'Tab') {
+        setAccountOpen(false);
+        return;
+      }
+      const items = getItems();
+      if (items.length === 0) return;
+      const activeIndex = items.indexOf(document.activeElement as HTMLElement);
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        items[(activeIndex + 1 + items.length) % items.length]?.focus();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        items[activeIndex <= 0 ? items.length - 1 : activeIndex - 1]?.focus();
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        items[0]?.focus();
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        items[items.length - 1]?.focus();
+      }
     };
     document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [accountOpen]);
+  }, [accountOpen, signedIn]);
 
   return (
     <>
@@ -337,11 +415,7 @@ export function SiteHeader({
                 className={`header-action header-connect ${signedIn ? 'header-connect-compact' : ''}`}
                 aria-label="Connect an agent"
                 title="Connect an agent"
-                onClick={() => {
-                  setAccountOpen(false);
-                  closeMobileNav();
-                  setSetup(true);
-                }}
+                onClick={(event) => openSetup(event.currentTarget)}
               >
                 <span className="header-connect-icon" aria-hidden="true">
                   <Icon name="spark" size={14} />
@@ -372,14 +446,30 @@ export function SiteHeader({
                   </a>
                   <div className="header-account" ref={accountRef}>
                     <button
+                      ref={accountTriggerRef}
                       type="button"
                       className="header-action header-account-trigger"
                       aria-haspopup="menu"
                       aria-expanded={accountOpen}
                       aria-label={`Account menu for ${workspaceLabel}`}
-                      onClick={() => {
+                      onClick={(event) => {
                         closeMobileNav();
+                        if (!accountOpen) {
+                          if (event.detail === 0) menuFocusRef.current = 'first';
+                          headerSession.refreshBalance();
+                        }
                         setAccountOpen((open) => !open);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                          event.preventDefault();
+                          closeMobileNav();
+                          if (!accountOpen) {
+                            headerSession.refreshBalance();
+                            menuFocusRef.current = event.key === 'ArrowUp' ? 'last' : 'first';
+                            setAccountOpen(true);
+                          }
+                        }
                       }}
                     >
                       <span className="header-account-mark" aria-hidden="true">
@@ -392,6 +482,7 @@ export function SiteHeader({
                     </button>
                     {accountOpen && (
                       <div
+                        ref={accountMenuRef}
                         className="header-account-menu"
                         role="menu"
                         aria-label="Workspace account"
@@ -458,10 +549,7 @@ export function SiteHeader({
                           <button
                             type="button"
                             role="menuitem"
-                            onClick={() => {
-                              setAccountOpen(false);
-                              setSetup(true);
-                            }}
+                            onClick={() => openSetup(accountTriggerRef.current)}
                           >
                             <Icon name="spark" size={14} />
                             <span>Agent setup</span>
@@ -491,6 +579,15 @@ export function SiteHeader({
                     )}
                   </div>
                 </>
+              ) : checkingAuthority ? (
+                <span
+                  className="header-action header-checking"
+                  role="status"
+                  aria-live="polite"
+                  data-testid="header-checking"
+                >
+                  Checking…
+                </span>
               ) : (
                 <a className="header-action header-signin" href={signInHref}>
                   Sign in
@@ -528,17 +625,16 @@ export function SiteHeader({
                   <a href="/feedback" onClick={closeMobileNav}>
                     Private feedback
                   </a>
-                  {!signedIn && (
+                  {!signedIn && !checkingAuthority && (
                     <a href={signInHref} onClick={closeMobileNav}>
                       Sign in
                     </a>
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      closeMobileNav();
-                      setSetup(true);
-                    }}
+                    onClick={() =>
+                      openSetup(mobileNavRef.current?.querySelector('summary') ?? null)
+                    }
                   >
                     Connect an agent
                   </button>
@@ -552,7 +648,7 @@ export function SiteHeader({
         <div
           className="modal-backdrop"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setSetup(false);
+            if (e.target === e.currentTarget) closeSetup();
           }}
         >
           <section
@@ -561,11 +657,7 @@ export function SiteHeader({
             aria-labelledby="setup-title"
             className="setup-modal"
           >
-            <button
-              className="close-button"
-              aria-label="Close setup"
-              onClick={() => setSetup(false)}
-            >
+            <button className="close-button" aria-label="Close setup" onClick={closeSetup}>
               <Icon name="close" />
             </button>
             <span className="eyebrow">CONNECT YOUR WORKFLOW</span>

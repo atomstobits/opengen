@@ -14,6 +14,7 @@ export type HeaderBalanceStatus = 'idle' | 'loading' | 'ready' | 'unavailable';
 export interface HeaderSessionSnapshot {
   session: BrowserSession | null;
   checked: boolean;
+  checkingAuthority: boolean;
   balance: WorkspaceBalance | null;
   balanceStatus: HeaderBalanceStatus;
   signingOut: boolean;
@@ -22,11 +23,21 @@ export interface HeaderSessionSnapshot {
 
 export interface HeaderSessionState extends HeaderSessionSnapshot {
   signOut: () => Promise<boolean>;
+  refreshBalance: () => void;
 }
 
 const sessionEvent = 'opengen:session-changed';
+const balanceEvent = 'opengen:balance-changed';
 const sessionSignal = 'opengen:session-signal';
 const sessionChannel = 'opengen-session';
+
+const BALANCE_POLL_INTERVAL_MS = 15_000;
+const MAX_IDLE_BALANCE_POLLS = 20;
+
+export function notifyHeaderBalanceChanged(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(balanceEvent));
+}
 
 export function formatRemainingUsd(micros: number | null | undefined): string {
   if (micros == null || !Number.isSafeInteger(micros)) return '—';
@@ -79,6 +90,7 @@ function canReadBalance(session: BrowserSession | null): session is BrowserSessi
 const initialSnapshot: HeaderSessionSnapshot = {
   session: null,
   checked: false,
+  checkingAuthority: false,
   balance: null,
   balanceStatus: 'idle',
   signingOut: false,
@@ -86,6 +98,7 @@ const initialSnapshot: HeaderSessionSnapshot = {
 };
 
 let state: HeaderSessionSnapshot = { ...initialSnapshot };
+let verifiedSession: BrowserSession | null = null;
 const listeners = new Set<() => void>();
 let activeConsumers = 0;
 let teardownListeners: (() => void) | null = null;
@@ -93,6 +106,9 @@ let sessionVersion = 0;
 let balanceVersion = 0;
 let sessionController: AbortController | null = null;
 let balanceController: AbortController | null = null;
+let balanceInFlight = false;
+let balancePollTimer: number | null = null;
+let idleBalancePolls = 0;
 let mutationActive = false;
 let queuedRefresh = false;
 let signalSource = '';
@@ -102,15 +118,72 @@ function update(patch: Partial<HeaderSessionSnapshot>) {
   for (const listener of listeners) listener();
 }
 
+function stopBalancePolling() {
+  if (balancePollTimer !== null) {
+    window.clearInterval(balancePollTimer);
+    balancePollTimer = null;
+  }
+}
+
+function startBalancePolling() {
+  if (
+    typeof window === 'undefined' ||
+    activeConsumers === 0 ||
+    balancePollTimer !== null ||
+    !canReadBalance(verifiedSession)
+  ) {
+    return;
+  }
+  balancePollTimer = window.setInterval(() => {
+    if (
+      activeConsumers === 0 ||
+      typeof document === 'undefined' ||
+      document.hidden ||
+      document.visibilityState !== 'visible'
+    ) {
+      return;
+    }
+    if (mutationActive || state.checkingAuthority || balanceInFlight) return;
+    if (!canReadBalance(verifiedSession)) {
+      stopBalancePolling();
+      return;
+    }
+    if (idleBalancePolls >= MAX_IDLE_BALANCE_POLLS) {
+      stopBalancePolling();
+      return;
+    }
+    idleBalancePolls++;
+    fetchBalanceFor(verifiedSession, sessionVersion);
+  }, BALANCE_POLL_INTERVAL_MS);
+}
+
+function suspendPrivateHeader() {
+  balanceVersion++;
+  balanceInFlight = false;
+  balanceController?.abort();
+  stopBalancePolling();
+  if (state.session?.authenticated || verifiedSession?.authenticated) {
+    update({
+      session: null,
+      balance: null,
+      balanceStatus: 'idle',
+      checkingAuthority: true,
+    });
+  }
+}
+
 function fetchBalanceFor(current: BrowserSession, expectedSessionVersion: number) {
   balanceController?.abort();
   if (!canReadBalance(current)) {
+    balanceInFlight = false;
+    stopBalancePolling();
     update({ balance: null, balanceStatus: current.authenticated ? 'unavailable' : 'idle' });
     return;
   }
   const controller = new AbortController();
   balanceController = controller;
   const version = ++balanceVersion;
+  balanceInFlight = true;
   if (state.balanceStatus !== 'ready') update({ balanceStatus: 'loading' });
 
   const authority = {
@@ -131,11 +204,13 @@ function fetchBalanceFor(current: BrowserSession, expectedSessionVersion: number
       )
         return;
       if (response.status === 401 || response.status === 409) {
+        balanceInFlight = false;
         update({ balance: null, balanceStatus: 'unavailable' });
         refreshSession();
         return;
       }
       if (!response.ok) {
+        balanceInFlight = false;
         update({ balance: null, balanceStatus: 'unavailable' });
         return;
       }
@@ -146,10 +221,18 @@ function fetchBalanceFor(current: BrowserSession, expectedSessionVersion: number
         expectedSessionVersion !== sessionVersion
       )
         return;
+      balanceInFlight = false;
       const parsed = parseBalance(body);
       if (!parsed) {
         update({ balance: null, balanceStatus: 'unavailable' });
         return;
+      }
+      if (
+        !state.balance ||
+        state.balance.availableMicros !== parsed.availableMicros ||
+        state.balance.reservedMicros !== parsed.reservedMicros
+      ) {
+        idleBalancePolls = 0;
       }
       update({ balance: parsed, balanceStatus: 'ready' });
     })
@@ -160,8 +243,25 @@ function fetchBalanceFor(current: BrowserSession, expectedSessionVersion: number
         expectedSessionVersion !== sessionVersion
       )
         return;
+      balanceInFlight = false;
       update({ balance: null, balanceStatus: 'unavailable' });
     });
+}
+
+function refreshBalance() {
+  if (
+    typeof window === 'undefined' ||
+    activeConsumers === 0 ||
+    mutationActive ||
+    state.checkingAuthority ||
+    balanceInFlight
+  ) {
+    return;
+  }
+  if (!canReadBalance(verifiedSession)) return;
+  idleBalancePolls = 0;
+  startBalancePolling();
+  fetchBalanceFor(verifiedSession, sessionVersion);
 }
 
 function refreshSession() {
@@ -174,6 +274,7 @@ function refreshSession() {
   const controller = new AbortController();
   sessionController = controller;
   const version = ++sessionVersion;
+  suspendPrivateHeader();
 
   void fetch('/api/session', { signal: controller.signal, cache: 'no-store' })
     .then(async (response) => {
@@ -183,16 +284,20 @@ function refreshSession() {
       const current = (body.data ?? body) as BrowserSession;
       if (typeof current?.authenticated !== 'boolean') throw new Error('Invalid session');
 
-      const previous = state.session;
+      const previous = verifiedSession;
       const identityChanged = sessionIdentity(previous) !== sessionIdentity(current);
       const verified = identityChanged ? current : previous!;
+      verifiedSession = verified;
 
       if (!verified.authenticated) {
         balanceVersion++;
+        balanceInFlight = false;
         balanceController?.abort();
+        stopBalancePolling();
         update({
           session: verified,
           checked: true,
+          checkingAuthority: false,
           balance: null,
           balanceStatus: 'idle',
           signOutError: '',
@@ -200,35 +305,45 @@ function refreshSession() {
         return;
       }
 
-      if (identityChanged) {
-        // Clear the previous workspace's balance immediately so it never flashes across switches.
-        balanceVersion++;
-        balanceController?.abort();
-        update({
-          session: verified,
-          checked: true,
-          balance: null,
-          balanceStatus: canReadBalance(verified) ? 'loading' : 'unavailable',
-          signOutError: '',
-        });
-      } else {
-        update({ session: verified, checked: true, signOutError: '' });
-      }
+      idleBalancePolls = 0;
+      update({
+        session: verified,
+        checked: true,
+        checkingAuthority: false,
+        balance: null,
+        balanceStatus: canReadBalance(verified) ? 'loading' : 'unavailable',
+        // Preserve any prior sign-out failure message if the unchanged session is still active.
+        ...(identityChanged ? { signOutError: '' } : {}),
+      });
 
       fetchBalanceFor(verified, version);
+      if (canReadBalance(verified)) startBalancePolling();
+      else stopBalancePolling();
     })
     .catch(() => {
       if (controller.signal.aborted || version !== sessionVersion) return;
+      verifiedSession = null;
       balanceVersion++;
+      balanceInFlight = false;
       balanceController?.abort();
-      update({ session: null, checked: true, balance: null, balanceStatus: 'idle' });
+      stopBalancePolling();
+      update({
+        session: null,
+        checked: true,
+        checkingAuthority: false,
+        balance: null,
+        balanceStatus: 'idle',
+        signOutError: '',
+      });
     });
 }
 
 async function signOut(): Promise<boolean> {
   const version = ++sessionVersion;
   balanceVersion++;
+  balanceInFlight = false;
   mutationActive = true;
+  stopBalancePolling();
   sessionController?.abort();
   balanceController?.abort();
   update({ signingOut: true, signOutError: '' });
@@ -236,12 +351,14 @@ async function signOut(): Promise<boolean> {
   try {
     const response = await fetch('/api/session', { method: 'DELETE' });
     if (!response.ok) throw new Error('Sign-out could not be completed. Please try again.');
-    const body = await response.json();
+    const body = response.status === 204 ? { authenticated: false } : await response.json();
     if (version !== sessionVersion) return false;
     const current = (body.data ?? body) as BrowserSession;
+    verifiedSession = current;
     update({
       session: current,
       checked: true,
+      checkingAuthority: false,
       balance: null,
       balanceStatus: 'idle',
       signOutError: '',
@@ -282,6 +399,15 @@ function attachListeners() {
     if ((event as CustomEvent<{ source?: string }>).detail?.source !== signalSource)
       refreshSession();
   };
+  const onBalanceSignal = () => {
+    refreshBalance();
+  };
+  const onUserActivity = () => {
+    if (idleBalancePolls > 0 || (balancePollTimer === null && canReadBalance(verifiedSession))) {
+      idleBalancePolls = 0;
+      if (!mutationActive && !state.checkingAuthority) startBalancePolling();
+    }
+  };
 
   let channel: BroadcastChannel | undefined;
   try {
@@ -297,10 +423,17 @@ function attachListeners() {
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('storage', onStorage);
   window.addEventListener(sessionEvent, onSessionSignal);
+  window.addEventListener(balanceEvent, onBalanceSignal);
+  window.addEventListener('pointerdown', onUserActivity, { passive: true });
+  window.addEventListener('keydown', onUserActivity, { passive: true });
 
   teardownListeners = () => {
     sessionVersion++;
     balanceVersion++;
+    balanceInFlight = false;
+    idleBalancePolls = 0;
+    verifiedSession = null;
+    stopBalancePolling();
     sessionController?.abort();
     balanceController?.abort();
     channel?.close();
@@ -308,6 +441,10 @@ function attachListeners() {
     document.removeEventListener('visibilitychange', onVisibility);
     window.removeEventListener('storage', onStorage);
     window.removeEventListener(sessionEvent, onSessionSignal);
+    window.removeEventListener(balanceEvent, onBalanceSignal);
+    window.removeEventListener('pointerdown', onUserActivity);
+    window.removeEventListener('keydown', onUserActivity);
+    state = { ...initialSnapshot };
     teardownListeners = null;
   };
 }
@@ -331,5 +468,5 @@ export function useHeaderSession(): HeaderSessionState {
     };
   }, []);
 
-  return { ...snapshot, signOut };
+  return { ...snapshot, signOut, refreshBalance };
 }
