@@ -964,17 +964,30 @@ export function createFalAdapter(
     if (!env.FAL_KEY) throw new SubmissionRejected('Configure FAL_KEY for the fal deployment.');
     return { Authorization: `Key ${env.FAL_KEY}` };
   }
-  async function lookupBillingCost(upstreamId: string): Promise<{
+  async function lookupBillingCost(
+    upstreamId: string,
+    attemptStartedAt?: string,
+  ): Promise<{
     billedCostMicros: number | null;
     retryAfterMs?: number;
   }> {
     const billingKey = env.FAL_BILLING_KEY?.trim();
     if (!billingKey) return { billedCostMicros: null };
+    const params = new URLSearchParams({ request_id: upstreamId, limit: '50' });
+    const anchorMs = attemptStartedAt ? Date.parse(attemptStartedAt) : NaN;
+    if (Number.isFinite(anchorMs)) {
+      const skewMs = 5 * 60_000;
+      const maxRangeMs = 30 * 24 * 60 * 60_000;
+      const startMs = anchorMs - skewMs;
+      const endMs = Math.max(startMs + 60_000, Math.min(Date.now() + skewMs, startMs + maxRangeMs));
+      params.set('start', new Date(startMs).toISOString());
+      params.set('end', new Date(endMs).toISOString());
+    }
     try {
       const billing = await pollProviderJson(
         request,
         'fal billing',
-        `https://api.fal.ai/v1/models/billing-events?request_id=${encodeURIComponent(upstreamId)}&limit=50`,
+        `https://api.fal.ai/v1/models/billing-events?${params.toString()}`,
         { Authorization: `Key ${billingKey}` },
       );
       const billedCostMicros = observedFalBillingEventCostMicros(billing, upstreamId);
@@ -1019,6 +1032,7 @@ export function createFalAdapter(
       deployment.id === 'fal-undisclosed' &&
       routeUpstreamModelIds(route).some(isKnownEndpoint) &&
       Boolean(env.FAL_KEY),
+    supportsDeferredBillingPoll: () => Boolean(env.FAL_BILLING_KEY?.trim()),
     async submit(context) {
       const issue = preflight(context);
       if (issue) throw new SubmissionRejected(issue);
@@ -1324,7 +1338,7 @@ export function createFalAdapter(
         return { status: 'running' };
       if (status.status !== 'COMPLETED') throw new Error('Unrecognized fal queue status.');
       if (status.error || status.error_type) {
-        const billing = await lookupBillingCost(context.upstreamId);
+        const billing = await lookupBillingCost(context.upstreamId, context.attemptStartedAt);
         return {
           status: 'failed',
           failureCategory: 'unknown',
@@ -1336,7 +1350,7 @@ export function createFalAdapter(
       const upstreamModel = resolveRouteUpstreamModelId(context.route, context.input.operation);
       const image = isFalImageEndpoint(upstreamModel);
       if (Array.isArray(output.has_nsfw_concepts) && output.has_nsfw_concepts.some(Boolean)) {
-        const billing = await lookupBillingCost(context.upstreamId);
+        const billing = await lookupBillingCost(context.upstreamId, context.attemptStartedAt);
         return {
           status: 'failed',
           failureCategory: 'policy',
@@ -1364,7 +1378,7 @@ export function createFalAdapter(
         ['image/png', 'image/jpeg', 'image/webp'].includes(asset.content_type)
           ? asset.content_type
           : defaultMediaType;
-      const billing = await lookupBillingCost(context.upstreamId);
+      const billing = await lookupBillingCost(context.upstreamId, context.attemptStartedAt);
       if (options.captureOutputs) {
         const captured = await captureProviderResult(
           options.captureOutputs,

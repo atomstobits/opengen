@@ -40,6 +40,9 @@ export const ledgerQuerySchema = z
     limit: z.coerce.number().int().min(1).max(1000).default(100),
   })
   .strict();
+const PENDING_RATE_LIMIT_WINDOW_MS = 60_000;
+const PENDING_RATE_LIMIT_MAX = 60;
+
 export async function registerOperator(
   app: FastifyInstance,
   options: {
@@ -50,6 +53,30 @@ export async function registerOperator(
     ) => Promise<Principal>;
   },
 ) {
+  let pendingWindowStart = 0;
+  let pendingWindowCount = 0;
+  const checkPendingRateLimit = () => {
+    const now = Date.now();
+    if (now - pendingWindowStart >= PENDING_RATE_LIMIT_WINDOW_MS) {
+      pendingWindowStart = now;
+      pendingWindowCount = 0;
+    }
+    pendingWindowCount += 1;
+    if (pendingWindowCount > PENDING_RATE_LIMIT_MAX)
+      throw Object.assign(new Error('Pending reconciliation query rate limit exceeded.'), {
+        code: 'rate_limited',
+        statusCode: 429,
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((PENDING_RATE_LIMIT_WINDOW_MS - (now - pendingWindowStart)) / 1000),
+        ),
+      });
+  };
+  const requireOperator = async (request: FastifyRequest, message: string): Promise<Principal> => {
+    const principal = await options.authenticate(request, 'keys:write');
+    if (!principal.bootstrap) throw Object.assign(new Error(message), { statusCode: 403 });
+    return principal;
+  };
   const engine = () => {
     if (!options.engine)
       throw Object.assign(new Error('Database is not configured.'), { statusCode: 503 });
@@ -101,12 +128,11 @@ export async function registerOperator(
     },
   );
   app.get('/v1/operator/reconciliations/pending', async (request, reply) => {
-    const principal = await options.authenticate(request, 'keys:write');
-    if (!principal.bootstrap)
-      throw Object.assign(
-        new Error('Only the installation operator can list pending reconciliation holds.'),
-        { statusCode: 403 },
-      );
+    await requireOperator(
+      request,
+      'Only the installation operator can list pending reconciliation holds.',
+    );
+    checkPendingRateLimit();
     const query = pendingReconciliationsQuerySchema.parse(request.query);
     reply.header('Cache-Control', 'no-store');
     return {

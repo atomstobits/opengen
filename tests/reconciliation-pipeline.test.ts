@@ -15,6 +15,10 @@ import {
   observedQwenImageCostMicros,
   opaquePublishedTariffChargeMicros,
 } from '@media-router/engine';
+import {
+  connectionEnvironment,
+  snapshotCredentialEnvironment,
+} from '../packages/engine/src/attempt-credentials.js';
 import { createFeePolicy } from '../packages/engine/src/billing-fees.js';
 import { buildApp } from '../apps/server/src/app.js';
 import { agedCostReliefFixture } from './aged-cost-relief-fixture.js';
@@ -192,6 +196,144 @@ describe('fal billing-events settlement (unit & adapter fixtures)', () => {
     const failedRes = await failedAdapter.poll(context);
     expect(failedRes).toMatchObject({ status: 'failed', billedCostMicros: 0 });
     expect(failedRes.retryAfterMs).toBeUndefined();
+  });
+
+  it('preserves FAL_BILLING_KEY in managed frozen credentials, excludes it from BYOK, and anchors billing-events queries to attemptStartedAt', async () => {
+    const falDeployment = catalog.deployments.find((d) => d.id === 'fal-undisclosed')!;
+    const falRoute = catalog.routes.find(
+      (r) =>
+        r.adapter === 'fal' &&
+        resolveRouteUpstreamModelId(r, 'text-to-video') === 'minimax/h3-max-turbo/text-to-video',
+    )!;
+
+    expect(
+      snapshotCredentialEnvironment(falDeployment, {
+        FAL_KEY: 'fixture-managed',
+        FAL_BILLING_KEY: 'fixture-billing',
+        OPENAI_API_KEY: 'fixture-other',
+      }),
+    ).toEqual({
+      FAL_KEY: 'fixture-managed',
+      FAL_BILLING_KEY: 'fixture-billing',
+    });
+    expect(connectionEnvironment(falDeployment, { apiKey: 'fixture-byok' })).toEqual({
+      FAL_KEY: 'fixture-byok',
+    });
+
+    const seenUrls: string[] = [];
+    const adapter = createFalAdapter({
+      env: { FAL_KEY: 'inference-key', FAL_BILLING_KEY: 'billing-readonly-key' },
+      fetch: async (url) => {
+        const u = String(url);
+        seenUrls.push(u);
+        if (u.includes('billing-events')) {
+          return Response.json({
+            billing_events: [{ request_id: 'fal-aged-1', cost_estimate_nano_usd: 91_000_000 }],
+            has_more: false,
+          });
+        }
+        if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
+        return Response.json({ video: { url: 'https://v3b.fal.media/files/b/fixture/out.mp4' } });
+      },
+    });
+    expect(adapter.supportsDeferredBillingPoll?.(falRoute, falDeployment)).toBe(true);
+    expect(
+      createFalAdapter({ env: { FAL_KEY: 'inference-key' } }).supportsDeferredBillingPoll?.(
+        falRoute,
+        falDeployment,
+      ),
+    ).toBe(false);
+
+    // 5 days old (> 24h fal default window): anchored start/end span ~5 days
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60_000).toISOString();
+    await adapter.poll({
+      jobId: 'job-aged-5d',
+      upstreamId: 'fal-aged-1',
+      attemptStartedAt: fiveDaysAgo,
+      route: falRoute,
+      deployment: falDeployment,
+      input: {
+        modelId: falRoute.modelId,
+        routeId: falRoute.id,
+        operation: 'text-to-video',
+        input: { prompt: 'Test.', resolution: '480p', duration: 5, aspectRatio: '16:9' },
+      },
+    });
+    const fiveDayUrl = new URL(seenUrls.find((u) => u.includes('billing-events'))!);
+    expect(fiveDayUrl.searchParams.get('request_id')).toBe('fal-aged-1');
+    const start5d = Date.parse(fiveDayUrl.searchParams.get('start')!);
+    const end5d = Date.parse(fiveDayUrl.searchParams.get('end')!);
+    expect(start5d).toBe(Date.parse(fiveDaysAgo) - 5 * 60_000);
+    expect(end5d - start5d).toBeGreaterThan(4 * 24 * 60 * 60_000);
+    expect(end5d - start5d).toBeLessThanOrEqual(30 * 24 * 60 * 60_000);
+
+    // 45 days old: window capped at 30 days (within fal's 90-day documented limit)
+    seenUrls.length = 0;
+    const fortyFiveDaysAgo = new Date(Date.now() - 45 * 24 * 60 * 60_000).toISOString();
+    await adapter.poll({
+      jobId: 'job-aged-45d',
+      upstreamId: 'fal-aged-1',
+      attemptStartedAt: fortyFiveDaysAgo,
+      route: falRoute,
+      deployment: falDeployment,
+      input: {
+        modelId: falRoute.modelId,
+        routeId: falRoute.id,
+        operation: 'text-to-video',
+        input: { prompt: 'Test.', resolution: '480p', duration: 5, aspectRatio: '16:9' },
+      },
+    });
+    const cappedUrl = new URL(seenUrls.find((u) => u.includes('billing-events'))!);
+    const start45d = Date.parse(cappedUrl.searchParams.get('start')!);
+    const end45d = Date.parse(cappedUrl.searchParams.get('end')!);
+    expect(start45d).toBe(Date.parse(fortyFiveDaysAgo) - 5 * 60_000);
+    expect(end45d - start45d).toBe(30 * 24 * 60 * 60_000);
+  });
+
+  it('rate-limits GET /v1/operator/reconciliations/pending after 60 requests per minute', async () => {
+    const app = await buildApp({
+      workspaceId: 'operator-ws',
+      apiToken: 'operator-bootstrap-token',
+      engine: {
+        accounts: {} as never,
+        getExecutableRouteIds: () => [],
+        routeMetrics: async () => [],
+        submit: async () => {
+          throw new Error('unused');
+        },
+        getJob: async () => null,
+        listJobs: async () => [],
+        cancel: async () => {
+          throw new Error('unused');
+        },
+        getBalance: async () => ({ availableMicros: 0, reservedMicros: 0, currency: 'USD' }),
+        pendingReconciliations: async () => [],
+      },
+    });
+    try {
+      // Unauthenticated requests must be rejected without consuming the operator quota
+      for (let i = 0; i < 10; i++) {
+        const denied = await app.inject({
+          url: '/v1/operator/reconciliations/pending',
+        });
+        expect(denied.statusCode).toBe(401);
+      }
+      for (let i = 0; i < 60; i++) {
+        const res = await app.inject({
+          url: '/v1/operator/reconciliations/pending',
+          headers: { authorization: 'Bearer operator-bootstrap-token' },
+        });
+        expect(res.statusCode).toBe(200);
+      }
+      const limited = await app.inject({
+        url: '/v1/operator/reconciliations/pending',
+        headers: { authorization: 'Bearer operator-bootstrap-token' },
+      });
+      expect(limited.statusCode).toBe(429);
+      expect(Number(limited.headers['retry-after'])).toBeGreaterThanOrEqual(1);
+    } finally {
+      await app.close();
+    }
   });
 });
 
@@ -1037,6 +1179,180 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
       ).toBe(409);
     } finally {
       await app.close();
+      await engine.close();
+      await isolated.close();
+    }
+  });
+
+  it('preserves frozen FAL_BILLING_KEY, anchors >24h billing-events queries, and keeps exact-billing intent across captured-output crash recovery on default adapters', async () => {
+    const isolated = await isolatedEngineDatabase(databaseUrl!, 'fal_frozen_recovery');
+    const route = catalog.routes.find(
+      (r) =>
+        r.adapter === 'fal' &&
+        resolveRouteUpstreamModelId(r, 'text-to-video') === 'minimax/h3-max-turbo/text-to-video',
+    )!;
+    let submitSeq = 0;
+    const billingUrls: string[] = [];
+    const billingAuths: Array<string | null> = [];
+    const indexedCosts = new Map<string, number>();
+
+    const engine = isolated.bind(
+      createEngine({
+        databaseUrl: isolated.databaseUrl,
+        vaultKey: '0'.repeat(64),
+        storage: privateStorageFixture(),
+        pollIntervalMs: 0,
+        providerEnv: {
+          FAL_KEY: 'fixture-fal-key',
+          FAL_BILLING_KEY: 'fixture-billing-key',
+        },
+        delivery: {
+          maxAttempts: 1,
+          download: async () => privateInputBytesFixture('video/mp4').bytes,
+        },
+        providerFetch: async (url, init) => {
+          const u = String(url);
+          if (init?.method === 'POST') {
+            submitSeq += 1;
+            return Response.json({ request_id: `fal-default-${submitSeq}` });
+          }
+          if (u.includes('billing-events')) {
+            billingUrls.push(u);
+            billingAuths.push(new Headers(init?.headers).get('Authorization'));
+            const reqId = new URL(u).searchParams.get('request_id') ?? '';
+            const nano = indexedCosts.get(reqId);
+            return Response.json({
+              billing_events:
+                nano === undefined ? [] : [{ request_id: reqId, cost_estimate_nano_usd: nano }],
+              has_more: false,
+            });
+          }
+          if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
+          return Response.json({ video: { url: 'https://v3b.fal.media/files/b/fixture/out.mp4' } });
+        },
+      }),
+    );
+    try {
+      await engine.initialize();
+      const ws = `fal-default-ws-${randomUUID()}`;
+      await engine.ensureWorkspace(ws, 1_000_000);
+
+      // 1. Default (non-injected) adapter freezes FAL_BILLING_KEY and anchors >24h attempt start time
+      const job1 = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'fal-aged-1',
+        input: {
+          modelId: route.modelId,
+          routeId: route.id,
+          operation: 'text-to-video',
+          input: {
+            prompt: 'Coastal lighthouse.',
+            resolution: '480p',
+            duration: 5,
+            aspectRatio: '16:9',
+          },
+        },
+      });
+      await workUntilJob(engine, ws, job1.id, (j) => j.status === 'running');
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60_000);
+      await engine.pool.query('UPDATE mr_attempts SET started_at=$2 WHERE job_id=$1', [
+        job1.id,
+        threeDaysAgo,
+      ]);
+      indexedCosts.set('fal-default-1', 87_500_000);
+      await workUntilJob(
+        engine,
+        ws,
+        job1.id,
+        (j) => j.status === 'succeeded' && j.settledMicros !== null,
+      );
+      expect(await engine.getJob(ws, job1.id)).toMatchObject({
+        status: 'succeeded',
+        settledMicros: 87_500,
+      });
+      expect(billingAuths[0]).toBe('Key fixture-billing-key');
+      const query1 = new URL(billingUrls[0]!);
+      expect(query1.searchParams.get('request_id')).toBe('fal-default-1');
+      expect(Date.parse(query1.searchParams.get('start')!)).toBe(
+        threeDaysAgo.getTime() - 5 * 60_000,
+      );
+      expect(query1.searchParams.get('end')).toBeTruthy();
+
+      // 2. Crash after captured output before applyProviderResult must NOT fall back to published tariff
+      const job2 = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'fal-crash-2',
+        input: {
+          modelId: route.modelId,
+          routeId: route.id,
+          operation: 'text-to-video',
+          input: {
+            prompt: 'Fog over pine forest.',
+            resolution: '480p',
+            duration: 5,
+            aspectRatio: '16:9',
+          },
+        },
+      });
+      await workUntilJob(engine, ws, job2.id, (j) => j.status === 'running');
+      // Next poll captures outputs into mr_output_receipts, then crashes before applyProviderResult commits.
+      const applySpy = vi
+        .spyOn(engine, 'applyProviderResult')
+        .mockRejectedValueOnce(new Error('Simulated worker crash after captureOutputs.'));
+      await engine.workOnce();
+      applySpy.mockRestore();
+
+      // Job is still 'running' while a durable mr_output_receipts row exists
+      expect((await engine.getJob(ws, job2.id))?.status).toBe('running');
+      expect(
+        (
+          await engine.pool.query(
+            'SELECT count(*)::int AS n FROM mr_output_receipts WHERE job_id=$1',
+            [job2.id],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+
+      // Recovery (reconcileCapturedCompletion + recoverDeliveryOnce) makes output available
+      // while keeping billing_poll_pending=true and settled_micros=null (never list-tariff 125_000!)
+      await workUntilJob(
+        engine,
+        ws,
+        job2.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      const afterRecovery = (
+        await engine.pool.query(
+          'SELECT settled_micros,upstream_cost_micros,billing_poll_pending FROM mr_jobs WHERE id=$1',
+          [job2.id],
+        )
+      ).rows[0];
+      expect(afterRecovery).toEqual({
+        settled_micros: null,
+        upstream_cost_micros: null,
+        billing_poll_pending: true,
+      });
+
+      // Once fal billing-events indexes exact cost (82_000 != tariff 125_000), deferred poll settles it
+      indexedCosts.set('fal-default-2', 82_000_000);
+      await engine.pool.query(
+        "UPDATE mr_jobs SET next_poll_at=clock_timestamp()-interval '1 second' WHERE id=$1",
+        [job2.id],
+      );
+      await workUntilJob(engine, ws, job2.id, (j) => j.settledMicros !== null);
+      expect(
+        (
+          await engine.pool.query(
+            'SELECT settled_micros::text,upstream_cost_micros::text,billing_poll_pending FROM mr_jobs WHERE id=$1',
+            [job2.id],
+          )
+        ).rows[0],
+      ).toEqual({
+        settled_micros: '82000',
+        upstream_cost_micros: '82000',
+        billing_poll_pending: false,
+      });
+    } finally {
       await engine.close();
       await isolated.close();
     }

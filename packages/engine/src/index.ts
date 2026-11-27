@@ -926,6 +926,7 @@ export class Engine {
       jobId: row.id,
       workspaceId: row.workspace_id,
       attempt: row.attempt_count,
+      attemptStartedAt: await this.attemptStartedAt(row),
       providerConnectionId: scope.providerConnectionId,
       input: row.input,
       route: row.route_snapshot,
@@ -992,6 +993,10 @@ export class Engine {
       AND (j.delivery_updated_at IS NULL OR r.updated_at>j.delivery_updated_at)) ORDER BY j.updated_at,j.id LIMIT 1`)
     ).rows[0];
     if (!candidate) return recovered;
+    const deferredBilling =
+      candidate.settled_micros === null && isOpaqueBillingRoute(candidate.route_snapshot)
+        ? await this.attemptDeferredBillingIntent(candidate)
+        : 'disabled';
     await this.transaction(async (client) => {
       await client.query('SELECT id FROM mr_workspaces WHERE id=$1 FOR UPDATE', [
         candidate.workspace_id,
@@ -1058,7 +1063,7 @@ export class Engine {
           client,
           row,
           result.deliveryStatus,
-          row.billing_poll_pending,
+          row.billing_poll_pending || deferredBilling !== 'disabled',
         );
       }
     });
@@ -1116,10 +1121,15 @@ export class Engine {
       ORDER BY j.created_at,j.id LIMIT 1`)
     ).rows[0];
     if (!row) return false;
+    const deferredBilling = await this.attemptDeferredBillingIntent(row);
     await this.applyProviderResult(
       row.workspace_id,
       row.id,
-      { status: 'succeeded', billedCostMicros: null },
+      {
+        status: 'succeeded',
+        billedCostMicros: null,
+        ...(deferredBilling === 'enabled' && row.upstream_id ? { retryAfterMs: 30_000 } : {}),
+      },
       undefined,
       this.resultAttempt(row),
     );
@@ -2813,6 +2823,41 @@ export class Engine {
     });
   }
 
+  private async attemptStartedAt(row: JobRow): Promise<string> {
+    const started = (
+      await this.pool.query<{ started_at: Date }>(
+        'SELECT started_at FROM mr_attempts WHERE job_id=$1 AND number=$2',
+        [row.id, row.attempt_count],
+      )
+    ).rows[0]?.started_at;
+    return (started ?? row.created_at).toISOString();
+  }
+
+  /** Inspect the attempt's frozen adapter/credentials to check whether exact deferred billing polling is configured. */
+  private async attemptDeferredBillingIntent(
+    row: JobRow,
+  ): Promise<'enabled' | 'disabled' | 'unknown'> {
+    if ((row.input.billing ?? 'managed') !== 'managed' || !isOpaqueBillingRoute(row.route_snapshot))
+      return 'disabled';
+    try {
+      const resolved = this.injectedAdapters
+        ? this.adapters
+        : createDefaultAdapters({
+            env: (await this.attemptCredentials.read(this.credentialScope(row))).env,
+            fetch: this.providerFetch,
+            captureOutputs: this.captureProviderOutputs,
+            storeOutput: this.storage ? (input) => this.storage!.putOutput(input) : undefined,
+          });
+      const adapter = resolved.find((value) => value.id === row.route_snapshot.adapter);
+      if (!adapter) return row.route_snapshot.adapter === 'fal' ? 'unknown' : 'disabled';
+      return adapter.supportsDeferredBillingPoll?.(row.route_snapshot, row.deployment_snapshot)
+        ? 'enabled'
+        : 'disabled';
+    } catch {
+      return row.route_snapshot.adapter === 'fal' ? 'unknown' : 'disabled';
+    }
+  }
+
   /**
    * For opaque providers (e.g. Runway, Replicate, MiniMax video, fal without billing key) that
    * do not report per-request USD charges, settle the customer wallet once output delivery is
@@ -3045,6 +3090,12 @@ export class Engine {
           ),
         );
     }
+    const deferredBilling =
+      !terminal.has(existing.status) &&
+      result.status === 'succeeded' &&
+      (result.billedCostMicros === undefined || result.billedCostMicros === null)
+        ? await this.attemptDeferredBillingIntent(existing)
+        : 'disabled';
     return this.transaction(async (client) => {
       await client.query('SELECT id FROM mr_workspaces WHERE id=$1 FOR UPDATE', [workspaceId]);
       const { rows } = await client.query<JobRow>(
@@ -3297,9 +3348,23 @@ export class Engine {
           client,
           row,
           delivery?.deliveryStatus,
-          Boolean(result.retryAfterMs),
+          Boolean(result.retryAfterMs) || deferredBilling !== 'disabled',
         );
       }
+      const needsDeferredBillingPoll = Boolean(
+        isTerminal &&
+        (result.retryAfterMs ||
+          (status === 'succeeded' && deferredBilling === 'enabled' && row.upstream_id)) &&
+        (row.fee_admission
+          ? !feeSettled && row.upstream_id
+          : (result.billedCostMicros === undefined || result.billedCostMicros === null) &&
+            row.input.billing !== 'byok'),
+      );
+      const nextPollDelayMs = result.retryAfterMs
+        ? Math.max(15000, Math.min(3600000, result.retryAfterMs))
+        : needsDeferredBillingPoll
+          ? 30_000
+          : this.pollIntervalMs;
       const updated = await client.query<JobRow>(
         `UPDATE mr_jobs SET status=$2,outputs=$3,error=$4,failure_category=$7,delivery_status=COALESCE($8,delivery_status),delivery_errors=COALESCE($9,delivery_errors),billing_poll_pending=$10,execution_progress=$11,execution_error=$12,execution_timings=COALESCE($13,execution_timings),lease_until=NULL,
          completed_at=CASE WHEN $5 THEN now() ELSE completed_at END,
@@ -3312,20 +3377,11 @@ export class Engine {
           ),
           observationError?.message ?? null,
           isTerminal,
-          result.retryAfterMs
-            ? Math.max(15000, Math.min(3600000, result.retryAfterMs))
-            : this.pollIntervalMs,
+          nextPollDelayMs,
           result.status === 'failed' ? (result.failureCategory ?? 'unknown') : null,
           delivery?.deliveryStatus ?? (isTerminal ? 'failed' : null),
           delivery ? JSON.stringify(delivery.deliveryErrors) : null,
-          Boolean(
-            isTerminal &&
-            result.retryAfterMs &&
-            (row.fee_admission
-              ? !feeSettled && row.upstream_id
-              : (result.billedCostMicros === undefined || result.billedCostMicros === null) &&
-                row.input.billing !== 'byok'),
-          ),
+          needsDeferredBillingPoll,
           JSON.stringify(observationProgress),
           JSON.stringify(observationError),
           observationTimings ? JSON.stringify(observationTimings) : null,
@@ -4063,10 +4119,12 @@ export class Engine {
         const costEvidenceScope = row.fee_admission
           ? await this.generationCostScope(row, this.pool)
           : null;
+        const attemptStartedAt = await this.attemptStartedAt(row);
         this.assertProviderExecutionEnabled();
         const result = await adapter.poll({
           ...context,
           upstreamId: row.upstream_id,
+          attemptStartedAt,
           ...(costEvidenceScope ? { costEvidenceScope } : {}),
         });
         await this.applyProviderResult(row.workspace_id, row.id, result, undefined, {

@@ -22,6 +22,8 @@ export interface AdapterContext {
   jobId: string;
   /** Trusted immutable attempt context supplied by the engine, never generation JSON. */
   attempt?: number;
+  /** Durable ISO-8601 timestamp when the current attempt started, for time-anchored billing lookups. */
+  attemptStartedAt?: string;
   providerConnectionId?: string | null;
   costEvidenceScope?: import('./generation-billing.js').GenerationCostScope;
   /** Stable caller identity for providers that require a privacy-preserving end-user ID. */
@@ -56,6 +58,8 @@ export interface ProviderAdapter {
   /** Canonical argument names this qualified adapter actually honors, including checked fixed values. */
   inputFields?(context: Omit<AdapterContext, 'jobId'>): readonly (keyof GenerationArguments)[];
   isConfigured(route: Route, deployment: Deployment): boolean;
+  /** True when this configured adapter polls an authoritative provider billing API after completion. */
+  supportsDeferredBillingPoll?(route: Route, deployment: Deployment): boolean;
   /** Pure adapter-specific checks shared by quote eligibility and submission; never calls a provider. */
   preflight?(context: Omit<AdapterContext, 'jobId'>): string | null;
   submit(context: AdapterContext): Promise<ProviderSubmission>;
