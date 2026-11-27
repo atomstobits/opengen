@@ -88,8 +88,9 @@ export function HeroMedia({
 
 /**
  * Single-stream 50/50 split comparison background player optimized for LCP and SEO:
- * - Immediate static AVIF/WebP poster rendered in SSR HTML (~25-45 KB LCP, zero CLS)
- * - Single muted AV1 + H.264 split stream mounted only after hydration on capable connections
+ * - Immediate static 1080p AVIF/WebP poster rendered in SSR HTML (fast LCP, zero CLS)
+ * - Single muted 1080p AV1 + H.264 split stream mounted only after hydration and initial poster paint
+ *   on capable connections so video bytes never compete with LCP
  * - Never preloads the full sequence up front; prefetches only the next poster once playing
  * - Auto-pauses when offscreen, tab-hidden, or while the comparison modal is open
  */
@@ -109,12 +110,26 @@ export function HeroSplitMedia({
   onProgress: (percent: number) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const posterImg = useRef<HTMLImageElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const [posterReady, setPosterReady] = useState(false);
   const [readyClipId, setReadyClipId] = useState<string | null>(null);
   const [avifFailedClipId, setAvifFailedClipId] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
   const prefetchedPosters = useRef(new Set<string>());
   const enabled = useHeroVideoAllowed({ skipNarrowMobile: true });
+
+  // Wait for the initial LCP poster to finish loading before mounting/fetching the background video
+  // so high-bitrate video never competes with initial LCP, fonts, or CSS.
+  useEffect(() => {
+    if (posterReady) return;
+    if (posterImg.current?.complete && posterImg.current.naturalWidth > 0) {
+      setPosterReady(true);
+      return;
+    }
+    const fallbackTimer = window.setTimeout(() => setPosterReady(true), 1200);
+    return () => window.clearTimeout(fallbackTimer);
+  }, [posterReady]);
 
   useEffect(() => {
     if (!container.current) return;
@@ -126,7 +141,7 @@ export function HeroSplitMedia({
   }, []);
 
   useEffect(() => {
-    if (!enabled || !video.current) return;
+    if (!enabled || !posterReady || !video.current) return;
     const player = video.current;
 
     const syncPlayback = () => {
@@ -143,7 +158,7 @@ export function HeroSplitMedia({
       document.removeEventListener('visibilitychange', syncPlayback);
       player.pause();
     };
-  }, [enabled, clip.id, isVisible, paused]);
+  }, [enabled, posterReady, clip.id, isVisible, paused]);
 
   const handlePlaying = () => {
     setReadyClipId(clip.id);
@@ -175,16 +190,22 @@ export function HeroSplitMedia({
           <source srcSet={clip.media.heroPosterAvif} type="image/avif" />
         )}
         <img
+          ref={posterImg}
           src={clip.media.heroPosterWebp}
           alt=""
           fetchPriority="high"
           decoding="sync"
+          onLoad={() => setPosterReady(true)}
           onError={() => {
-            if (showAvifSource) setAvifFailedClipId(clip.id);
+            if (showAvifSource) {
+              setAvifFailedClipId(clip.id);
+            } else {
+              setPosterReady(true);
+            }
           }}
         />
       </picture>
-      {enabled && (
+      {enabled && posterReady && (
         <video
           key={clip.id}
           ref={video}
@@ -200,7 +221,7 @@ export function HeroSplitMedia({
           onEnded={loopSingle ? undefined : onEnded}
         >
           {clip.media.heroVideoAv1 && (
-            <source src={clip.media.heroVideoAv1} type='video/mp4; codecs="av01.0.04M.08"' />
+            <source src={clip.media.heroVideoAv1} type='video/mp4; codecs="av01.0.08M.08"' />
           )}
           <source src={clip.media.heroVideoH264} type="video/mp4" />
         </video>

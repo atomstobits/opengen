@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
  * Builds the 3-tier web-optimized OpenGen hero comparison media bundle:
- *   Tier 1: LCP split posters (AVIF + WebP), modal posters, compact input thumbnails
- *   Tier 2: Muted single-stream 50/50 split hero background loops (AV1 + H.264 +faststart, <=10s)
- *   Tier 3: Lazy modal inspection clips (separate left/right 720p H.264 + AAC, full duration)
+ *   Tier 1: LCP split posters (1920x1080 AVIF + WebP from raw frames), modal posters, compact input thumbnails
+ *   Tier 2: Muted single-stream 1920x1080 50/50 split hero background loops (AV1 + H.264 +faststart, <=10s)
+ *   Tier 3: Lazy modal inspection clips (separate left/right up to 1440px H.264 + AAC, full duration)
  *
  * Usage:
  *   node scripts/build-hero-media.mjs \
  *     --input /path/to/kling4-sample \
  *     --out /path/to/hero-media-dist \
- *     --version v1 \
+ *     --version v2 \
  *     --base-url https://media.opengen.dev
  */
 
@@ -36,7 +36,7 @@ function parseArgs(argv) {
   const args = {
     input: '',
     out: '',
-    version: 'v1',
+    version: 'v2',
     baseUrl: 'https://media.opengen.dev',
     cases: null,
     heroMaxSec: 10,
@@ -70,7 +70,7 @@ function parseArgs(argv) {
       args.skipExisting = true;
     } else if (flag === '--help' || flag === '-h') {
       console.log(
-        'Usage: node scripts/build-hero-media.mjs --input <dir> --out <dir> [--version v1] [--base-url https://media.opengen.dev] [--cases case-17,case-26] [--hero-max-sec 10] [--skip-existing]',
+        'Usage: node scripts/build-hero-media.mjs --input <dir> --out <dir> [--version v2] [--base-url https://media.opengen.dev] [--cases case-17,case-26] [--hero-max-sec 10] [--skip-existing]',
       );
       process.exit(0);
     } else {
@@ -175,15 +175,15 @@ function summarizePrompt(caseKey, prompt) {
 }
 
 /**
- * Builds an ffmpeg filtergraph that frames each side into 640x720 (total 1280x720)
+ * Builds an ffmpeg filtergraph that frames each side into 960x1080 (total 1920x1080)
  * using upper-weighted vertical crop for portrait videos so faces stay visible.
  */
 function splitFilterGraph(leftMeta, rightMeta) {
   const paneFilter = (meta, label) => {
     const isPortrait = meta.height > meta.width;
     // Portrait videos crop slightly toward upper third; landscape/4:3 center crop cleanly.
-    const cropY = isPortrait ? '(ih-720)*0.22' : '(ih-720)/2';
-    return `[${label}:v]scale=640:720:force_original_aspect_ratio=increase:flags=lanczos,crop=640:720:(iw-640)/2:${cropY},fps=24,setsar=1[${label}p]`;
+    const cropY = isPortrait ? '(ih-1080)*0.22' : '(ih-1080)/2';
+    return `[${label}:v]scale=960:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=960:1080:(iw-960)/2:${cropY},fps=24,setsar=1[${label}p]`;
   };
   return `${paneFilter(leftMeta, '0')};${paneFilter(rightMeta, '1')};[0p][1p]hstack=inputs=2[v]`;
 }
@@ -256,9 +256,9 @@ function main() {
 
     const filterComplex = splitFilterGraph(leftMeta, rightMeta);
 
-    // Tier 2a: Hero split H.264 (universal fallback, muted, +faststart, VBV-capped for fast streaming)
+    // Tier 2a: Hero split H.264 (universal fallback, muted, +faststart, crisp 1080p VBV-capped streaming)
     if (!args.skipExisting || !existsSync(heroH264)) {
-      console.log(`  [Tier 2] hero-split.h264.mp4 (${heroDurSec}s, 1280x720, muted)...`);
+      console.log(`  [Tier 2] hero-split.h264.mp4 (${heroDurSec}s, 1920x1080, muted)...`);
       run('ffmpeg', [
         '-y',
         '-v',
@@ -279,17 +279,17 @@ function main() {
         '-c:v',
         'libx264',
         '-profile:v',
-        'main',
+        'high',
         '-level',
-        '4.0',
+        '4.1',
         '-pix_fmt',
         'yuv420p',
         '-crf',
-        '28',
+        '22',
         '-maxrate',
-        '1100k',
+        '3600k',
         '-bufsize',
-        '2200k',
+        '7200k',
         '-preset',
         'medium',
         '-g',
@@ -301,9 +301,9 @@ function main() {
       verifyVideoDecode(heroH264);
     }
 
-    // Tier 2b: Hero split AV1 (primary modern stream, muted, +faststart, ultra-compact)
+    // Tier 2b: Hero split AV1 (primary modern stream, muted, +faststart, crisp 1080p)
     if (!args.skipExisting || !existsSync(heroAv1)) {
-      console.log(`  [Tier 2] hero-split.av1.mp4 (${heroDurSec}s, 1280x720, muted, SVT-AV1)...`);
+      console.log(`  [Tier 2] hero-split.av1.mp4 (${heroDurSec}s, 1920x1080, muted, SVT-AV1)...`);
       run('ffmpeg', [
         '-y',
         '-v',
@@ -326,13 +326,13 @@ function main() {
         '-pix_fmt',
         'yuv420p',
         '-crf',
-        '46',
+        '30',
         '-preset',
         '6',
         '-g',
         '48',
         '-svtav1-params',
-        'tune=0:enable-overlays=1:mbr=900',
+        'tune=0:enable-overlays=1:mbr=2800',
         '-movflags',
         '+faststart',
         heroAv1,
@@ -340,7 +340,7 @@ function main() {
       verifyVideoDecode(heroAv1);
     }
 
-    // Tier 1: Static posters extracted from exact first frame (t=0.05s) so video fade-in has zero jump
+    // Tier 1: Static posters extracted directly from raw source first frames (t=0.05s) so LCP is sharp and video fade-in has zero jump
     const tier1Images = [
       heroPosterWebp,
       heroPosterAvif,
@@ -351,7 +351,7 @@ function main() {
     ];
     if (!args.skipExisting || !tier1Images.every(existsSync)) {
       console.log(
-        '  [Tier 1] hero-poster.webp + hero-poster.avif + modal posters + input thumbs...',
+        '  [Tier 1] hero-poster.webp + hero-poster.avif (1920x1080 raw) + modal posters + input thumbs...',
       );
       const tmpHeroPng = join(outCaseDir, '.tmp-hero-poster.png');
       const tmpLeftPng = join(outCaseDir, '.tmp-left-poster.png');
@@ -366,15 +366,23 @@ function main() {
           '-ss',
           '0.05',
           '-i',
-          heroH264,
+          leftRaw,
+          '-ss',
+          '0.05',
+          '-i',
+          rightRaw,
+          '-filter_complex',
+          filterComplex,
+          '-map',
+          '[v]',
           '-frames:v',
           '1',
           tmpHeroPng,
         ]);
         encodeImageVariants(tmpHeroPng, heroPosterWebp, heroPosterAvif, {
           webpQuality: 80,
-          avifMin: 26,
-          avifMax: 40,
+          avifMin: 24,
+          avifMax: 36,
         });
 
         run('ffmpeg', [
@@ -386,12 +394,12 @@ function main() {
           '-i',
           leftRaw,
           '-vf',
-          "scale='min(640,iw)':-2:flags=lanczos",
+          "scale='min(960,iw)':-2:flags=lanczos",
           '-frames:v',
           '1',
           tmpLeftPng,
         ]);
-        encodeImageVariants(tmpLeftPng, leftPosterWebp, null, { webpQuality: 80 });
+        encodeImageVariants(tmpLeftPng, leftPosterWebp, null, { webpQuality: 82 });
 
         run('ffmpeg', [
           '-y',
@@ -402,12 +410,12 @@ function main() {
           '-i',
           rightRaw,
           '-vf',
-          "scale='min(640,iw)':-2:flags=lanczos",
+          "scale='min(960,iw)':-2:flags=lanczos",
           '-frames:v',
           '1',
           tmpRightPng,
         ]);
-        encodeImageVariants(tmpRightPng, rightPosterWebp, null, { webpQuality: 80 });
+        encodeImageVariants(tmpRightPng, rightPosterWebp, null, { webpQuality: 82 });
 
         run('ffmpeg', [
           '-y',
@@ -430,12 +438,12 @@ function main() {
           '-i',
           inputRaw,
           '-vf',
-          "scale='min(640,iw)':-2:flags=lanczos",
+          "scale='min(960,iw)':-2:flags=lanczos",
           '-frames:v',
           '1',
           tmpInputPng,
         ]);
-        encodeImageVariants(tmpInputPng, inputModalWebp, null, { webpQuality: 84 });
+        encodeImageVariants(tmpInputPng, inputModalWebp, null, { webpQuality: 85 });
       } finally {
         for (const tmp of [tmpHeroPng, tmpLeftPng, tmpRightPng, tmpThumbPng, tmpInputPng]) {
           if (existsSync(tmp)) unlinkSync(tmp);
@@ -446,7 +454,7 @@ function main() {
     // Tier 3: Modal inspection clips (separate left/right, full duration, with audio, lazy-loaded on click)
     const encodeModal = (src, dst, label) => {
       if (args.skipExisting && existsSync(dst)) return;
-      console.log(`  [Tier 3] ${label} (full duration, 720p max, H.264 + AAC)...`);
+      console.log(`  [Tier 3] ${label} (full duration, up to 1440px, H.264 + AAC)...`);
       run('ffmpeg', [
         '-y',
         '-v',
@@ -454,27 +462,27 @@ function main() {
         '-i',
         src,
         '-vf',
-        "scale='if(gt(iw,ih),min(960,iw),-2)':'if(gt(iw,ih),-2,min(960,ih))':flags=lanczos,scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "scale='if(gt(iw,ih),min(1440,iw),-2)':'if(gt(iw,ih),-2,min(1440,ih))':flags=lanczos,scale=trunc(iw/2)*2:trunc(ih/2)*2",
         '-c:v',
         'libx264',
         '-profile:v',
-        'main',
+        'high',
         '-level',
-        '4.0',
+        '4.1',
         '-pix_fmt',
         'yuv420p',
         '-crf',
-        '26',
+        '22',
         '-maxrate',
-        '1400k',
-        '-bufsize',
         '2800k',
+        '-bufsize',
+        '5600k',
         '-preset',
         'medium',
         '-c:a',
         'aac',
         '-b:a',
-        '96k',
+        '128k',
         '-ac',
         '2',
         '-movflags',

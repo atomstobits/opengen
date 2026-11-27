@@ -287,7 +287,7 @@ function joinMediaUrl(baseUrl: string, relPath: string): string {
 
 export function getHeroComparisons({
   mediaBaseUrl = process.env.OPENGEN_HERO_MEDIA_BASE_URL,
-  version = process.env.OPENGEN_HERO_MEDIA_VERSION ?? 'v1',
+  version = process.env.OPENGEN_HERO_MEDIA_VERSION ?? 'v2',
   nowDate,
 }: {
   mediaBaseUrl?: string;
@@ -296,7 +296,7 @@ export function getHeroComparisons({
 } = {}): HeroComparisonItem[] {
   const base = validatePublicMediaBaseUrl(mediaBaseUrl);
   if (!base) return [];
-  const cleanVersion = version.replace(/^\/+|\/+$/g, '') || 'v1';
+  const cleanVersion = version.replace(/^\/+|\/+$/g, '') || 'v2';
 
   return BUILTIN_COMPARISON_SEEDS.map((seed) => {
     const prefix = `hero/${cleanVersion}/${seed.id}`;
