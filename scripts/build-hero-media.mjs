@@ -25,12 +25,118 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+const DEFAULT_LEFT_MODEL_ID = 'bytedance/seedance-2.5';
+const DEFAULT_RIGHT_MODEL_ID = 'kling/kling-4.0';
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+
 const DEFAULT_SUMMARIES = {
   'case-17':
     'Hallway to luxury Miami villa match cut from @Image1 — casual sweatshirt to black mini dress and knee-high boots.',
   'case-26':
     'Five street dancers from @Image1 perform synchronized night choreography in front of a warmly lit food stall.',
 };
+
+function modelFileSlug(modelId) {
+  const raw = String(modelId ?? '').trim();
+  const segment = raw.split('/').pop() ?? '';
+  const slug = segment
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!slug || slug === '.' || slug === '..') {
+    throw new Error(`Invalid model ID for output filename: ${modelId}`);
+  }
+  return slug;
+}
+
+function assertSafeFilename(filename, label) {
+  const value = String(filename ?? '').trim();
+  if (
+    !value ||
+    value === '.' ||
+    value === '..' ||
+    value.includes('/') ||
+    value.includes('\\') ||
+    value.includes('\0')
+  ) {
+    throw new Error(`Invalid ${label} filename: ${filename}`);
+  }
+  return value;
+}
+
+function resolveCaseVideoFile(caseDir, candidates, sideLabel, caseKey) {
+  const checked = [];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const safeName = assertSafeFilename(candidate, `${sideLabel} video`);
+    if (checked.includes(safeName)) continue;
+    checked.push(safeName);
+    const fullPath = join(caseDir, safeName);
+    if (existsSync(fullPath)) {
+      return fullPath;
+    }
+  }
+  throw new Error(
+    `Missing required ${sideLabel} video for ${caseKey} (checked: ${checked.join(', ')})`,
+  );
+}
+
+function discoverInputImages(caseDir, spec, caseKey) {
+  const resolved = [];
+  if (Array.isArray(spec.inputs) && spec.inputs.length > 0) {
+    const ordered = [...spec.inputs].sort((a, b) => Number(a?.index ?? 0) - Number(b?.index ?? 0));
+    for (let pos = 0; pos < ordered.length; pos += 1) {
+      const input = ordered[pos];
+      const index = Number.isInteger(input?.index) && input.index > 0 ? input.index : pos + 1;
+      const candidates = [];
+      if (typeof input?.filename === 'string' && input.filename.trim()) {
+        candidates.push(assertSafeFilename(input.filename, `input #${index}`));
+      }
+      for (const ext of IMAGE_EXTENSIONS) {
+        candidates.push(`input-image-${index}.${ext}`);
+      }
+      const match = candidates.find((name) => existsSync(join(caseDir, name)));
+      if (!match) {
+        throw new Error(
+          `Missing required input image #${index} for ${caseKey} (checked: ${candidates.join(', ')})`,
+        );
+      }
+      resolved.push({
+        index,
+        kind: input?.kind ?? null,
+        path: join(caseDir, match),
+      });
+    }
+    return resolved;
+  }
+
+  const discovered = readdirSync(caseDir)
+    .map((name) => {
+      const match = name.match(/^input-image-(\d+)\.(jpe?g|png|webp)$/i);
+      return match ? { index: Number(match[1]), kind: null, path: join(caseDir, name) } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.index - b.index);
+
+  if (!discovered.length) {
+    throw new Error(
+      `Missing required source file for ${caseKey}: ${join(caseDir, 'input-image-1.jpg')}`,
+    );
+  }
+  return discovered;
+}
+
+function resolveInputRole(spec, inputCount) {
+  const firstKind = String(spec.inputs?.[0]?.kind ?? '').toUpperCase();
+  if (inputCount <= 1) {
+    return firstKind === 'FIRST_FRAME' ? 'First frame (@Image1)' : 'Reference (@Image1)';
+  }
+  if (firstKind === 'FIRST_FRAME') {
+    const refs = inputCount - 1;
+    return `First frame + ${refs} ${refs === 1 ? 'reference' : 'references'} (@Image1–@Image${inputCount})`;
+  }
+  return `${inputCount} references (@Image1–@Image${inputCount})`;
+}
 
 function parseArgs(argv) {
   const args = {
@@ -185,7 +291,7 @@ function splitFilterGraph(leftMeta, rightMeta) {
     const cropY = isPortrait ? '(ih-1080)*0.22' : '(ih-1080)/2';
     return `[${label}:v]scale=960:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=960:1080:(iw-960)/2:${cropY},fps=24,setsar=1[${label}p]`;
   };
-  return `${paneFilter(leftMeta, '0')};${paneFilter(rightMeta, '1')};[0p][1p]hstack=inputs=2[v]`;
+  return `${paneFilter(leftMeta, '0')};${paneFilter(rightMeta, '1')};[0p][1p]hstack=inputs=2:shortest=1[v]`;
 }
 
 function formatBytes(bytes) {
@@ -217,42 +323,76 @@ function main() {
   for (const caseKey of caseKeys) {
     const caseDir = join(args.input, caseKey);
     const specPath = join(caseDir, 'spec.json');
-    const leftRaw = join(caseDir, 'seedance-2.5.mp4');
-    const rightRaw = join(caseDir, 'kling-4.0.mp4');
-    const inputRaw = join(caseDir, 'input-image-1.jpg');
-
-    for (const required of [specPath, leftRaw, rightRaw, inputRaw]) {
-      if (!existsSync(required)) {
-        throw new Error(`Missing required source file for ${caseKey}: ${required}`);
-      }
+    if (!existsSync(specPath)) {
+      throw new Error(`Missing required source file for ${caseKey}: ${specPath}`);
     }
 
     const spec = JSON.parse(readFileSync(specPath, 'utf8'));
+    const leftModelId = spec.leftModelId || DEFAULT_LEFT_MODEL_ID;
+    const rightModelId = spec.rightModelId || DEFAULT_RIGHT_MODEL_ID;
+    const leftSlug = modelFileSlug(leftModelId);
+    const rightSlug = modelFileSlug(rightModelId);
+    if (leftSlug === rightSlug) {
+      throw new Error(
+        `Left and right models resolve to the same output filename (${leftSlug}.mp4) for ${caseKey}`,
+      );
+    }
+
+    const modalLeftFilename = `${leftSlug}.mp4`;
+    const modalRightFilename = `${rightSlug}.mp4`;
+    const leftRaw = resolveCaseVideoFile(
+      caseDir,
+      [spec.leftFilename, modalLeftFilename, 'left.mp4'],
+      'left',
+      caseKey,
+    );
+    const rightRaw = resolveCaseVideoFile(
+      caseDir,
+      [spec.rightFilename, modalRightFilename, 'right.mp4'],
+      'right',
+      caseKey,
+    );
+    const inputImages = discoverInputImages(caseDir, spec, caseKey);
+    const inputRaw = inputImages[0].path;
+
     const leftMeta = probe(leftRaw);
     const rightMeta = probe(rightRaw);
-    const heroDurSec = Math.min(
-      args.heroMaxSec,
-      Math.floor(Math.min(leftMeta.durationSec, rightMeta.durationSec)),
-    );
+    const minSourceDurSec = Math.min(leftMeta.durationSec, rightMeta.durationSec);
+    if (!Number.isFinite(minSourceDurSec) || minSourceDurSec < 1) {
+      throw new Error(
+        `Invalid source video duration for ${caseKey}: left=${leftMeta.durationSec}s, right=${rightMeta.durationSec}s`,
+      );
+    }
+    const heroDurSec = Math.max(1, Math.min(args.heroMaxSec, Math.floor(minSourceDurSec + 0.1)));
 
     const outCaseDir = join(outVersionDir, caseKey);
     mkdirSync(outCaseDir, { recursive: true });
     const rel = (filename) => `${versionRelPrefix}/${caseKey}/${filename}`;
 
     console.log(
-      `\n=== Encoding ${caseKey} (raw: ${formatBytes(leftMeta.bytes)} + ${formatBytes(rightMeta.bytes)}, hero loop: ${heroDurSec}s) ===`,
+      `\n=== Encoding ${caseKey} [${leftModelId} vs ${rightModelId}] (raw: ${formatBytes(leftMeta.bytes)} + ${formatBytes(rightMeta.bytes)}, inputs: ${inputImages.length}, hero loop: ${heroDurSec}s) ===`,
     );
 
     const heroAv1 = join(outCaseDir, 'hero-split.av1.mp4');
     const heroH264 = join(outCaseDir, 'hero-split.h264.mp4');
-    const modalLeft = join(outCaseDir, 'seedance-2.5.mp4');
-    const modalRight = join(outCaseDir, 'kling-4.0.mp4');
+    const modalLeft = join(outCaseDir, modalLeftFilename);
+    const modalRight = join(outCaseDir, modalRightFilename);
     const heroPosterWebp = join(outCaseDir, 'hero-poster.webp');
     const heroPosterAvif = join(outCaseDir, 'hero-poster.avif');
     const leftPosterWebp = join(outCaseDir, 'left-poster.webp');
     const rightPosterWebp = join(outCaseDir, 'right-poster.webp');
     const inputThumbWebp = join(outCaseDir, 'input-thumb.webp');
-    const inputModalWebp = join(outCaseDir, 'input.webp');
+    const inputModalSpecs = inputImages.map((img, pos) => {
+      const filename = pos === 0 ? 'input.webp' : `input-${pos + 1}.webp`;
+      return {
+        pos,
+        src: img.path,
+        filename,
+        dst: join(outCaseDir, filename),
+        tmpPng: join(outCaseDir, `.tmp-input-modal-${pos + 1}.png`),
+      };
+    });
+    const inputModalWebp = inputModalSpecs[0].dst;
 
     const filterComplex = splitFilterGraph(leftMeta, rightMeta);
 
@@ -347,17 +487,23 @@ function main() {
       leftPosterWebp,
       rightPosterWebp,
       inputThumbWebp,
-      inputModalWebp,
+      ...inputModalSpecs.map((item) => item.dst),
     ];
     if (!args.skipExisting || !tier1Images.every(existsSync)) {
       console.log(
-        '  [Tier 1] hero-poster.webp + hero-poster.avif (1920x1080 raw) + modal posters + input thumbs...',
+        `  [Tier 1] hero-poster.webp + hero-poster.avif (1920x1080 raw) + modal posters + ${inputModalSpecs.length} input image(s)...`,
       );
       const tmpHeroPng = join(outCaseDir, '.tmp-hero-poster.png');
       const tmpLeftPng = join(outCaseDir, '.tmp-left-poster.png');
       const tmpRightPng = join(outCaseDir, '.tmp-right-poster.png');
       const tmpThumbPng = join(outCaseDir, '.tmp-input-thumb.png');
-      const tmpInputPng = join(outCaseDir, '.tmp-input-modal.png');
+      const tmpFiles = [
+        tmpHeroPng,
+        tmpLeftPng,
+        tmpRightPng,
+        tmpThumbPng,
+        ...inputModalSpecs.map((item) => item.tmpPng),
+      ];
       try {
         run('ffmpeg', [
           '-y',
@@ -431,21 +577,23 @@ function main() {
         ]);
         encodeImageVariants(tmpThumbPng, inputThumbWebp, null, { webpQuality: 78 });
 
-        run('ffmpeg', [
-          '-y',
-          '-v',
-          'error',
-          '-i',
-          inputRaw,
-          '-vf',
-          "scale='min(960,iw)':-2:flags=lanczos",
-          '-frames:v',
-          '1',
-          tmpInputPng,
-        ]);
-        encodeImageVariants(tmpInputPng, inputModalWebp, null, { webpQuality: 85 });
+        for (const item of inputModalSpecs) {
+          run('ffmpeg', [
+            '-y',
+            '-v',
+            'error',
+            '-i',
+            item.src,
+            '-vf',
+            "scale='min(960,iw)':-2:flags=lanczos",
+            '-frames:v',
+            '1',
+            item.tmpPng,
+          ]);
+          encodeImageVariants(item.tmpPng, item.dst, null, { webpQuality: 85 });
+        }
       } finally {
-        for (const tmp of [tmpHeroPng, tmpLeftPng, tmpRightPng, tmpThumbPng, tmpInputPng]) {
+        for (const tmp of tmpFiles) {
           if (existsSync(tmp)) unlinkSync(tmp);
         }
       }
@@ -492,8 +640,8 @@ function main() {
       verifyVideoDecode(dst);
     };
 
-    encodeModal(leftRaw, modalLeft, 'seedance-2.5.mp4');
-    encodeModal(rightRaw, modalRight, 'kling-4.0.mp4');
+    encodeModal(leftRaw, modalLeft, modalLeftFilename);
+    encodeModal(rightRaw, modalRight, modalRightFilename);
 
     const av1Bytes = statSync(heroAv1).size;
     const h264Bytes = statSync(heroH264).size;
@@ -503,9 +651,10 @@ function main() {
     const modalRightBytes = statSync(modalRight).size;
     const thumbBytes = statSync(inputThumbWebp).size;
     const inputBytes = statSync(inputModalWebp).size;
+    const inputImagesBytes = inputModalSpecs.map((item) => statSync(item.dst).size);
 
     console.log(
-      `  Done: poster=${formatBytes(posterAvifBytes || posterWebpBytes)} (webp ${formatBytes(posterWebpBytes)}) | hero AV1=${formatBytes(av1Bytes)}, H.264=${formatBytes(h264Bytes)} | modal L=${formatBytes(modalLeftBytes)}, R=${formatBytes(modalRightBytes)} | thumb=${formatBytes(thumbBytes)}`,
+      `  Done: poster=${formatBytes(posterAvifBytes || posterWebpBytes)} (webp ${formatBytes(posterWebpBytes)}) | hero AV1=${formatBytes(av1Bytes)}, H.264=${formatBytes(h264Bytes)} | modal L=${formatBytes(modalLeftBytes)} (${modalLeftFilename}), R=${formatBytes(modalRightBytes)} (${modalRightFilename}) | thumb=${formatBytes(thumbBytes)} | inputs=${inputModalSpecs.length}`,
     );
 
     items.push({
@@ -516,10 +665,10 @@ function main() {
       heroDurationSec: heroDurSec,
       shortPrompt: summarizePrompt(caseKey, spec.prompt),
       fullPrompt: spec.prompt,
-      inputRole:
-        spec.inputs?.[0]?.kind === 'FIRST_FRAME' ? 'First frame (@Image1)' : 'Reference (@Image1)',
-      leftModelId: 'bytedance/seedance-2.5',
-      rightModelId: 'kling/kling-4.0',
+      inputCount: inputImages.length,
+      inputRole: resolveInputRole(spec, inputImages.length),
+      leftModelId,
+      rightModelId,
       media: {
         heroPosterWebp: rel('hero-poster.webp'),
         ...(existsSync(heroPosterAvif) ? { heroPosterAvif: rel('hero-poster.avif') } : {}),
@@ -527,8 +676,9 @@ function main() {
         heroVideoH264: rel('hero-split.h264.mp4'),
         inputThumbWebp: rel('input-thumb.webp'),
         inputImageWebp: rel('input.webp'),
-        modalLeftVideo: rel('seedance-2.5.mp4'),
-        modalRightVideo: rel('kling-4.0.mp4'),
+        inputImagesWebp: inputModalSpecs.map((item) => rel(item.filename)),
+        modalLeftVideo: rel(modalLeftFilename),
+        modalRightVideo: rel(modalRightFilename),
         modalLeftPoster: rel('left-poster.webp'),
         modalRightPoster: rel('right-poster.webp'),
       },
@@ -539,6 +689,7 @@ function main() {
         heroVideoH264: h264Bytes,
         inputThumbWebp: thumbBytes,
         inputImageWebp: inputBytes,
+        inputImagesWebp: inputImagesBytes,
         modalLeftVideo: modalLeftBytes,
         modalRightVideo: modalRightBytes,
       },

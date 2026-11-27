@@ -13,7 +13,7 @@ test.describe('split comparison homepage hero', () => {
     const modalVideoRequests: string[] = [];
     page.on('request', (req) => {
       const url = req.url();
-      if (url.endsWith('/seedance-2.5.mp4') || url.endsWith('/kling-4.0.mp4')) {
+      if (/\/hero\/[^/]+\/case-\d+\/(?!hero-split\.)[^/]+\.mp4(?:$|\?)/.test(url)) {
         modalVideoRequests.push(url);
       }
     });

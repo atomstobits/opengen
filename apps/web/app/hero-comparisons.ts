@@ -21,6 +21,7 @@ export type HeroComparisonMedia = {
   heroVideoH264: string;
   inputThumbWebp: string;
   inputImageWebp: string;
+  inputImagesWebp: string[];
   modalLeftVideo: string;
   modalRightVideo: string;
   modalLeftPoster: string;
@@ -36,6 +37,7 @@ export type HeroComparisonItem = {
   shortPrompt: string;
   fullPrompt: string;
   inputRole: string;
+  inputCount: number;
   left: HeroModelPricing;
   right: HeroModelPricing;
   media: HeroComparisonMedia;
@@ -63,18 +65,79 @@ const ACTIVE_PROMOTIONS: DocumentedPromotion[] = [
   },
 ];
 
-type ComparisonSeed = {
+export type ComparisonSeed = {
   id: string;
   resolution: '480p' | '720p' | '1080p';
   operation: Operation;
   durationSec: number;
   heroDurationSec: number;
   inputRole: string;
+  inputCount?: number;
   leftModelId: string;
   rightModelId: string;
   shortPrompt: string;
   fullPrompt: string;
 };
+
+/**
+ * Preferred round-robin right-side model order so visitors immediately see
+ * diverse frontier models without back-to-back repeats (starting with Kling 4.0 flagship case-17).
+ */
+export const HERO_RIGHT_MODEL_ROTATION_ORDER = [
+  'kling/kling-4.0',
+  'google/gemini-omni-1.2-flash',
+  'bfl/flux-3-video',
+  'alibaba/wan-3.0',
+  'bytedance/seedance-2.0',
+  'bytedance/seedance-2.5-flash',
+] as const;
+
+export function modelFileSlug(modelId: string): string {
+  const raw = modelId.trim();
+  const segment = raw.split('/').pop() ?? '';
+  const slug = segment
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!slug || slug === '.' || slug === '..') {
+    throw new Error(`Invalid modelId for hero media filename: ${modelId}`);
+  }
+  return slug;
+}
+
+/**
+ * Interleaves comparison clips across distinct right-side models in deterministic round-robin order,
+ * preserving relative order within each model group so the flagship clip stays first.
+ */
+export function interleaveComparisonSeeds<T extends { rightModelId: string }>(
+  seeds: readonly T[],
+  preferredModelOrder: readonly string[] = HERO_RIGHT_MODEL_ROTATION_ORDER,
+): T[] {
+  const buckets = new Map<string, T[]>();
+  for (const seed of seeds) {
+    const queue = buckets.get(seed.rightModelId);
+    if (queue) queue.push(seed);
+    else buckets.set(seed.rightModelId, [seed]);
+  }
+
+  const orderedModels = [
+    ...preferredModelOrder.filter((modelId) => buckets.has(modelId)),
+    ...[...buckets.keys()].filter((modelId) => !preferredModelOrder.includes(modelId)),
+  ];
+
+  const result: T[] = [];
+  let remaining = seeds.length;
+  while (remaining > 0) {
+    for (const modelId of orderedModels) {
+      const queue = buckets.get(modelId);
+      if (queue && queue.length > 0) {
+        result.push(queue.shift()!);
+        remaining -= 1;
+      }
+    }
+  }
+  return result;
+}
 
 const BUILTIN_COMPARISON_SEEDS: ComparisonSeed[] = [
   {
@@ -285,21 +348,32 @@ function joinMediaUrl(baseUrl: string, relPath: string): string {
   return baseUrl === '/' ? `/${cleanRel}` : `${baseUrl}/${cleanRel}`;
 }
 
-export function getHeroComparisons({
-  mediaBaseUrl = process.env.OPENGEN_HERO_MEDIA_BASE_URL,
-  version = process.env.OPENGEN_HERO_MEDIA_VERSION ?? 'v2',
-  nowDate,
-}: {
-  mediaBaseUrl?: string;
-  version?: string;
-  nowDate?: string;
-} = {}): HeroComparisonItem[] {
+export function buildHeroComparisonsFromSeeds(
+  seeds: readonly ComparisonSeed[],
+  {
+    mediaBaseUrl = process.env.OPENGEN_HERO_MEDIA_BASE_URL,
+    version = process.env.OPENGEN_HERO_MEDIA_VERSION ?? 'v2',
+    nowDate,
+    preferredModelOrder = HERO_RIGHT_MODEL_ROTATION_ORDER,
+  }: {
+    mediaBaseUrl?: string;
+    version?: string;
+    nowDate?: string;
+    preferredModelOrder?: readonly string[];
+  } = {},
+): HeroComparisonItem[] {
   const base = validatePublicMediaBaseUrl(mediaBaseUrl);
   if (!base) return [];
   const cleanVersion = version.replace(/^\/+|\/+$/g, '') || 'v2';
 
-  return BUILTIN_COMPARISON_SEEDS.map((seed) => {
+  return interleaveComparisonSeeds(seeds, preferredModelOrder).map((seed) => {
     const prefix = `hero/${cleanVersion}/${seed.id}`;
+    const leftSlug = modelFileSlug(seed.leftModelId);
+    const rightSlug = modelFileSlug(seed.rightModelId);
+    const inputCount = Math.max(1, seed.inputCount ?? 1);
+    const inputImagesWebp = Array.from({ length: inputCount }, (_, index) =>
+      joinMediaUrl(base, `${prefix}/${index === 0 ? 'input.webp' : `input-${index + 1}.webp`}`),
+    );
     return {
       id: seed.id,
       resolution: seed.resolution,
@@ -309,6 +383,7 @@ export function getHeroComparisons({
       shortPrompt: seed.shortPrompt,
       fullPrompt: seed.fullPrompt,
       inputRole: seed.inputRole,
+      inputCount,
       left: resolveHeroModelPricing(seed.leftModelId, seed.resolution, nowDate),
       right: resolveHeroModelPricing(seed.rightModelId, seed.resolution, nowDate),
       media: {
@@ -317,13 +392,30 @@ export function getHeroComparisons({
         heroVideoAv1: joinMediaUrl(base, `${prefix}/hero-split.av1.mp4`),
         heroVideoH264: joinMediaUrl(base, `${prefix}/hero-split.h264.mp4`),
         inputThumbWebp: joinMediaUrl(base, `${prefix}/input-thumb.webp`),
-        inputImageWebp: joinMediaUrl(base, `${prefix}/input.webp`),
-        modalLeftVideo: joinMediaUrl(base, `${prefix}/seedance-2.5.mp4`),
-        modalRightVideo: joinMediaUrl(base, `${prefix}/kling-4.0.mp4`),
+        inputImageWebp: inputImagesWebp[0]!,
+        inputImagesWebp,
+        modalLeftVideo: joinMediaUrl(base, `${prefix}/${leftSlug}.mp4`),
+        modalRightVideo: joinMediaUrl(base, `${prefix}/${rightSlug}.mp4`),
         modalLeftPoster: joinMediaUrl(base, `${prefix}/left-poster.webp`),
         modalRightPoster: joinMediaUrl(base, `${prefix}/right-poster.webp`),
       },
     };
+  });
+}
+
+export function getHeroComparisons({
+  mediaBaseUrl = process.env.OPENGEN_HERO_MEDIA_BASE_URL,
+  version = process.env.OPENGEN_HERO_MEDIA_VERSION ?? 'v2',
+  nowDate,
+}: {
+  mediaBaseUrl?: string;
+  version?: string;
+  nowDate?: string;
+} = {}): HeroComparisonItem[] {
+  return buildHeroComparisonsFromSeeds(BUILTIN_COMPARISON_SEEDS, {
+    mediaBaseUrl,
+    version,
+    nowDate,
   });
 }
 

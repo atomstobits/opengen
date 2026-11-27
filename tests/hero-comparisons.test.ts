@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  buildHeroComparisonsFromSeeds,
   getHeroComparisons,
   getHeroComparisonsSafe,
+  HERO_RIGHT_MODEL_ROTATION_ORDER,
+  interleaveComparisonSeeds,
+  modelFileSlug,
   resolveHeroModelPricing,
   validatePublicMediaBaseUrl,
+  type ComparisonSeed,
 } from '../apps/web/app/hero-comparisons';
 
 afterEach(() => {
@@ -140,5 +145,156 @@ describe('hero comparison pricing and media configuration', () => {
       [],
     );
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('derives clean modal video filenames from any canonical model ID', () => {
+    expect(modelFileSlug('bytedance/seedance-2.5')).toBe('seedance-2.5');
+    expect(modelFileSlug('kling/kling-4.0')).toBe('kling-4.0');
+    expect(modelFileSlug('bfl/flux-3-video')).toBe('flux-3-video');
+    expect(modelFileSlug('google/gemini-omni-1.2-flash')).toBe('gemini-omni-1.2-flash');
+    expect(modelFileSlug('bytedance/seedance-2.0')).toBe('seedance-2.0');
+    expect(modelFileSlug('bytedance/seedance-2.5-flash')).toBe('seedance-2.5-flash');
+    expect(modelFileSlug('alibaba/wan-3.0')).toBe('wan-3.0');
+    expect(() => modelFileSlug('   ')).toThrow('Invalid modelId');
+    expect(() => modelFileSlug('vendor/..')).toThrow('Invalid modelId');
+  });
+
+  it('interleaves diverse comparison models without back-to-back repeats and builds dynamic multi-ref media URLs', () => {
+    const makeSeed = (
+      id: string,
+      rightModelId: string,
+      resolution: '720p' | '1080p',
+      inputCount = 1,
+    ): ComparisonSeed => ({
+      id,
+      resolution,
+      operation: inputCount > 1 ? 'reference-to-video' : 'image-to-video',
+      durationSec: 15,
+      heroDurationSec: 10,
+      inputRole:
+        inputCount > 1
+          ? `${inputCount} references (@Image1–@Image${inputCount})`
+          : 'First frame (@Image1)',
+      inputCount,
+      leftModelId: 'bytedance/seedance-2.5',
+      rightModelId,
+      shortPrompt: `Short prompt for ${id}`,
+      fullPrompt: `Full prompt for ${id}`,
+    });
+
+    const rawSeeds: ComparisonSeed[] = [
+      makeSeed('case-17', 'kling/kling-4.0', '1080p', 1),
+      makeSeed('case-26', 'kling/kling-4.0', '720p', 1),
+      makeSeed('case-10', 'bfl/flux-3-video', '720p', 1),
+      makeSeed('case-01', 'bfl/flux-3-video', '720p', 1),
+      makeSeed('case-23', 'google/gemini-omni-1.2-flash', '1080p', 1),
+      makeSeed('case-24', 'google/gemini-omni-1.2-flash', '1080p', 5),
+      makeSeed('case-20', 'bytedance/seedance-2.0', '1080p', 2),
+      makeSeed('case-05', 'bytedance/seedance-2.0', '720p', 1),
+      makeSeed('case-27', 'bytedance/seedance-2.5-flash', '720p', 1),
+      makeSeed('case-34', 'bytedance/seedance-2.5-flash', '720p', 1),
+      makeSeed('case-18', 'alibaba/wan-3.0', '1080p', 4),
+      makeSeed('case-22', 'alibaba/wan-3.0', '1080p', 2),
+    ];
+
+    const interleaved = interleaveComparisonSeeds(rawSeeds);
+    expect(interleaved.map((s) => s.id)).toEqual([
+      'case-17',
+      'case-23',
+      'case-10',
+      'case-18',
+      'case-20',
+      'case-27',
+      'case-26',
+      'case-24',
+      'case-01',
+      'case-22',
+      'case-05',
+      'case-34',
+    ]);
+    expect(interleaved.slice(0, 6).map((s) => s.rightModelId)).toEqual([
+      ...HERO_RIGHT_MODEL_ROTATION_ORDER,
+    ]);
+    for (let i = 0; i < interleaved.length; i += 1) {
+      const next = interleaved[(i + 1) % interleaved.length]!;
+      expect(interleaved[i]!.rightModelId).not.toBe(next.rightModelId);
+    }
+
+    const clips = buildHeroComparisonsFromSeeds(rawSeeds, {
+      mediaBaseUrl: 'https://media.opengen.dev',
+      version: 'v3',
+      nowDate: '2026-11-26',
+    });
+    expect(clips).toHaveLength(12);
+    expect(clips[0]?.id).toBe('case-17');
+    expect(clips[0]?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v3/case-17/kling-4.0.mp4',
+    );
+    expect(clips[1]?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v3/case-23/gemini-omni-1.2-flash.mp4',
+    );
+    expect(clips[2]?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v3/case-10/flux-3-video.mp4',
+    );
+    expect(clips[3]?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v3/case-18/wan-3.0.mp4',
+    );
+    expect(clips[4]?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v3/case-20/seedance-2.0.mp4',
+    );
+    expect(clips[5]?.media.modalRightVideo).toBe(
+      'https://media.opengen.dev/hero/v3/case-27/seedance-2.5-flash.mp4',
+    );
+
+    const multiRef = clips.find((c) => c.id === 'case-24');
+    expect(multiRef?.inputCount).toBe(5);
+    expect(multiRef?.media.inputImageWebp).toBe(
+      'https://media.opengen.dev/hero/v3/case-24/input.webp',
+    );
+    expect(multiRef?.media.inputImagesWebp).toEqual([
+      'https://media.opengen.dev/hero/v3/case-24/input.webp',
+      'https://media.opengen.dev/hero/v3/case-24/input-2.webp',
+      'https://media.opengen.dev/hero/v3/case-24/input-3.webp',
+      'https://media.opengen.dev/hero/v3/case-24/input-4.webp',
+      'https://media.opengen.dev/hero/v3/case-24/input-5.webp',
+    ]);
+  });
+
+  it('resolves honest catalog pricing across diverse frontier right-side models', () => {
+    const flux720 = resolveHeroModelPricing('bfl/flux-3-video', '720p', '2026-11-26');
+    expect(flux720.modelName).toBe('FLUX 3 Video');
+    expect(flux720.seriesHref).toBe('/bfl/flux-3-video');
+    expect(flux720.providerName).toBe('Black Forest Labs');
+    expect(flux720.priceLabel).toBe('$0.150/s');
+    expect(flux720.comparePriceLabel).toBe('$0.170/s');
+    expect(flux720.discountLabel).toBe('-12%');
+
+    const gemini1080 = resolveHeroModelPricing(
+      'google/gemini-omni-1.2-flash',
+      '1080p',
+      '2026-11-26',
+    );
+    expect(gemini1080.modelName).toBe('Gemini Omni 1.2 Flash');
+    expect(gemini1080.seriesHref).toBe('/google/gemini-omni-1.2-flash');
+    expect(gemini1080.providerName).toBe('Runway');
+    expect(gemini1080.priceLabel).toBe('$0.100/s');
+    expect(gemini1080.comparePriceLabel).toBe('≈$0.123/s');
+    expect(gemini1080.discountLabel).toBe('-19%');
+
+    const wan1080 = resolveHeroModelPricing('alibaba/wan-3.0', '1080p', '2026-11-26');
+    expect(wan1080.modelName).toBe('Wan 3.0');
+    expect(wan1080.seriesHref).toBe('/alibaba/wan-3.0');
+    expect(wan1080.providerName).toBe('Pika');
+    expect(wan1080.priceLabel).toBe('$0.130/s');
+    expect(wan1080.comparePriceLabel).toBe('$0.200/s');
+    expect(wan1080.discountLabel).toBe('-35%');
+
+    const s20_1080 = resolveHeroModelPricing('bytedance/seedance-2.0', '1080p', '2026-11-26');
+    expect(s20_1080.modelName).toBe('Seedance 2.0');
+    expect(s20_1080.seriesHref).toBe('/bytedance/seedance-2.0');
+    expect(s20_1080.providerName).toBe('BytePlus');
+    expect(s20_1080.priceLabel).toBe('≈$0.370/s');
+    expect(s20_1080.comparePriceLabel).toBe('≈$0.682/s');
+    expect(s20_1080.discountLabel).toBe('-46%');
   });
 });
