@@ -8,6 +8,7 @@ Keep public hero media in a dedicated public bucket separate from private custom
 
 - `OPENGEN_HERO_MEDIA_BASE_URL` — public origin/base URL (e.g. `https://media.opengen.dev`) or repo-owned root-relative path.
 - `OPENGEN_HERO_MEDIA_VERSION` — immutable version segment under `/hero/<version>/...` (default `v3`).
+- `OPENGEN_HERO_CLIP_ORDER` — optional comma-separated list of case IDs (e.g. `case-26,case-23,case-13,case-18,case-07,case-27,case-17,case-03,case-01,case-22,case-05,case-34`). When set, plays **only** the listed valid clips in that exact order (acting as both sequence and allowlist without code changes or R2 re-uploads); blank uses the default 12-clip interleaved sequence (`case-26` first, `case-17` seventh).
 
 Each comparison clip uses three renditions built by `scripts/build-hero-media.mjs` and published via `scripts/publish-hero-r2.mjs`:
 

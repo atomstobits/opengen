@@ -32,11 +32,11 @@ test.describe('split comparison homepage hero', () => {
     const leftBadge = hero.getByTestId('hero-badge-left');
     const rightBadge = hero.getByTestId('hero-badge-right');
     await expect(leftBadge).toContainText('Seedance 2.5');
-    await expect(leftBadge).toContainText('1080p');
+    await expect(leftBadge).toContainText('720p');
     await expect(leftBadge).toContainText(/\$\d+\.\d{3}\/s/);
     await expect(leftBadge).toHaveAttribute('href', '/bytedance/seedance-2.5');
     await expect(rightBadge).toContainText('Kling 4.0');
-    await expect(rightBadge).toContainText('1080p');
+    await expect(rightBadge).toContainText('720p');
     await expect(rightBadge).toContainText(/\$\d+\.\d{3}\/s/);
     await expect(rightBadge).toHaveAttribute('href', '/kling/kling-4.0');
 
@@ -66,15 +66,17 @@ test.describe('split comparison homepage hero', () => {
     await dock.getByRole('button', { name: 'Generate', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Shared Input' });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByTestId('hero-modal-bar-left')).toContainText('1080p');
-    await expect(dialog.getByTestId('hero-modal-bar-right')).toContainText('1080p');
+    await expect(dialog.getByTestId('hero-modal-bar-left')).toContainText('720p');
+    await expect(dialog.getByTestId('hero-modal-bar-right')).toContainText('720p');
     await expect(dialog.locator('video')).toHaveCount(2);
     await expect(dialog.getByRole('button', { name: 'Audio: Muted' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Copy prompt' })).toBeVisible();
     const inputImg = dialog.locator('.hero-modal-input-grid img');
     await expect(inputImg).toBeVisible();
     await expect
-      .poll(() => inputImg.evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .poll(() => inputImg.evaluate((img: HTMLImageElement) => img.naturalWidth), {
+        timeout: 15_000,
+      })
       .toBeGreaterThan(0);
     await expect(dialog.getByRole('link', { name: 'CLI setup' })).toHaveAttribute(
       'href',
@@ -86,7 +88,7 @@ test.describe('split comparison homepage hero', () => {
     );
     await expect(dialog.getByRole('link', { name: 'Continue in browser' })).toHaveAttribute(
       'href',
-      '/playground?model=bytedance%2Fseedance-2.5&operation=reference-to-video',
+      '/playground?model=bytedance%2Fseedance-2.5&operation=image-to-video',
     );
 
     // Cycle audio and close cleanly via Escape.
@@ -163,6 +165,11 @@ test.describe('split comparison homepage hero', () => {
       'href',
       '/bytedance/seedance-2.5?variant=bytedance%2Fseedance-2.5-flash',
     );
+
+    // Advance clip 5 (Seedance 2.5 Flash) -> clip 6 (slot #7: case-17 Kling 4.0 1080p)
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Kling 4.0');
+    await expect(rightBadge).toContainText('1080p');
   });
 
   test.describe('phone viewport', () => {
