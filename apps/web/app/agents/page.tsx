@@ -1,6 +1,6 @@
 import { pageMetadata } from '../seo';
 import { Footer, SiteHeader } from '../ui';
-import { AGENT_REVIEW_DATE, agentClients } from './clients';
+import { AGENT_EVIDENCE_DATE, AGENT_REVIEW_DATE, agentClients } from './clients';
 import styles from './setup.module.css';
 
 export const metadata = pageMetadata({
@@ -130,7 +130,7 @@ export default function AgentsPage() {
           </p>
           <div className={styles.tableWrap}>
             <table className={styles.matrix}>
-              <caption>OpenGen client support evidence as of {AGENT_REVIEW_DATE}</caption>
+              <caption>OpenGen client support evidence as of {AGENT_EVIDENCE_DATE}</caption>
               <thead>
                 <tr>
                   <th scope="col">Client</th>

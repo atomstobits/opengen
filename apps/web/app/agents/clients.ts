@@ -1,5 +1,7 @@
 /** Primary documentation reviewed 2026-11-03. Documentation is not an interoperability test. */
 export const AGENT_REVIEW_DATE = '2026-11-03';
+/** Latest live client interoperability evidence recorded on /agents. */
+export const AGENT_EVIDENCE_DATE = '2026-11-27';
 export type AgentClient = {
   slug: string;
   name: string;

@@ -212,16 +212,6 @@ describe('portable private OpenGen CLI package', () => {
             error: { code: 'unauthorized', message: 'Sign in to diagnose access.' },
           }),
         );
-      } else if (request.method === 'GET' && path === '/v1/jobs/job_wait_base_url') {
-        response.end(
-          JSON.stringify({
-            id: 'job_wait_base_url',
-            status: 'queued',
-            reservedMicros: 0,
-            settledMicros: null,
-            deliveryStatus: 'pending',
-          }),
-        );
       } else {
         fixtureErrors.push(`${request.method} ${path}`);
         response.statusCode = 500;
@@ -412,48 +402,78 @@ describe('portable private OpenGen CLI package', () => {
   it('honors OPENGEN_API_URL in bundled recovery errors and defaults to https://opengen.dev', async () => {
     const code = await readFile(executable, 'utf8');
     expect(code).not.toContain('http://127.0.0.1:4310');
-    const envWithCanonicalUrl: NodeJS.ProcessEnv = {
-      ...environment(),
-      OPENGEN_API_URL: baseUrl,
-    };
-    delete envWithCanonicalUrl.MEDIA_ROUTER_URL;
-    const waitResult = await new Promise<{ stderr: string; code: number }>(
-      (resolveResult, reject) => {
-        const child = execFile(
-          process.execPath,
-          [
-            '--disallow-code-generation-from-strings',
-            executable,
-            'job',
-            'wait',
-            'job_wait_base_url',
-            '--timeout-ms',
-            '40',
-            '--poll-interval-ms',
-            '10',
-          ],
-          { cwd, env: envWithCanonicalUrl, timeout: 15000 },
+    const waitServer = createServer((request, response) => {
+      response.setHeader('content-type', 'application/json');
+      if (request.method === 'GET' && request.url === '/v1/generations/job_wait_base_url') {
+        response.end(
+          JSON.stringify({
+            id: 'job_wait_base_url',
+            status: 'queued',
+            reservedMicros: 0,
+            settledMicros: null,
+            deliveryStatus: 'pending',
+          }),
         );
-        let stderr = '';
-        child.stderr!.setEncoding('utf8').on('data', (chunk) => {
-          stderr += chunk;
-        });
-        child.once('error', reject);
-        child.once('close', (code) => resolveResult({ stderr, code: code ?? -1 }));
-      },
-    );
-    expect(waitResult.code).toBe(1);
-    expect(JSON.parse(waitResult.stderr)).toMatchObject({
-      error: {
-        code: 'wait_timeout',
-        jobId: 'job_wait_base_url',
-        resume: {
-          environment: {
-            OPENGEN_API_URL: baseUrl,
+      } else {
+        response.statusCode = 404;
+        response.end(JSON.stringify({ error: { code: 'not_found', message: 'Not found.' } }));
+      }
+    });
+    await new Promise<void>((resolveListen, reject) => {
+      waitServer.once('error', reject);
+      waitServer.listen(0, '127.0.0.1', resolveListen);
+    });
+    try {
+      const addr = waitServer.address();
+      if (!addr || typeof addr === 'string') throw new Error('Wait fixture server did not bind.');
+      const waitBaseUrl = `http://127.0.0.1:${addr.port}`;
+      const envWithCanonicalUrl: NodeJS.ProcessEnv = {
+        ...environment(),
+        OPENGEN_API_URL: waitBaseUrl,
+      };
+      delete envWithCanonicalUrl.MEDIA_ROUTER_URL;
+      const waitResult = await new Promise<{ stderr: string; code: number }>(
+        (resolveResult, reject) => {
+          const child = execFile(
+            process.execPath,
+            [
+              '--disallow-code-generation-from-strings',
+              executable,
+              'job',
+              'wait',
+              'job_wait_base_url',
+              '--timeout-ms',
+              '40',
+              '--poll-interval-ms',
+              '10',
+            ],
+            { cwd, env: envWithCanonicalUrl, timeout: 15000 },
+          );
+          let stderr = '';
+          child.stderr!.setEncoding('utf8').on('data', (chunk) => {
+            stderr += chunk;
+          });
+          child.once('error', reject);
+          child.once('close', (code) => resolveResult({ stderr, code: code ?? -1 }));
+        },
+      );
+      expect(waitResult.code).toBe(1);
+      expect(JSON.parse(waitResult.stderr)).toMatchObject({
+        error: {
+          code: 'wait_timeout',
+          jobId: 'job_wait_base_url',
+          resume: {
+            environment: {
+              OPENGEN_API_URL: waitBaseUrl,
+            },
           },
         },
-      },
-    });
+      });
+    } finally {
+      await new Promise<void>((resolveClose, reject) =>
+        waitServer.close((error) => (error ? reject(error) : resolveClose())),
+      );
+    }
   });
 
   it('packs exactly the allowed regular files and supplies verifiable SHA-256 evidence', async () => {
