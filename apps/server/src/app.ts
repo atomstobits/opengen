@@ -134,6 +134,9 @@ export interface AppOptions {
   publicUrl?: string;
   env?: NodeJS.ProcessEnv;
   resolvePublicEndpoint?: import('@media-router/engine').PublicResolver;
+  githubFetch?: typeof fetch;
+  emailOtpTransport?: import('./email-otp.js').EmailOtpTransport;
+  emailOtpStore?: import('./email-otp.js').EmailOtpStore;
 }
 export async function buildApp(options: AppOptions = {}) {
   const publicUrl = new URL(

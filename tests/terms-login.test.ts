@@ -646,4 +646,107 @@ describe('human Terms notice and verified login receipt', () => {
     expect(f.refresh).toHaveBeenCalledOnce();
     expect(f.record).not.toHaveBeenCalled();
   });
+
+  it.each([
+    '/playground?model=openai%2Fgpt-image-2&operation=text-to-image',
+    '/billing',
+    '/app#activity',
+    '/agents/claude-code',
+    '/models',
+    '/start',
+  ])(
+    'binds validated same-origin returnTo %s across the signed OIDC transaction',
+    async (target) => {
+      const f = await fixture(true);
+      const start = await f.app.inject({
+        url: `/auth/login?returnTo=${encodeURIComponent(target)}`,
+      });
+      expect(start.statusCode).toBe(200);
+      expect(start.body).toContain('Effective November 1, 2026');
+      expect(start.body).toContain('<details><summary>Policy fingerprint</summary>');
+      expect(start.body).not.toMatch(/\sstyle=/i);
+      const fields = noticeForm(start.body);
+      const startCookies = cookieParts(start.headers);
+      const continued = await f.app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        headers: {
+          origin,
+          cookie: cookieJar(startCookies),
+          'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+        payload: fields.toString(),
+      });
+      expect(continued.statusCode).toBe(200);
+      const cb = await f.callback(
+        cookieJar(startCookies, cookieParts(continued.headers)),
+        '&returnTo=/billing-tampered',
+      );
+      expect(cb.statusCode).toBe(302);
+      expect(cb.headers.location).toBe(new URL(target, origin).href);
+      expect(f.record).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('keeps pending MCP consent priority ahead of a safe returnTo', async () => {
+    const f = await fixture(true);
+    const start = await f.app.inject({
+      url: `/auth/login?returnTo=${encodeURIComponent('/billing')}`,
+      headers: { cookie: `og_mcp_consent=${pendingId}` },
+    });
+    expect(start.statusCode).toBe(200);
+    const fields = noticeForm(start.body);
+    const startCookie = cookieJar([`og_mcp_consent=${pendingId}`], cookieParts(start.headers));
+    const continued = await f.app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: {
+        origin,
+        cookie: startCookie,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: fields.toString(),
+    });
+    expect(continued.statusCode).toBe(200);
+    const cb = await f.callback(cookieJar(startCookie.split('; '), cookieParts(continued.headers)));
+    expect(cb.statusCode).toBe(302);
+    expect(cb.headers.location).toBe(`${origin}/oauth/consent?request=${pendingId}`);
+  });
+
+  it.each([
+    '//attacker.fixture.invalid/path',
+    'https://attacker.fixture.invalid/billing',
+    'javascript:alert(1)',
+    '/\\attacker.fixture.invalid',
+    '/api/session',
+    '/API/session',
+    '/auth/callback',
+    '/oauth/consent?request=abc',
+    '/v1/keys',
+    '/mcp',
+    '/webhooks/stripe',
+    '/playground/../api/session',
+    '/playground/%2fapi',
+    '/playground?q=has space',
+    '/' + 'a'.repeat(513),
+  ])('rejects unsafe returnTo %s before presenting a notice', async (unsafe) => {
+    const f = await fixture(true);
+    const response = await f.app.inject({
+      url: `/auth/login?returnTo=${encodeURIComponent(unsafe)}`,
+    });
+    expect(response.statusCode).toBe(401);
+    expect(oidc.buildAuthorizationUrl).not.toHaveBeenCalled();
+    expect(f.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate returnTo or unknown query parameters on GET /auth/login', async () => {
+    const f = await fixture(true);
+    for (const url of [
+      '/auth/login?returnTo=/models&returnTo=/billing',
+      '/auth/login?next=/models',
+      '/auth/login?returnTo=/models&extra=1',
+    ]) {
+      expect((await f.app.inject({ url })).statusCode).toBe(401);
+    }
+  });
 });

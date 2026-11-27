@@ -4,6 +4,80 @@ import { useEffect, useRef, useState } from 'react';
 import { useLegalPresentation } from './legal/presentation';
 import styles from './onboarding/onboarding.module.css';
 
+const MAX_RETURN_TO_LENGTH = 512;
+const BLOCKED_RETURN_TO_PREFIX = /^\/(?:api|auth|oauth|webhooks|v1|mcp|\.well-known)(?:\/|$)/i;
+
+/**
+ * Validates a same-origin relative return path for sign-in links.
+ * Strictly rejects external URLs, protocol-relative paths, traversal, and internal API/auth routes.
+ */
+export function safeReturnToPath(candidate: string | null | undefined): string | null {
+  if (
+    typeof candidate !== 'string' ||
+    candidate.length === 0 ||
+    candidate.length > MAX_RETURN_TO_LENGTH
+  )
+    return null;
+  if (/[\u0000-\u001f\u007f\s\\]/.test(candidate)) return null;
+  if (!candidate.startsWith('/') || candidate.startsWith('//')) return null;
+  const rawPathname = candidate.split(/[?#]/)[0]!;
+  if (/%(?:2f|5c|00|2e)/i.test(rawPathname)) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate, 'https://opengen.invalid');
+  } catch {
+    return null;
+  }
+  if (
+    parsed.origin !== 'https://opengen.invalid' ||
+    parsed.username ||
+    parsed.password ||
+    parsed.pathname !== rawPathname
+  )
+    return null;
+  if (BLOCKED_RETURN_TO_PREFIX.test(parsed.pathname)) return null;
+  const normalized = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  return normalized.length <= MAX_RETURN_TO_LENGTH ? normalized : null;
+}
+
+/**
+ * Builds a sign-in href preserving a safe same-origin `returnTo` query parameter when appropriate.
+ * Leaves non-default login URLs (e.g. `/oauth/login?request=...`) untouched, and avoids echoing
+ * `/` or `/start` when auto-deriving from the current browser URL so sign-in lands on `/app#start`.
+ */
+export function buildLoginHref(options?: {
+  loginUrl?: string;
+  returnTo?: string | null;
+  currentLocation?: string | null;
+}): string {
+  const base = options?.loginUrl ?? '/auth/login';
+  if (base !== '/auth/login') return base;
+  let candidate: string | null = null;
+  if (options?.returnTo !== undefined) {
+    candidate = safeReturnToPath(options.returnTo);
+  } else {
+    const raw =
+      options?.currentLocation !== undefined
+        ? options.currentLocation
+        : typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+          : null;
+    const safe = safeReturnToPath(raw);
+    if (safe) {
+      const pathname = safe.split(/[?#]/)[0]!;
+      if (pathname !== '/' && pathname !== '/start') candidate = safe;
+    }
+  }
+  return candidate ? `/auth/login?returnTo=${encodeURIComponent(candidate)}` : '/auth/login';
+}
+
+export type AuthProviders = {
+  oidc: boolean;
+  oidcLabel?: string;
+  github: boolean;
+  emailOtp: boolean;
+};
+
 export type BrowserSession = {
   /** Opaque server namespace binding the current identity, workspace and authority. */
   recoveryScope?: string;
@@ -15,6 +89,7 @@ export type BrowserSession = {
   workspaceId?: string;
   scopes?: string[];
   oidcEnabled?: boolean;
+  authProviders?: AuthProviders;
   canSwitchWorkspace?: boolean;
   isOperator?: boolean;
   role?: 'admin' | 'member';
@@ -52,20 +127,29 @@ const sessionIdentity = (session: BrowserSession | null) =>
     session.isOperator,
     session.canSwitchWorkspace,
     session.oidcEnabled,
+    session.authProviders?.oidc ?? null,
+    session.authProviders?.oidcLabel ?? null,
+    session.authProviders?.github ?? null,
+    session.authProviders?.emailOtp ?? null,
   ]);
 
-/** Customer sign-in reuses configured OIDC and opaque HttpOnly sessions. */
+/** Customer sign-in reuses configured identity providers and opaque HttpOnly sessions. */
 export function GatewayAccess({
   onChange,
   onSession,
   loginUrl = '/auth/login',
+  returnTo,
 }: {
   onChange: (authenticated: boolean) => void;
   onSession?: (session: BrowserSession) => void;
   loginUrl?: string;
+  returnTo?: string;
 }) {
   const legal = useLegalPresentation();
   const [session, setSession] = useState<BrowserSession | null>(null);
+  const [resolvedLoginUrl, setResolvedLoginUrl] = useState(() =>
+    returnTo !== undefined ? buildLoginHref({ loginUrl, returnTo }) : loginUrl,
+  );
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -80,6 +164,18 @@ export function GatewayAccess({
   const callbacks = useRef({ onChange, onSession });
   callbacks.current = { onChange, onSession };
   const refreshAuthority = useRef<(preserveError?: boolean) => void>(() => {});
+
+  useEffect(() => {
+    const syncHref = () => setResolvedLoginUrl(buildLoginHref({ loginUrl, returnTo }));
+    syncHref();
+    window.addEventListener('hashchange', syncHref);
+    window.addEventListener('popstate', syncHref);
+    return () => {
+      window.removeEventListener('hashchange', syncHref);
+      window.removeEventListener('popstate', syncHref);
+    };
+  }, [loginUrl, returnTo]);
+
   function publishSession(current: BrowserSession) {
     const previous = verifiedSession.current;
     const verified = sessionIdentity(previous) === sessionIdentity(current) ? previous! : current;
@@ -216,6 +312,21 @@ export function GatewayAccess({
       }
     }
   }
+
+  const providers = session?.authProviders;
+  const signInAvailable = Boolean(
+    session?.oidcEnabled || providers?.oidc || providers?.github || providers?.emailOtp,
+  );
+  const providerLabels: string[] = [];
+  if (providers?.oidc) providerLabels.push(providers.oidcLabel || 'Single sign-on');
+  if (providers?.github) providerLabels.push('GitHub');
+  if (providers?.emailOtp) providerLabels.push('Email code');
+  const showProviderSummary =
+    providerLabels.length > 1 ||
+    Boolean(providers?.oidcLabel) ||
+    Boolean(providers?.github) ||
+    Boolean(providers?.emailOtp);
+
   return (
     <section className={`${styles.access} gateway-access`} aria-label="OpenGen account">
       {session?.authenticated ? (
@@ -258,23 +369,26 @@ export function GatewayAccess({
             )}
           </p>
           {!session && !error && <p role="status">Checking available sign-in…</p>}
-          {session?.oidcEnabled && (
+          {signInAvailable && (
             <>
               <div className={styles.actions}>
-                <a className={styles.primary} href={loginUrl}>
+                <a className={styles.primary} href={resolvedLoginUrl}>
                   Sign in or create account
                 </a>
                 <a className={styles.quiet} href="/agents">
                   Explore agent setup ↗
                 </a>
               </div>
+              {showProviderSummary && (
+                <p className="auth-providers-summary">Sign in with {providerLabels.join(' · ')}.</p>
+              )}
               <p>
                 First sign-in creates your account and a personal workspace. Your workspace starts
                 with $0 credit.
               </p>
             </>
           )}
-          {session && !session.oidcEnabled && (
+          {session && !signInAvailable && (
             <p role="status">
               Account sign-in is not configured on this installation yet. You can explore models and
               agent guides now. Contact your installation operator for account access.

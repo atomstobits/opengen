@@ -441,3 +441,48 @@ test('signed-in session without read scope never fabricates zero credit or calls
   await expect(balancePill).not.toContainText('$0.00');
   expect(balanceCalls).toBe(0);
 });
+
+test('formats fractional balances compactly without rounding tiny positive credit down to zero', async ({
+  page,
+}) => {
+  let availableMicros = 94_257_920;
+  let reservedMicros = 0;
+
+  await page.route('**/api/session', (route) =>
+    route.fulfill({ json: buildSession({ authenticated: true, workspaceId: 'studio-a' }) }),
+  );
+  await page.route('**/api/balance', (route) =>
+    route.fulfill({ json: { availableMicros, reservedMicros } }),
+  );
+
+  await page.goto('/models');
+  const balancePill = page.getByTestId('header-balance');
+  await expect(balancePill).toHaveText('$94.26');
+
+  availableMicros = 5_970;
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('opengen:balance-changed')));
+  await expect(balancePill).toHaveText('$0.006');
+
+  availableMicros = 50;
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('opengen:balance-changed')));
+  await expect(balancePill).toHaveText('<$0.0001');
+  await expect(balancePill).not.toHaveClass(/header-balance-zero/);
+});
+
+test('consolidates /start to /app#start once authenticated', async ({ page }) => {
+  await page.route('**/api/session', (route) =>
+    route.fulfill({ json: buildSession({ authenticated: true, workspaceId: 'studio-a' }) }),
+  );
+  await page.route('**/api/balance', (route) =>
+    route.fulfill({ json: { availableMicros: 9_600_000, reservedMicros: 0 } }),
+  );
+  await page.route(/\/api\/activity(?:\?|$)/, (route) =>
+    route.fulfill({ json: { items: [], nextCursor: null } }),
+  );
+  for (const path of ['ledger', 'policies', 'keys', 'workspaces', 'connections', 'oauth/grants']) {
+    await page.route(`**/api/${path}`, (route) => route.fulfill({ json: { data: [] } }));
+  }
+
+  await page.goto('/start');
+  await expect(page).toHaveURL(/\/app#start$/);
+});
