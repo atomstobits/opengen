@@ -32,8 +32,16 @@ describe('actionable, compact catalog discovery', () => {
       region: 'eu-central-1',
     };
     const found = searchCatalog('', filters);
-    expect(found.length).toBeGreaterThan(0);
-    expect(found.every((model) => model.id.startsWith('alibaba/wan-3.0'))).toBe(true);
+    expect(found.map((model) => model.id).sort()).toEqual([
+      'alibaba/happy-horse-1.1',
+      'alibaba/wan-3.0',
+      'alibaba/wan-3.0-prime',
+    ]);
+    expect(
+      searchCatalog('', { ...filters, region: 'cn-hongkong' })
+        .map((model) => model.id)
+        .sort(),
+    ).toEqual(['alibaba/wan-3.0', 'alibaba/wan-3.0-prime']);
     expect(searchCatalog('', { ...filters, providerId: 'byteplus' })).toEqual([]);
     expect(searchCatalog('', { ...filters, inputRole: 'references.audio' })).toEqual([]);
     expect(searchCatalog('qwen image 2.1').map((model) => model.id)).toContain('qwen/image-2.1');

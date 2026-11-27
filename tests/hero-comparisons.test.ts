@@ -48,8 +48,14 @@ describe('hero comparison pricing and media configuration', () => {
     expect(expired.discountLabel).toBeNull();
   });
 
-  it('returns null pricing when a model resolution is undocumented', () => {
-    const unknown = resolveHeroModelPricing('kling/kling-4.0', '4K', '2026-11-25');
+  it('resolves official Kling 4.0 4K pricing and returns null when a model resolution is undocumented', () => {
+    const kling4k = resolveHeroModelPricing('kling/kling-4.0', '4K', '2026-11-25');
+    expect(kling4k.providerName).toBe('Kling AI');
+    expect(kling4k.priceLabel).toBe('$0.549/s');
+    expect(kling4k.comparePriceLabel).toBeNull();
+    expect(kling4k.discountLabel).toBeNull();
+
+    const unknown = resolveHeroModelPricing('kling/kling-4.0-flash', '4K', '2026-11-25');
     expect(unknown.priceLabel).toBeNull();
     expect(unknown.comparePriceLabel).toBeNull();
     expect(unknown.discountLabel).toBeNull();

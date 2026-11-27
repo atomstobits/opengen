@@ -5,6 +5,7 @@ type PublishedOutputRate = NonNullable<PublishedPricing['outputRates']>[number];
 type PublishedQuality = NonNullable<PublishedOutputRate['quality']>;
 const checkedAt = '2026-11-02';
 const recheckedAt = '2026-11-14';
+const officialCheckedAt = '2026-11-26';
 const regionUnknown = 'No region-specific tariff or inference/storage residency was verified.';
 const tariff = (
   summary: string,
@@ -73,8 +74,11 @@ const byteplusPricing =
   'https://console.byteplus.com/ark/region%3Aap-southeast-1/docs/model-pricing';
 const byteplusPricingDocs = 'https://docs.byteplus.com/en/docs/modelark/model-pricing';
 const alibabaPricing = 'https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio';
+const alibabaModelPricing = 'https://www.alibabacloud.com/help/en/model-studio/model-pricing';
 const wanStandard = 'https://www.alibabacloud.com/help/en/model-studio/wan3-0-video';
 const wanPrime = 'https://www.alibabacloud.com/help/en/model-studio/wan3-0-video-prime';
+const klingPricing = 'https://kling.ai/document-api/pricing/base/video';
+const bflPricing = 'https://docs.bfl.ai/quick_start/pricing';
 const runwayPricing = 'https://docs.dev.runwayml.com/guides/pricing/';
 
 const gptImage2Tokens: [string, number][] = [
@@ -645,6 +649,129 @@ const published: Record<string, PublishedPricing> = {
         ],
       ];
     }),
+  ),
+  // Alibaba Model Studio regional HappyHorse 1.1 offerings (five documented regions; cn-hongkong is not listed).
+  ...Object.fromEntries(
+    ['cn-beijing', 'ap-southeast-1', 'ap-northeast-1', 'eu-central-1', 'us-east-1'].map((code) => {
+      const sg = code === 'ap-southeast-1';
+      const rates: [string, number][] = sg
+        ? [
+            ['480p', 70_000],
+            ['720p', 140_000],
+            ['1080p', 180_000],
+          ]
+        : [
+            ['480p', 61_885],
+            ['720p', 123_769],
+            ['1080p', 165_026],
+          ];
+      return [
+        `alibaba-model-studio-${code}|alibaba/happy-horse-1.1`,
+        regionalTariff(
+          sg
+            ? 'Singapore International: $0.07 / second at 480p; $0.14 at 720p; $0.18 at 1080p.'
+            : 'Model Studio regional tariff: $0.061885 / second at 480p; $0.123769 at 720p; $0.165026 at 1080p.',
+          alibabaModelPricing,
+          [
+            sg
+              ? 'Identical output-second list rates across happyhorse-1.1-t2v, happyhorse-1.1-i2v and happyhorse-1.1-r2v; input media is unbilled, native audio is included, failed requests are unbilled, and Singapore includes 10s free quota (90 days).'
+              : 'Published list rates are $0.0618845 / $0.123769 / $0.165026 per output second (CNY 0.45 / 0.90 / 1.20) across happyhorse-1.1-t2v, happyhorse-1.1-i2v and happyhorse-1.1-r2v; 480p is rounded upward to integer micro-USD ($0.061885). Input media is unbilled and native audio is included.',
+            'Hong Kong (cn-hongkong) is not listed for HappyHorse 1.1; processing and storage residency commitments remain unqualified.',
+          ],
+          officialCheckedAt,
+          outputRates('output-second', rates),
+        ),
+      ];
+    }),
+  ),
+
+  // Kling AI first-party Singapore API (api-singapore.klingai.com)
+  'kling-ap-southeast-1|kling/kling-4.0': regionalTariff(
+    'Balance USD without video input: $0.157 / second at 720p; $0.235 at 1080p; $0.549 at 4K (1.0 / 1.5 / 3.5 Units/s).',
+    klingPricing,
+    [
+      'With input video (reference video, base video to edit, or video character element): $0.094 / $0.141 / $0.329 per second at 720p / 1080p / 4K billed on output duration plus max(input duration, output duration).',
+      'Optional 10-bit HDR output adds $0.047/s at 1080p or $0.078/s at 4K (unsupported at 720p). Prepaid Flagship packages discount unit cost ($0.1413–$0.15386/unit).',
+      'Singapore API endpoint (api-singapore.klingai.com); processing and storage residency commitments remain unqualified.',
+    ],
+    officialCheckedAt,
+    outputRates(
+      'output-second',
+      [
+        ['720p', 157_000],
+        ['1080p', 235_000],
+        ['4K', 549_000],
+      ],
+      'Balance USD output-second rate without video input (1.0 / 1.5 / 3.5 Units/s). With input video: $0.094/$0.141/$0.329 per second across output + max(input, output). Optional HDR adds $0.047/s (1080p) or $0.078/s (4K).',
+    ),
+  ),
+  'kling-ap-southeast-1|kling/kling-4.0-flash': regionalTariff(
+    'Balance USD without video input: $0.094 / second at 720p (0.6 Units/s).',
+    klingPricing,
+    [
+      'With input video (reference video, base video to edit, or video character element): $0.063 / second (0.4 Units/s) billed on output duration plus max(input duration, output duration).',
+      '720p SDR only; prepaid Flagship packages discount unit cost ($0.1413–$0.15386/unit).',
+      'Singapore API endpoint (api-singapore.klingai.com); processing and storage residency commitments remain unqualified.',
+    ],
+    officialCheckedAt,
+    outputRates(
+      'output-second',
+      [['720p', 94_000]],
+      'Balance USD output-second rate without video input (0.6 Units/s). With input video: $0.063/s across output + max(input, output).',
+    ),
+  ),
+
+  // Black Forest Labs first-party API (api.bfl.ai/v1)
+  'bfl-undisclosed|bfl/flux-3-video': tariff(
+    'Output video (t2v/i2v): $0.15 / second at 720p (hd); $0.24 at 1080p (fhd); $0.28 at 1440p (qhd); $0.41 at 2160p (uhd).',
+    bflPricing,
+    [
+      '1 BFL credit = $0.01 USD (15 / 24 / 28 / 41 credits/s for t2v/i2v; draft mode renders at hd for $0.06/s). Native audio is included.',
+      'Video continuation (v2v, 5–15s) bills $0.21 / $0.27 / $0.31 / $0.45 per second across hd/fhd/qhd/uhd ($0.12/s draft). Separate FLUX Video Edit [fast] (/v1/flux-tools/video-edit-v1) bills $0.03/s.',
+    ],
+    officialCheckedAt,
+    outputRates(
+      'output-second',
+      [
+        ['720p', 150_000],
+        ['1080p', 240_000],
+        ['1440p', 280_000],
+        ['2160p', 410_000],
+      ],
+      'Official BFL t2v/i2v output-second list rate (15 / 24 / 28 / 41 credits/s at $0.01/credit). Video continuation (v2v) bills $0.21/$0.27/$0.31/$0.45 per second; FLUX Video Edit bills $0.03/s.',
+    ),
+  ),
+  'bfl-undisclosed|bfl/flux-3-image': tariff(
+    'Per output image: $0.041 at 768sq; $0.048 at 1K; $0.07 at 1.5K; $0.10 at 2K; $0.607 at 4K.',
+    bflPricing,
+    [
+      '1 BFL credit = $0.01 USD (4.1 / 4.8 / 7 / 10 / 60.7 credits). Text-to-image and multi-reference editing (1–10 images) share the same output-tier price; references add no extra charge.',
+      'Custom width/height or match_input dimensions bill at the smallest tier with at least that pixel count (above ~4 MP bills at 4K).',
+    ],
+    officialCheckedAt,
+    outputRates('image', [
+      ['768sq', 41_000],
+      ['1K', 48_000],
+      ['1.5K', 70_000],
+      ['2K', 100_000],
+      ['4K', 607_000],
+    ]),
+  ),
+  'bfl-undisclosed|bfl/flux-3-klein': tariff(
+    'Per output image: $0.008 at 768sq; $0.009 at 1K; $0.011 at 1.5K; $0.014 at 2K; $0.036 at 4K.',
+    bflPricing,
+    [
+      '1 BFL credit = $0.01 USD (0.8 / 0.9 / 1.1 / 1.4 / 3.6 credits). Text-to-image and multi-reference editing (1–10 images) share the same output-tier price.',
+      'Serves the distilled 5.6B checkpoint (open weights also available under the FLUX Kommunity License).',
+    ],
+    officialCheckedAt,
+    outputRates('image', [
+      ['768sq', 8_000],
+      ['1K', 9_000],
+      ['1.5K', 11_000],
+      ['2K', 14_000],
+      ['4K', 36_000],
+    ]),
   ),
 
   // MiniMax first-party
@@ -2495,7 +2622,31 @@ const published: Record<string, PublishedPricing> = {
 const publishedByRoute: Record<string, PublishedPricing> = {};
 
 /** Operation-scoped overrides (`deploymentId|modelId|operation`) take priority over deployment-wide tariffs. */
-const publishedByOperation: Record<string, PublishedPricing> = {};
+const publishedByOperation: Record<string, PublishedPricing> = {
+  'bfl-undisclosed|bfl/flux-3-video|video-edit': tariff(
+    'FLUX Video Edit [fast]: $0.03 / second of output video (source clip length preserved; sources above 720p are downscaled to 720p).',
+    bflPricing,
+    [
+      'Separate /v1/flux-tools/video-edit-v1 endpoint (3 BFL credits/s at $0.01/credit). Preserves source duration (up to 15s), aspect ratio and audio.',
+    ],
+    officialCheckedAt,
+    outputRates('output-second', [['', 30_000]]),
+  ),
+  'bfl-undisclosed|bfl/flux-3-video|video-extend': tariff(
+    'Video continuation (v2v, 5–15s): $0.21 / second at 720p (hd); $0.27 at 1080p (fhd); $0.31 at 1440p (qhd); $0.45 at 2160p (uhd).',
+    bflPricing,
+    [
+      '1 BFL credit = $0.01 USD (21 / 27 / 31 / 45 credits/s; draft mode renders at hd for $0.12/s).',
+    ],
+    officialCheckedAt,
+    outputRates('output-second', [
+      ['720p', 210_000],
+      ['1080p', 270_000],
+      ['1440p', 310_000],
+      ['2160p', 450_000],
+    ]),
+  ),
+};
 
 export function scopePublishedPricing(
   entry: PublishedPricing | undefined,

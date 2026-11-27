@@ -34,6 +34,8 @@ const providerFields: Record<string, readonly string[]> = {
   replicate: ['REPLICATE_API_TOKEN'],
   runway: ['RUNWAYML_API_SECRET'],
   pika: ['PIKA_API_KEY'],
+  kling: ['KLING_API_KEY'],
+  bfl: ['BFL_API_KEY'],
 };
 /** Only this deployment's configured credentials, never the complete process environment. */
 export function snapshotCredentialEnvironment(

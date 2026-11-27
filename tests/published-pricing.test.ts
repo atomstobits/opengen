@@ -124,7 +124,7 @@ describe('informational provider tariffs', () => {
   });
 
   it('ensures every provider route has primary-sourced USD pricing across series tables and Playground', () => {
-    expect(catalog.routes.length).toBeGreaterThanOrEqual(164);
+    expect(catalog.routes.length).toBeGreaterThanOrEqual(174);
     for (const route of catalog.routes) {
       const model = catalog.models.find((entry) => entry.id === route.modelId)!;
       const unit = model.modality === 'image' ? 'image' : 'output-second';

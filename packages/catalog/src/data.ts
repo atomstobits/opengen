@@ -14,6 +14,7 @@ import { unifyRoutes } from './unify-routes';
 
 const checkedAt = '2026-11-02';
 const recheckedAt = '2026-11-14';
+const officialCheckedAt = '2026-11-26';
 const source = (url: string, note?: string, checkedOn = checkedAt): Source => ({
   url,
   checkedAt: checkedOn,
@@ -100,6 +101,22 @@ deployments.push({
     'Singapore API offering. Processing and storage commitments have not been qualified; the API region is not a residency assertion.',
   ),
 });
+deployments.push({
+  id: 'kling-ap-southeast-1',
+  providerId: 'kling',
+  name: 'Kling AI · Singapore',
+  endpointRegion: 'ap-southeast-1',
+  scope: 'undisclosed',
+  processingRegions: null,
+  storageRegions: null,
+  endpointTemplate: 'https://api-singapore.klingai.com',
+  credentialEnv: 'KLING_API_KEY',
+  source: source(
+    'https://kling.ai/document-api/api/get-started/authentication',
+    'Official Singapore API endpoint (api-singapore.klingai.com) documented for callers outside China. Processing and storage commitments have not been qualified; the API region is not a residency assertion.',
+    officialCheckedAt,
+  ),
+});
 
 const providerEndpoints: Record<string, { endpoint: string; credential: string }> = {
   fal: { endpoint: 'https://queue.fal.run', credential: 'FAL_KEY' },
@@ -143,7 +160,7 @@ function model(
   modality: Model['modality'],
   url: string,
   description: string,
-  extra: Partial<Pick<Model, 'aliases' | 'openness' | 'license'>> = {},
+  extra: Partial<Pick<Model, 'aliases' | 'openness' | 'license' | 'source'>> = {},
 ): Model {
   return {
     id,
@@ -231,8 +248,15 @@ const models: Model[] = [
     'Kling AI',
     'kling',
     'video',
-    'https://fal.ai/models/kling/v4/flash/text-to-video',
+    'https://kling.ai/document-api/api/video/4-0-flash/text-to-video',
     '720p fast sibling in the Kling 4.0 family with native synchronized audio.',
+    {
+      source: source(
+        'https://kling.ai/document-api/api/video/4-0-flash/text-to-video',
+        undefined,
+        officialCheckedAt,
+      ),
+    },
   ),
   model(
     'alibaba/happy-horse-1.1',
@@ -240,8 +264,15 @@ const models: Model[] = [
     'Alibaba',
     'happy-horse',
     'video',
-    'https://fal.ai/models/alibaba/happy-horse/v1.1/text-to-video',
-    '720p and 1080p video generation with native synchronized audio and multi-image references.',
+    'https://www.alibabacloud.com/help/en/model-studio/happyhorse-1-1-t2v',
+    '480p–1080p video generation with native synchronized audio and multi-image references.',
+    {
+      source: source(
+        'https://www.alibabacloud.com/help/en/model-studio/happyhorse-1-1-t2v',
+        undefined,
+        officialCheckedAt,
+      ),
+    },
   ),
   model(
     'alibaba/wan-3.0',
@@ -717,7 +748,16 @@ function route(
   extra: Partial<
     Pick<
       Route,
-      'id' | 'providerModelName' | 'feature' | 'adapter' | 'rates' | 'fidelity' | 'pricingSource'
+      | 'id'
+      | 'upstreamEndpoints'
+      | 'providerModelName'
+      | 'feature'
+      | 'operationCapabilities'
+      | 'adapter'
+      | 'rates'
+      | 'fidelity'
+      | 'pricingSource'
+      | 'source'
     >
   > = {},
 ): void {
@@ -794,6 +834,57 @@ route(
 );
 route(
   'kling/kling-4.0',
+  'kling-ap-southeast-1',
+  'kling-4.0',
+  'https://kling.ai/document-api/api/usage-guide/kling-4-0',
+  ['text-to-video', 'image-to-video', 'reference-to-video', 'video-edit'],
+  ['720p', '1080p', '4K'],
+  durations(3, 30),
+  {
+    adapter: 'kling',
+    upstreamEndpoints: {
+      'text-to-video': '/text-to-video/kling-4.0',
+      'image-to-video': '/image-to-video/kling-4.0',
+      'reference-to-video': '/omni-video/kling-4.0',
+      'video-edit': '/omni-video/kling-4.0',
+    },
+    rates: (['text-to-video', 'image-to-video'] as const).flatMap((operation) => [
+      {
+        operation,
+        resolution: '720p',
+        unit: 'output-second' as const,
+        usdMicros: 157_000,
+        note: 'Official Kling 4.0 SDR Balance USD list rate without video input ($0.157/sec).',
+      },
+      {
+        operation,
+        resolution: '1080p',
+        unit: 'output-second' as const,
+        usdMicros: 235_000,
+        note: 'Official Kling 4.0 SDR Balance USD list rate without video input ($0.235/sec; optional HDR adds $0.047/sec).',
+      },
+      {
+        operation,
+        resolution: '4K',
+        unit: 'output-second' as const,
+        usdMicros: 549_000,
+        note: 'Official Kling 4.0 SDR Balance USD list rate without video input ($0.549/sec; optional HDR adds $0.078/sec).',
+      },
+    ]),
+    pricingSource: source(
+      'https://kling.ai/document-api/pricing/base/video',
+      'Official Kling 4.0 SDR output-second Balance USD list tariff ($0.157/$0.235/$0.549 per sec across 720p/1080p/4K without video input). Video-input omni/edit operations carry separate input billing and remain unpriced for managed quotes.',
+      officialCheckedAt,
+    ),
+    source: source(
+      'https://kling.ai/document-api/api/usage-guide/kling-4-0',
+      'Official Kling AI Singapore API (/text-to-video/kling-4.0, /image-to-video/kling-4.0, /omni-video/kling-4.0); 720p/1080p/4K with optional HDR at 1080p/4K. Direct adapter checked against docs; not live-verified.',
+      officialCheckedAt,
+    ),
+  },
+);
+route(
+  'kling/kling-4.0',
   'runway-undisclosed',
   'kling_4',
   'https://dev.runwayml.com/learn/kling-4-0-api',
@@ -867,6 +958,41 @@ for (const [operation, suffix] of [
 }
 route(
   'kling/kling-4.0-flash',
+  'kling-ap-southeast-1',
+  'kling-4.0-flash',
+  'https://kling.ai/document-api/api/video/4-0-flash/text-to-video',
+  ['text-to-video', 'image-to-video', 'reference-to-video', 'video-edit'],
+  ['720p'],
+  durations(3, 20),
+  {
+    adapter: 'kling',
+    upstreamEndpoints: {
+      'text-to-video': '/text-to-video/kling-4.0-flash',
+      'image-to-video': '/image-to-video/kling-4.0-flash',
+      'reference-to-video': '/omni-video/kling-4.0-flash',
+      'video-edit': '/omni-video/kling-4.0-flash',
+    },
+    rates: (['text-to-video', 'image-to-video'] as const).map((operation) => ({
+      operation,
+      resolution: '720p',
+      unit: 'output-second' as const,
+      usdMicros: 94_000,
+      note: 'Official Kling 4.0 Flash 720p SDR Balance USD list rate without video input ($0.094/sec).',
+    })),
+    pricingSource: source(
+      'https://kling.ai/document-api/pricing/base/video',
+      'Official Kling 4.0 Flash 720p SDR output-second Balance USD list tariff ($0.094/sec without video input). Video-input omni/edit operations carry separate input billing and remain unpriced for managed quotes.',
+      officialCheckedAt,
+    ),
+    source: source(
+      'https://kling.ai/document-api/api/video/4-0-flash/text-to-video',
+      'Official Kling AI Singapore API (/text-to-video/kling-4.0-flash, /image-to-video/kling-4.0-flash, /omni-video/kling-4.0-flash); 720p SDR 3–20s. Direct adapter checked against docs; not live-verified.',
+      officialCheckedAt,
+    ),
+  },
+);
+route(
+  'kling/kling-4.0-flash',
   'runway-undisclosed',
   'kling_4_flash',
   'https://docs.dev.runwayml.com/guides/models/',
@@ -924,6 +1050,64 @@ for (const [operation, suffix] of [
       'Explicit fal Kling v4 Flash queue endpoint schema checked; not live-verified.',
     ),
   });
+}
+// Official Alibaba Cloud Model Studio HappyHorse 1.1 routes across the five explicitly documented regions (cn-hongkong is not listed).
+for (const region of regionalDefinitions.filter((item) => item.code !== 'cn-hongkong')) {
+  const isSingapore = region.code === 'ap-southeast-1';
+  const rates: Rate[] = [
+    {
+      resolution: '480p',
+      unit: 'output-second',
+      usdMicros: isSingapore ? 70_000 : 61_885,
+      note: isSingapore
+        ? 'Singapore International list rate ($0.07/sec); input images unbilled.'
+        : 'CNY 0.45/sec list rate ($0.0618845/sec rounded up to $0.061885/sec); input images unbilled.',
+    },
+    {
+      resolution: '720p',
+      unit: 'output-second',
+      usdMicros: isSingapore ? 140_000 : 123_769,
+      note: isSingapore
+        ? 'Singapore International list rate ($0.14/sec); input images unbilled.'
+        : 'CNY 0.90/sec list rate ($0.123769/sec); input images unbilled.',
+    },
+    {
+      resolution: '1080p',
+      unit: 'output-second',
+      usdMicros: isSingapore ? 180_000 : 165_026,
+      note: isSingapore
+        ? 'Singapore International list rate ($0.18/sec); input images unbilled.'
+        : 'CNY 1.20/sec list rate ($0.165026/sec); input images unbilled.',
+    },
+  ];
+  route(
+    'alibaba/happy-horse-1.1',
+    `alibaba-model-studio-${region.code}`,
+    'happyhorse-1.1',
+    'https://www.alibabacloud.com/help/en/model-studio/happyhorse-api-reference/',
+    [...genVideoOps],
+    ['480p', '720p', '1080p'],
+    durations(3, 15),
+    {
+      adapter: 'alibaba',
+      upstreamEndpoints: {
+        'text-to-video': 'happyhorse-1.1-t2v',
+        'image-to-video': 'happyhorse-1.1-i2v',
+        'reference-to-video': 'happyhorse-1.1-r2v',
+      },
+      rates,
+      pricingSource: source(
+        'https://www.alibabacloud.com/help/en/model-studio/model-pricing',
+        `Official Alibaba Cloud Model Studio ${region.name} HappyHorse 1.1 output-second list tariff (input images unbilled). Live account access and settled billing remain unverified.`,
+        officialCheckedAt,
+      ),
+      source: source(
+        'https://www.alibabacloud.com/help/en/model-studio/happyhorse-api-reference/',
+        `Official Alibaba Cloud Model Studio ${region.name} offering (happyhorse-1.1-t2v, happyhorse-1.1-i2v, happyhorse-1.1-r2v). Direct HappyHorse adapter checked against docs; not live-verified.`,
+        officialCheckedAt,
+      ),
+    },
+  );
 }
 for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
   const upstream = `alibaba/happy-horse/v1.1/${operation}`;
@@ -1455,6 +1639,75 @@ route(
   ['360p', '720p', '1080p', '4K'],
   durations(3, 15),
 );
+route(
+  'bfl/flux-3-video',
+  'bfl-undisclosed',
+  'flux-3-video',
+  'https://docs.bfl.ai/flux_3/flux3_video',
+  ['text-to-video', 'image-to-video', 'video-edit', 'video-extend'],
+  ['720p', '1080p', '1440p', '2160p'],
+  durations(5, 20),
+  {
+    adapter: 'bfl',
+    upstreamEndpoints: {
+      'text-to-video': 'flux-3-video',
+      'image-to-video': 'flux-3-video',
+      'video-edit': 'flux-tools/video-edit-v1',
+      'video-extend': 'flux-3-video',
+    },
+    rates: (['text-to-video', 'image-to-video'] as const).flatMap((operation) =>
+      (
+        [
+          ['720p', 150_000],
+          ['1080p', 240_000],
+          ['1440p', 280_000],
+          ['2160p', 410_000],
+        ] as const
+      ).map(([resolution, usdMicros]) => ({
+        operation,
+        resolution,
+        unit: 'output-second' as const,
+        usdMicros,
+        note: 'Official BFL FLUX 3 Video t2v/i2v regular rate (1 credit = $0.01 USD).',
+      })),
+    ),
+    operationCapabilities: {
+      'video-edit': {
+        resolutions: [],
+        durations: [],
+        source: source(
+          'https://docs.bfl.ai/flux_tools/flux_video_edit',
+          'Official Black Forest Labs FLUX Video Edit [fast] (/v1/flux-tools/video-edit-v1); preserves source clip length (up to 15s) and downscales sources above 720p to 720p.',
+          officialCheckedAt,
+        ),
+        pricingSource: unknownPrice('https://docs.bfl.ai/quick_start/pricing', officialCheckedAt),
+        publishedPricing: publishedPricingFor({
+          deploymentId: 'bfl-undisclosed',
+          modelId: 'bfl/flux-3-video',
+          operations: ['video-edit'],
+        }),
+      },
+      'video-extend': {
+        durations: durations(5, 15),
+        publishedPricing: publishedPricingFor({
+          deploymentId: 'bfl-undisclosed',
+          modelId: 'bfl/flux-3-video',
+          operations: ['video-extend'],
+        }),
+      },
+    },
+    pricingSource: source(
+      'https://docs.bfl.ai/quick_start/pricing',
+      'Official BFL FLUX 3 Video regular t2v/i2v output-second tariff ($0.15/$0.24/$0.28/$0.41 per sec across 720p/1080p/1440p/2160p; 1 credit = $0.01). Draft, video-edit, and video-extend remain unpriced for managed quotes.',
+      officialCheckedAt,
+    ),
+    source: source(
+      'https://docs.bfl.ai/flux_3/flux3_video',
+      'Official Black Forest Labs FLUX 3 Video API (/v1/flux-3-video plus /v1/flux-tools/video-edit-v1). Regional EU/US FLUX 3 availability is not separately qualified; direct adapter checked against docs (t2v/i2v/v2v); not live-verified.',
+      officialCheckedAt,
+    ),
+  },
+);
 for (const [operation, suffix, allowedResolutions, allowedDurations] of [
   ['text-to-video', 'text-to-video', ['720p', '1080p', '1440p', '2160p'], durations(5, 20)],
   ['image-to-video', 'image-to-video', ['720p', '1080p', '1440p', '2160p'], durations(5, 20)],
@@ -1708,6 +1961,7 @@ route(
   ['video-edit', 'video-extend'],
   ['480p', '720p'],
   durations(1, 15),
+  { adapter: 'xai' },
 );
 for (const [operation, suffix, minDuration, maxDuration] of [
   ['video-edit', 'edit-video', 1, 15],
@@ -2074,6 +2328,80 @@ routes.push({
     'Explicit fal Nano Banana 2 Lite text-to-image queue endpoint schema checked; not live-verified.',
   ),
 });
+route(
+  'bfl/flux-3-image',
+  'bfl-undisclosed',
+  'flux-3-image',
+  'https://docs.bfl.ai/flux_3/flux3_image_generate',
+  imageOps,
+  ['768sq', '1K', '1.5K', '2K', '4K'],
+  [],
+  {
+    adapter: 'bfl',
+    rates: (
+      [
+        ['768sq', 41_000],
+        ['1K', 48_000],
+        ['1.5K', 70_000],
+        ['2K', 100_000],
+        ['4K', 607_000],
+      ] as const
+    ).map(([resolution, usdMicros]) => ({
+      operation: 'text-to-image' as const,
+      resolution,
+      unit: 'image' as const,
+      usdMicros,
+      note: 'Official BFL FLUX 3 Image per-image text-to-image rate (1 credit = $0.01 USD).',
+    })),
+    pricingSource: source(
+      'https://docs.bfl.ai/quick_start/pricing',
+      'Official BFL FLUX 3 Image text-to-image list tariff ($0.041/$0.048/$0.07/$0.10/$0.607 across 768sq–4K; 1 credit = $0.01). Multi-reference edits and custom dimensions remain unpriced for managed quotes.',
+      officialCheckedAt,
+    ),
+    source: source(
+      'https://docs.bfl.ai/flux_3/flux3_image_generate',
+      'Official Black Forest Labs FLUX 3 Image API (/v1/flux-3-image) for text-to-image and multi-reference editing (1–10 images). Direct adapter checked against docs; not live-verified.',
+      officialCheckedAt,
+    ),
+  },
+);
+route(
+  'bfl/flux-3-klein',
+  'bfl-undisclosed',
+  'flux-3-image-klein',
+  'https://docs.bfl.ai/flux_3/flux3_image_klein',
+  imageOps,
+  ['768sq', '1K', '1.5K', '2K', '4K'],
+  [],
+  {
+    adapter: 'bfl',
+    rates: (
+      [
+        ['768sq', 8_000],
+        ['1K', 9_000],
+        ['1.5K', 11_000],
+        ['2K', 14_000],
+        ['4K', 36_000],
+      ] as const
+    ).map(([resolution, usdMicros]) => ({
+      operation: 'text-to-image' as const,
+      resolution,
+      unit: 'image' as const,
+      usdMicros,
+      note: 'Official BFL FLUX 3 Image Klein per-image text-to-image rate (1 credit = $0.01 USD).',
+    })),
+    pricingSource: source(
+      'https://docs.bfl.ai/quick_start/pricing',
+      'Official BFL FLUX 3 Image Klein text-to-image list tariff ($0.008/$0.009/$0.011/$0.014/$0.036 across 768sq–4K; 1 credit = $0.01). Multi-reference edits and custom dimensions remain unpriced for managed quotes.',
+      officialCheckedAt,
+    ),
+    source: source(
+      'https://docs.bfl.ai/flux_3/flux3_image_klein',
+      'Official Black Forest Labs FLUX 3 Image Klein API (/v1/flux-3-image-klein, distilled 5.6B) for text-to-image and multi-reference editing (1–10 images). Direct adapter checked against docs; not live-verified.',
+      officialCheckedAt,
+    ),
+  },
+);
 for (const [modelId, prefix, resolutions] of [
   ['bfl/flux-3-image', 'blackforestlabs/flux-3', ['768sq', '1K', '1.5K', '2K', '4K']],
   ['bfl/flux-3-klein', 'blackforestlabs/flux-3/klein', ['1K', '2K', '4K']],
