@@ -304,6 +304,11 @@ export function validateCatalog(): string[] {
         verifiedOps.some((operation) => !route.operations.includes(operation))
       )
         errors.push(`Live verification lists unsupported operation for ${route.id}`);
+      if (
+        route.liveVerification.duration !== undefined &&
+        (!Number.isFinite(route.liveVerification.duration) || route.liveVerification.duration <= 0)
+      )
+        errors.push(`Live verification lists invalid duration for ${route.id}`);
     }
     if (!route.source.url.startsWith('https://') || !route.pricingSource.url.startsWith('https://'))
       errors.push(`Missing source for ${route.id}`);
@@ -541,7 +546,7 @@ export function quote(
             : ['Published list-price estimate; not a guaranteed settled provider charge.']),
           ...(route.liveVerification
             ? [
-                `Live verification covered ${(route.liveVerification.operations ?? [route.liveVerification.operation]).join(', ')} at ${route.liveVerification.resolution} for ${route.liveVerification.duration}s.`,
+                `Live verification covered ${(route.liveVerification.operations ?? [route.liveVerification.operation]).join(', ')} at ${route.liveVerification.resolution}${route.liveVerification.duration === undefined ? '' : ` for ${route.liveVerification.duration}s`}.`,
               ]
             : route.status !== 'live-verified'
               ? ['This route has not been live-verified by this installation.']

@@ -772,6 +772,8 @@ function route(
       | 'feature'
       | 'operationCapabilities'
       | 'adapter'
+      | 'status'
+      | 'liveVerification'
       | 'rates'
       | 'fidelity'
       | 'pricingSource'
@@ -874,6 +876,13 @@ route(
   durations(3, 30),
   {
     adapter: 'kling',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-video',
+      resolution: '720p',
+      duration: 3,
+    },
     upstreamEndpoints: {
       'text-to-video': '/text-to-video/kling-4.0',
       'image-to-video': '/image-to-video/kling-4.0',
@@ -910,7 +919,7 @@ route(
     ),
     source: source(
       'https://kling.ai/document-api/api/usage-guide/kling-4-0',
-      'Official Kling AI Singapore API (/text-to-video/kling-4.0, /image-to-video/kling-4.0, /omni-video/kling-4.0); 720p/1080p/4K with optional HDR at 1080p/4K. Direct adapter checked against docs; not live-verified.',
+      'Official Kling AI Singapore API (/text-to-video/kling-4.0, /image-to-video/kling-4.0, /omni-video/kling-4.0); 720p/1080p/4K with optional HDR at 1080p/4K. Hosted live-verified on 2026-11-27 for 720p 3s text-to-video; other operations, resolutions, durations and HDR remain documented.',
       officialCheckedAt,
     ),
   },
@@ -998,6 +1007,13 @@ route(
   durations(3, 20),
   {
     adapter: 'kling',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-video',
+      resolution: '720p',
+      duration: 3,
+    },
     upstreamEndpoints: {
       'text-to-video': '/text-to-video/kling-4.0-flash',
       'image-to-video': '/image-to-video/kling-4.0-flash',
@@ -1018,7 +1034,7 @@ route(
     ),
     source: source(
       'https://kling.ai/document-api/api/video/4-0-flash/text-to-video',
-      'Official Kling AI Singapore API (/text-to-video/kling-4.0-flash, /image-to-video/kling-4.0-flash, /omni-video/kling-4.0-flash); 720p SDR 3–20s. Direct adapter checked against docs; not live-verified.',
+      'Official Kling AI Singapore API (/text-to-video/kling-4.0-flash, /image-to-video/kling-4.0-flash, /omni-video/kling-4.0-flash); 720p SDR 3–20s. Hosted live-verified on 2026-11-27 for 720p 3s text-to-video; other operations and durations remain documented.',
       officialCheckedAt,
     ),
   },
@@ -1086,6 +1102,7 @@ for (const [operation, suffix] of [
 // Official Alibaba Cloud Model Studio HappyHorse 1.1 routes across the five explicitly documented regions (cn-hongkong is not listed).
 for (const region of regionalDefinitions.filter((item) => item.code !== 'cn-hongkong')) {
   const isSingapore = region.code === 'ap-southeast-1';
+  const verified = ['ap-southeast-1', 'ap-northeast-1', 'us-east-1'].includes(region.code);
   const rates: Rate[] = [
     {
       resolution: '480p',
@@ -1122,6 +1139,15 @@ for (const region of regionalDefinitions.filter((item) => item.code !== 'cn-hong
     durations(3, 15),
     {
       adapter: 'alibaba',
+      status: verified ? 'live-verified' : 'documented',
+      ...(verified && {
+        liveVerification: {
+          checkedAt: '2026-11-27',
+          operation: 'text-to-video',
+          resolution: '480p',
+          duration: 3,
+        },
+      }),
       upstreamEndpoints: {
         'text-to-video': 'happyhorse-1.1-t2v',
         'image-to-video': 'happyhorse-1.1-i2v',
@@ -1130,12 +1156,16 @@ for (const region of regionalDefinitions.filter((item) => item.code !== 'cn-hong
       rates,
       pricingSource: source(
         'https://www.alibabacloud.com/help/en/model-studio/model-pricing',
-        `Official Alibaba Cloud Model Studio ${region.name} HappyHorse 1.1 output-second list tariff (input images unbilled). Live account access and settled billing remain unverified.`,
+        verified
+          ? `Official Alibaba Cloud Model Studio ${region.name} HappyHorse 1.1 output-second list tariff (input images unbilled). Hosted live verification covered 480p 3s text-to-video.`
+          : `Official Alibaba Cloud Model Studio ${region.name} HappyHorse 1.1 output-second list tariff (input images unbilled). Live account access and settled billing remain unverified.`,
         officialCheckedAt,
       ),
       source: source(
         'https://www.alibabacloud.com/help/en/model-studio/happyhorse-api-reference/',
-        `Official Alibaba Cloud Model Studio ${region.name} offering (happyhorse-1.1-t2v, happyhorse-1.1-i2v, happyhorse-1.1-r2v). Direct HappyHorse adapter checked against docs; not live-verified.`,
+        verified
+          ? `Official Alibaba Cloud Model Studio ${region.name} offering (happyhorse-1.1-t2v, happyhorse-1.1-i2v, happyhorse-1.1-r2v). Hosted live-verified on 2026-11-27 for 480p 3s text-to-video; other operations, resolutions and durations remain documented.`
+          : `Official Alibaba Cloud Model Studio ${region.name} offering (happyhorse-1.1-t2v, happyhorse-1.1-i2v, happyhorse-1.1-r2v). Direct HappyHorse adapter checked against docs; not live-verified.`,
         officialCheckedAt,
       ),
     },
@@ -1716,6 +1746,13 @@ route(
   durations(5, 20),
   {
     adapter: 'bfl',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-video',
+      resolution: '720p',
+      duration: 5,
+    },
     upstreamEndpoints: {
       'text-to-video': 'flux-3-video',
       'image-to-video': 'flux-3-video',
@@ -1770,7 +1807,7 @@ route(
     ),
     source: source(
       'https://docs.bfl.ai/flux_3/flux3_video',
-      'Official Black Forest Labs FLUX 3 Video API (/v1/flux-3-video plus /v1/flux-tools/video-edit-v1). Regional EU/US FLUX 3 availability is not separately qualified; direct adapter checked against docs (t2v/i2v/v2v); not live-verified.',
+      'Official Black Forest Labs FLUX 3 Video API (/v1/flux-3-video plus /v1/flux-tools/video-edit-v1). Regional EU/US FLUX 3 availability is not separately qualified. Hosted live-verified on 2026-11-27 for 720p 5s text-to-video; image-to-video, video-extend, other resolutions/durations remain documented and video-edit remains unsupported.',
       officialCheckedAt,
     ),
   },
@@ -2028,7 +2065,21 @@ route(
   ['video-edit', 'video-extend'],
   ['480p', '720p'],
   durations(1, 15),
-  { adapter: 'xai' },
+  {
+    adapter: 'xai',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'video-edit',
+      resolution: '720p',
+      duration: 3,
+    },
+    source: source(
+      'https://docs.x.ai/developers/model-capabilities/video/overview',
+      'Official xAI Grok Imagine Video edit/extend API (/v1/videos/edits, /v1/videos/extensions). Hosted BYOK live-verified on 2026-11-27 for 720p 3s source-video video-edit; video-extend and managed quoting remain unverified/unpriced.',
+      '2026-11-27',
+    ),
+  },
 );
 for (const [operation, suffix, minDuration, maxDuration] of [
   ['video-edit', 'edit-video', 1, 15],
@@ -2405,6 +2456,12 @@ route(
   [],
   {
     adapter: 'bfl',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-image',
+      resolution: '768sq',
+    },
     rates: (
       [
         ['768sq', 41_000],
@@ -2427,7 +2484,7 @@ route(
     ),
     source: source(
       'https://docs.bfl.ai/flux_3/flux3_image_generate',
-      'Official Black Forest Labs FLUX 3 Image API (/v1/flux-3-image) for text-to-image and multi-reference editing (1–10 images). Direct adapter checked against docs; not live-verified.',
+      'Official Black Forest Labs FLUX 3 Image API (/v1/flux-3-image) for text-to-image and multi-reference editing (1–10 images). Hosted live-verified on 2026-11-27 for 768sq text-to-image (BFL image poll omits cost, leaving managed settlement pending reconciliation); other tiers and image-edit remain documented.',
       officialCheckedAt,
     ),
   },
@@ -2442,6 +2499,12 @@ route(
   [],
   {
     adapter: 'bfl',
+    status: 'live-verified',
+    liveVerification: {
+      checkedAt: '2026-11-27',
+      operation: 'text-to-image',
+      resolution: '768sq',
+    },
     rates: (
       [
         ['768sq', 8_000],
@@ -2464,7 +2527,7 @@ route(
     ),
     source: source(
       'https://docs.bfl.ai/flux_3/flux3_image_klein',
-      'Official Black Forest Labs FLUX 3 Image Klein API (/v1/flux-3-image-klein, distilled 5.6B) for text-to-image and multi-reference editing (1–10 images). Direct adapter checked against docs; not live-verified.',
+      'Official Black Forest Labs FLUX 3 Image Klein API (/v1/flux-3-image-klein, distilled 5.6B) for text-to-image and multi-reference editing (1–10 images). Hosted live-verified on 2026-11-27 for 768sq text-to-image (BFL image poll omits cost, leaving managed settlement pending reconciliation); other tiers and image-edit remain documented.',
       officialCheckedAt,
     ),
   },
