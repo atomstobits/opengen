@@ -334,16 +334,21 @@ function HeroModelBadge({ model, side }: { model: HeroModelPricing; side: 'left'
     >
       <span className={`hero-model-dot is-${side}`} aria-hidden="true" />
       <span className="hero-badge-name">{model.modelName}</span>
-      {model.priceLabel && (
+      {(model.resolution || model.priceLabel) && (
         <>
           <span className="hero-badge-sep" aria-hidden="true" />
           <span className="hero-price-group">
-            <span className="hero-price-current">{model.priceLabel}</span>
-            {model.comparePriceLabel && (
-              <span className="hero-price-compare">{model.comparePriceLabel}</span>
-            )}
-            {model.discountLabel && (
-              <span className="hero-price-discount">{model.discountLabel}</span>
+            {model.resolution && <span className="hero-price-res">{model.resolution}</span>}
+            {model.priceLabel && (
+              <>
+                <span className="hero-price-current">{model.priceLabel}</span>
+                {model.comparePriceLabel && (
+                  <span className="hero-price-compare">{model.comparePriceLabel}</span>
+                )}
+                {model.discountLabel && (
+                  <span className="hero-price-discount">{model.discountLabel}</span>
+                )}
+              </>
             )}
           </span>
         </>

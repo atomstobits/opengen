@@ -27,14 +27,16 @@ test.describe('split comparison homepage hero', () => {
     await expect(hero.getByRole('region', { name: 'Give this to your agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: /pause/i })).toHaveCount(0);
 
-    // Model + cheapest price badges link directly to canonical series pages.
+    // Model + resolution + cheapest price badges link directly to canonical series pages.
     // Exact promotional dates/expiry are covered deterministically in tests/hero-comparisons.test.ts.
     const leftBadge = hero.getByTestId('hero-badge-left');
     const rightBadge = hero.getByTestId('hero-badge-right');
     await expect(leftBadge).toContainText('Seedance 2.5');
+    await expect(leftBadge).toContainText('1080p');
     await expect(leftBadge).toContainText(/\$\d+\.\d{3}\/s/);
     await expect(leftBadge).toHaveAttribute('href', '/bytedance/seedance-2.5');
     await expect(rightBadge).toContainText('Kling 4.0');
+    await expect(rightBadge).toContainText('1080p');
     await expect(rightBadge).toContainText(/\$\d+\.\d{3}\/s/);
     await expect(rightBadge).toHaveAttribute('href', '/kling/kling-4.0');
 
@@ -46,10 +48,26 @@ test.describe('split comparison homepage hero', () => {
     await expect(dock.getByRole('button', { name: 'Generate', exact: true })).toBeVisible();
     expect(modalVideoRequests).toEqual([]);
 
+    // Verify desktop corner badges do not overlap the centered prompt dock.
+    const [leftBox, rightBox, dockBox] = await Promise.all([
+      leftBadge.boundingBox(),
+      rightBadge.boundingBox(),
+      dock.boundingBox(),
+    ]);
+    expect(leftBox).not.toBeNull();
+    expect(rightBox).not.toBeNull();
+    expect(dockBox).not.toBeNull();
+    if (leftBox && rightBox && dockBox && Math.abs(leftBox.y - dockBox.y) < 40) {
+      expect(leftBox.x + leftBox.width).toBeLessThan(dockBox.x);
+      expect(dockBox.x + dockBox.width).toBeLessThan(rightBox.x);
+    }
+
     // Clicking Generate opens the lazy comparison modal with both videos and homepage actions.
     await dock.getByRole('button', { name: 'Generate', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Shared Input' });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId('hero-modal-bar-left')).toContainText('1080p');
+    await expect(dialog.getByTestId('hero-modal-bar-right')).toContainText('1080p');
     await expect(dialog.locator('video')).toHaveCount(2);
     await expect(dialog.getByRole('button', { name: 'Audio: Muted' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Copy prompt' })).toBeVisible();
