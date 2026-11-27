@@ -172,7 +172,8 @@ export interface Route {
     /** Operations verified at this same resolution, duration and date. */
     operations?: [Operation, ...Operation[]];
     resolution: string;
-    duration: number;
+    /** Verified output duration in seconds for video routes; omitted for image routes. */
+    duration?: number;
   };
   rates: Rate[];
   /** Informational provider tariff only; never participates in execution, quotes or settlement. */
