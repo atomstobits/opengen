@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { staffRefundHash } from './staff-refunds.js';
 
 export const AGED_COST_RELIEF_VERSION = 'aged-cost-relief-v1' as const;
+export const AGED_COST_RELIEF_MIN_AGE_MINUTES = 60 as const;
 export class AgedCostReliefError extends Error {
   constructor(
     public code: string,
@@ -67,6 +68,8 @@ export interface AgedCostReliefApprovalRequest extends AgedCostReliefReview {
 export interface AgedCostReliefOptions {
   activation?: 'staff-approved';
   policyVersion: string;
+  /** Minimum elapsed minutes since earliest durable attempt (floor 60 minutes enforced in SQL). */
+  minAgeMinutes?: number;
   /** Trusted server hooks use this client for reads/revalidation only. They must
    * not perform external I/O, commit, acquire another connection or change money. */
   authorize(client: PoolClient, context: unknown): Promise<AgedCostReliefActor>;
@@ -192,20 +195,26 @@ function receipt(row: Record<string, unknown>): AgedCostReliefReceipt {
  * The original supplier liability stays held until the ordinary evidence path
  * settles it. Its unused advance is recovered only from that original release. */
 export class AgedCostReliefStore {
+  private readonly minAgeMinutes: number;
   constructor(
     private pool: Pool,
     private options: AgedCostReliefOptions,
   ) {
+    const minAgeMinutes = options?.minAgeMinutes ?? AGED_COST_RELIEF_MIN_AGE_MINUTES;
     if (
       !options ||
       typeof options.authorize !== 'function' ||
       typeof options.creditInTransaction !== 'function' ||
       typeof options.policyVersion !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(options.policyVersion) ||
-      (options.activation !== undefined && options.activation !== 'staff-approved')
+      (options.activation !== undefined && options.activation !== 'staff-approved') ||
+      !Number.isSafeInteger(minAgeMinutes) ||
+      minAgeMinutes < AGED_COST_RELIEF_MIN_AGE_MINUTES ||
+      minAgeMinutes > 525_600
     )
       fail('aged_cost_relief_disabled', 'Use explicit reviewed staff relief composition.', 403);
-    this.options = Object.freeze({ ...options });
+    this.minAgeMinutes = minAgeMinutes;
+    this.options = Object.freeze({ ...options, minAgeMinutes });
   }
   private async actor(client: PoolClient, context: unknown) {
     const actor = await this.options.authorize(client, context);
@@ -396,9 +405,9 @@ export class AgedCostReliefStore {
     const aging = (
       await client.query(
         `SELECT min(started_at)::text AS liability_since,
-      coalesce(min(started_at)<=clock_timestamp()-interval '24 hours',false) AS aged
+      coalesce(min(started_at)<=clock_timestamp()-($2 * interval '1 minute'),false) AS aged
       FROM mr_attempts WHERE job_id=$1`,
-        [row.id],
+        [row.id, this.minAgeMinutes],
       )
     ).rows[0];
     if (

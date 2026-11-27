@@ -14,7 +14,7 @@ const source = {
   commit: 'a'.repeat(40),
   tree: 'b'.repeat(40),
   dirty: false,
-  migrations: Array.from({ length: 33 }, (_, i) => ({
+  migrations: Array.from({ length: 34 }, (_, i) => ({
     name: `${String(i + 1).padStart(3, '0')}.sql`,
     checksum: (i + 1).toString(16).padStart(64, '0'),
   })),
@@ -102,6 +102,7 @@ describe('offline current-core activation assertions', () => {
         '031.sql',
         '032.sql',
         '033.sql',
+        '034.sql',
       ],
       hostedReadiness: 'not-established',
     });

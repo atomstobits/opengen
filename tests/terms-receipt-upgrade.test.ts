@@ -156,7 +156,7 @@ it.skipIf(!databaseUrl)(
       await engine.initialize();
       const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
       expect(journal.slice(0, 28)).toEqual(oldJournal);
-      expect(journal).toHaveLength(33);
+      expect(journal).toHaveLength(34);
       expect(journal[28]).toMatchObject({
         name: '029.sql',
         checksum: sha256(await migration('029.sql')),
@@ -166,7 +166,7 @@ it.skipIf(!databaseUrl)(
       // separately verifying the one legitimate new journal entry above.
       after.mr_migrations = after.mr_migrations!.filter(
         (row) =>
-          !['029.sql', '030.sql', '031.sql', '032.sql', '033.sql'].includes(
+          !['029.sql', '030.sql', '031.sql', '032.sql', '033.sql', '034.sql'].includes(
             JSON.parse(row.value).name,
           ),
       );
@@ -186,7 +186,7 @@ it.skipIf(!databaseUrl)(
       const afterRestart = await snapshot();
       afterRestart.mr_migrations = afterRestart.mr_migrations!.filter(
         (row) =>
-          !['029.sql', '030.sql', '031.sql', '032.sql', '033.sql'].includes(
+          !['029.sql', '030.sql', '031.sql', '032.sql', '033.sql', '034.sql'].includes(
             JSON.parse(row.value).name,
           ),
       );

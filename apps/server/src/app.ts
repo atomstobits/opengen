@@ -108,6 +108,12 @@ export interface EngineLike extends AccountsEngine, Partial<ComparisonEngine> {
     authority?: { operatorId: string },
   ): Promise<Job>;
   reconciliations?(workspaceId: string, id: string): Promise<unknown>;
+  pendingReconciliations?(options?: {
+    workspaceId?: string;
+    kind?: 'customer-hold' | 'supplier-cost' | 'all';
+    minAgeMinutes?: number;
+    limit?: number;
+  }): Promise<unknown>;
   executableForWorkspace?(
     workspaceId: string,
     input: GenerateInput,

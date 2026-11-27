@@ -120,6 +120,8 @@ export * from './execution-telemetry.js';
 export * from './execution-scope.js';
 export * from './job-status.js';
 export * from './byteplus.js';
+import { isOpaqueBillingRoute, opaquePublishedTariffChargeMicros } from './opaque-tariff.js';
+export * from './opaque-tariff.js';
 export * from './providers.js';
 export * from './accounts.js';
 export * from './terms-receipts.js';
@@ -170,13 +172,31 @@ export interface Balance {
   currency: 'USD';
 }
 export interface Reconciliation {
-  action: 'resume' | 'reject' | 'settle';
+  action: 'resume' | 'reject' | 'settle' | 'resolve' | 'record-supplier-cost';
   reference: string;
   note: string;
   evidenceUrl: string;
   upstreamId?: string;
+  terminalStatus?: 'failed' | 'cancelled';
   billedCostMicros?: number;
   costBasis?: 'operator-audited';
+}
+export interface PendingReconciliationItem {
+  id: string;
+  workspaceId: string;
+  pendingKind: 'customer-hold' | 'supplier-cost';
+  status: string;
+  routeId: string;
+  deploymentId: string;
+  providerId: string | null;
+  upstreamId: string | null;
+  reservedMicros: number;
+  settledMicros: number | null;
+  attemptCount: number;
+  billingPollPending: boolean;
+  createdAt: string;
+  completedAt: string | null;
+  ageMinutes: number;
 }
 export interface EngineOptions {
   databaseUrl: string;
@@ -253,6 +273,7 @@ interface JobRow {
   error: string | null;
   reserved_micros: string;
   settled_micros: string | null;
+  upstream_cost_micros: string | null;
   attempt_count: number;
   created_at: Date;
   updated_at: Date;
@@ -589,6 +610,7 @@ export class Engine {
         '031.sql',
         '032.sql',
         '033.sql',
+        '034.sql',
       ].map((name, index) => {
         if (name !== `${String(index + 1).padStart(3, '0')}.sql`)
           throw new Error('Migration manifest must be unique and contiguous.');
@@ -958,7 +980,7 @@ export class Engine {
       upstreamId: row.upstream_id,
     });
   }
-  /** Accepted receipt work only; never a new attempt, submit, reservation or settlement. */
+  /** Accepted receipt work only; never a new attempt, submit, or reservation. For opaque-provider routes without an active billing poll, verified delivery settles the customer wallet at the frozen published tariff. */
   async recoverDeliveryOnce(): Promise<boolean> {
     if (!this.providerExecutionEnabled) return false;
     const recovered = await this.delivery.recoverOne();
@@ -1031,6 +1053,14 @@ export class Engine {
           error?.message ?? null,
         ],
       );
+      if (result.deliveryStatus === 'available' && row.settled_micros === null) {
+        await this.trySettleOpaqueVerifiedDelivery(
+          client,
+          row,
+          result.deliveryStatus,
+          row.billing_poll_pending,
+        );
+      }
     });
     return true;
   }
@@ -2387,6 +2417,72 @@ export class Engine {
         );
       return existing;
     }
+    if (input.action === 'record-supplier-cost') {
+      if (input.billedCostMicros === undefined)
+        throw new EngineError(
+          'invalid_settlement',
+          'Recording supplier cost requires evidenced billedCostMicros.',
+        );
+      micros(input.billedCostMicros);
+      return this.transaction(async (client) => {
+        await client.query('SELECT id FROM mr_workspaces WHERE id=$1 FOR UPDATE', [workspaceId]);
+        const row = (
+          await client.query<JobRow>(
+            'SELECT * FROM mr_jobs WHERE workspace_id=$1 AND id=$2 FOR UPDATE',
+            [workspaceId, id],
+          )
+        ).rows[0];
+        if (!row) throw new EngineError('not_found', 'Generation not found.', 404);
+        const hash = createHash('sha256').update(stableJson(input)).digest('hex');
+        const replay = (
+          await client.query(
+            'SELECT request_hash FROM mr_reconciliations WHERE workspace_id=$1 AND job_id=$2 AND reference=$3',
+            [workspaceId, id, input.reference],
+          )
+        ).rows[0];
+        if (replay) {
+          if (replay.request_hash !== hash)
+            throw new EngineError(
+              'reconciliation_conflict',
+              'This reference already records different evidence or cost.',
+              409,
+            );
+          return job(row);
+        }
+        if (row.settled_micros === null)
+          throw new EngineError(
+            'invalid_transition',
+            'Use settle or resolve for unsettled jobs; record-supplier-cost applies only after customer settlement.',
+            409,
+          );
+        if (row.upstream_cost_micros !== null)
+          throw new EngineError(
+            'already_reconciled',
+            'Upstream supplier cost has already been recorded for this job.',
+            409,
+          );
+        await client.query(
+          'INSERT INTO mr_reconciliations(id,workspace_id,job_id,reference,request_hash,action,note,evidence_url) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+          [
+            randomUUID(),
+            workspaceId,
+            id,
+            input.reference,
+            hash,
+            input.action,
+            input.note,
+            input.evidenceUrl,
+          ],
+        );
+        const updated = (
+          await client.query<JobRow>(
+            'UPDATE mr_jobs SET upstream_cost_micros=$2,updated_at=now() WHERE id=$1 RETURNING *',
+            [id, input.billedCostMicros],
+          )
+        ).rows[0]!;
+        return job(updated);
+      }).then((value) => this.withFreshAssets(value));
+    }
     let result: ProviderResult;
     if (input.action === 'resume') {
       if (!['submission-unknown', 'submitting'].includes(existing.status))
@@ -2413,6 +2509,34 @@ export class Engine {
         failureCategory: 'invalid',
         billedCostMicros: 0,
         error: 'The installation operator confirmed that the upstream request was not accepted.',
+      };
+    } else if (input.action === 'resolve') {
+      if (!['submission-unknown', 'running'].includes(existing.status))
+        throw new EngineError(
+          'invalid_transition',
+          'Only a stuck running or unknown-acceptance job can be resolved to terminal and settled.',
+          409,
+        );
+      if (input.billedCostMicros === undefined)
+        throw new EngineError(
+          'invalid_settlement',
+          'Resolve requires evidenced provider cost (use 0 for confirmed zero cost).',
+        );
+      micros(input.billedCostMicros);
+      const terminalStatus = input.terminalStatus ?? 'failed';
+      if (terminalStatus !== 'failed' && terminalStatus !== 'cancelled')
+        throw new EngineError(
+          'invalid_transition',
+          'Resolve target status must be failed or cancelled.',
+        );
+      result = {
+        status: terminalStatus,
+        ...(terminalStatus === 'failed' ? { failureCategory: 'unknown' as const } : {}),
+        billedCostMicros: input.billedCostMicros,
+        error:
+          terminalStatus === 'cancelled'
+            ? 'The installation operator resolved this job as cancelled with verified provider billing.'
+            : 'The installation operator resolved this stuck job as failed with verified provider billing.',
       };
     } else {
       if (!terminal.has(existing.status) || input.billedCostMicros === undefined)
@@ -2449,6 +2573,94 @@ export class Engine {
         [workspaceId, id],
       )
     ).rows;
+  }
+
+  async pendingReconciliations(
+    options: {
+      workspaceId?: string;
+      kind?: 'customer-hold' | 'supplier-cost' | 'all';
+      minAgeMinutes?: number;
+      limit?: number;
+    } = {},
+  ): Promise<PendingReconciliationItem[]> {
+    const kind = options.kind ?? 'customer-hold';
+    const limit = Math.min(Math.max(1, options.limit ?? 100), 200);
+    const minAgeMinutes = Math.max(0, Math.min(options.minAgeMinutes ?? 0, 525_600));
+    const { rows } = await this.pool.query<{
+      id: string;
+      workspace_id: string;
+      pending_kind: 'customer-hold' | 'supplier-cost';
+      status: string;
+      route_id: string;
+      deployment_id: string;
+      provider_id: string | null;
+      upstream_id: string | null;
+      reserved_micros: string;
+      settled_micros: string | null;
+      attempt_count: number;
+      billing_poll_pending: boolean;
+      created_at: Date;
+      completed_at: Date | null;
+      age_minutes: number;
+    }>(
+      `SELECT j.id,
+              j.workspace_id,
+              CASE WHEN j.settled_micros IS NULL THEN 'customer-hold' ELSE 'supplier-cost' END AS pending_kind,
+              j.status,
+              j.route_snapshot->>'id' AS route_id,
+              j.deployment_snapshot->>'id' AS deployment_id,
+              j.deployment_snapshot->>'providerId' AS provider_id,
+              j.upstream_id,
+              j.reserved_micros::text,
+              j.settled_micros::text,
+              j.attempt_count,
+              j.billing_poll_pending,
+              j.created_at,
+              j.completed_at,
+              GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (clock_timestamp() - COALESCE(a.first_started_at, j.created_at))) / 60))::integer AS age_minutes
+         FROM mr_jobs j
+         LEFT JOIN (
+           SELECT job_id, min(started_at) AS first_started_at
+             FROM mr_attempts
+            GROUP BY job_id
+         ) a ON a.job_id = j.id
+        WHERE (
+            ($4 IN ('customer-hold', 'all')
+              AND j.settled_micros IS NULL
+              AND j.reserved_micros > 0
+              AND (
+                j.status IN ('succeeded', 'failed', 'cancelled', 'submission-unknown')
+                OR (j.status = 'running' AND COALESCE(a.first_started_at, j.created_at) <= clock_timestamp() - interval '60 minutes')
+              ))
+            OR ($4 IN ('supplier-cost', 'all')
+              AND j.settled_micros IS NOT NULL
+              AND j.upstream_cost_micros IS NULL
+              AND COALESCE(j.input->>'billing', 'managed') = 'managed'
+              AND j.status = 'succeeded')
+          )
+          AND ($1::text IS NULL OR j.workspace_id = $1)
+          AND COALESCE(a.first_started_at, j.created_at) <= clock_timestamp() - ($2 * interval '1 minute')
+        ORDER BY COALESCE(a.first_started_at, j.created_at) ASC, j.id ASC
+        LIMIT $3`,
+      [options.workspaceId ?? null, minAgeMinutes, limit, kind],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      workspaceId: row.workspace_id,
+      pendingKind: row.pending_kind,
+      status: row.status,
+      routeId: row.route_id,
+      deploymentId: row.deployment_id,
+      providerId: row.provider_id,
+      upstreamId: row.upstream_id,
+      reservedMicros: Number(row.reserved_micros),
+      settledMicros: row.settled_micros === null ? null : Number(row.settled_micros),
+      attemptCount: row.attempt_count,
+      billingPollPending: row.billing_poll_pending,
+      createdAt: row.created_at.toISOString(),
+      completedAt: row.completed_at ? row.completed_at.toISOString() : null,
+      ageMinutes: row.age_minutes,
+    }));
   }
 
   async cancel(workspaceId: string, id: string): Promise<Job> {
@@ -2509,6 +2721,7 @@ export class Engine {
     upstreamCostMicros: number | null,
     feeSettlement?: GenerationFeeSettlement,
     costEvidence?: GenerationCostEvidence,
+    extraDetails?: Record<string, unknown>,
   ): Promise<void> {
     if (row.settled_micros !== null) return;
     if (Boolean(row.fee_admission) !== Boolean(feeSettlement))
@@ -2565,6 +2778,7 @@ export class Engine {
               : upstreamCostMicros === null
                 ? null
                 : Math.max(0, upstreamCostMicros - charge)),
+          ...(extraDetails ?? {}),
           ...(feeSettlement ? { billingFee: feeSettlement } : {}),
         }),
       ],
@@ -2592,10 +2806,53 @@ export class Engine {
         chargedMicros: charge,
         billing: row.input.billing ?? 'managed',
         upstreamCostMicros,
+        ...(extraDetails ?? {}),
         ...(customerRelief ? { customerRelief } : {}),
         ...(feeSettlement ? { billingFee: feeSettlement } : {}),
       },
     });
+  }
+
+  /**
+   * For opaque providers (e.g. Runway, Replicate, MiniMax video, fal without billing key) that
+   * do not report per-request USD charges, settle the customer wallet once output delivery is
+   * verified (`delivery_status === 'available'`) using the frozen published tariff, while keeping
+   * `upstream_cost_micros = null` for independent supplier-invoice reconciliation.
+   */
+  private async trySettleOpaqueVerifiedDelivery(
+    client: PoolClient,
+    row: JobRow,
+    deliveryStatus: string | undefined,
+    hasBillingPollPending: boolean,
+  ): Promise<boolean> {
+    if (
+      row.settled_micros !== null ||
+      row.fee_admission !== null ||
+      (row.input.billing ?? 'managed') !== 'managed' ||
+      deliveryStatus !== 'available' ||
+      hasBillingPollPending ||
+      !isOpaqueBillingRoute(row.route_snapshot)
+    )
+      return false;
+    const tariffMicros = opaquePublishedTariffChargeMicros(row.route_snapshot, row.input);
+    if (tariffMicros === null) return false;
+    // Never bypass aged-cost-relief's verified-upstream-cost settlement guard.
+    const reliefSchema = (await client.query("SELECT to_regclass('mr_aged_cost_reliefs') AS name"))
+      .rows[0]?.name;
+    if (reliefSchema) {
+      const hasRelief = (
+        await client.query(
+          'SELECT 1 FROM mr_aged_cost_reliefs WHERE workspace_id=$1 AND job_id=$2',
+          [row.workspace_id, row.id],
+        )
+      ).rowCount;
+      if (hasRelief) return false;
+    }
+    await this.settle(client, row, tariffMicros, null, undefined, undefined, {
+      settlementBasis: 'verified-delivery-published-tariff',
+      supplierReconciliationPending: true,
+    });
+    return true;
   }
 
   private async settleNeverDispatched(client: PoolClient, row: JobRow, slotClosed: boolean) {
@@ -2625,13 +2882,16 @@ export class Engine {
   private async generationCostScope(
     row: JobRow,
     client: Pick<PoolClient, 'query'> | Pool,
+    options: { allowMissingUpstreamId?: boolean } = {},
   ): Promise<GenerationCostScope | null> {
     if (
-      !row.upstream_id ||
-      row.upstream_id.length > 256 ||
-      !/^[^\s\u0000-\u001f]+$/.test(row.upstream_id)
+      row.upstream_id !== null &&
+      (!row.upstream_id ||
+        row.upstream_id.length > 256 ||
+        !/^[^\s\u0000-\u001f]+$/.test(row.upstream_id))
     )
       return null;
+    if (row.upstream_id === null && !options.allowMissingUpstreamId) return null;
     const attempt = (
       await client.query<{ id: string }>(
         'SELECT id FROM mr_attempts WHERE job_id=$1 AND number=$2 AND route_id=$3 AND deployment_id=$4',
@@ -2651,7 +2911,7 @@ export class Engine {
       attemptId: attempt.id,
       providerId: row.deployment_snapshot.providerId,
       deploymentId: row.deployment_snapshot.id,
-      upstreamReference: row.upstream_id,
+      upstreamReference: row.upstream_id ?? `no-upstream-id:${attempt.id}`,
     };
   }
 
@@ -2663,7 +2923,7 @@ export class Engine {
     authority?: { operatorId: string },
   ): Promise<boolean> {
     const admission = row.fee_admission!;
-    const audit = reconciliation?.action === 'settle';
+    const audit = reconciliation?.action === 'settle' || reconciliation?.action === 'resolve';
     const refuse = () => {
       if (audit)
         throw new EngineError(
@@ -2677,7 +2937,7 @@ export class Engine {
     if (audit && (reconciliation.costBasis !== 'operator-audited' || !authority?.operatorId))
       return refuse();
     if (!audit && (!result.costEvidence || !this.injectedAdapters)) return false;
-    const scope = await this.generationCostScope(row, client);
+    const scope = await this.generationCostScope(row, client, { allowMissingUpstreamId: audit });
     if (!scope) return refuse();
     const observation: GenerationCostEvidence = audit
       ? {
@@ -2867,6 +3127,20 @@ export class Engine {
             'This job is already settled; no second financial adjustment was applied.',
             409,
           );
+        if (reconciliation.action === 'resolve') {
+          if (row.settled_micros !== null)
+            throw new EngineError(
+              'already_settled',
+              'This job is already settled; no second financial adjustment was applied.',
+              409,
+            );
+          if (!['submission-unknown', 'running'].includes(row.status))
+            throw new EngineError(
+              'invalid_transition',
+              'Only a stuck running or unknown-acceptance job can be resolved to terminal and settled.',
+              409,
+            );
+        }
         if (
           reconciliation.action === 'resume' &&
           row.upstream_id &&
@@ -3014,6 +3288,17 @@ export class Engine {
         isTerminal
       ) {
         await this.settle(client, row, result.billedCostMicros, result.billedCostMicros);
+      } else if (
+        isTerminal &&
+        status === 'succeeded' &&
+        (result.billedCostMicros === undefined || result.billedCostMicros === null)
+      ) {
+        await this.trySettleOpaqueVerifiedDelivery(
+          client,
+          row,
+          delivery?.deliveryStatus,
+          Boolean(result.retryAfterMs),
+        );
       }
       const updated = await client.query<JobRow>(
         `UPDATE mr_jobs SET status=$2,outputs=$3,error=$4,failure_category=$7,delivery_status=COALESCE($8,delivery_status),delivery_errors=COALESCE($9,delivery_errors),billing_poll_pending=$10,execution_progress=$11,execution_error=$12,execution_timings=COALESCE($13,execution_timings),lease_until=NULL,

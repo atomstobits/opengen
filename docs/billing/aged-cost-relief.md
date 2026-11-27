@@ -10,8 +10,11 @@ HTTP, MCP, customer, agent, scheduler, provider or cash-payment entry point.
 
 For one managed job with a positive unresolved reservation `R`, staff may advance
 exactly `R` into the same paying workspace. There is one immutable decision per
-job. Eligibility starts at the policy's 24-hour manual-review point, measured by
-database time from the earliest durable provider attempt. A rejected attempt does
+job. Following forward migration `034.sql`, eligibility starts at **1 hour** (60
+minutes, configurable upward via `minAgeMinutes` in `AgedCostReliefOptions`),
+measured by database time from the earliest durable provider attempt (shortened
+from the earlier 24-hour floor in `031.sql` so customer funds are not held for a
+full day). A rejected attempt does
 not establish zero supplier cost. An admitted fallback with that predecessor can
 still have unresolved exposure. The day-30
 decision remains an operator obligation. This operation performs no automatic
@@ -69,8 +72,9 @@ accounting; it does not certify that every supplier invoice has been reconciled.
 
 ## Manual procedure
 
-1. Open the case after an acceptance/cost question has remained unresolved for
-   24 hours. Record the original request time, job and paying workspace, amount,
+1. Open the case once an acceptance/cost question has remained unresolved for
+   1 hour (the minimum staff-relief eligibility window enforced by `034.sql`).
+   Record the original request time, job and paying workspace, amount,
    issue, evidence sought, policy version and next review date. Target the first
    explanation within two business days, billing-owner escalation at seven
    calendar days and weekly updates. By day 30, document reliable settlement or

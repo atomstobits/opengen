@@ -594,7 +594,7 @@ describe.skipIf(!configured)('bounded staff relief preserves original supplier a
     }
   });
 
-  it('requires a durable attempt aged at least 24 hours rather than an old queued job', async () => {
+  it('requires a durable attempt aged at least 1 hour rather than an old queued job', async () => {
     const f = await agedCostReliefFixture();
     try {
       const queued = await f.admit({ queued: true });
@@ -604,10 +604,10 @@ describe.skipIf(!configured)('bounded staff relief preserves original supplier a
       );
       await expect(f.store.review(f.target(queued), f.context)).rejects.toThrow();
       await f.engine.cancel(f.workspaceId, queued.id);
-      const recent = await f.admit({ hours: 23.99 });
+      const recent = await f.admit({ hours: 0.99 });
       await expect(f.store.review(f.target(recent), f.context)).rejects.toThrow();
       await f.engine.pool.query(
-        "UPDATE mr_attempts SET started_at=clock_timestamp()-interval '24 hours' WHERE job_id=$1",
+        "UPDATE mr_attempts SET started_at=clock_timestamp()-interval '1 hour' WHERE job_id=$1",
         [recent.id],
       );
       expect((await f.store.review(f.target(recent), f.context)).amountMicros).toBe(

@@ -5,7 +5,7 @@ import type { EngineLike } from './app.js';
 
 export const reconciliationSchema = z
   .object({
-    action: z.enum(['resume', 'reject', 'settle']),
+    action: z.enum(['resume', 'reject', 'settle', 'resolve', 'record-supplier-cost']),
     reference: z.string().min(1).max(200),
     note: z.string().min(20).max(1000),
     evidenceUrl: z.url().refine((value) => {
@@ -18,8 +18,20 @@ export const reconciliationSchema = z
       .max(256)
       .regex(/^[^\s\u0000-\u001f]+$/)
       .optional(),
+    terminalStatus: z.enum(['failed', 'cancelled']).optional(),
     billedCostMicros: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
     costBasis: z.literal('operator-audited').optional(),
+  })
+  .strict();
+export const pendingReconciliationsQuerySchema = z
+  .object({
+    workspaceId: z
+      .string()
+      .regex(/^[a-zA-Z0-9_-]{1,80}$/)
+      .optional(),
+    kind: z.enum(['customer-hold', 'supplier-cost', 'all']).default('customer-hold'),
+    minAgeMinutes: z.coerce.number().int().min(0).max(525_600).default(0),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
   })
   .strict();
 export const ledgerQuerySchema = z
@@ -88,6 +100,19 @@ export async function registerOperator(
       };
     },
   );
+  app.get('/v1/operator/reconciliations/pending', async (request, reply) => {
+    const principal = await options.authenticate(request, 'keys:write');
+    if (!principal.bootstrap)
+      throw Object.assign(
+        new Error('Only the installation operator can list pending reconciliation holds.'),
+        { statusCode: 403 },
+      );
+    const query = pendingReconciliationsQuerySchema.parse(request.query);
+    reply.header('Cache-Control', 'no-store');
+    return {
+      data: (await engine().pendingReconciliations?.(query)) ?? [],
+    };
+  });
   app.get<{ Params: { workspaceId: string; id: string } }>(
     '/v1/workspaces/:workspaceId/generations/:id',
     async (request, reply) => {

@@ -16,6 +16,56 @@ import { createPublicPinnedFetch, type PublicResolver } from './public-network.j
 const models = new Set(['qwen-image-2.1-turbo', 'qwen-image-2.1-pro', 'qwen-image-3.0-pro']);
 export const isQwenImageModel = (model: string) => models.has(model);
 
+const qwenTierMaxPixels: Record<string, number> = {
+  '1K': 1024 * 1024,
+  '2K': 2048 * 2048,
+};
+
+/**
+ * Exact Alibaba Model Studio Qwen Image text-to-image settlement from returned usage
+ * multiplied by the job's frozen regional route rate. Fail-closed on edits, custom sizes,
+ * thinking mode, missing/mismatched usage, oversized dimensions, or missing route tariff.
+ */
+export function observedQwenImageCostMicros(
+  context: Pick<AdapterContext, 'input' | 'route'>,
+  body: Record<string, unknown>,
+): number | null {
+  if (context.input.operation !== 'text-to-image') return null;
+  const args = context.input.input;
+  if (args.size || args.thinking === true) return null;
+  const tier = (args.resolution ?? '').toUpperCase();
+  const maxPixels = qwenTierMaxPixels[tier];
+  if (!maxPixels) return null;
+  const rate = context.route.rates.find(
+    (entry) =>
+      entry.unit === 'image' &&
+      entry.resolution.toUpperCase() === tier &&
+      (!entry.operation || entry.operation === 'text-to-image'),
+  );
+  if (!rate) return null;
+  if (!body.usage || typeof body.usage !== 'object' || Array.isArray(body.usage)) return null;
+  const usage = providerObject(body.usage);
+  const rawCount = usage.image_count !== undefined ? usage.image_count : usage.output_image_count;
+  if (typeof rawCount !== 'number' || !Number.isSafeInteger(rawCount) || rawCount !== 1)
+    return null;
+  const rawWidth = usage.width !== undefined ? usage.width : usage.output_width;
+  const rawHeight = usage.height !== undefined ? usage.height : usage.output_height;
+  if (rawWidth !== undefined || rawHeight !== undefined) {
+    if (
+      typeof rawWidth !== 'number' ||
+      !Number.isSafeInteger(rawWidth) ||
+      rawWidth <= 0 ||
+      typeof rawHeight !== 'number' ||
+      !Number.isSafeInteger(rawHeight) ||
+      rawHeight <= 0 ||
+      rawWidth * rawHeight > maxPixels
+    )
+      return null;
+  }
+  const total = rate.usdMicros * rawCount;
+  return Number.isSafeInteger(total) && total >= 0 ? total : null;
+}
+
 function size(resolution: string, ratio = '1:1'): string | null {
   const tier = resolution.toUpperCase();
   if (!['1K', '2K'].includes(tier)) return null;
@@ -209,7 +259,7 @@ export function createQwenImageAdapter(
         throw new Error('Qwen has not returned the expected single image output.');
       return {
         status: 'succeeded',
-        billedCostMicros: null,
+        billedCostMicros: observedQwenImageCostMicros(context, body),
         outputs: [{ url: image, mediaType: 'image/png', fidelity: 'unverified' }],
       };
     },
