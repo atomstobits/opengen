@@ -12,6 +12,54 @@ function nanoToMicrosCeil(nanoUsd: bigint): number | null {
   return micros <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(micros) : null;
 }
 
+function allowsResidualTextOutput(
+  body: Record<string, unknown>,
+  mediaModality: 'image' | 'video',
+  textOutputTokens: number,
+  thoughtTokens: number,
+  mediaOutputTokens: number,
+): boolean {
+  // Live GCP Billing SKU evidence (2026-11-27, opengen-dev, gemini-3.1-flash-lite-image)
+  // confirmed that Gemini Interactions image responses can fold thought-step tokens into
+  // total_output_tokens while reporting total_thought_tokens: 0 and omitting `text` from
+  // output_tokens_by_modality, billing the residual tokens under the text-output SKU (same
+  // rate as thought tokens). Only accept that residual when the response steps strictly prove
+  // a single image output plus thought/text steps with no other modalities or tool steps.
+  if (
+    mediaModality !== 'image' ||
+    textOutputTokens !== 0 ||
+    thoughtTokens !== 0 ||
+    mediaOutputTokens <= 0 ||
+    !Array.isArray(body.steps) ||
+    body.steps.length === 0
+  )
+    return false;
+  let sawThoughtOrText = false;
+  let imageBlocks = 0;
+  for (const rawStep of body.steps) {
+    if (!rawStep || typeof rawStep !== 'object' || Array.isArray(rawStep)) return false;
+    const step = providerObject(rawStep);
+    if (step.type === 'user_input') continue;
+    if (step.type === 'thought') {
+      sawThoughtOrText = true;
+      continue;
+    }
+    if (step.type === 'model_output') {
+      if (!Array.isArray(step.content) || step.content.length === 0) return false;
+      for (const rawBlock of step.content) {
+        if (!rawBlock || typeof rawBlock !== 'object' || Array.isArray(rawBlock)) return false;
+        const block = providerObject(rawBlock);
+        if (block.type === 'image') imageBlocks += 1;
+        else if (block.type === 'text') sawThoughtOrText = true;
+        else return false;
+      }
+      continue;
+    }
+    return false;
+  }
+  return sawThoughtOrText && imageBlocks === 1;
+}
+
 function parseGoogleInteractionTokens(
   body: Record<string, unknown>,
   mediaModality: 'image' | 'video',
@@ -49,11 +97,24 @@ function parseGoogleInteractionTokens(
     else if (modality === mediaModality) mediaOutputTokens += tokens;
     else if (tokens > 0) return null;
   }
-  if (textOutputTokens + mediaOutputTokens !== outputTokens) return null;
+  const accountedOutputTokens = textOutputTokens + mediaOutputTokens;
+  if (accountedOutputTokens > outputTokens) return null;
+  const residualOutputTokens = outputTokens - accountedOutputTokens;
+  if (
+    residualOutputTokens > 0 &&
+    !allowsResidualTextOutput(
+      body,
+      mediaModality,
+      textOutputTokens,
+      thoughtTokens,
+      mediaOutputTokens,
+    )
+  )
+    return null;
 
   return {
     inputTokens,
-    textAndThoughtTokens: textOutputTokens + thoughtTokens,
+    textAndThoughtTokens: textOutputTokens + thoughtTokens + residualOutputTokens,
     mediaOutputTokens,
   };
 }
