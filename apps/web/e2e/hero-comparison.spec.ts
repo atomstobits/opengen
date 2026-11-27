@@ -151,6 +151,18 @@ test.describe('split comparison homepage hero', () => {
     );
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
+
+    // Advance clip 3 (Wan 3.0) -> clip 4 (Seedance 2.0) -> clip 5 (Seedance 2.5 Flash)
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Seedance 2.0');
+    await expect(rightBadge).toHaveAttribute('href', '/bytedance/seedance-2.0');
+
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Seedance 2.5 Flash');
+    await expect(rightBadge).toHaveAttribute(
+      'href',
+      '/bytedance/seedance-2.5?variant=bytedance%2Fseedance-2.5-flash',
+    );
   });
 
   test.describe('phone viewport', () => {

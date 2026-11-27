@@ -321,5 +321,30 @@ describe('hero comparison pricing and media configuration', () => {
     expect(s20_1080.priceLabel).toBe('≈$0.370/s');
     expect(s20_1080.comparePriceLabel).toBe('≈$0.682/s');
     expect(s20_1080.discountLabel).toBe('-46%');
+
+    const s25Flash720 = resolveHeroModelPricing(
+      'bytedance/seedance-2.5-flash',
+      '720p',
+      '2026-11-26',
+    );
+    expect(s25Flash720.modelName).toBe('Seedance 2.5 Flash');
+    expect(s25Flash720.seriesHref).toBe(
+      '/bytedance/seedance-2.5?variant=bytedance%2Fseedance-2.5-flash',
+    );
+    expect(s25Flash720.providerName).toBe('BytePlus');
+    expect(s25Flash720.priceLabel).toBe('≈$0.150/s');
+    expect(s25Flash720.comparePriceLabel).toBe('≈$0.302/s');
+    expect(s25Flash720.discountLabel).toBe('-50%');
+
+    const allBuiltins = getHeroComparisons({
+      mediaBaseUrl: 'https://media.opengen.dev',
+      nowDate: '2026-11-26',
+    });
+    expect(allBuiltins).toHaveLength(12);
+    for (const clip of allBuiltins) {
+      expect(clip.left.priceLabel).toMatch(/\$\d+\.\d{3}\/s/);
+      expect(clip.right.priceLabel).toMatch(/\$\d+\.\d{3}\/s/);
+      expect(clip.right.discountLabel).toMatch(/^-\d+%$/);
+    }
   });
 });

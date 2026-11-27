@@ -365,7 +365,7 @@ export function HeroComparisonModal({
                     <img
                       src={src}
                       alt={`Shared reference image ${index + 1} (@Image${index + 1}) for ${clip.left.modelName} and ${clip.right.modelName}`}
-                      loading="lazy"
+                      fetchPriority="high"
                       decoding="async"
                     />
                     <figcaption>@Image{index + 1}</figcaption>
@@ -376,6 +376,7 @@ export function HeroComparisonModal({
               <img
                 src={inputImages[0]}
                 alt={`Shared input image for ${clip.left.modelName} and ${clip.right.modelName}`}
+                fetchPriority="high"
                 decoding="async"
               />
             )}
