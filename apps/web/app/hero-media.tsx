@@ -168,11 +168,21 @@ export function HeroSplitMedia({
 
   const handlePlaying = () => {
     setReadyClipId(clip.id);
-    // Warm only the next clip's lightweight poster image after the current clip is playing.
-    if (nextClip && !prefetchedPosters.current.has(nextClip.media.heroPosterWebp)) {
-      prefetchedPosters.current.add(nextClip.media.heroPosterWebp);
-      const preload = new window.Image();
-      preload.src = nextClip.media.heroPosterWebp;
+    // Warm only the next clip's lightweight poster (matching the format this browser uses) and tiny input thumb.
+    if (nextClip) {
+      const preferAvif =
+        Boolean(nextClip.media.heroPosterAvif) &&
+        (posterImg.current?.currentSrc?.endsWith('.avif') ?? true);
+      const nextPosterUrl = preferAvif
+        ? nextClip.media.heroPosterAvif!
+        : nextClip.media.heroPosterWebp;
+      for (const url of [nextPosterUrl, nextClip.media.inputThumbWebp]) {
+        if (!prefetchedPosters.current.has(url)) {
+          prefetchedPosters.current.add(url);
+          const preload = new window.Image();
+          preload.src = url;
+        }
+      }
     }
   };
 

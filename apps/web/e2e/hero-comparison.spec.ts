@@ -13,7 +13,7 @@ test.describe('split comparison homepage hero', () => {
     const modalVideoRequests: string[] = [];
     page.on('request', (req) => {
       const url = req.url();
-      if (url.endsWith('/seedance-2.5.mp4') || url.endsWith('/kling-4.0.mp4')) {
+      if (/\/hero\/[^/]+\/case-\d+\/(?!hero-split\.)[^/]+\.mp4(?:$|\?)/.test(url)) {
         modalVideoRequests.push(url);
       }
     });
@@ -103,6 +103,66 @@ test.describe('split comparison homepage hero', () => {
 
     // Modal video fetches occurred only after user interaction.
     expect(modalVideoRequests.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('renders poster-first SSR HTML without video tags and rotates through diverse models with multi-ref modal', async ({
+    page,
+    request,
+  }) => {
+    const ssrRes = await request.get('/');
+    expect(ssrRes.status()).toBe(200);
+    const html = await ssrRes.text();
+    expect(html).toContain('hero-poster.webp');
+    expect(html).not.toContain('<video');
+
+    await page.goto('/');
+    const hero = page.locator('.hero');
+    const rightBadge = hero.getByTestId('hero-badge-right');
+    const splitVideo = hero.locator('.hero-split-video');
+
+    await expect(splitVideo).toBeVisible();
+    await expect(rightBadge).toContainText('Kling 4.0');
+
+    // Advance clip 0 (Kling 4.0) -> clip 1 (Gemini Omni 1.2 Flash) -> clip 2 (FLUX 3 Video) -> clip 3 (Wan 3.0, 4 refs)
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Gemini Omni 1.2 Flash');
+    await expect(rightBadge).toHaveAttribute('href', '/google/gemini-omni-1.2-flash');
+
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('FLUX 3 Video');
+    await expect(rightBadge).toHaveAttribute('href', '/bfl/flux-3-video');
+
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Wan 3.0');
+    await expect(rightBadge).toHaveAttribute('href', '/alibaba/wan-3.0');
+
+    // Open multi-ref modal on case-18 (Wan 3.0, 4 shared reference images)
+    await hero
+      .getByTestId('hero-prompt-dock')
+      .getByRole('button', { name: 'Generate', exact: true })
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Shared Input' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId('hero-modal-bar-right')).toContainText('Wan 3.0');
+    await expect(dialog.locator('.hero-modal-input-strip figure')).toHaveCount(4);
+    await expect(dialog.locator('.hero-modal-video-stage video').nth(1)).toHaveAttribute(
+      'src',
+      /\/wan-3\.0\.mp4$/,
+    );
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+
+    // Advance clip 3 (Wan 3.0) -> clip 4 (Seedance 2.0) -> clip 5 (Seedance 2.5 Flash)
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Seedance 2.0');
+    await expect(rightBadge).toHaveAttribute('href', '/bytedance/seedance-2.0');
+
+    await splitVideo.dispatchEvent('ended');
+    await expect(rightBadge).toContainText('Seedance 2.5 Flash');
+    await expect(rightBadge).toHaveAttribute(
+      'href',
+      '/bytedance/seedance-2.5?variant=bytedance%2Fseedance-2.5-flash',
+    );
   });
 
   test.describe('phone viewport', () => {

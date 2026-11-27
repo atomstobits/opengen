@@ -265,6 +265,11 @@ export function HeroComparisonModal({
         : `Audio: ${clip.right.modelName}`;
 
   const browserHref = playgroundHref(clip.left.modelId, undefined, clip.operation);
+  const inputImages =
+    clip.media.inputImagesWebp.length > 0
+      ? clip.media.inputImagesWebp
+      : [clip.media.inputImageWebp];
+  const isMultiInput = inputImages.length > 1;
 
   const modalContent = (
     <div
@@ -349,12 +354,32 @@ export function HeroComparisonModal({
             </span>
             <CopyButton text={clip.fullPrompt} label="Copy prompt" />
           </div>
-          <div className="hero-modal-input-grid">
-            <img
-              src={clip.media.inputImageWebp}
-              alt={`Shared input image for ${clip.left.modelName} and ${clip.right.modelName}`}
-              decoding="async"
-            />
+          <div className={`hero-modal-input-grid${isMultiInput ? ' is-multi' : ''}`}>
+            {isMultiInput ? (
+              <div
+                className="hero-modal-input-strip"
+                aria-label={`${inputImages.length} shared reference images`}
+              >
+                {inputImages.map((src, index) => (
+                  <figure className="hero-modal-input-tile" key={src}>
+                    <img
+                      src={src}
+                      alt={`Shared reference image ${index + 1} (@Image${index + 1}) for ${clip.left.modelName} and ${clip.right.modelName}`}
+                      fetchPriority="high"
+                      decoding="async"
+                    />
+                    <figcaption>@Image{index + 1}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            ) : (
+              <img
+                src={inputImages[0]}
+                alt={`Shared input image for ${clip.left.modelName} and ${clip.right.modelName}`}
+                fetchPriority="high"
+                decoding="async"
+              />
+            )}
             <pre className="hero-modal-prompt">{clip.fullPrompt}</pre>
           </div>
         </div>
