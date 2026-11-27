@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { createEngine } from '@media-router/engine';
 import { TermsReceiptStore } from '../packages/engine/src/terms-receipts.js';
@@ -30,6 +30,53 @@ const identifier = (value: string) => {
 it('preserves the exact reviewed 001–028 migration bytes', async () => {
   for (const [name, checksum] of Object.entries(historicalChecksums))
     expect(sha256(await migration(name)), name).toBe(checksum);
+});
+
+function touchesTermsReceiptsDdl(sql: string): boolean {
+  const stripped = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+  return (
+    /\b(?:alter|drop|truncate)\s+table\b[^;]*\bmr_terms_receipts\b/i.test(stripped) ||
+    /\b(?:create(?:\s+or\s+replace)?|alter|drop)\s+(?:unique\s+)?(?:trigger|index|policy|rule)\b[^;]*\bmr_terms_receipts\b/i.test(
+      stripped,
+    ) ||
+    /\bcomment\s+on\s+table\b[^;]*\bmr_terms_receipts\b/i.test(stripped) ||
+    /\b(?:grant|revoke)\b[^;]*\bmr_terms_receipts\b/i.test(stripped)
+  );
+}
+
+it('flags post-029 migrations containing DDL on separately owned mr_terms_receipts', async () => {
+  // On hardened hosted Cloud SQL, mr_terms_receipts is owned by a dedicated NOLOGIN owner role
+  // (not the runtime role) so runtime code cannot disable immutability triggers. Any forward
+  // migration altering mr_terms_receipts cannot run as the runtime role on startup and requires
+  // the guarded owner-migration procedure in docs/RUNTIME-PERMISSIONS.md.
+  expect(
+    touchesTermsReceiptsDdl(
+      'CREATE TRIGGER receipt_guard BEFORE UPDATE ON mr_terms_receipts FOR EACH STATEMENT EXECUTE FUNCTION mr_terms_receipts_immutable();',
+    ),
+  ).toBe(true);
+  expect(
+    touchesTermsReceiptsDdl(
+      'CREATE OR REPLACE TRIGGER receipt_guard BEFORE UPDATE ON mr_terms_receipts FOR EACH STATEMENT EXECUTE FUNCTION mr_terms_receipts_immutable();',
+    ),
+  ).toBe(true);
+  expect(
+    touchesTermsReceiptsDdl(
+      'CREATE OR REPLACE TRIGGER other_guard BEFORE UPDATE ON mr_jobs FOR EACH STATEMENT EXECUTE FUNCTION mr_jobs_guard();',
+    ),
+  ).toBe(false);
+
+  const reviewedOwnerMigrations = new Set(['036.sql']);
+  const dir = new URL('../packages/engine/migrations/', import.meta.url);
+  const files = (await readdir(dir)).filter((name) => /^\d{3}\.sql$/.test(name)).sort();
+  const matched: string[] = [];
+  for (const name of files) {
+    if (name <= '029.sql') continue;
+    if (touchesTermsReceiptsDdl(await migration(name))) matched.push(name);
+  }
+  expect(
+    matched,
+    'Migration alters separately owned mr_terms_receipts; avoid altering it or follow docs/RUNTIME-PERMISSIONS.md owner-migration procedure and allowlist explicitly.',
+  ).toEqual([...reviewedOwnerMigrations].sort());
 });
 
 it.skipIf(!databaseUrl)(
