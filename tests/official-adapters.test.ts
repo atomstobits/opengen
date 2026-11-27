@@ -167,6 +167,143 @@ describe('Official Kling AI adapter (synthetic fixtures, no network)', () => {
     });
     expect(polled).toMatchObject({ status: 'succeeded', billedCostMicros: null });
   });
+
+  it('requires exact task ID match, never settles list-rate estimates without billing, and enforces omni-video prompt/ratio/ordering rules', async () => {
+    const bodies: unknown[] = [];
+    const adapter = createKlingAdapter({
+      env: { KLING_API_KEY: 'kling-fixture-key' },
+      fetch: async (_url, init) => {
+        if (init?.method === 'POST') {
+          bodies.push(JSON.parse(String(init.body)));
+          return Response.json({ code: 0, data: { id: 'kling-omni-1' } });
+        }
+        return Response.json({
+          code: 0,
+          data: [
+            {
+              id: 'kling-other-task',
+              status: 'succeeded',
+              outputs: [{ type: 'video', url: 'https://cdn.klingai.com/out/other.mp4' }],
+              usage: { output_duration: '3' },
+              billing: [{ charge_type: 'cash', currency: 'USD', amount: '0.471' }],
+            },
+          ],
+        });
+      },
+    });
+    const { route, deployment } = routeAndDeployment('kling-ap-southeast-1/kling-kling-4.0');
+
+    // Reference-to-video requires non-empty prompt and rejects aspectRatio: 'source'.
+    const r2vNoPrompt = parseGenerationRequest({
+      modelId: 'kling/kling-4.0',
+      routeId: route.id,
+      operation: 'reference-to-video',
+      input: {
+        resolution: '720p',
+        duration: 3,
+        aspectRatio: '16:9',
+        references: [{ type: 'image', asset: { url: 'https://media.example.com/ref.png' } }],
+      },
+    });
+    expect(adapter.preflight?.({ route, deployment, input: r2vNoPrompt })).toMatch(
+      /requires a prompt/i,
+    );
+
+    const r2vSourceRatio = parseGenerationRequest({
+      modelId: 'kling/kling-4.0',
+      routeId: route.id,
+      operation: 'reference-to-video',
+      input: {
+        prompt: 'Keep style from Image1.',
+        resolution: '720p',
+        duration: 3,
+        aspectRatio: 'source',
+        references: [{ type: 'image', asset: { url: 'https://media.example.com/ref.png' } }],
+      },
+    });
+    expect(adapter.preflight?.({ route, deployment, input: r2vSourceRatio })).toMatch(
+      /cannot guarantee source aspect-ratio preservation/i,
+    );
+
+    // video-edit defaults aspectRatio to 'source' in canonical parsing; adapter rejects it instead of mapping to adaptive.
+    const editDefaultRatio = parseGenerationRequest({
+      modelId: 'kling/kling-4.0',
+      routeId: route.id,
+      operation: 'video-edit',
+      input: {
+        prompt: 'Add rain.',
+        resolution: '720p',
+        duration: 3,
+        sourceVideo: { url: 'https://media.example.com/clip.mp4' },
+      },
+    });
+    expect(adapter.preflight?.({ route, deployment, input: editDefaultRatio })).toMatch(
+      /cannot guarantee source aspect-ratio preservation/i,
+    );
+
+    // Combined firstFrame + references + lastFrame orders refer_image BEFORE last_frame and maps auto -> adaptive.
+    const r2vCombined = parseGenerationRequest({
+      modelId: 'kling/kling-4.0',
+      routeId: route.id,
+      operation: 'reference-to-video',
+      input: {
+        prompt: 'Transition smoothly using Image2 style.',
+        resolution: '720p',
+        duration: 3,
+        aspectRatio: 'auto',
+        firstFrame: { url: 'https://media.example.com/first.png' },
+        lastFrame: { url: 'https://media.example.com/last.png' },
+        references: [{ type: 'image', asset: { url: 'https://media.example.com/ref.png' } }],
+      },
+    });
+    await adapter.submit({ jobId: 'job-omni-1', route, deployment, input: r2vCombined });
+    expect(bodies[0]).toMatchObject({
+      contents: [
+        { type: 'prompt', text: 'Transition smoothly using Image2 style.' },
+        { type: 'first_frame', url: 'https://media.example.com/first.png', id: 'Image1' },
+        { type: 'refer_image', url: 'https://media.example.com/ref.png', id: 'Image2' },
+        { type: 'last_frame', url: 'https://media.example.com/last.png', id: 'Image3' },
+      ],
+      settings: { aspect_ratio: 'adaptive' },
+    });
+
+    // Polling must not fall back to a singleton task with a mismatched ID.
+    expect(
+      await adapter.poll({
+        jobId: 'job-omni-1',
+        route,
+        deployment,
+        input: r2vCombined,
+        upstreamId: 'kling-omni-1',
+      }),
+    ).toMatchObject({ status: 'unknown' });
+
+    // Missing billing entries return null instead of settling a list-price estimate.
+    const noBillingAdapter = createKlingAdapter({
+      env: { KLING_API_KEY: 'kling-fixture-key' },
+      fetch: async () =>
+        Response.json({
+          code: 0,
+          data: [
+            {
+              id: 'kling-omni-1',
+              status: 'succeeded',
+              outputs: [{ type: 'video', url: 'https://cdn.klingai.com/out/no-bill.mp4' }],
+              usage: { output_duration: '3' },
+            },
+          ],
+        }),
+    });
+    expect(
+      await noBillingAdapter.poll({
+        jobId: 'job-omni-1',
+        route,
+        deployment,
+        input: r2vCombined,
+        upstreamId: 'kling-omni-1',
+      }),
+    ).toMatchObject({ status: 'succeeded', billedCostMicros: null });
+  });
 });
 
 describe('Official Black Forest Labs FLUX 3 adapter (synthetic fixtures, no network)', () => {
@@ -297,6 +434,55 @@ describe('Official Black Forest Labs FLUX 3 adapter (synthetic fixtures, no netw
     await expect(
       adapter.submit({ jobId: 'job-bfl-edit', route, deployment, input: editInput }),
     ).rejects.toBeInstanceOf(SubmissionRejected);
+
+    // Rejects aspectRatio: 'source' rather than converting it to prompt-controlled 'auto'.
+    const i2vSource = parseGenerationRequest({
+      modelId: 'bfl/flux-3-video',
+      routeId: route.id,
+      operation: 'image-to-video',
+      input: {
+        prompt: 'Subtle camera drift.',
+        resolution: '720p',
+        duration: 5,
+        aspectRatio: 'source',
+        firstFrame: { url: 'https://media.example.com/frame.png' },
+      },
+    });
+    expect(adapter.preflight?.({ route, deployment, input: i2vSource })).toMatch(
+      /cannot guarantee source aspect-ratio preservation/i,
+    );
+
+    const { route: imgRoute, deployment: imgDeployment } = routeAndDeployment(
+      'bfl-undisclosed/bfl-flux-3-image',
+    );
+    const imgEditSource = parseGenerationRequest({
+      modelId: 'bfl/flux-3-image',
+      routeId: imgRoute.id,
+      operation: 'image-edit',
+      input: {
+        prompt: 'Turn into dusk.',
+        resolution: '1K',
+        aspectRatio: 'source',
+        references: [{ type: 'image', asset: { url: 'https://media.example.com/frame.png' } }],
+      },
+    });
+    expect(
+      adapter.preflight?.({ route: imgRoute, deployment: imgDeployment, input: imgEditSource }),
+    ).toMatch(/cannot guarantee source aspect-ratio preservation/i);
+    const imgEditExplicit = parseGenerationRequest({
+      modelId: 'bfl/flux-3-image',
+      routeId: imgRoute.id,
+      operation: 'image-edit',
+      input: {
+        prompt: 'Turn into dusk.',
+        resolution: '1K',
+        aspectRatio: '3:4',
+        references: [{ type: 'image', asset: { url: 'https://media.example.com/frame.png' } }],
+      },
+    });
+    expect(
+      adapter.preflight?.({ route: imgRoute, deployment: imgDeployment, input: imgEditExplicit }),
+    ).toBeNull();
   });
 });
 
@@ -385,7 +571,69 @@ describe('Official Alibaba HappyHorse 1.1 adapter (synthetic fixtures, no networ
         firstFrame: { url: 'https://media.example.com/frame.png' },
       },
     });
-    expect(adapter.preflight?.({ route, deployment, input })).toMatch(/ratio/i);
+    expect(adapter.preflight?.({ route, deployment, input })).toMatch(
+      /does not support ratio overrides/i,
+    );
+    const sourceInput: GenerateInput = parseGenerationRequest({
+      modelId: 'alibaba/happy-horse-1.1',
+      routeId: route.id,
+      operation: 'image-to-video',
+      input: {
+        prompt: 'Gentle ripples.',
+        resolution: '720p',
+        duration: 3,
+        aspectRatio: 'source',
+        firstFrame: { url: 'https://media.example.com/frame.png' },
+      },
+    });
+    expect(adapter.preflight?.({ route, deployment, input: sourceInput })).toBeNull();
+  });
+
+  it('enforces HappyHorse 2,500-character Chinese and 5,000-character non-Chinese prompt limits across operations', () => {
+    const adapter = createAlibabaMediaAdapter({
+      env: {
+        ALIBABA_AP_SOUTHEAST_1_API_KEY: 'dashscope-fixture',
+        ALIBABA_AP_SOUTHEAST_1_ENDPOINT:
+          'https://ws-fixture.ap-southeast-1.maas.aliyuncs.com/api/v1',
+      },
+    });
+    const { route, deployment } = routeAndDeployment(
+      'alibaba-model-studio-ap-southeast-1/alibaba-happy-horse-1.1',
+    );
+    const cases: Array<{
+      operation: 'text-to-video' | 'image-to-video' | 'reference-to-video';
+      extra: Record<string, unknown>;
+    }> = [
+      { operation: 'text-to-video', extra: { aspectRatio: '16:9' } },
+      {
+        operation: 'image-to-video',
+        extra: { aspectRatio: 'source', firstFrame: { url: 'https://media.example.com/f.png' } },
+      },
+      {
+        operation: 'reference-to-video',
+        extra: {
+          aspectRatio: '16:9',
+          references: [{ type: 'image', asset: { url: 'https://media.example.com/r.png' } }],
+        },
+      },
+    ];
+    for (const { operation, extra } of cases) {
+      const make = (prompt: string) =>
+        parseGenerationRequest({
+          modelId: 'alibaba/happy-horse-1.1',
+          routeId: route.id,
+          operation,
+          input: { prompt, resolution: '720p', duration: 3, ...extra },
+        });
+      expect(adapter.preflight?.({ route, deployment, input: make('画'.repeat(2500)) })).toBeNull();
+      expect(adapter.preflight?.({ route, deployment, input: make('画'.repeat(2501)) })).toMatch(
+        /2,500/,
+      );
+      expect(adapter.preflight?.({ route, deployment, input: make('a'.repeat(5000)) })).toBeNull();
+      expect(adapter.preflight?.({ route, deployment, input: make('a'.repeat(5001)) })).toMatch(
+        /5,000/,
+      );
+    }
   });
 });
 
@@ -415,6 +663,21 @@ describe('Official xAI Grok Imagine Video edit/extend adapter (synthetic fixture
         sourceVideo: { url: 'https://media.example.com/clip.mp4' },
       },
     });
+    expect(edit.input.resolution).toBeUndefined();
+    expect(adapter.inputFields?.({ route, deployment, input: edit })).not.toContain('resolution');
+    const editWithResolution = parseGenerationRequest({
+      modelId: 'xai/grok-imagine-video',
+      routeId: route.id,
+      operation: 'video-edit',
+      input: {
+        prompt: 'Shift lighting to golden hour.',
+        sourceVideo: { url: 'https://media.example.com/clip.mp4' },
+        resolution: '720p',
+      },
+    });
+    expect(adapter.preflight?.({ route, deployment, input: editWithResolution })).toMatch(
+      /resolution override/i,
+    );
     expect(await adapter.submit({ jobId: 'job-xai-edit', route, deployment, input: edit })).toEqual(
       {
         upstreamId: 'xai-vid-req-1',

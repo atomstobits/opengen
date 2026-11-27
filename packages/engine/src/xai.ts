@@ -56,7 +56,6 @@ export function createXaiAdapter(
         ? [
             'prompt',
             'sourceVideo',
-            'resolution',
             ...(context.input.operation === 'video-extend' ? (['duration'] as const) : []),
             'aspectRatio',
             'audio',
@@ -78,6 +77,11 @@ export function createXaiAdapter(
     const { input, route, deployment } = context;
     if (deployment.providerId !== 'xai') return 'Unsupported xAI deployment.';
     const args = input.input;
+    if (
+      (input.operation === 'video-edit' || input.operation === 'video-extend') &&
+      args.resolution !== undefined
+    )
+      return 'xAI video edit/extend inherits source dimensions up to 720p; do not request a resolution override.';
     const issue = adapterInputIssue(context, fields(context)) ?? referenceTypeIssue(input);
     if (issue) return issue;
     if (args.count !== undefined && args.count !== 1)
@@ -118,8 +122,6 @@ export function createXaiAdapter(
       if (args.audio === false) return 'xAI video edit/extend does not expose an audio-off toggle.';
       if (args.aspectRatio && args.aspectRatio !== 'source')
         return 'xAI video edit/extend inherits source aspect ratio; omit aspectRatio or use source.';
-      if (args.resolution && args.resolution.toLowerCase() !== '720p')
-        return 'xAI video edit/extend inherits source dimensions up to 720p; do not request a resolution override.';
       if (input.operation === 'video-extend' && args.duration !== undefined) {
         const d = numericDuration(input);
         if (!Number.isInteger(d) || d < 2 || d > 10)

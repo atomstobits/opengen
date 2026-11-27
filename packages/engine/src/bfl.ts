@@ -181,10 +181,10 @@ export function createBflAdapter(
       } else {
         if (!imageResolutions.has((args.resolution ?? '').toLowerCase()))
           return 'Unsupported Black Forest Labs image resolution.';
-        if (args.aspectRatio && args.aspectRatio !== 'source' && !imageRatios.has(args.aspectRatio))
+        if (args.aspectRatio === 'source')
+          return 'Black Forest Labs cannot guarantee source aspect-ratio preservation; specify an explicit aspectRatio or use auto.';
+        if (args.aspectRatio && !imageRatios.has(args.aspectRatio))
           return 'Unsupported Black Forest Labs image aspect ratio.';
-        if (args.aspectRatio === 'source' && input.operation !== 'image-edit')
-          return 'Source aspect ratio requires an image edit reference.';
       }
       if (upstream === 'flux-3-image-klein') {
         if (
@@ -216,10 +216,10 @@ export function createBflAdapter(
       return `FLUX 3 Video duration must be 5–${maxDuration} seconds or auto.`;
     if (args.outputFormat !== undefined && args.outputFormat !== 'mp4')
       return 'FLUX 3 Video produces MP4 output only.';
-    if (args.aspectRatio && args.aspectRatio !== 'source' && !videoRatios.has(args.aspectRatio))
+    if (args.aspectRatio === 'source')
+      return 'Black Forest Labs FLUX 3 Video cannot guarantee source aspect-ratio preservation; specify an explicit aspectRatio or use auto.';
+    if (args.aspectRatio && !videoRatios.has(args.aspectRatio))
       return 'Unsupported FLUX 3 Video aspect ratio.';
-    if (args.aspectRatio === 'source' && mode === 't2v')
-      return 'Source aspect ratio requires a first frame or source video.';
     if (mode === 't2v' && (args.firstFrame || args.sourceVideo))
       return 'Text-to-video does not accept media inputs.';
     if (mode === 'i2v' && (!args.firstFrame || args.sourceVideo))
@@ -256,14 +256,13 @@ export function createBflAdapter(
       let payload: Record<string, unknown>;
       if (upstream === 'flux-3-image') {
         const refs = referenceUrls(input, 'image');
-        const ratio = args.aspectRatio === 'source' ? 'auto' : args.aspectRatio;
         payload = {
           prompt: args.prompt,
           ...(args.size
             ? { width: args.size.width, height: args.size.height }
             : {
                 resolution: (args.resolution ?? '1k').toLowerCase(),
-                ...(ratio ? { aspect_ratio: ratio } : {}),
+                ...(args.aspectRatio ? { aspect_ratio: args.aspectRatio } : {}),
               }),
           ...(refs.length ? { images: refs } : {}),
           ...(args.grounding === undefined ? {} : { grounding: args.grounding }),
@@ -271,14 +270,13 @@ export function createBflAdapter(
         };
       } else if (upstream === 'flux-3-image-klein') {
         const refs = referenceUrls(input, 'image');
-        const ratio = args.aspectRatio === 'source' ? 'auto' : args.aspectRatio;
         payload = {
           prompt: args.prompt,
           ...(args.size
             ? { width: args.size.width, height: args.size.height }
             : {
                 resolution: (args.resolution ?? '1k').toLowerCase(),
-                ...(ratio ? { aspect_ratio: ratio } : {}),
+                ...(args.aspectRatio ? { aspect_ratio: args.aspectRatio } : {}),
               }),
           ...(refs.length ? { images: refs } : {}),
           ...(args.seed === undefined ? {} : { seed: args.seed }),
@@ -286,13 +284,12 @@ export function createBflAdapter(
         };
       } else {
         const mode = videoModeByOperation[input.operation]!;
-        const ratio = args.aspectRatio === 'source' ? 'auto' : args.aspectRatio;
         payload = {
           mode,
           prompt: args.prompt,
           resolution: videoResolutionMap[(args.resolution ?? '').toLowerCase()],
           duration: args.duration,
-          ...(ratio ? { aspect_ratio: ratio } : {}),
+          ...(args.aspectRatio ? { aspect_ratio: args.aspectRatio } : {}),
           generate_audio: args.audio ?? true,
           ...(args.draft === undefined ? {} : { draft: args.draft }),
           ...(mode === 'i2v' ? { keyframes: [frameUrl(input, 'first')] } : {}),

@@ -102,6 +102,8 @@ for (const width of [1440, 390]) {
     });
 
     await page.goto('/playground/compare');
+    await page.getByLabel('Model 1 and route').selectOption(ids[0]);
+    await page.getByLabel('Model 2 and route').selectOption(ids[1]);
     const prompt = page.getByRole('textbox', { name: 'Shared prompt' });
     await prompt.fill(privatePrompt);
     await page.getByRole('button', { name: 'Get comparison quote' }).click();

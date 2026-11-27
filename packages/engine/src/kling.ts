@@ -21,7 +21,7 @@ import { pollProviderJson, providerObject, submitProviderJson } from './provider
 const baseUrl = 'https://api-singapore.klingai.com';
 const klingModels = new Set(['kling-4.0', 'kling-4.0-flash']);
 const t2vRatios = new Set(['21:9', '16:9', '9:16', '1:1', '4:3', '3:4']);
-const omniRatios = new Set([...t2vRatios, 'auto', 'source']);
+const omniRatios = new Set([...t2vRatios, 'auto']);
 
 function expectedEndpointPath(upstreamModelId: string, operation: Operation): string | null {
   if (!klingModels.has(upstreamModelId)) return null;
@@ -43,44 +43,18 @@ function parseUsdMicros(value: unknown): number | null {
   return rounded <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(rounded) : null;
 }
 
-function observedKlingCostMicros(
-  task: Record<string, unknown>,
-  context: AdapterContext,
-): number | null {
+function observedKlingCostMicros(task: Record<string, unknown>): number | null {
   const billing = Array.isArray(task.billing) ? task.billing.map(providerObject) : [];
-  if (billing.length > 0) {
-    let total = 0;
-    for (const entry of billing) {
-      if (entry.charge_type !== 'cash' || entry.currency !== 'USD') return null;
-      const amount = parseUsdMicros(entry.amount);
-      if (amount === null) return null;
-      total += amount;
-      if (!Number.isSafeInteger(total)) return null;
-    }
-    return total;
+  if (!billing.length) return null;
+  let total = 0;
+  for (const entry of billing) {
+    if (entry.charge_type !== 'cash' || entry.currency !== 'USD') return null;
+    const amount = parseUsdMicros(entry.amount);
+    if (amount === null) return null;
+    total += amount;
+    if (!Number.isSafeInteger(total)) return null;
   }
-  if (task.status !== 'succeeded') return null;
-  const hasVideoInput = Boolean(
-    context.input.input.sourceVideo ||
-    (context.input.input.references ?? []).some((ref) => ref.type === 'video'),
-  );
-  if (hasVideoInput) return null;
-  const usage = providerObject(task.usage);
-  const rawDuration = usage.output_duration;
-  const duration =
-    typeof rawDuration === 'number'
-      ? rawDuration
-      : typeof rawDuration === 'string' && /^\d+(?:\.\d+)?$/.test(rawDuration.trim())
-        ? Number(rawDuration.trim())
-        : NaN;
-  const rate = context.route.rates.find(
-    (entry) =>
-      entry.resolution.toLowerCase() === (context.input.input.resolution ?? '').toLowerCase() &&
-      entry.unit === 'output-second' &&
-      (!entry.operation || entry.operation === context.input.operation),
-  );
-  if (!Number.isFinite(duration) || duration < 0 || !rate) return null;
-  return Math.ceil(duration * rate.usdMicros);
+  return total;
 }
 
 /** Official Kling AI Singapore API adapter for Kling 4.0 and Kling 4.0 Flash. */
@@ -163,14 +137,19 @@ export function createKlingAdapter(
       if (args.aspectRatio && args.aspectRatio !== 'source')
         return 'Kling image-to-video inherits frame ratio; omit aspectRatio or use source.';
     } else if (input.operation === 'reference-to-video') {
+      if (!(args.prompt ?? '').trim()) return 'Kling reference-to-video requires a prompt.';
       if (!imageRefs.length && !videoRefs.length)
         return 'Kling reference-to-video requires at least one image or video reference.';
       if (args.sourceVideo) return 'Reference-to-video does not accept sourceVideo.';
+      if (args.aspectRatio === 'source')
+        return 'Kling omni-video cannot guarantee source aspect-ratio preservation; specify an explicit aspectRatio or use auto.';
       if (args.aspectRatio && !omniRatios.has(args.aspectRatio))
         return 'Unsupported Kling omni-video aspect ratio.';
     } else if (input.operation === 'video-edit') {
       if (!args.sourceVideo) return 'Kling video-edit requires sourceVideo.';
       if (!(args.prompt ?? '').trim()) return 'Kling video-edit requires an edit prompt.';
+      if (args.aspectRatio === 'source')
+        return 'Kling omni-video cannot guarantee source aspect-ratio preservation; specify an explicit aspectRatio or use auto.';
       if (args.aspectRatio && !omniRatios.has(args.aspectRatio))
         return 'Unsupported Kling omni-video aspect ratio.';
     }
@@ -246,25 +225,22 @@ export function createKlingAdapter(
         const contents: Record<string, unknown>[] = [
           ...(args.prompt ? [{ type: 'prompt', text: args.prompt }] : []),
           ...(first ? [{ type: 'first_frame', url: first, id: `Image${++imageIndex}` }] : []),
-          ...(last ? [{ type: 'last_frame', url: last, id: `Image${++imageIndex}` }] : []),
-          ...(baseVideo
-            ? [{ type: 'base_video', url: baseVideo, id: `Video${++videoIndex}` }]
-            : []),
           ...imageRefs.map((url) => ({
             type: 'refer_image',
             url,
             id: `Image${++imageIndex}`,
           })),
+          ...(last ? [{ type: 'last_frame', url: last, id: `Image${++imageIndex}` }] : []),
+          ...(baseVideo
+            ? [{ type: 'base_video', url: baseVideo, id: `Video${++videoIndex}` }]
+            : []),
           ...videoRefs.map((url) => ({
             type: 'feature_video',
             url,
             id: `Video${++videoIndex}`,
           })),
         ];
-        const ratio =
-          args.aspectRatio === 'auto' || args.aspectRatio === 'source'
-            ? 'adaptive'
-            : args.aspectRatio;
+        const ratio = args.aspectRatio === 'auto' ? 'adaptive' : args.aspectRatio;
         payload = {
           contents,
           settings: {
@@ -300,16 +276,14 @@ export function createKlingAdapter(
       if (body.code !== 0 || !Array.isArray(body.data))
         throw new Error('Kling AI returned an unrecognized task query response.');
       const tasks = body.data.map(providerObject);
-      const task =
-        tasks.find((item) => item.id === context.upstreamId) ??
-        (tasks.length === 1 ? tasks[0] : undefined);
+      const task = tasks.find((item) => item.id === context.upstreamId);
       if (!task || typeof task.status !== 'string')
         return {
           status: 'unknown',
           error: 'Kling AI cannot resolve this task; billing requires reconciliation.',
         };
       if (task.status === 'submitted' || task.status === 'processing') return { status: 'running' };
-      const billedCostMicros = observedKlingCostMicros(task, context);
+      const billedCostMicros = observedKlingCostMicros(task);
       if (task.status === 'failed')
         return {
           status: 'failed',

@@ -81,8 +81,13 @@ export function createHappyHorseAdapter(
     const args = input.input;
     const issue = adapterInputIssue(context, fields) ?? referenceTypeIssue(input, ['image']);
     if (issue) return issue;
-    if ((args.prompt ?? '').length > 5000)
-      return 'HappyHorse 1.1 prompt exceeds 5,000 characters; it will not be truncated.';
+    const prompt = args.prompt ?? '';
+    const hasChinese = /\p{Script=Han}/u.test(prompt);
+    const promptLimit = hasChinese ? 2500 : 5000;
+    if ([...prompt].length > promptLimit)
+      return hasChinese
+        ? 'HappyHorse 1.1 Chinese prompts cannot exceed 2,500 characters; it will not be truncated.'
+        : 'HappyHorse 1.1 prompt exceeds 5,000 characters; it will not be truncated.';
     if (input.operation !== 'image-to-video' && !(args.prompt ?? '').trim())
       return 'HappyHorse 1.1 text-to-video and reference-to-video require a prompt.';
     if (!['480p', '720p', '1080p'].includes((args.resolution ?? '').toLowerCase()))

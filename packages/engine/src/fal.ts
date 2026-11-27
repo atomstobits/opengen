@@ -627,6 +627,7 @@ export function createFalAdapter(
         return 'Grok Imagine Video audio cannot be disabled through this endpoint.';
       if (
         xaiSpec.resolutions &&
+        (operation !== 'video-edit' || args.resolution !== undefined) &&
         !xaiSpec.resolutions.includes((args.resolution ?? '').toLowerCase())
       )
         return 'Unsupported fal Grok Imagine Video resolution.';
