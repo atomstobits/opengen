@@ -1,5 +1,7 @@
 import { catalog, getCompany, getModel, seriesHref } from '@media-router/catalog';
 import type { ModelSeries } from '@media-router/contracts';
+import { CardPricing } from './card-pricing';
+import { summarizeSeriesCardPricing } from './route-pricing-comparison';
 import { Icon } from './ui';
 
 export function SeriesCards({
@@ -20,11 +22,13 @@ export function SeriesCards({
           item.modelIds.includes(route.modelId),
         ).length;
         const owner = getCompany(item.companyId);
+        const pricing = summarizeSeriesCardPricing(models, catalog);
         return (
           <article
             className="series-card"
             key={item.id}
             data-testid="series-card"
+            data-series-id={item.id}
             data-media={models[0]?.modality}
           >
             <div className="series-card-top">
@@ -48,25 +52,28 @@ export function SeriesCards({
               </a>
             </div>
             <p>{item.description}</p>
-            <div className="series-card-meta">
-              <span>{models[0]?.modality === 'video' ? 'Video' : 'Image'}</span>
-              <span>
-                {models.length} {models.length === 1 ? 'variant' : 'variants'}
-              </span>
-              <span>
-                {routeCount} {routeCount === 1 ? 'provider route' : 'provider routes'}
-              </span>
-            </div>
-            {!compact && (
-              <div className="company-model-links">
-                {models.map((model) => (
-                  <a key={model.id} href={seriesHref(model.id)}>
-                    {model.name}
-                    <Icon name="chevron" size={11} />
-                  </a>
-                ))}
+            <div className="series-card-footer">
+              <CardPricing summary={pricing} variant="series" multiVariant={models.length > 1} />
+              <div className="series-card-meta">
+                <span>{models[0]?.modality === 'video' ? 'Video' : 'Image'}</span>
+                <span>
+                  {models.length} {models.length === 1 ? 'variant' : 'variants'}
+                </span>
+                <span>
+                  {routeCount} {routeCount === 1 ? 'provider route' : 'provider routes'}
+                </span>
               </div>
-            )}
+              {!compact && (
+                <div className="company-model-links">
+                  {models.map((model) => (
+                    <a key={model.id} href={seriesHref(model.id)}>
+                      {model.name}
+                      <Icon name="chevron" size={11} />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
           </article>
         );
       })}

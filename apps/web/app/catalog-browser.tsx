@@ -3,12 +3,17 @@
 import { useMemo, useState } from 'react';
 import { getModelRoutes, modelSeries, seriesHref } from '@media-router/catalog';
 import type { Catalog, Operation } from '@media-router/contracts';
+import { CardPricing } from './card-pricing';
 import {
   buildCatalogModelEntries,
   describeEndpointRegions,
   groupCatalogModels,
   variantGridColumns,
 } from './model-groups';
+import {
+  summarizeSeriesCardPricing,
+  summarizeVariantCardPricing,
+} from './route-pricing-comparison';
 import { Icon, Playground, regionNames } from './ui';
 import type { PlaygroundDraftTransfer } from './private-playground';
 
@@ -108,12 +113,13 @@ export function ModelsCatalog({
               ...entry,
               matchingDeployments,
               matchingRoutes,
+              pricing: summarizeVariantCardPricing(entry.model, matchingRoutes, catalog),
               regionText: describeEndpointRegions(matchingRoutes.length, matchingDeployments),
             };
           });
 
           if (group.totalVariants <= 1) {
-            const { model, company, matchingRoutes, regionText } = variantItems[0]!;
+            const { model, company, matchingRoutes, pricing, regionText } = variantItems[0]!;
             const href = seriesHref(model.id);
             return (
               <section
@@ -164,6 +170,7 @@ export function ModelsCatalog({
                     </div>
                   </div>
                   <div className="model-directory-offerings">
+                    <CardPricing summary={pricing} variant="directory" />
                     <div className="model-directory-route-stat">
                       <strong>
                         {matchingRoutes.length}{' '}
@@ -186,6 +193,11 @@ export function ModelsCatalog({
           );
           const groupDeployments = variantItems.flatMap((item) => item.matchingDeployments);
           const groupRegionText = describeEndpointRegions(groupRoutesCount, groupDeployments);
+          const groupPricing = summarizeSeriesCardPricing(
+            variantItems.map((item) => item.model),
+            catalog,
+            new Map(variantItems.map((item) => [item.model.id, item.matchingRoutes])),
+          );
           const columns = variantGridColumns(variantItems.length);
 
           return (
@@ -230,6 +242,11 @@ export function ModelsCatalog({
                   <p className="model-series-description">{group.description}</p>
                 </div>
                 <div className="model-series-summary">
+                  <CardPricing
+                    summary={groupPricing}
+                    variant="directory"
+                    multiVariant={variantItems.length > 1}
+                  />
                   <div className="model-directory-route-stat">
                     <strong>
                       {groupRoutesCount} <span>{routeCountLabel(groupRoutesCount, region)}</span>
@@ -244,7 +261,7 @@ export function ModelsCatalog({
                 </div>
               </div>
               <div className="model-series-variants" data-columns={columns}>
-                {variantItems.map(({ model, matchingRoutes, regionText }) => {
+                {variantItems.map(({ model, matchingRoutes, pricing, regionText }) => {
                   const href = seriesHref(model.id);
                   return (
                     <article
@@ -275,6 +292,10 @@ export function ModelsCatalog({
                         </div>
                       </div>
                       <div className="model-directory-offerings">
+                        <CardPricing
+                          summary={pricing}
+                          variant={columns === 1 ? 'directory' : 'compact'}
+                        />
                         <div className="model-directory-route-stat">
                           <strong>
                             {matchingRoutes.length}{' '}

@@ -2197,6 +2197,8 @@ select option {
   gap: 20px;
 }
 .series-card {
+  display: flex;
+  flex-direction: column;
   padding: 27px;
   border: 1px solid var(--line);
   border-top: 3px solid var(--model-panel, var(--accent));
@@ -2208,6 +2210,62 @@ select option {
     background 0.15s,
     transform 0.15s,
     box-shadow 0.15s;
+}
+.series-card-footer {
+  margin-top: auto;
+}
+.series-card-pricing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-top: 14px;
+  margin-bottom: 14px;
+  border-top: 1px solid var(--line-subtle);
+}
+.card-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.card-price-prefix {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--subtle);
+}
+.card-price strong {
+  display: inline;
+  font-family: var(--sans);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.card-price small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--subtle);
+}
+.card-savings-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--success-line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .series-card:hover {
   border-color: var(--control-line);
@@ -4269,7 +4327,7 @@ select option {
 .model-series-header,
 .model-series-group.single-variant .model-directory-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 248px;
   gap: 36px;
   align-items: center;
 }
@@ -4409,8 +4467,29 @@ select option {
   padding-left: 26px;
   font-variant-numeric: tabular-nums;
 }
+.model-directory-pricing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+.model-directory-pricing .card-price strong {
+  font-size: 16px;
+}
+.model-directory-pricing.is-compact {
+  flex-basis: 100%;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+}
+.model-directory-pricing.is-compact .card-price strong {
+  font-size: 15px;
+}
 .model-directory-route-stat strong,
-.model-directory-offerings strong {
+.model-directory-offerings > strong {
   display: block;
   font-family: var(--display);
   font-size: 24px;
@@ -4420,14 +4499,14 @@ select option {
   font-variant-numeric: tabular-nums;
 }
 .model-directory-route-stat strong span,
-.model-directory-offerings strong span {
+.model-directory-offerings > strong span {
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 500;
   color: var(--subtle);
 }
 .model-directory-route-stat p,
-.model-directory-offerings p {
+.model-directory-offerings > p {
   color: var(--subtle);
   font-size: 13px;
   line-height: 1.45;
@@ -4507,7 +4586,7 @@ select option {
 }
 .model-series-variants[data-columns='1'] .variant-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 210px;
+  grid-template-columns: minmax(0, 1fr) 236px;
   gap: 28px;
   align-items: center;
 }
@@ -4799,12 +4878,18 @@ select option {
     justify-content: space-between;
     gap: 10px 14px;
   }
+  .model-directory-pricing {
+    flex-basis: 100%;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    margin-bottom: 2px;
+  }
   .model-directory-route-stat strong,
-  .model-directory-offerings strong {
+  .model-directory-offerings > strong {
     font-size: 20px;
   }
   .model-directory-route-stat p,
-  .model-directory-offerings p {
+  .model-directory-offerings > p {
     margin: 4px 0 0;
     font-size: 12px;
   }

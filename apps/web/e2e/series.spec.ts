@@ -13,6 +13,17 @@ test('company pages expose every owned variant through its canonical series', as
     page.getByRole('heading', { level: 1, name: 'ByteDance', exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('series-card')).toHaveCount(9);
+  const seedance25Card = page.locator('[data-series-id="bytedance/seedance-2.5"]');
+  await expect(seedance25Card.getByTestId('card-price')).toHaveText(/From\s*\$0\.1028\s*\/ sec/);
+  await expect(seedance25Card.getByTestId('card-savings')).toHaveText('Up to 53% off');
+  const seedream5ProCard = page.locator('[data-series-id="bytedance/seedream-5.0-pro"]');
+  await expect(seedream5ProCard.getByTestId('card-price')).toHaveText(
+    /From\s*\$0\.03825\s*\/ image/,
+  );
+  await expect(seedream5ProCard.getByTestId('card-savings')).toHaveText('Up to 43% off');
+  const seedance10Card = page.locator('[data-series-id="bytedance/seedance-1.0"]');
+  await expect(seedance10Card.getByTestId('card-price')).toHaveText(/From\s*≈\$0\.01\s*\/ sec/);
+  await expect(seedance10Card.getByTestId('card-savings')).toHaveCount(0);
   for (const [name, href] of [
     ['Seedance 2.5', '/bytedance/seedance-2.5'],
     ['Seedance 2.0', '/bytedance/seedance-2.0'],
@@ -371,6 +382,17 @@ test.describe('phone series pages', () => {
     await page.screenshot({ path: path.join(evidenceDir, 'series-h3-mobile.png'), fullPage: true });
     await page.goto('/bytedance');
     await expect(page.getByTestId('series-card')).toHaveCount(9);
+    const seedance25Card = page.locator('[data-series-id="bytedance/seedance-2.5"]');
+    await expect(seedance25Card.getByTestId('card-price')).toHaveText(/From\s*\$0\.1028\s*\/ sec/);
+    await expect(seedance25Card.getByTestId('card-savings')).toHaveText('Up to 53% off');
+    const seedream5ProCard = page.locator('[data-series-id="bytedance/seedream-5.0-pro"]');
+    await expect(seedream5ProCard.getByTestId('card-price')).toHaveText(
+      /From\s*\$0\.03825\s*\/ image/,
+    );
+    await expect(seedream5ProCard.getByTestId('card-savings')).toHaveText('Up to 43% off');
+    const seedance10Card = page.locator('[data-series-id="bytedance/seedance-1.0"]');
+    await expect(seedance10Card.getByTestId('card-price')).toHaveText(/From\s*≈\$0\.01\s*\/ sec/);
+    await expect(seedance10Card.getByTestId('card-savings')).toHaveCount(0);
     const companyOverflow = await page.evaluate(() => ({
       page: document.documentElement.scrollWidth,
       viewport: innerWidth,

@@ -42,9 +42,19 @@ test('the model catalog filters discovery while model pages preserve every regio
   await page.getByLabel('Search models, providers or regions').fill('Wan 3.0');
   await expect(seriesGroups(page)).toHaveCount(1);
   await expect(cards(page)).toHaveCount(2);
+  await expect(card(page, 'alibaba/wan-3.0').getByTestId('card-price')).toHaveText(
+    /From\s*\$0\.0325\s*\/ sec/,
+  );
+  await expect(card(page, 'alibaba/wan-3.0').getByTestId('card-savings')).toHaveText(
+    'Up to 35% off',
+  );
   await page.getByLabel('Filter endpoint region').selectOption('ap-southeast-1');
   await expect(card(page, 'alibaba/wan-3.0')).toBeVisible();
   await expect(card(page, 'alibaba/wan-3.0-prime')).toBeVisible();
+  await expect(card(page, 'alibaba/wan-3.0').getByTestId('card-price')).toHaveText(
+    /From\s*\$0\.05\s*\/ sec/,
+  );
+  await expect(card(page, 'alibaba/wan-3.0').getByTestId('card-savings')).toHaveCount(0);
   await card(page, 'alibaba/wan-3.0').getByRole('link', { name: 'Wan 3.0', exact: true }).click();
   await expect(page).toHaveURL(/\/alibaba\/wan-3\.0$/);
   const standard = page.locator('[data-testid="series-variant"][data-model-id="alibaba/wan-3.0"]');
@@ -212,6 +222,15 @@ test('home keeps the agent-first hero and curated discovery while company pages 
   );
   await expect(nav.getByRole('link', { name: 'Companies', exact: true })).toHaveCount(0);
   await expect(page.locator('.home-discovery').getByTestId('series-card')).toHaveCount(3);
+  const homeSeedance = page.locator('.home-discovery [data-series-id="bytedance/seedance-2.5"]');
+  await expect(homeSeedance.getByTestId('card-price')).toHaveText(/From\s*\$0\.1028\s*\/ sec/);
+  await expect(homeSeedance.getByTestId('card-savings')).toHaveText('Up to 53% off');
+  const homeNanoBanana = page.locator('.home-discovery [data-series-id="google/nano-banana-2.1"]');
+  await expect(homeNanoBanana.getByTestId('card-price')).toHaveText(/From\s*\$0\.0336\s*\/ image/);
+  await expect(homeNanoBanana.getByTestId('card-savings')).toHaveText('Up to 16% off');
+  const homeH3 = page.locator('.home-discovery [data-series-id="minimax/h3"]');
+  await expect(homeH3.getByTestId('card-price')).toHaveText(/From\s*\$0\.01\s*\/ sec/);
+  await expect(homeH3.getByTestId('card-savings')).toHaveText('Up to 50% off');
   await expect(cards(page)).toHaveCount(0);
   await expect(page.getByLabel('Prompt', { exact: true })).toHaveCount(0);
   await mkdir(evidenceDir, { recursive: true });
