@@ -18,20 +18,25 @@ const FOCUSABLE_SELECTOR =
 
 function ModelPriceChip({ model, side }: { model: HeroModelPricing; side: 'left' | 'right' }) {
   return (
-    <div className="hero-modal-video-bar">
+    <div className="hero-modal-video-bar" data-testid={`hero-modal-bar-${side}`}>
       <a className="hero-modal-model-link" href={model.seriesHref} title={model.priceNote}>
         <span className={`hero-model-dot is-${side}`} aria-hidden="true" />
         <span>{model.modelName}</span>
         {model.providerName && <small>({model.providerName})</small>}
       </a>
-      {model.priceLabel && (
+      {(model.resolution || model.priceLabel) && (
         <span className="hero-price-group" title={model.priceNote}>
-          <span className="hero-price-current">{model.priceLabel}</span>
-          {model.comparePriceLabel && (
-            <span className="hero-price-compare">{model.comparePriceLabel}</span>
-          )}
-          {model.discountLabel && (
-            <span className="hero-price-discount">{model.discountLabel}</span>
+          {model.resolution && <span className="hero-price-res">{model.resolution}</span>}
+          {model.priceLabel && (
+            <>
+              <span className="hero-price-current">{model.priceLabel}</span>
+              {model.comparePriceLabel && (
+                <span className="hero-price-compare">{model.comparePriceLabel}</span>
+              )}
+              {model.discountLabel && (
+                <span className="hero-price-discount">{model.discountLabel}</span>
+              )}
+            </>
           )}
         </span>
       )}
