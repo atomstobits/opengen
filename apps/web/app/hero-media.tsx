@@ -119,17 +119,23 @@ export function HeroSplitMedia({
   const prefetchedPosters = useRef(new Set<string>());
   const enabled = useHeroVideoAllowed({ skipNarrowMobile: true });
 
-  // Wait for the initial LCP poster to finish loading before mounting/fetching the background video
-  // so high-bitrate video never competes with initial LCP, fonts, or CSS.
+  const isVideoReady = readyClipId === clip.id;
+  const showAvifSource = Boolean(clip.media.heroPosterAvif) && avifFailedClipId !== clip.id;
+
+  // Keep the background video gated until the initial LCP poster either loads or reaches a
+  // terminal error so 1080p video bytes never compete with a pending poster on slow links.
   useEffect(() => {
     if (posterReady) return;
-    if (posterImg.current?.complete && posterImg.current.naturalWidth > 0) {
+    const img = posterImg.current;
+    if (!img || !img.complete) return;
+    if (img.naturalWidth > 0) {
       setPosterReady(true);
-      return;
+    } else if (showAvifSource) {
+      setAvifFailedClipId(clip.id);
+    } else {
+      setPosterReady(true);
     }
-    const fallbackTimer = window.setTimeout(() => setPosterReady(true), 1200);
-    return () => window.clearTimeout(fallbackTimer);
-  }, [posterReady]);
+  }, [posterReady, showAvifSource, clip.id]);
 
   useEffect(() => {
     if (!container.current) return;
@@ -179,9 +185,6 @@ export function HeroSplitMedia({
         : clip.heroDurationSec;
     onProgress(Math.min(100, (player.currentTime / duration) * 100));
   };
-
-  const isVideoReady = readyClipId === clip.id;
-  const showAvifSource = Boolean(clip.media.heroPosterAvif) && avifFailedClipId !== clip.id;
 
   return (
     <div className="hero-media hero-media-split" ref={container} aria-hidden="true">

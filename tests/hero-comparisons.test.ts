@@ -115,6 +115,7 @@ describe('hero comparison pricing and media configuration', () => {
     expect(clips[1]?.left.discountLabel).toBe('-51%');
     expect(clips[1]?.right.discountLabel).toBe('-20%');
 
+    vi.stubEnv('OPENGEN_HERO_MEDIA_VERSION', '');
     const defaultClips = getHeroComparisons({
       mediaBaseUrl: 'https://media.opengen.dev',
       nowDate: '2026-11-25',
