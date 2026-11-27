@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildHeroComparisonsFromSeeds,
   getHeroComparisons,
@@ -6,10 +6,16 @@ import {
   HERO_RIGHT_MODEL_ROTATION_ORDER,
   interleaveComparisonSeeds,
   modelFileSlug,
+  parseHeroClipOrder,
   resolveHeroModelPricing,
+  selectComparisonSeeds,
   validatePublicMediaBaseUrl,
   type ComparisonSeed,
 } from '../apps/web/app/hero-comparisons';
+
+beforeEach(() => {
+  vi.stubEnv('OPENGEN_HERO_CLIP_ORDER', '');
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -84,6 +90,7 @@ describe('hero comparison pricing and media configuration', () => {
 
   it('returns no comparisons when OPENGEN_HERO_MEDIA_BASE_URL is unset and builds 3-tier CDN URLs when configured', () => {
     vi.stubEnv('OPENGEN_HERO_MEDIA_BASE_URL', '');
+    vi.stubEnv('OPENGEN_HERO_CLIP_ORDER', '');
     expect(getHeroComparisons()).toEqual([]);
 
     const clips = getHeroComparisons({
@@ -93,29 +100,29 @@ describe('hero comparison pricing and media configuration', () => {
     });
     expect(clips).toHaveLength(12);
     expect(clips[0]).toMatchObject({
-      id: 'case-17',
-      resolution: '1080p',
-      operation: 'reference-to-video',
-      durationSec: 10,
+      id: 'case-26',
+      resolution: '720p',
+      operation: 'image-to-video',
+      durationSec: 30,
       heroDurationSec: 10,
       inputCount: 1,
     });
     expect(clips[0]?.left.discountLabel).toBe('-51%');
     expect(clips[0]?.right.discountLabel).toBe('-20%');
     expect(clips[0]?.media.heroPosterAvif).toBe(
-      'https://media.opengen.dev/hero/v1/case-17/hero-poster.avif',
+      'https://media.opengen.dev/hero/v1/case-26/hero-poster.avif',
     );
     expect(clips[0]?.media.heroVideoAv1).toBe(
-      'https://media.opengen.dev/hero/v1/case-17/hero-split.av1.mp4',
+      'https://media.opengen.dev/hero/v1/case-26/hero-split.av1.mp4',
     );
     expect(clips[0]?.media.heroVideoH264).toBe(
-      'https://media.opengen.dev/hero/v1/case-17/hero-split.h264.mp4',
+      'https://media.opengen.dev/hero/v1/case-26/hero-split.h264.mp4',
     );
     expect(clips[0]?.media.modalLeftVideo).toBe(
-      'https://media.opengen.dev/hero/v1/case-17/seedance-2.5.mp4',
+      'https://media.opengen.dev/hero/v1/case-26/seedance-2.5.mp4',
     );
     expect(clips[0]?.media.modalRightVideo).toBe(
-      'https://media.opengen.dev/hero/v1/case-17/kling-4.0.mp4',
+      'https://media.opengen.dev/hero/v1/case-26/kling-4.0.mp4',
     );
     expect(clips.slice(0, 6).map((c) => c.right.modelId)).toEqual([
       ...HERO_RIGHT_MODEL_ROTATION_ORDER,
@@ -125,17 +132,16 @@ describe('hero comparison pricing and media configuration', () => {
       expect(clips[i]!.right.modelId).not.toBe(next.right.modelId);
     }
 
-    const case26 = clips.find((c) => c.id === 'case-26');
-    expect(case26).toMatchObject({
-      id: 'case-26',
-      resolution: '720p',
-      operation: 'image-to-video',
-      durationSec: 30,
+    expect(clips[6]).toMatchObject({
+      id: 'case-17',
+      resolution: '1080p',
+      operation: 'reference-to-video',
+      durationSec: 10,
       heroDurationSec: 10,
       inputCount: 1,
     });
-    expect(case26?.left.discountLabel).toBe('-51%');
-    expect(case26?.right.discountLabel).toBe('-20%');
+    expect(clips[6]?.left.discountLabel).toBe('-51%');
+    expect(clips[6]?.right.discountLabel).toBe('-20%');
 
     const case03 = clips.find((c) => c.id === 'case-03');
     expect(case03).toMatchObject({
@@ -157,11 +163,62 @@ describe('hero comparison pricing and media configuration', () => {
     });
     expect(defaultClips).toHaveLength(12);
     expect(defaultClips[0]?.media.heroPosterAvif).toBe(
-      'https://media.opengen.dev/hero/v3/case-17/hero-poster.avif',
+      'https://media.opengen.dev/hero/v3/case-26/hero-poster.avif',
     );
     expect(defaultClips[0]?.media.heroVideoAv1).toBe(
-      'https://media.opengen.dev/hero/v3/case-17/hero-split.av1.mp4',
+      'https://media.opengen.dev/hero/v3/case-26/hero-split.av1.mp4',
     );
+  });
+
+  it('supports dynamic exact sequence and allowlist configuration via OPENGEN_HERO_CLIP_ORDER', () => {
+    expect(parseHeroClipOrder(undefined)).toBeNull();
+    expect(parseHeroClipOrder('   , ,  ')).toBeNull();
+    expect(parseHeroClipOrder(' case-18 , CASE-26, case-18, ')).toEqual(['case-18', 'case-26']);
+
+    vi.stubEnv('OPENGEN_HERO_MEDIA_BASE_URL', 'https://media.opengen.dev');
+    vi.stubEnv('OPENGEN_HERO_MEDIA_VERSION', 'v3');
+    vi.stubEnv('OPENGEN_HERO_CLIP_ORDER', 'case-18, case-27, case-17');
+
+    // Exact custom order and strict allowlist (plays only listed clips, hiding the rest).
+    const subset = getHeroComparisons({ nowDate: '2026-11-26' });
+    expect(subset.map((clip) => clip.id)).toEqual(['case-18', 'case-27', 'case-17']);
+    expect(subset[0]?.right.modelId).toBe('alibaba/wan-3.0');
+    expect(subset[1]?.right.modelId).toBe('bytedance/seedance-2.5-flash');
+    expect(subset[2]?.right.modelId).toBe('kling/kling-4.0');
+
+    // Single-clip allowlist works cleanly (enables loopSingle mode in HomeHero).
+    const single = getHeroComparisons({ clipOrder: 'CASE-03', nowDate: '2026-11-26' });
+    expect(single.map((clip) => clip.id)).toEqual(['case-03']);
+
+    // Unknown IDs mixed with valid ones are warned and skipped without dropping valid clips.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const partial = getHeroComparisons({
+      clipOrder: 'case-26, unknown-99, case-05, case-26',
+      nowDate: '2026-11-26',
+    });
+    expect(partial.map((clip) => clip.id)).toEqual(['case-26', 'case-05']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    // All-unknown input warns and safely falls back to the default 12-clip interleaved order.
+    warnSpy.mockClear();
+    const fallback = getHeroComparisons({
+      clipOrder: 'missing-1, missing-2',
+      nowDate: '2026-11-26',
+    });
+    expect(fallback).toHaveLength(12);
+    expect(fallback[0]?.id).toBe('case-26');
+    expect(fallback[6]?.id).toBe('case-17');
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    // Blank env var restores default interleaved order.
+    const defaultFromSelect = selectComparisonSeeds(
+      [
+        { id: 'case-26', rightModelId: 'kling/kling-4.0' },
+        { id: 'case-18', rightModelId: 'alibaba/wan-3.0' },
+      ],
+      { clipOrder: '   ' },
+    );
+    expect(defaultFromSelect.map((s) => s.id)).toEqual(['case-26', 'case-18']);
   });
 
   it('falls back safely to an empty comparison list when optional hero media URL is malformed', () => {
