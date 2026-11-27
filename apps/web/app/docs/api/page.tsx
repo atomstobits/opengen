@@ -25,13 +25,24 @@ const PUBLIC_OPERATIONS = new Set<string>([
   'routes.list',
   'metrics.list',
   'operations.list',
+  'quotes.single',
+  'quotes.batch',
 ]);
 
 const IDEMPOTENT_OPERATIONS = new Set<string>([
   'media.generate',
+  'assets.import',
+  'assets.reuse',
   'images.generate',
   'images.edit',
   'videos.create',
+]);
+
+const BODYLESS_OPERATIONS = new Set<string>([
+  'jobs.cancel',
+  'notifications.read',
+  'webhooks.rotate',
+  'workspaces.acceptInvite',
 ]);
 
 function inferGroup(operationId: string): string {
@@ -103,9 +114,12 @@ function buildBaselineEndpoints(): ExplorerEndpoint[] {
       publicAccess: PUBLIC_OPERATIONS.has(operationId),
       requiresIdempotencyKey,
       parameters,
-      requestContentTypes: ['POST', 'PUT', 'PATCH'].includes(target.method)
-        ? ['application/json']
-        : [],
+      requestContentTypes:
+        ['POST', 'PUT', 'PATCH'].includes(target.method) && !BODYLESS_OPERATIONS.has(operationId)
+          ? operationId === 'images.edit'
+            ? ['application/json', 'multipart/form-data']
+            : ['application/json']
+          : [],
       responses: [],
     };
   });

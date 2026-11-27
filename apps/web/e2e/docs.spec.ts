@@ -122,6 +122,7 @@ test('interactive OpenAPI explorer filters live spec endpoints and stays inside 
               operationId: 'quotes.single',
               summary: 'Quote one canonical request',
               tags: ['quotes'],
+              security: [],
               requestBody: {
                 content: {
                   'application/json': {
@@ -141,7 +142,31 @@ test('interactive OpenAPI explorer filters live spec endpoints and stays inside 
               summary: 'Submit one generation',
               tags: ['generations'],
               parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+              requestBody: {
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: Object.fromEntries(
+                        Array.from({ length: 40 }, (_, i) => [
+                          `field_${i}`,
+                          { type: 'string', description: 'Sample schema property' },
+                        ]),
+                      ),
+                    },
+                  },
+                },
+              },
               responses: { 202: { description: 'Job accepted' } },
+            },
+          },
+          '/v1/generations/{id}/cancel': {
+            post: {
+              operationId: 'jobs.cancel',
+              summary: 'Request cancellation of an existing job',
+              tags: ['generations'],
+              parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+              responses: { 200: { description: 'Cancellation requested' } },
             },
           },
         },
@@ -165,26 +190,75 @@ test('interactive OpenAPI explorer filters live spec endpoints and stays inside 
     page.getByRole('heading', { level: 1, name: 'Interactive API reference.' }),
   ).toBeVisible();
   await expect(page.getByTestId('openapi-status')).toContainText('OpenAPI 3.1.0');
-  await expect(page.getByTestId('openapi-endpoint')).toHaveCount(2);
+  await expect(page.getByTestId('openapi-endpoint')).toHaveCount(3);
 
-  await page.getByLabel('Filter endpoints').fill('generations');
+  // Public POST quote uses honest auth label and omits Authorization header.
+  const quoteCard = page.getByTestId('openapi-endpoint').first();
+  await quoteCard.locator('summary').click();
+  await expect(quoteCard).toContainText('Public (no auth required)');
+  await quoteCard.getByRole('button', { name: 'Copy cURL', exact: true }).click();
+  const quoteCurl = await page.evaluate(() => navigator.clipboard.readText());
+  expect(quoteCurl).toContain('/v1/quotes');
+  expect(quoteCurl).toContain('--data-binary @request.json');
+  expect(quoteCurl).not.toContain('Authorization: Bearer');
+
+  // Large JSON Schema stays vertically bounded (<= 420px) and includes Idempotency-Key.
+  await page.getByLabel('Filter endpoints').fill('media.generate');
   await expect(page.getByTestId('openapi-endpoint')).toHaveCount(1);
   const card = page.getByTestId('openapi-endpoint').first();
   await card.locator('summary').click();
   await expect(card).toContainText('Idempotency-Key');
+  const schemaBox = await card.getByLabel('Request JSON Schema').boundingBox();
+  expect(schemaBox).not.toBeNull();
+  expect(schemaBox!.height).toBeLessThanOrEqual(422);
   await card.getByRole('button', { name: 'Copy cURL', exact: true }).click();
   const curl = await page.evaluate(() => navigator.clipboard.readText());
   expect(curl).toContain('OPENGEN_API_URL');
   expect(curl).toContain('OPENGEN_API_KEY');
   expect(curl).toContain('Idempotency-Key: $OPENGEN_IDEMPOTENCY_KEY');
+  expect(curl).toContain('--data-binary @request.json');
 
   await card.getByRole('tab', { name: 'MCP call', exact: true }).click();
   await card.getByRole('button', { name: 'Copy MCP JSON', exact: true }).click();
   const mcp = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
   expect(mcp.operationId).toBe('media.generate');
 
+  // Bodyless POST omits Content-Type and --data-binary.
+  await page.getByLabel('Filter endpoints').fill('jobs.cancel');
+  await expect(page.getByTestId('openapi-endpoint')).toHaveCount(1);
+  const cancelCard = page.getByTestId('openapi-endpoint').first();
+  await cancelCard.locator('summary').click();
+  await cancelCard.getByRole('button', { name: 'Copy cURL', exact: true }).click();
+  const cancelCurl = await page.evaluate(() => navigator.clipboard.readText());
+  expect(cancelCurl).toContain('-X POST');
+  expect(cancelCurl).not.toContain('--data-binary');
+  expect(cancelCurl).not.toContain('Content-Type');
+
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  // Verify contracts fallback parity when /openapi.json is unreachable (503).
+  await page.unroute('**/openapi.json');
+  await page.route('**/openapi.json', (route) => route.fulfill({ status: 503, json: {} }));
+  await page.goto('/docs/api');
+  await expect(page.getByTestId('openapi-status')).toContainText('Contract operation registry');
+  await page.getByLabel('Filter endpoints').fill('quotes.single');
+  const fallbackQuote = page.getByTestId('openapi-endpoint').first();
+  await fallbackQuote.locator('summary').click();
+  await expect(fallbackQuote).toContainText('Public (no auth required)');
+  await fallbackQuote.getByRole('button', { name: 'Copy cURL', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain(
+    'Authorization: Bearer',
+  );
+  await page.getByLabel('Filter endpoints').fill('assets.reuse');
+  const fallbackReuse = page.getByTestId('openapi-endpoint').first();
+  await fallbackReuse.locator('summary').click();
+  await expect(fallbackReuse).toContainText('Idempotency-Key');
+  await page.getByLabel('Filter endpoints').fill('jobs.cancel');
+  const fallbackCancel = page.getByTestId('openapi-endpoint').first();
+  await fallbackCancel.locator('summary').click();
+  await fallbackCancel.getByRole('button', { name: 'Copy cURL', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain('--data-binary');
 });
 
 test('agent setup pages avoid 390px overflow, expose first-prompt copy, billing links and per-model agent copy', async ({

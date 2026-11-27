@@ -234,8 +234,7 @@ function buildCurlSnippet(endpoint: ExplorerEndpoint, origin: string): string {
   }
   if (
     ['POST', 'PUT', 'PATCH'].includes(endpoint.method) &&
-    (endpoint.requestContentTypes.length === 0 ||
-      endpoint.requestContentTypes.includes('application/json'))
+    endpoint.requestContentTypes.includes('application/json')
   ) {
     lines.push("  -H 'Content-Type: application/json' \\");
     lines.push('  --data-binary @request.json');
@@ -289,7 +288,9 @@ function EndpointCard({
         <div className={styles.badgesRow}>
           <span>
             Auth:{' '}
-            <code>{endpoint.publicAccess ? 'Public (read-only)' : 'Bearer token or session'}</code>
+            <code>
+              {endpoint.publicAccess ? 'Public (no auth required)' : 'Bearer token or session'}
+            </code>
           </span>
           {endpoint.requiresIdempotencyKey && (
             <span>
@@ -348,7 +349,7 @@ function EndpointCard({
                 <span>JSON Schema</span>
                 <CopyButton text={endpoint.requestSchemaJson} label="Copy schema" />
               </div>
-              <pre>
+              <pre className={styles.schemaPre} tabIndex={0} aria-label="Request JSON Schema">
                 <code>{endpoint.requestSchemaJson}</code>
               </pre>
             </div>
