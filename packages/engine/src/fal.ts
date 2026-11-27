@@ -28,6 +28,53 @@ import {
   isFalImageEndpoint,
 } from './fal-images.js';
 
+const NANO_PER_MICRO = 1_000n;
+
+function parseNonnegativeNanoUsd(value: unknown): bigint | null {
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value) || value < 0) return null;
+    return BigInt(value);
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    const parsed = BigInt(value);
+    return parsed >= 0n ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Strict fail-closed parser for fal Platform API `/v1/models/billing-events?request_id=...`.
+ * Sums integer `cost_estimate_nano_usd` across matching events on a complete page and rounds
+ * upward to integer micro-USD. Returns null on pagination, missing events, or malformed values.
+ */
+export function observedFalBillingEventCostMicros(
+  body: Record<string, unknown>,
+  expectedRequestId: string,
+): number | null {
+  if (
+    !expectedRequestId ||
+    body.has_more !== false ||
+    body.next_cursor !== null ||
+    !Array.isArray(body.billing_events)
+  )
+    return null;
+  let totalNanoUsd = 0n;
+  let matched = 0;
+  for (const raw of body.billing_events) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const event = providerObject(raw);
+    if (typeof event.request_id !== 'string') return null;
+    if (event.request_id !== expectedRequestId) continue;
+    const nano = parseNonnegativeNanoUsd(event.cost_estimate_nano_usd);
+    if (nano === null) return null;
+    totalNanoUsd += nano;
+    matched++;
+  }
+  if (matched === 0) return null;
+  const micros = (totalNanoUsd + NANO_PER_MICRO - 1n) / NANO_PER_MICRO;
+  return micros <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(micros) : null;
+}
+
 const h3Endpoints = new Map<string, 'text-to-video' | 'image-to-video' | 'reference-to-video'>(
   ['minimax/h3-max', 'minimax/h3-max-turbo', 'minimax/h3'].flatMap((prefix) =>
     (['text-to-video', 'image-to-video', 'reference-to-video'] as const).map(
@@ -922,6 +969,40 @@ export function createFalAdapter(
     if (!env.FAL_KEY) throw new SubmissionRejected('Configure FAL_KEY for the fal deployment.');
     return { Authorization: `Key ${env.FAL_KEY}` };
   }
+  async function lookupBillingCost(
+    upstreamId: string,
+    attemptStartedAt?: string,
+  ): Promise<{
+    billedCostMicros: number | null;
+    retryAfterMs?: number;
+  }> {
+    const billingKey = env.FAL_BILLING_KEY?.trim();
+    if (!billingKey) return { billedCostMicros: null };
+    const params = new URLSearchParams({ request_id: upstreamId, limit: '50' });
+    const anchorMs = attemptStartedAt ? Date.parse(attemptStartedAt) : NaN;
+    if (Number.isFinite(anchorMs)) {
+      const skewMs = 5 * 60_000;
+      const maxRangeMs = 30 * 24 * 60 * 60_000;
+      const startMs = anchorMs - skewMs;
+      const endMs = Math.max(startMs + 60_000, Math.min(Date.now() + skewMs, startMs + maxRangeMs));
+      params.set('start', new Date(startMs).toISOString());
+      params.set('end', new Date(endMs).toISOString());
+    }
+    try {
+      const billing = await pollProviderJson(
+        request,
+        'fal billing',
+        `https://api.fal.ai/v1/models/billing-events?${params.toString()}`,
+        { Authorization: `Key ${billingKey}` },
+      );
+      const billedCostMicros = observedFalBillingEventCostMicros(billing, upstreamId);
+      return billedCostMicros === null
+        ? { billedCostMicros: null, retryAfterMs: 30_000 }
+        : { billedCostMicros };
+    } catch {
+      return { billedCostMicros: null, retryAfterMs: 30_000 };
+    }
+  }
   function base(context: AdapterContext) {
     // Queue management uses owner/app, excluding endpoint paths such as text-to-video.
     const model = resolveRouteUpstreamModelId(context.route, context.input.operation);
@@ -956,6 +1037,7 @@ export function createFalAdapter(
       deployment.id === 'fal-undisclosed' &&
       routeUpstreamModelIds(route).some(isKnownEndpoint) &&
       Boolean(env.FAL_KEY),
+    supportsDeferredBillingPoll: () => Boolean(env.FAL_BILLING_KEY?.trim()),
     async submit(context) {
       const issue = preflight(context);
       if (issue) throw new SubmissionRejected(issue);
@@ -1260,23 +1342,27 @@ export function createFalAdapter(
       if (status.status === 'IN_QUEUE' || status.status === 'IN_PROGRESS')
         return { status: 'running' };
       if (status.status !== 'COMPLETED') throw new Error('Unrecognized fal queue status.');
-      if (status.error || status.error_type)
+      if (status.error || status.error_type) {
+        const billing = await lookupBillingCost(context.upstreamId, context.attemptStartedAt);
         return {
           status: 'failed',
           failureCategory: 'unknown',
           error: 'fal generation failed. Billing requires provider reconciliation.',
-          billedCostMicros: null,
+          ...billing,
         };
+      }
       const output = await pollProviderJson(request, 'fal', path, auth());
       const upstreamModel = resolveRouteUpstreamModelId(context.route, context.input.operation);
       const image = isFalImageEndpoint(upstreamModel);
-      if (Array.isArray(output.has_nsfw_concepts) && output.has_nsfw_concepts.some(Boolean))
+      if (Array.isArray(output.has_nsfw_concepts) && output.has_nsfw_concepts.some(Boolean)) {
+        const billing = await lookupBillingCost(context.upstreamId, context.attemptStartedAt);
         return {
           status: 'failed',
           failureCategory: 'policy',
           error: 'The provider filtered this output.',
-          billedCostMicros: null,
+          ...billing,
         };
+      }
       const assets = image
         ? Array.isArray(output.images)
           ? output.images.map(providerObject)
@@ -1297,8 +1383,9 @@ export function createFalAdapter(
         ['image/png', 'image/jpeg', 'image/webp'].includes(asset.content_type)
           ? asset.content_type
           : defaultMediaType;
-      if (options.captureOutputs)
-        return captureProviderResult(
+      const billing = await lookupBillingCost(context.upstreamId, context.attemptStartedAt);
+      if (options.captureOutputs) {
+        const captured = await captureProviderResult(
           options.captureOutputs,
           context,
           assets.map((asset) => ({
@@ -1307,16 +1394,25 @@ export function createFalAdapter(
             mediaType: assetMediaType(asset),
             refreshable: true,
           })),
+          billing.billedCostMicros,
         );
+        return {
+          ...captured,
+          ...(billing.retryAfterMs ? { retryAfterMs: billing.retryAfterMs } : {}),
+        };
+      }
       return {
         status: 'succeeded',
-        billedCostMicros: null,
+        ...billing,
         outputs: assets.map((asset) => ({
           url: String(asset.url),
           mediaType: assetMediaType(asset),
           fidelity: 'unverified' as const,
         })),
       };
+    },
+    async pollBilling(context) {
+      return lookupBillingCost(context.upstreamId, context.attemptStartedAt);
     },
   };
 }

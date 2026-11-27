@@ -2,7 +2,7 @@ import type { CaptureProviderOutputs } from './adapter-output.js';
 import { createAlibabaAdapter, type ProviderAdapter } from './adapters.js';
 import type { PublicResolver } from './public-network.js';
 import { createBytePlusAdapter } from './byteplus.js';
-import { createFalAdapter } from './fal.js';
+import { createFalAdapter, observedFalBillingEventCostMicros } from './fal.js';
 import {
   createOpenAIAdapter,
   type StoreProviderImage,
@@ -16,7 +16,7 @@ import {
   observedMiniMaxImageCostMicros,
 } from './minimax-image.js';
 import { createGoogleImageAdapter } from './google.js';
-import { createQwenImageAdapter, isQwenImageModel } from './qwen.js';
+import { createQwenImageAdapter, isQwenImageModel, observedQwenImageCostMicros } from './qwen.js';
 import { createHappyHorseAdapter, isHappyHorseModel } from './happyhorse.js';
 import { createReplicateAdapter } from './replicate.js';
 import { createGoogleVideoAdapter } from './google-video.js';
@@ -27,6 +27,7 @@ import { createBflAdapter } from './bfl.js';
 
 export {
   createFalAdapter,
+  observedFalBillingEventCostMicros,
   createOpenAIAdapter,
   createXaiAdapter,
   createMiniMaxAdapter,
@@ -34,6 +35,7 @@ export {
   observedMiniMaxImageCostMicros,
   createGoogleImageAdapter,
   createQwenImageAdapter,
+  observedQwenImageCostMicros,
   createHappyHorseAdapter,
   createReplicateAdapter,
   createGoogleVideoAdapter,

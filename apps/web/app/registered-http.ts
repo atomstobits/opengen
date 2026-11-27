@@ -14,6 +14,7 @@ const protocolTargets = [
   { method: 'POST', path: '/v1/billing/documents/sync' },
   { method: 'POST', path: '/v1/billing/recharges/:id/authentication' },
   { method: 'GET', path: '/v1/operator/billing' },
+  { method: 'GET', path: '/v1/operator/reconciliations/pending' },
   { method: 'POST', path: '/v1/operator/billing/holds/resolve' },
   { method: 'POST', path: '/v1/operator/billing/recharges/resolve' },
   { method: 'POST', path: '/v1/operator/billing/work' },

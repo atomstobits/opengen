@@ -26,7 +26,7 @@ const denied = () =>
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const providerFields: Record<string, readonly string[]> = {
   byteplus: ['BYTEPLUS_API_KEY'],
-  fal: ['FAL_KEY', 'FAL_END_USER_ID'],
+  fal: ['FAL_KEY', 'FAL_END_USER_ID', 'FAL_BILLING_KEY'],
   openai: ['OPENAI_API_KEY'],
   xai: ['XAI_API_KEY'],
   minimax: ['MINIMAX_API_KEY'],

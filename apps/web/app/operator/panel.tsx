@@ -4,14 +4,31 @@ import type { Job } from '@media-router/contracts';
 import { GatewayAccess } from '../gateway-access';
 import Link from 'next/link';
 
+interface PendingHold {
+  id: string;
+  workspaceId: string;
+  pendingKind: 'customer-hold' | 'supplier-cost';
+  status: string;
+  routeId: string;
+  providerId: string | null;
+  upstreamId: string | null;
+  reservedMicros: number;
+  settledMicros: number | null;
+  billingPollPending: boolean;
+  ageMinutes: number;
+}
+
 export function OperatorPanel() {
   const identityVersion = useRef(0);
   const [connected, setConnected] = useState(false),
     [operator, setOperator] = useState(false);
   const [workspace, setWorkspace] = useState('local'),
+    [queueWorkspaceFilter, setQueueWorkspaceFilter] = useState(''),
     [id, setId] = useState('');
   const [record, setRecord] = useState<{ key: string; job: Job } | null>(null);
+  const [pendingHolds, setPendingHolds] = useState<PendingHold[] | null>(null);
   const [action, setAction] = useState('resume'),
+    [terminalStatus, setTerminalStatus] = useState<'failed' | 'cancelled'>('failed'),
     [upstream, setUpstream] = useState(''),
     [cost, setCost] = useState('');
   const [reference, setReference] = useState(''),
@@ -26,6 +43,8 @@ export function OperatorPanel() {
     identityVersion.current++;
     setOperator(false);
     setRecord(null);
+    setPendingHolds(null);
+    setError('');
     if (!connected) return;
     const controller = new AbortController();
     fetch('/api/session', { signal: controller.signal, cache: 'no-store' })
@@ -38,18 +57,44 @@ export function OperatorPanel() {
       .catch(() => {});
     return () => controller.abort();
   }, [connected]);
-  async function inspect() {
+  async function loadPending(kind: 'customer-hold' | 'supplier-cost' = 'customer-hold') {
     const version = identityVersion.current;
     setBusy(true);
     setError('');
     try {
+      const params = new URLSearchParams({ kind, limit: '50' });
+      const trimmedWorkspace = queueWorkspaceFilter.trim();
+      if (trimmedWorkspace) params.set('workspaceId', trimmedWorkspace);
+      const response = await fetch(`/api/operator/reconciliations/pending?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error?.message ?? 'Pending holds could not be loaded.');
+      if (version === identityVersion.current)
+        setPendingHolds(Array.isArray(data.data) ? data.data : []);
+    } catch (cause) {
+      if (version === identityVersion.current)
+        setError(cause instanceof Error ? cause.message : 'Pending holds could not be loaded.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function inspect(targetWorkspace = workspace, targetId = id) {
+    const version = identityVersion.current;
+    const targetKey = `${targetWorkspace}/${targetId}`;
+    setWorkspace(targetWorkspace);
+    setId(targetId);
+    setBusy(true);
+    setError('');
+    try {
       const response = await fetch(
-        `/api/workspaces/${encodeURIComponent(workspace)}/generations/${encodeURIComponent(id)}`,
+        `/api/workspaces/${encodeURIComponent(targetWorkspace)}/generations/${encodeURIComponent(targetId)}`,
         { cache: 'no-store' },
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message ?? 'Job could not be loaded.');
-      if (version === identityVersion.current) setRecord({ key, job: data });
+      if (version === identityVersion.current) setRecord({ key: targetKey, job: data });
       setConfirmed(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Job could not be loaded.');
@@ -63,6 +108,8 @@ export function OperatorPanel() {
     setBusy(true);
     setError('');
     try {
+      const needsCost =
+        action === 'settle' || action === 'resolve' || action === 'record-supplier-cost';
       const response = await fetch(
         `/api/workspaces/${encodeURIComponent(workspace)}/generations/${encodeURIComponent(id)}/reconcile`,
         {
@@ -74,7 +121,13 @@ export function OperatorPanel() {
             note,
             evidenceUrl: evidence,
             ...(action === 'resume' ? { upstreamId: upstream } : {}),
-            ...(action === 'settle' ? { billedCostMicros: Number(cost) } : {}),
+            ...(action === 'resolve' ? { terminalStatus } : {}),
+            ...(needsCost
+              ? {
+                  billedCostMicros: Number(cost),
+                  ...(action !== 'record-supplier-cost' ? { costBasis: 'operator-audited' } : {}),
+                }
+              : {}),
           }),
         },
       );
@@ -94,13 +147,69 @@ export function OperatorPanel() {
       <Link href="/dashboard">← Workspace</Link>
       <h1>Operator reconciliation</h1>
       <p>
-        Resolve an uncertain provider submission or a completed job’s pending cost using verified
-        provider evidence. Every action creates an audit record.
+        Resolve an uncertain or expired provider submission or a completed job’s pending cost using
+        verified provider evidence. Every action creates an audit record.
       </p>
       <GatewayAccess onChange={connectionChanged} />
       {connected && !operator && <p>This page requires installation operator access.</p>}
       {operator && (
         <section className="workspace-settings operator-form">
+          <div>
+            <label>
+              Queue workspace filter (optional)
+              <input
+                value={queueWorkspaceFilter}
+                placeholder="All workspaces"
+                onChange={(e) => setQueueWorkspaceFilter(e.target.value)}
+              />
+            </label>
+            <button
+              className="button button-outline"
+              onClick={() => void loadPending('customer-hold')}
+              disabled={busy}
+            >
+              Load pending holds
+            </button>{' '}
+            <button
+              className="button button-outline"
+              onClick={() => void loadPending('supplier-cost')}
+              disabled={busy}
+            >
+              Load pending supplier invoices
+            </button>
+            {pendingHolds && (
+              <div style={{ marginTop: '0.75rem' }}>
+                {pendingHolds.length === 0 ? (
+                  <p>No pending reconciliation items.</p>
+                ) : (
+                  <ul>
+                    {pendingHolds.map((item) => (
+                      <li key={item.id}>
+                        <code>{item.workspaceId}</code> / <code>{item.id}</code> —{' '}
+                        {item.pendingKind === 'supplier-cost'
+                          ? 'supplier invoice pending'
+                          : item.status}{' '}
+                        ({item.routeId},{' '}
+                        {item.pendingKind === 'supplier-cost'
+                          ? `customer settled ${item.settledMicros ?? 0} micro-USD`
+                          : `held ${item.reservedMicros} micro-USD`}
+                        , age {item.ageMinutes}m
+                        {item.billingPollPending ? ', billing poll pending' : ''}){' '}
+                        <button
+                          className="button button-outline"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void inspect(item.workspaceId, item.id)}
+                        >
+                          Inspect
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
           <label>
             Workspace ID
             <input value={workspace} onChange={(e) => setWorkspace(e.target.value)} />
@@ -109,7 +218,11 @@ export function OperatorPanel() {
             Generation ID
             <input value={id} onChange={(e) => setId(e.target.value)} />
           </label>
-          <button className="button button-outline" onClick={inspect} disabled={busy || !id}>
+          <button
+            className="button button-outline"
+            onClick={() => void inspect()}
+            disabled={busy || !id}
+          >
             Inspect generation
           </button>
           {record?.key === key && (
@@ -138,6 +251,12 @@ export function OperatorPanel() {
                   <option value="resume">Resume a confirmed provider task</option>
                   <option value="reject">Confirm that submission was not accepted</option>
                   <option value="settle">Record a completed job’s provider cost</option>
+                  <option value="resolve">
+                    Resolve a stuck or expired task to terminal and settle cost
+                  </option>
+                  <option value="record-supplier-cost">
+                    Record supplier invoice cost (customer already settled)
+                  </option>
                 </select>
               </label>
               {action === 'resume' && (
@@ -146,7 +265,24 @@ export function OperatorPanel() {
                   <input value={upstream} onChange={(e) => setUpstream(e.target.value)} />
                 </label>
               )}
-              {action === 'settle' && (
+              {action === 'resolve' && (
+                <label>
+                  Final status
+                  <select
+                    value={terminalStatus}
+                    onChange={(e) => {
+                      setTerminalStatus(e.target.value as 'failed' | 'cancelled');
+                      setConfirmed(false);
+                    }}
+                  >
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+              )}
+              {(action === 'settle' ||
+                action === 'resolve' ||
+                action === 'record-supplier-cost') && (
                 <label>
                   Verified provider cost, micro-USD
                   <input
@@ -157,7 +293,10 @@ export function OperatorPanel() {
                     onChange={(e) => setCost(e.target.value)}
                   />
                   <small>
-                    1,000,000 micro-USD = $1. The existing reservation caps the customer debit.
+                    1,000,000 micro-USD = $1.{' '}
+                    {action === 'record-supplier-cost'
+                      ? 'Records internal supplier cost without changing customer balance.'
+                      : 'The existing reservation caps the customer debit.'}
                   </small>
                 </label>
               )}
@@ -191,7 +330,10 @@ export function OperatorPanel() {
                   !reference ||
                   !evidence ||
                   (action === 'resume' && !upstream) ||
-                  (action === 'settle' && cost === '')
+                  ((action === 'settle' ||
+                    action === 'resolve' ||
+                    action === 'record-supplier-cost') &&
+                    cost === '')
                 }
               >
                 Apply reconciliation

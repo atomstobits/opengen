@@ -476,7 +476,7 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const journal = (await db.query('SELECT * FROM mr_migrations ORDER BY name')).rows;
     expect(journal.slice(0, 29)).toEqual(oldJournal);
     expect(journal.map((row) => row.name)).toEqual(
-      Array.from({ length: 33 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
+      Array.from({ length: 34 }, (_, i) => `${String(i + 1).padStart(3, '0')}.sql`),
     );
     expect(journal[29].checksum).toBe(sha256(await sql(30)));
     for (let i = 0; i < 29; i++) {
@@ -492,6 +492,7 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     const retainedConstraints = oldConstraints.filter(
       (row) =>
         ![
+          'mr_reconciliations_action_check',
           'mr_staff_refund_cases_livemode_check',
           'mr_ledger_kind_check',
           'mr_payment_orders_amount_cents_check',
@@ -508,6 +509,11 @@ async function qualifyPopulatedUpgrade(restore: boolean) {
     expect(constraints.filter((row) => retainedNames.has(row.conname))).toEqual(
       retainedConstraints,
     );
+    const reconciliationActions = constraints.find(
+      (row) => row.conname === 'mr_reconciliations_action_check',
+    )!.definition;
+    for (const action of ['resume', 'reject', 'settle', 'resolve', 'record-supplier-cost'])
+      expect(reconciliationActions).toContain(`'${action}'`);
     const ledgerKinds = constraints.find(
       (row) => row.conname === 'mr_ledger_kind_check',
     )!.definition;
