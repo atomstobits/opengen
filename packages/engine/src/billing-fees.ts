@@ -390,6 +390,18 @@ export type ProviderCostEvidence =
       readonly amountMicros: number;
       readonly auditReference: string;
       readonly operatorId: string;
+    })
+  | (EvidenceIdentity & {
+      readonly basis: 'verified-delivery-published-tariff';
+      readonly deliveryVerified: true;
+      readonly currency: 'USD';
+      readonly tariffRouteId: string;
+      readonly operation: string;
+      readonly resolution?: string;
+      readonly unit: 'output-second' | 'image';
+      readonly unitRateMicros: number;
+      readonly quantity: number;
+      readonly amountMicros: number;
     });
 export interface UnknownProviderCostEvidence {
   readonly basis: 'unknown';
@@ -417,9 +429,13 @@ export function verifyProviderCostEvidence(
         typeof value.reason === 'string' ? value.reason.slice(0, 200) : 'provider-cost-unknown',
     });
   if (
-    !['provider-billed-usd', 'qualified-actual-usage', 'operator-audited'].includes(
-      String(value.basis),
-    )
+    typeof value.basis !== 'string' ||
+    ![
+      'provider-billed-usd',
+      'qualified-actual-usage',
+      'operator-audited',
+      'verified-delivery-published-tariff',
+    ].includes(value.basis)
   )
     return freeze({ verified: false, reason: 'unsupported-cost-basis' });
   for (const key of ['attemptId', 'providerId', 'deploymentId', 'upstreamReference'] as const) {
@@ -459,6 +475,23 @@ export function verifyProviderCostEvidence(
         (numerator + denominator - 1n) / denominator,
         'Verified actual usage cost',
       );
+    } else if (value.basis === 'verified-delivery-published-tariff') {
+      if (value.deliveryVerified !== true)
+        return freeze({ verified: false, reason: 'delivery-not-verified' });
+      identifier(value.tariffRouteId, 'Tariff route ID');
+      identifier(value.operation, 'Tariff operation');
+      if (value.resolution !== undefined) identifier(value.resolution, 'Tariff resolution');
+      if (value.unit !== 'output-second' && value.unit !== 'image')
+        return freeze({ verified: false, reason: 'invalid-tariff-evidence' });
+      const unitRateMicros = assertMicros(value.unitRateMicros, 'Tariff unit rate');
+      const quantity = boundedInteger(value.quantity, 'Tariff quantity');
+      if (quantity < 1) return freeze({ verified: false, reason: 'invalid-tariff-evidence' });
+      const computed = fromBigInt(
+        BigInt(unitRateMicros) * BigInt(quantity),
+        'Published tariff cost',
+      );
+      amount = assertMicros(value.amountMicros, 'Published tariff cost');
+      if (amount !== computed) return freeze({ verified: false, reason: 'tariff-amount-mismatch' });
     } else {
       amount = assertMicros(value.amountMicros, 'Verified provider cost');
       if (value.basis === 'operator-audited') {
@@ -492,16 +525,30 @@ export function verifyProviderCostEvidence(
               ratePerUnits: line.ratePerUnits,
             })),
           }
-        : value.basis === 'operator-audited'
+        : value.basis === 'verified-delivery-published-tariff'
           ? {
               ...identity,
-              basis: 'operator-audited',
+              basis: 'verified-delivery-published-tariff',
+              deliveryVerified: true,
               currency: 'USD',
+              tariffRouteId: value.tariffRouteId as string,
+              operation: value.operation as string,
+              ...(value.resolution !== undefined ? { resolution: value.resolution as string } : {}),
+              unit: value.unit as 'output-second' | 'image',
+              unitRateMicros: value.unitRateMicros as number,
+              quantity: value.quantity as number,
               amountMicros: amount,
-              auditReference: value.auditReference as string,
-              operatorId: value.operatorId as string,
             }
-          : { ...identity, basis: 'provider-billed-usd', currency: 'USD', amountMicros: amount };
+          : value.basis === 'operator-audited'
+            ? {
+                ...identity,
+                basis: 'operator-audited',
+                currency: 'USD',
+                amountMicros: amount,
+                auditReference: value.auditReference as string,
+                operatorId: value.operatorId as string,
+              }
+            : { ...identity, basis: 'provider-billed-usd', currency: 'USD', amountMicros: amount };
     return freeze({ verified: true, amountMicros: amount, evidence: selected });
   } catch (error) {
     if (!(error instanceof BillingFeeError)) throw error;

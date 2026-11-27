@@ -946,12 +946,21 @@ function SafeDocumentLink({ url, children }: { url: string; children: React.Reac
 }
 /** Optional private receipt detail; callers pass the persisted settlement statement. */
 export function BillingFeeBreakdown({ statement }: { statement: FeeSettlementStatement }) {
+  const isPublishedTariff = statement.evidence.basis === 'verified-delivery-published-tariff';
   return (
-    <section className={styles.feeBreakdown} aria-label="Verified generation cost">
+    <section
+      className={styles.feeBreakdown}
+      aria-label={
+        isPublishedTariff ? 'Published tariff generation cost' : 'Verified generation cost'
+      }
+    >
       <h3>Generation cost</h3>
       <dl>
         <div>
-          <dt>Verified provider cost{statement.billing === 'byok' ? ' · billed directly' : ''}</dt>
+          <dt>
+            {isPublishedTariff ? 'Published tariff cost' : 'Verified provider cost'}
+            {statement.billing === 'byok' ? ' · billed directly' : ''}
+          </dt>
           <dd>{microDollars(statement.providerCostMicros)}</dd>
         </div>
         <div>

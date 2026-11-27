@@ -12,12 +12,27 @@ import { isMiniMaxImageModel } from './minimax-image.js';
  * settle the customer immediately at the agreed frozen published tariff while leaving
  * `upstream_cost_micros = null` for independent supplier-invoice reconciliation.
  */
-export const OPAQUE_TARIFF_ADAPTERS = new Set(['runway', 'replicate', 'minimax', 'fal']);
+export const OPAQUE_TARIFF_ADAPTERS = new Set(['runway', 'replicate', 'minimax', 'fal', 'bfl']);
+
+const BFL_OPAQUE_IMAGE_MODELS = new Set(['flux-3-image', 'flux-3-image-klein']);
+
+export interface OpaquePublishedTariffQuote {
+  readonly routeId: string;
+  readonly operation: GenerateInput['operation'];
+  readonly resolution: string | null;
+  readonly unit: 'output-second' | 'image';
+  readonly unitRateMicros: number;
+  readonly quantity: number;
+  readonly amountMicros: number;
+}
 
 export function isOpaqueBillingRoute(route: Pick<Route, 'adapter' | 'upstreamModelId'>): boolean {
   if (!route.adapter || !OPAQUE_TARIFF_ADAPTERS.has(route.adapter)) return false;
   // First-party MiniMax H3 Image auto-settles from conserved token usage.
   if (route.adapter === 'minimax' && isMiniMaxImageModel(route.upstreamModelId)) return false;
+  // First-party BFL FLUX 3 Video returns exact settled credits in get_result.cost; only BFL
+  // image endpoints (flux-3-image, flux-3-image-klein) omit cost on poll responses.
+  if (route.adapter === 'bfl' && !BFL_OPAQUE_IMAGE_MODELS.has(route.upstreamModelId)) return false;
   return true;
 }
 
@@ -37,15 +52,15 @@ function publishedRateForRoute(
 }
 
 /**
- * Computes the deterministic customer charge for an opaque-provider job whose output delivery
- * has been verified (`delivery_status === 'available'`). Mirrors `quote()` exclusions so only
- * complete, fixed-tariff configurations qualify; returns null for token-billed routes,
+ * Computes the deterministic customer charge breakdown for an opaque-provider job whose output
+ * delivery has been verified (`delivery_status === 'available'`). Mirrors `quote()` exclusions
+ * so only complete, fixed-tariff configurations qualify; returns null for token-billed routes,
  * variable-input edits/references, custom sizes, or special unpriced modes.
  */
-export function opaquePublishedTariffChargeMicros(
+export function opaquePublishedTariffQuote(
   route: Route,
   input: GenerateInput,
-): number | null {
+): OpaquePublishedTariffQuote | null {
   if (!isOpaqueBillingRoute(route)) return null;
   if ((input.billing ?? 'managed') !== 'managed') return null;
   const args = input.input;
@@ -91,12 +106,15 @@ export function opaquePublishedTariffChargeMicros(
   if (modelExtras) return null;
 
   let quantity: number | null;
+  let unit: 'output-second' | 'image';
   if (rate.unit === 'output-second') {
+    unit = 'output-second';
     quantity =
       typeof args.duration === 'number' && Number.isInteger(args.duration) && args.duration > 0
         ? args.duration
         : null;
   } else if (rate.unit === 'image') {
+    unit = 'image';
     quantity = Number.isInteger(count) && count > 0 ? count : null;
   } else {
     return null;
@@ -104,5 +122,21 @@ export function opaquePublishedTariffChargeMicros(
   if (quantity === null) return null;
 
   const total = rate.usdMicros * quantity;
-  return Number.isSafeInteger(total) && total >= 0 ? total : null;
+  if (!Number.isSafeInteger(total) || total < 0) return null;
+  return {
+    routeId: route.id,
+    operation: input.operation,
+    resolution: rate.resolution ?? args.resolution ?? null,
+    unit,
+    unitRateMicros: rate.usdMicros,
+    quantity,
+    amountMicros: total,
+  };
+}
+
+export function opaquePublishedTariffChargeMicros(
+  route: Route,
+  input: GenerateInput,
+): number | null {
+  return opaquePublishedTariffQuote(route, input)?.amountMicros ?? null;
 }

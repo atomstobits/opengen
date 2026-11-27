@@ -136,6 +136,15 @@ bounded evidence reference. Supported bases are:
    actual bill.
 3. `operator-audited`: USD `amountMicros`, durable `auditReference` and authenticated
    `operatorId` from the existing audited reconciliation path.
+4. `verified-delivery-published-tariff`: explicit engine-produced tariff evidence for
+   qualified opaque-provider routes (`runway`, `replicate`, `minimax` video, `bfl` image
+   routes `flux-3-image` / `flux-3-image-klein`, and `fal` without `FAL_BILLING_KEY`)
+   whose private output delivery reached `available`. Requires `deliveryVerified: true`,
+   USD, exact frozen `tariffRouteId`, `operation`, `unit` (`output-second` or `image`),
+   `unitRateMicros`, positive integer `quantity`, and exact `unitRateMicros * quantity = amountMicros`.
+   Fee settlements on this basis record `costStatus: 'published-tariff'` (distinct from
+   `verified`) under migration `035.sql` and retain `upstream_cost_micros = null` for
+   independent supplier-invoice reconciliation via `record-supplier-cost`.
 
 The evidence producer must be trusted and reviewed. This pure validator cannot
 prove provider signatures, account tariffs or operator authority; never map a
@@ -167,8 +176,11 @@ const result = settleVerifiedCost(snapshot, {
 ```
 
 A settled result records currency, policy ID/version, frozen rate and service,
-provider actual cost, customer provider debit, externally billed BYOK provider
-cost, nominal/collected/waived fee, customer total, operator overrun, released
+settlement cost basis (`providerCostMicros`: actual provider cost when verified,
+or the frozen published tariff when `costStatus` is `published-tariff`, with
+actual supplier invoice cost tracked separately in `upstream_cost_micros`),
+customer provider debit, externally billed BYOK provider cost,
+nominal/collected/waived fee, customer total, operator overrun, released
 reservation, outcome eligibility and whitelisted evidence. A policy rate is never
 presented as a fully collected fee when a cap caused a waiver.
 
@@ -183,9 +195,10 @@ For the explicit `provider-first` fixture rule:
 At USD1.02 verified provider cost, a USD1.05 accepted limit collects USD0.03 of the
 USD0.051 nominal fee and shows USD0.021 waived. At USD1.10 provider cost, that
 limit collects USD1.05, shows USD0.055 fee waived and USD0.05 operator overrun.
-For managed single-attempt work, exact conservation is:
+For managed single-attempt work, exact conservation against the settlement cost
+basis (`providerCostMicros`) is:
 
-`provider actual + nominal fee = customer total + waived fee + operator overrun`
+`settlement cost basis + nominal fee = customer total + waived fee + operator overrun`
 
 `customer total + released reservation = original reservation`
 

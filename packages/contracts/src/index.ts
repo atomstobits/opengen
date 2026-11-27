@@ -214,7 +214,7 @@ export interface GenerationFeeEstimate {
   customerEstimateMicros: number | null;
 }
 export interface GenerationFeeSettlement extends GenerationFeeTerms {
-  costStatus: 'verified' | 'no-upstream-charge';
+  costStatus: 'verified' | 'published-tariff' | 'no-upstream-charge';
   providerCostMicros: number;
   customerProviderDebitMicros: number;
   nominalFeeMicros: number;

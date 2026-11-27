@@ -302,6 +302,157 @@ describe('verified provider cost evidence', () => {
       ),
     ).toMatchObject({ verified: false });
   });
+  it('validates verified-delivery-published-tariff evidence strictly and calculates fees/caps accurately', () => {
+    const tariffEvidence = {
+      ...expected,
+      reference: 'published-tariff:job-1:1',
+      basis: 'verified-delivery-published-tariff' as const,
+      deliveryVerified: true as const,
+      currency: 'USD' as const,
+      tariffRouteId: 'bfl-undisclosed/bfl-flux-3-image',
+      operation: 'text-to-image',
+      resolution: '768sq',
+      unit: 'image' as const,
+      unitRateMicros: 41_000,
+      quantity: 1,
+      amountMicros: 41_000,
+    };
+    const verified = verifyProviderCostEvidence(
+      { ...tariffEvidence, rawProviderPayload: { privatePrompt: 'never persist' } },
+      expected,
+    );
+    expect(verified).toMatchObject({
+      verified: true,
+      amountMicros: 41_000,
+      evidence: tariffEvidence,
+    });
+    if (verified.verified) expect(verified.evidence).not.toHaveProperty('rawProviderPayload');
+
+    // Smart 5% fee on 41_000 published tariff -> 2_050 fee, 43_050 total
+    expect(
+      settleVerifiedCost(snapshot(), {
+        reservedMicros: 43_050,
+        customerCeilingMicros: 43_050,
+        evidence: tariffEvidence,
+        expected,
+        outcome: 'succeeded',
+      }),
+    ).toMatchObject({
+      status: 'settled',
+      statement: {
+        providerCostMicros: 41_000,
+        customerProviderDebitMicros: 41_000,
+        nominalFeeMicros: 2_050,
+        collectedFeeMicros: 2_050,
+        waivedFeeMicros: 0,
+        operatorOverrunMicros: 0,
+        customerTotalMicros: 43_050,
+        releasedReservationMicros: 0,
+      },
+    });
+
+    // Ceiling below reservation waives part of the fee and releases the unused reservation
+    const cappedFee = settleVerifiedCost(snapshot(), {
+      reservedMicros: 43_050,
+      customerCeilingMicros: 42_000,
+      evidence: tariffEvidence,
+      expected,
+      outcome: 'succeeded',
+    });
+    expect(cappedFee).toMatchObject({
+      status: 'settled',
+      statement: {
+        providerCostMicros: 41_000,
+        customerProviderDebitMicros: 41_000,
+        nominalFeeMicros: 2_050,
+        collectedFeeMicros: 1_000,
+        waivedFeeMicros: 1_050,
+        operatorOverrunMicros: 0,
+        customerTotalMicros: 42_000,
+        releasedReservationMicros: 1_050,
+      },
+    });
+    if (cappedFee.status === 'settled') {
+      const s = cappedFee.statement;
+      expect(s.providerCostMicros + s.nominalFeeMicros).toBe(
+        s.customerTotalMicros + s.waivedFeeMicros + s.operatorOverrunMicros,
+      );
+      expect(s.customerTotalMicros + s.releasedReservationMicros).toBe(43_050);
+      expect(s.customerTotalMicros).toBeLessThanOrEqual(42_000);
+    }
+
+    // Limit below tariff waives the entire fee and records operator overrun
+    const overrunTariff = settleVerifiedCost(snapshot(), {
+      reservedMicros: 40_000,
+      customerCeilingMicros: 40_000,
+      evidence: tariffEvidence,
+      expected,
+      outcome: 'succeeded',
+    });
+    expect(overrunTariff).toMatchObject({
+      status: 'settled',
+      statement: {
+        providerCostMicros: 41_000,
+        customerProviderDebitMicros: 40_000,
+        nominalFeeMicros: 2_050,
+        collectedFeeMicros: 0,
+        waivedFeeMicros: 2_050,
+        operatorOverrunMicros: 1_000,
+        customerTotalMicros: 40_000,
+        releasedReservationMicros: 0,
+      },
+    });
+    if (overrunTariff.status === 'settled') {
+      const s = overrunTariff.statement;
+      expect(s.providerCostMicros + s.nominalFeeMicros).toBe(
+        s.customerTotalMicros + s.waivedFeeMicros + s.operatorOverrunMicros,
+      );
+      expect(s.customerTotalMicros + s.releasedReservationMicros).toBe(40_000);
+      expect(s.customerTotalMicros).toBeLessThanOrEqual(40_000);
+    }
+
+    // Non-string basis values (e.g. single-element arrays) must be rejected before dispatch
+    for (const basis of [
+      ['verified-delivery-published-tariff'],
+      ['operator-audited'],
+      ['provider-billed-usd'],
+      123,
+    ]) {
+      expect(verifyProviderCostEvidence({ ...evidence(41_000), basis }, expected)).toEqual({
+        verified: false,
+        reason: 'unsupported-cost-basis',
+      });
+    }
+
+    // Fail-closed checks: unverified delivery, arithmetic mismatch, zero quantity, bad unit, overflow
+    expect(
+      verifyProviderCostEvidence({ ...tariffEvidence, deliveryVerified: false }, expected),
+    ).toEqual({ verified: false, reason: 'delivery-not-verified' });
+    expect(
+      verifyProviderCostEvidence({ ...tariffEvidence, amountMicros: 41_001 }, expected),
+    ).toEqual({ verified: false, reason: 'tariff-amount-mismatch' });
+    expect(
+      verifyProviderCostEvidence({ ...tariffEvidence, quantity: 0, amountMicros: 0 }, expected),
+    ).toEqual({
+      verified: false,
+      reason: 'invalid-tariff-evidence',
+    });
+    expect(verifyProviderCostEvidence({ ...tariffEvidence, unit: 'token' }, expected)).toEqual({
+      verified: false,
+      reason: 'invalid-tariff-evidence',
+    });
+    expect(
+      verifyProviderCostEvidence(
+        {
+          ...tariffEvidence,
+          unitRateMicros: Number.MAX_SAFE_INTEGER,
+          quantity: 2,
+          amountMicros: Number.MAX_SAFE_INTEGER,
+        },
+        expected,
+      ),
+    ).toEqual({ verified: false, reason: 'invalid-cost-evidence' });
+  });
   it('does not accept estimates, historical averages, incomplete public prices, non-USD bills or another attempt', () => {
     for (const basis of ['estimate', 'historical-average', 'published-price'])
       expect(verifyProviderCostEvidence({ ...evidence(1_000_000), basis }, expected)).toEqual({

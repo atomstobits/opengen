@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { catalog } from '@media-router/catalog';
 import { resolveRouteUpstreamModelId, type GenerateInput } from '@media-router/contracts';
 import {
+  AccountGovernanceStore,
   AGED_COST_RELIEF_MIN_AGE_MINUTES,
   AgedCostReliefStore,
+  createBflAdapter,
   createEngine,
   createFalAdapter,
   createQwenImageAdapter,
@@ -14,6 +16,7 @@ import {
   observedFalBillingEventCostMicros,
   observedQwenImageCostMicros,
   opaquePublishedTariffChargeMicros,
+  opaquePublishedTariffQuote,
 } from '@media-router/engine';
 import {
   connectionEnvironment,
@@ -489,13 +492,16 @@ describe('Alibaba Qwen Image usage settlement (unit & adapter fixtures)', () => 
 });
 
 describe('opaque-provider verified-delivery published tariff (unit)', () => {
-  it('prices qualified opaque routes (Runway, Replicate, MiniMax video, fal) and fails closed on non-opaque, token, BYOK or extra-input routes', () => {
+  it('prices qualified opaque routes (Runway, Replicate, MiniMax video, BFL image, fal) and fails closed on non-opaque, token, BYOK or extra-input routes', () => {
     const runwayKling = catalog.routes.find((r) => r.id === 'runway-undisclosed/kling-kling-4.0')!;
     const replicateSeedance = catalog.routes.find((r) => r.adapter === 'replicate')!;
     const minimaxVideo = catalog.routes.find(
       (r) => r.id === 'minimax-undisclosed/minimax-h3-lite',
     )!;
     const minimaxImage = catalog.routes.find((r) => r.upstreamModelId === 'MiniMax-H3-Image')!;
+    const bflImage = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-image')!;
+    const bflKlein = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-klein')!;
+    const bflVideo = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-video')!;
     const falTurbo = catalog.routes.find(
       (r) =>
         r.adapter === 'fal' &&
@@ -507,8 +513,83 @@ describe('opaque-provider verified-delivery published tariff (unit)', () => {
     expect(isOpaqueBillingRoute(replicateSeedance)).toBe(true);
     expect(isOpaqueBillingRoute(minimaxVideo)).toBe(true);
     expect(isOpaqueBillingRoute(minimaxImage)).toBe(false);
+    expect(isOpaqueBillingRoute(bflImage)).toBe(true);
+    expect(isOpaqueBillingRoute(bflKlein)).toBe(true);
+    expect(isOpaqueBillingRoute(bflVideo)).toBe(false);
+    expect(isOpaqueBillingRoute({ adapter: 'bfl', upstreamModelId: 'flux-4-unknown' })).toBe(false);
     expect(isOpaqueBillingRoute(falTurbo)).toBe(true);
     expect(isOpaqueBillingRoute(alibabaWan)).toBe(false);
+
+    // BFL FLUX 3 Image & Klein text-to-image published tariffs
+    expect(
+      opaquePublishedTariffQuote(bflImage, {
+        modelId: bflImage.modelId,
+        routeId: bflImage.id,
+        operation: 'text-to-image',
+        input: { prompt: 'Studio ceramic cup.', resolution: '768sq' },
+      }),
+    ).toEqual({
+      routeId: 'bfl-undisclosed/bfl-flux-3-image',
+      operation: 'text-to-image',
+      resolution: '768sq',
+      unit: 'image',
+      unitRateMicros: 41_000,
+      quantity: 1,
+      amountMicros: 41_000,
+    });
+    expect(
+      opaquePublishedTariffChargeMicros(bflImage, {
+        modelId: bflImage.modelId,
+        routeId: bflImage.id,
+        operation: 'text-to-image',
+        input: { prompt: 'Studio ceramic cup.', resolution: '4K' },
+      }),
+    ).toBe(607_000);
+    expect(
+      opaquePublishedTariffChargeMicros(bflKlein, {
+        modelId: bflKlein.modelId,
+        routeId: bflKlein.id,
+        operation: 'text-to-image',
+        input: { prompt: 'Minimal line art.', resolution: '768sq' },
+      }),
+    ).toBe(8_000);
+    // BFL fail-closed cases: flux-3-video (exact cost on poll), image-edit, custom size, grounding
+    expect(
+      opaquePublishedTariffChargeMicros(bflVideo, {
+        modelId: bflVideo.modelId,
+        routeId: bflVideo.id,
+        operation: 'text-to-video',
+        input: { prompt: 'Waves.', resolution: '720p', duration: 5 },
+      }),
+    ).toBeNull();
+    expect(
+      opaquePublishedTariffChargeMicros(bflImage, {
+        modelId: bflImage.modelId,
+        routeId: bflImage.id,
+        operation: 'image-edit',
+        input: {
+          prompt: 'Recolor.',
+          resolution: '768sq',
+          references: [{ type: 'image', asset: { url: 'https://media.example.com/a.png' } }],
+        },
+      }),
+    ).toBeNull();
+    expect(
+      opaquePublishedTariffChargeMicros(bflImage, {
+        modelId: bflImage.modelId,
+        routeId: bflImage.id,
+        operation: 'text-to-image',
+        input: { prompt: 'Custom size.', size: { width: 1024, height: 1024 } },
+      }),
+    ).toBeNull();
+    expect(
+      opaquePublishedTariffChargeMicros(bflImage, {
+        modelId: bflImage.modelId,
+        routeId: bflImage.id,
+        operation: 'text-to-image',
+        input: { prompt: 'Grounded.', resolution: '1K', grounding: true },
+      }),
+    ).toBeNull();
 
     // Runway Kling 4.0: 3s @ 720p = 3 * 157_000 = 471_000 micro-USD
     expect(
@@ -1489,6 +1570,586 @@ describe.skipIf(!databaseUrl)('reconciliation pipeline, resolve action, and 1-ho
         billing_poll_pending: false,
       });
     } finally {
+      await engine.close();
+      await isolated.close();
+    }
+  });
+
+  it('settles BFL image routes via published tariff on verified delivery while keeping BFL video exact-cost-only', async () => {
+    const isolated = await isolatedEngineDatabase(databaseUrl!, 'bfl_opaque_image');
+    const bflImage = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-image')!;
+    const bflKlein = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-klein')!;
+    const bflVideo = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-video')!;
+    let seq = 0;
+    const taskMeta = new Map<string, { kind: 'image' | 'video'; cost?: number }>();
+    const bfl = createBflAdapter({
+      env: { BFL_API_KEY: 'fixture-bfl-key' },
+      fetch: async (url, init) => {
+        const u = String(url);
+        if (init?.method === 'POST') {
+          seq += 1;
+          const id = `bfl-task-${seq}`;
+          const isVideo = u.endsWith('/flux-3-video');
+          taskMeta.set(id, {
+            kind: isVideo ? 'video' : 'image',
+            ...(isVideo && seq === 3 ? { cost: 40 } : {}),
+          });
+          return Response.json({ id, polling_url: `https://api.bfl.ai/v1/get_result?id=${id}` });
+        }
+        const id = new URL(u).searchParams.get('id') ?? '';
+        const meta = taskMeta.get(id)!;
+        if (meta.kind === 'video') {
+          return Response.json({
+            status: 'Ready',
+            ...(meta.cost !== undefined ? { cost: meta.cost } : {}),
+            result: { sample: `https://cdn.example.com/${id}.mp4` },
+          });
+        }
+        // Live BFL image polls omit `cost`
+        return Response.json({
+          status: 'Ready',
+          result: { sample: `https://cdn.example.com/${id}.png` },
+        });
+      },
+    });
+    const engine = isolated.bind(
+      createEngine({
+        databaseUrl: isolated.databaseUrl,
+        storage: privateStorageFixture(),
+        pollIntervalMs: 0,
+        delivery: {
+          maxAttempts: 1,
+          download: async (source) =>
+            privateInputBytesFixture(source.mediaType === 'video/mp4' ? 'video/mp4' : 'image/png')
+              .bytes,
+        },
+        adapters: [bfl],
+      }),
+    );
+    const app = await buildApp({
+      engine,
+      workspaceId: 'operator-ws',
+      apiToken: 'operator-bootstrap-token',
+    });
+    try {
+      await engine.initialize();
+      const ws = `bfl-ws-${randomUUID()}`;
+      await engine.ensureWorkspace('operator-ws');
+      await engine.ensureWorkspace(ws, 2_000_000);
+
+      // 1. BFL FLUX 3 Image (768sq) settles immediately at 41_000 with upstream_cost_micros = null
+      const imageJob = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'bfl-img-1',
+        input: {
+          modelId: bflImage.modelId,
+          routeId: bflImage.id,
+          operation: 'text-to-image',
+          input: { prompt: 'Glass sphere.', resolution: '768sq' },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        imageJob.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      expect(await engine.getJob(ws, imageJob.id)).toMatchObject({
+        status: 'succeeded',
+        deliveryStatus: 'available',
+        settledMicros: 41_000,
+      });
+      expect(
+        (
+          await engine.pool.query(
+            'SELECT settled_micros::text,upstream_cost_micros::text FROM mr_jobs WHERE id=$1',
+            [imageJob.id],
+          )
+        ).rows[0],
+      ).toEqual({ settled_micros: '41000', upstream_cost_micros: null });
+
+      // 2. BFL FLUX 3 Klein (768sq) settles immediately at 8_000 with upstream_cost_micros = null
+      const kleinJob = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'bfl-klein-1',
+        input: {
+          modelId: bflKlein.modelId,
+          routeId: bflKlein.id,
+          operation: 'text-to-image',
+          input: { prompt: 'Paper crane.', resolution: '768sq' },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        kleinJob.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      expect(await engine.getJob(ws, kleinJob.id)).toMatchObject({
+        status: 'succeeded',
+        deliveryStatus: 'available',
+        settledMicros: 8_000,
+      });
+      expect(
+        (await engine.pendingReconciliations({ workspaceId: ws, kind: 'supplier-cost' })).map(
+          (item) => item.id,
+        ),
+      ).toEqual([imageJob.id, kleinJob.id]);
+
+      // Operator records BFL supplier invoice cost for imageJob without changing customer balance
+      const recordRes = await app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${ws}/generations/${imageJob.id}/reconcile`,
+        headers: { authorization: 'Bearer operator-bootstrap-token' },
+        payload: {
+          action: 'record-supplier-cost',
+          reference: 'bfl-invoice-1',
+          note: 'Confirmed 4.1 BFL credits billed for FLUX 3 Image 768sq.',
+          evidenceUrl: 'https://api.bfl.ai/billing/usage/bfl-task-1',
+          billedCostMicros: 41_000,
+        },
+      });
+      expect(recordRes.statusCode, recordRes.body).toBe(200);
+      expect(
+        (
+          await engine.pool.query(
+            'SELECT settled_micros::text,upstream_cost_micros::text FROM mr_jobs WHERE id=$1',
+            [imageJob.id],
+          )
+        ).rows[0],
+      ).toEqual({ settled_micros: '41000', upstream_cost_micros: '41000' });
+
+      // 3. BFL FLUX 3 Video with get_result.cost = 40 settles exact 400_000
+      const videoExact = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'bfl-vid-exact',
+        input: {
+          modelId: bflVideo.modelId,
+          routeId: bflVideo.id,
+          operation: 'text-to-video',
+          input: { prompt: 'Ocean tide.', resolution: '720p', duration: 5 },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        videoExact.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      expect(
+        (
+          await engine.pool.query(
+            'SELECT settled_micros::text,upstream_cost_micros::text FROM mr_jobs WHERE id=$1',
+            [videoExact.id],
+          )
+        ).rows[0],
+      ).toEqual({ settled_micros: '400000', upstream_cost_micros: '400000' });
+
+      // 4. BFL FLUX 3 Video omitting cost MUST NOT fall back to published tariff
+      const videoMissingCost = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'bfl-vid-nocost',
+        input: {
+          modelId: bflVideo.modelId,
+          routeId: bflVideo.id,
+          operation: 'text-to-video',
+          input: { prompt: 'Mountain fog.', resolution: '720p', duration: 5 },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        videoMissingCost.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      expect(await engine.getJob(ws, videoMissingCost.id)).toMatchObject({
+        status: 'succeeded',
+        deliveryStatus: 'available',
+        settledMicros: null,
+      });
+      expect(
+        (await engine.pendingReconciliations({ workspaceId: ws, kind: 'customer-hold' })).map(
+          (item) => item.id,
+        ),
+      ).toEqual([videoMissingCost.id]);
+    } finally {
+      await app.close();
+      await engine.close();
+      await isolated.close();
+    }
+  });
+
+  it('settles fee-bearing opaque verified-delivery jobs at the published tariff with costStatus published-tariff and enforces migration 035 SQL guards', async () => {
+    const isolated = await isolatedEngineDatabase(databaseUrl!, 'fee_opaque_tariff');
+    const policy = createFeePolicy({
+      id: 'fixture-opaque-smart-5pct',
+      version: 1,
+      activation: 'fixture',
+      basisPoints: 500,
+      eligibleOutcomes: ['succeeded'],
+      overrunAllocation: 'provider-first',
+    });
+    const feeAcceptance = { policyId: policy.id, policyVersion: policy.version };
+    const bflImage = catalog.routes.find((r) => r.id === 'bfl-undisclosed/bfl-flux-3-image')!;
+    const runwayKling = catalog.routes.find((r) => r.id === 'runway-undisclosed/kling-kling-4.0')!;
+    const falTurbo = catalog.routes.find(
+      (r) =>
+        r.adapter === 'fal' &&
+        resolveRouteUpstreamModelId(r, 'text-to-video') === 'minimax/h3-max-turbo/text-to-video',
+    )!;
+    let failDownload = false;
+    let bflSeq = 0;
+    const bfl = createBflAdapter({
+      env: { BFL_API_KEY: 'fixture-bfl-key' },
+      fetch: async (url, init) => {
+        if (init?.method === 'POST') {
+          bflSeq += 1;
+          const id = `bfl-fee-${bflSeq}`;
+          return Response.json({ id, polling_url: `https://api.bfl.ai/v1/get_result?id=${id}` });
+        }
+        const id = new URL(String(url)).searchParams.get('id') ?? '';
+        return Response.json({
+          status: 'Ready',
+          result: { sample: `https://cdn.example.com/${id}.png` },
+        });
+      },
+    });
+    const falWithBillingKey = createFalAdapter({
+      env: { FAL_KEY: 'fixture-fal-key', FAL_BILLING_KEY: 'fixture-billing-key' },
+      fetch: async (url, init) => {
+        const u = String(url);
+        if (init?.method === 'POST') return Response.json({ request_id: 'fal-fee-1' });
+        if (u.includes('billing-events'))
+          return Response.json({ billing_events: [], has_more: false, next_cursor: null });
+        if (u.endsWith('/status')) return Response.json({ status: 'COMPLETED' });
+        return Response.json({ video: { url: 'https://v3b.fal.media/files/b/fixture/out.mp4' } });
+      },
+    });
+    const engine = isolated.bind(
+      createEngine({
+        databaseUrl: isolated.databaseUrl,
+        storage: privateStorageFixture(),
+        pollIntervalMs: 0,
+        fixtureBillingPolicy: policy,
+        delivery: {
+          maxAttempts: 1,
+          download: async (source) => {
+            if (failDownload) throw new Error('Simulated media outage.');
+            return privateInputBytesFixture(
+              source.mediaType === 'video/mp4' ? 'video/mp4' : 'image/png',
+            ).bytes;
+          },
+        },
+        adapters: [
+          bfl,
+          falWithBillingKey,
+          {
+            id: 'runway',
+            isConfigured: (candidate) => candidate.id === runwayKling.id,
+            submit: async ({ jobId }) => ({ upstreamId: `runway-fee-${jobId}` }),
+            poll: async () => ({
+              status: 'succeeded',
+              billedCostMicros: null,
+              outputs: [
+                {
+                  url: 'https://cdn.example.com/runway-fee.mp4',
+                  mediaType: 'video/mp4',
+                  fidelity: 'unverified',
+                },
+              ],
+            }),
+          },
+        ],
+      }),
+    );
+    const app = await buildApp({
+      engine,
+      workspaceId: 'operator-ws',
+      apiToken: 'operator-bootstrap-token',
+    });
+    try {
+      await engine.initialize();
+      const ws = `fee-opaque-ws-${randomUUID()}`;
+      await engine.ensureWorkspace('operator-ws');
+      await engine.ensureWorkspace(ws, 2_000_000);
+      const key = await new AccountGovernanceStore(engine.pool).createKey(
+        { workspaceId: ws, bootstrap: true, scopes: ['read', 'generate', 'keys:write'] },
+        { name: 'Fee opaque key', scopes: ['read', 'generate'], monthlyCapMicros: 1_500_000 },
+      );
+
+      // 1. Smart 5% fee on BFL FLUX 3 Image (768sq): 41_000 tariff + 2_050 fee = 43_050
+      const smartRes = await app.inject({
+        method: 'POST',
+        url: '/v1/generations',
+        headers: {
+          authorization: `Bearer ${key.token}`,
+          'idempotency-key': 'fee-bfl-1',
+        },
+        payload: {
+          modelId: bflImage.modelId,
+          operation: 'text-to-image',
+          routing: { fallback: false },
+          feeAcceptance,
+          input: { prompt: 'Warm lantern.', resolution: '768sq' },
+        },
+      });
+      expect(smartRes.statusCode, smartRes.body).toBe(202);
+      const smartJob = smartRes.json();
+      expect(smartJob.reservedMicros).toBe(43_050);
+
+      await workUntilJob(
+        engine,
+        ws,
+        smartJob.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      const smartSettled = await engine.getJob(ws, smartJob.id);
+      const expectedSmartBilling = {
+        ...feeAcceptance,
+        service: 'smart',
+        basisPoints: 500,
+        costStatus: 'published-tariff',
+        providerCostMicros: 41_000,
+        customerProviderDebitMicros: 41_000,
+        nominalFeeMicros: 2_050,
+        collectedFeeMicros: 2_050,
+        waivedFeeMicros: 0,
+        operatorOverrunMicros: 0,
+        customerTotalMicros: 43_050,
+      };
+      expect(smartSettled).toMatchObject({
+        status: 'succeeded',
+        deliveryStatus: 'available',
+        settledMicros: 43_050,
+        billing: expectedSmartBilling,
+      });
+
+      const smartDb = (
+        await engine.pool.query(
+          'SELECT settled_micros::text,upstream_cost_micros::text,fee_cost_evidence FROM mr_jobs WHERE id=$1',
+          [smartJob.id],
+        )
+      ).rows[0];
+      expect(smartDb.settled_micros).toBe('43050');
+      expect(smartDb.upstream_cost_micros).toBeNull();
+      expect(smartDb.fee_cost_evidence).toMatchObject({
+        workspaceId: ws,
+        jobId: smartJob.id,
+        routeId: bflImage.id,
+        evidence: {
+          basis: 'verified-delivery-published-tariff',
+          deliveryVerified: true,
+          currency: 'USD',
+          tariffRouteId: bflImage.id,
+          operation: 'text-to-image',
+          resolution: '768sq',
+          unit: 'image',
+          unitRateMicros: 41_000,
+          quantity: 1,
+          amountMicros: 41_000,
+        },
+      });
+
+      // Private credential identity and upstream reference must never leak to customer job or ledger
+      const smartLedger = (await engine.ledger(ws)).filter((entry) => entry.job_id === smartJob.id);
+      expect(JSON.stringify(smartSettled)).not.toContain(
+        smartDb.fee_cost_evidence.evidence.upstreamReference,
+      );
+      expect(JSON.stringify(smartLedger)).not.toContain(
+        smartDb.fee_cost_evidence.credentialIdentity,
+      );
+      expect(smartLedger.find((entry) => entry.kind === 'settle')?.details).toMatchObject({
+        upstreamCostMicros: null,
+        settlementBasis: 'verified-delivery-published-tariff',
+        supplierReconciliationPending: true,
+        billingFee: expectedSmartBilling,
+      });
+      expect(
+        (
+          await engine.pool.query(
+            'SELECT gross_debit_micros::text,held_micros::text FROM mr_key_months WHERE key_id=$1',
+            [key.id],
+          )
+        ).rows,
+      ).toEqual([{ gross_debit_micros: '43050', held_micros: '0' }]);
+
+      // Appears in supplier-cost queue (not customer-hold); record-supplier-cost leaves customer untouched
+      expect(
+        await engine.pendingReconciliations({ workspaceId: ws, kind: 'customer-hold' }),
+      ).toEqual([]);
+      expect(
+        (await engine.pendingReconciliations({ workspaceId: ws, kind: 'supplier-cost' })).map(
+          (item) => item.id,
+        ),
+      ).toEqual([smartJob.id]);
+      const recordRes = await app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${ws}/generations/${smartJob.id}/reconcile`,
+        headers: { authorization: 'Bearer operator-bootstrap-token' },
+        payload: {
+          action: 'record-supplier-cost',
+          reference: 'bfl-fee-supplier-1',
+          note: 'Supplier invoice settled at discounted $0.035 USD.',
+          evidenceUrl: 'https://api.bfl.ai/billing/invoice/1',
+          billedCostMicros: 35_000,
+        },
+      });
+      expect(recordRes.statusCode, recordRes.body).toBe(200);
+      expect(
+        (
+          await engine.pool.query(
+            "SELECT settled_micros::text,upstream_cost_micros::text,fee_settlement->>'costStatus' AS cost_status FROM mr_jobs WHERE id=$1",
+            [smartJob.id],
+          )
+        ).rows[0],
+      ).toEqual({
+        settled_micros: '43050',
+        upstream_cost_micros: '35000',
+        cost_status: 'published-tariff',
+      });
+      expect(await engine.getBalance(ws)).toEqual({
+        availableMicros: 2_000_000 - 43_050,
+        reservedMicros: 0,
+        currency: 'USD',
+      });
+
+      // Direct SQL migration 035 CHECK constraints reject missing evidence or invalid costStatus
+      const client = await engine.pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SAVEPOINT sp_evidence');
+        await expect(
+          client.query('UPDATE mr_jobs SET fee_cost_evidence=NULL WHERE id=$1', [smartJob.id]),
+        ).rejects.toMatchObject({ code: '23514' });
+        await client.query('ROLLBACK TO SAVEPOINT sp_evidence');
+
+        await client.query('SAVEPOINT sp_status');
+        await expect(
+          client.query(
+            `UPDATE mr_jobs SET fee_settlement=jsonb_set(fee_settlement,'{costStatus}','"estimate"') WHERE id=$1`,
+            [smartJob.id],
+          ),
+        ).rejects.toMatchObject({ code: '23514' });
+        await client.query('ROLLBACK TO SAVEPOINT sp_status');
+        await client.query('ROLLBACK');
+      } finally {
+        client.release();
+      }
+
+      // 2. Direct 0% fee pinned Runway job settles at 471_000 with costStatus published-tariff
+      const directJob = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'fee-runway-1',
+        input: {
+          modelId: runwayKling.modelId,
+          routeId: runwayKling.id,
+          operation: 'text-to-video',
+          routing: { fallback: false },
+          feeAcceptance,
+          input: { prompt: 'Boat.', resolution: '720p', duration: 3, aspectRatio: '16:9' },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        directJob.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      expect(await engine.getJob(ws, directJob.id)).toMatchObject({
+        status: 'succeeded',
+        settledMicros: 471_000,
+        billing: {
+          ...feeAcceptance,
+          service: 'direct',
+          basisPoints: 0,
+          costStatus: 'published-tariff',
+          providerCostMicros: 471_000,
+          nominalFeeMicros: 0,
+          collectedFeeMicros: 0,
+          customerTotalMicros: 471_000,
+        },
+      });
+
+      // 3. Undelivered fee-bearing opaque job stays held until audited operator settlement
+      failDownload = true;
+      const failedDeliveryJob = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'fee-fail-1',
+        input: {
+          modelId: runwayKling.modelId,
+          routeId: runwayKling.id,
+          operation: 'text-to-video',
+          routing: { fallback: false },
+          feeAcceptance,
+          input: { prompt: 'Storm.', resolution: '720p', duration: 3, aspectRatio: '16:9' },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        failedDeliveryJob.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'failed',
+      );
+      expect(await engine.getJob(ws, failedDeliveryJob.id)).toMatchObject({
+        status: 'succeeded',
+        deliveryStatus: 'failed',
+        settledMicros: null,
+        billing: { ...feeAcceptance, costStatus: 'pending' },
+      });
+      const auditedSettle = await app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${ws}/generations/${failedDeliveryJob.id}/reconcile`,
+        headers: { authorization: 'Bearer operator-bootstrap-token' },
+        payload: {
+          action: 'settle',
+          reference: 'runway-audited-1',
+          note: 'Confirmed 39 Runway promo credits ($0.312 USD) after failed media fetch.',
+          evidenceUrl: 'https://dev.runwayml.com/billing/usage/1',
+          costBasis: 'operator-audited',
+          billedCostMicros: 312_000,
+        },
+      });
+      expect(auditedSettle.statusCode, auditedSettle.body).toBe(200);
+      expect(auditedSettle.json()).toMatchObject({
+        settledMicros: 312_000,
+        billing: { costStatus: 'verified', providerCostMicros: 312_000 },
+      });
+
+      // 4. Fee-bearing fal job WITH FAL_BILLING_KEY enabled must NOT prematurely fall back to published tariff
+      failDownload = false;
+      const falJob = await engine.submit({
+        workspaceId: ws,
+        idempotencyKey: 'fee-fal-1',
+        input: {
+          modelId: falTurbo.modelId,
+          routeId: falTurbo.id,
+          operation: 'text-to-video',
+          routing: { fallback: false },
+          feeAcceptance,
+          input: { prompt: 'Tide.', resolution: '480p', duration: 5, aspectRatio: '16:9' },
+        },
+      });
+      await workUntilJob(
+        engine,
+        ws,
+        falJob.id,
+        (j) => j.status === 'succeeded' && j.deliveryStatus === 'available',
+      );
+      expect(await engine.getJob(ws, falJob.id)).toMatchObject({
+        status: 'succeeded',
+        deliveryStatus: 'available',
+        settledMicros: null,
+        billing: { ...feeAcceptance, costStatus: 'pending' },
+      });
+      expect(
+        (
+          await engine.pool.query('SELECT billing_poll_pending FROM mr_jobs WHERE id=$1', [
+            falJob.id,
+          ])
+        ).rows[0],
+      ).toEqual({ billing_poll_pending: true });
+    } finally {
+      await app.close();
       await engine.close();
       await isolated.close();
     }

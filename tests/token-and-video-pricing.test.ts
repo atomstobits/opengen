@@ -430,6 +430,116 @@ describe('Google Nano Banana 2.1 and Gemini Omni 1.1 Flash bounded max-token quo
       }),
     ).toBeNull();
 
+    // Live GCP Billing SKU shape (gemini-3.1-flash-lite-image, 2026-11-27):
+    // 19 input ($0.25/1M = 4,750 nano) + 385 residual thought/text output ($1.50/1M = 577,500 nano)
+    // + 1,120 image output ($30/1M = 33,600,000 nano) = 34,182,250 nano -> 34,183 micros
+    const flashLiteThoughtResidual = {
+      usage: {
+        total_tokens: 1_524,
+        total_input_tokens: 19,
+        total_output_tokens: 1_505,
+        total_thought_tokens: 0,
+        total_cached_tokens: 0,
+        total_tool_use_tokens: 0,
+        output_tokens_by_modality: [{ modality: 'image', tokens: 1_120 }],
+      },
+      steps: [
+        { type: 'user_input', content: [{ type: 'text', text: 'Minimal ceramic vase.' }] },
+        { type: 'thought', content: null },
+        {
+          type: 'model_output',
+          content: [{ type: 'image', mime_type: 'image/jpeg', data: 'AAAA' }],
+        },
+      ],
+    };
+    expect(
+      observedGoogleImageCostMicros(flashLiteThoughtResidual, 'gemini-3.1-flash-lite-image'),
+    ).toBe(34_183);
+
+    // Residual output MUST fail closed without proving steps, with extra image/unknown blocks,
+    // without image modality tokens, or on video interactions
+    expect(
+      observedGoogleImageCostMicros(
+        { usage: flashLiteThoughtResidual.usage },
+        'gemini-3.1-flash-lite-image',
+      ),
+    ).toBeNull();
+    expect(
+      observedGoogleImageCostMicros(
+        {
+          usage: flashLiteThoughtResidual.usage,
+          steps: [
+            { type: 'user_input', content: [{ type: 'text', text: 'No thought step.' }] },
+            {
+              type: 'model_output',
+              content: [{ type: 'image', mime_type: 'image/jpeg', data: 'AAAA' }],
+            },
+          ],
+        },
+        'gemini-3.1-flash-lite-image',
+      ),
+    ).toBeNull();
+    expect(
+      observedGoogleImageCostMicros(
+        {
+          usage: flashLiteThoughtResidual.usage,
+          steps: [
+            { type: 'thought', content: null },
+            {
+              type: 'model_output',
+              content: [
+                { type: 'image', mime_type: 'image/jpeg', data: 'AAAA' },
+                { type: 'image', mime_type: 'image/jpeg', data: 'BBBB' },
+              ],
+            },
+          ],
+        },
+        'gemini-3.1-flash-lite-image',
+      ),
+    ).toBeNull();
+    expect(
+      observedGoogleImageCostMicros(
+        {
+          usage: flashLiteThoughtResidual.usage,
+          steps: [
+            { type: 'thought', content: null },
+            {
+              type: 'model_output',
+              content: [
+                { type: 'image', mime_type: 'image/jpeg', data: 'AAAA' },
+                { type: 'audio', mime_type: 'audio/mp3', data: 'BBBB' },
+              ],
+            },
+          ],
+        },
+        'gemini-3.1-flash-lite-image',
+      ),
+    ).toBeNull();
+    expect(
+      observedGoogleImageCostMicros(
+        {
+          usage: { ...flashLiteThoughtResidual.usage, output_tokens_by_modality: [] },
+          steps: flashLiteThoughtResidual.steps,
+        },
+        'gemini-3.1-flash-lite-image',
+      ),
+    ).toBeNull();
+    expect(
+      observedGoogleVideoCostMicros(
+        {
+          usage: {
+            total_tokens: 60_500,
+            total_input_tokens: 200,
+            total_output_tokens: 60_300,
+            total_thought_tokens: 0,
+            output_tokens_by_modality: [{ modality: 'video', tokens: 60_000 }],
+          },
+          steps: flashLiteThoughtResidual.steps,
+        },
+        'gemini-omni-1.2-flash',
+      ),
+    ).toBeNull();
+
     const nanoRoute = catalog.routes.find(
       (entry) => entry.modelId === 'google/nano-banana-2.1' && entry.adapter === 'google',
     )!;

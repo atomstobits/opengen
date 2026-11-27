@@ -863,16 +863,17 @@ printf 'frame=1\nprogress=end\n'
 });
 
 describe('4. Preflight 032 support, reduced runtime role check & private-file CLI guards', () => {
-  it('validates 34 migrations in core-activation-preflight.mjs', async () => {
+  it('validates 35 migrations in core-activation-preflight.mjs', async () => {
     const actual = await sourceContext();
-    expect(actual.migrations).toHaveLength(34);
-    expect(actual.migrations.at(-1)?.name).toBe('034.sql');
+    expect(actual.migrations).toHaveLength(35);
+    expect(actual.migrations.at(-1)?.name).toBe('035.sql');
     const cleanSource = { ...actual, dirty: false };
     const result = inspectManifest(exampleManifest(cleanSource), cleanSource);
     expect(result.result).toBe('preflight-passed');
     expect(result.migrationsToApply).toContain('032.sql');
     expect(result.migrationsToApply).toContain('033.sql');
     expect(result.migrationsToApply).toContain('034.sql');
+    expect(result.migrationsToApply).toContain('035.sql');
     expect(result.hostedReadiness).toBe('not-established');
   });
 
