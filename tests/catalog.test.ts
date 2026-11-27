@@ -62,8 +62,8 @@ describe('source-backed catalog', () => {
         }),
       ]),
     );
-    expect(catalog.models).toHaveLength(49);
-    expect(catalog.routes).toHaveLength(174);
+    expect(catalog.models).toHaveLength(50);
+    expect(catalog.routes).toHaveLength(178);
   });
   it('resolves Omni Flash as a search alias without creating duplicate live releases', () => {
     expect(searchCatalog('Gemini Omni Flash').map((model) => model.id)).toEqual([
@@ -128,6 +128,15 @@ describe('source-backed catalog', () => {
     expect(getModelRoutes('bytedance/seedance-2.5')[0]?.id).toBe(
       'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5',
     );
+    expect(getModelRoutes('bytedance/seedance-2.5-flash')[0]?.id).toBe(
+      'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5-flash',
+    );
+    expect(getModelRoutes('bytedance/seedance-2.5-flash').map((route) => route.id)).toEqual([
+      'byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5-flash',
+      'runway-undisclosed/bytedance-seedance-2.5-flash',
+      'fal-undisclosed/bytedance-seedance-2.5-flash',
+      'pika-undisclosed/bytedance-seedance-2.5-flash',
+    ]);
     expect(getModelRoutes('minimax/h3-max')[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(getModelRoutes('fal/h3-max')[0]?.id).toBe('minimax-undisclosed/minimax-h3-max');
     expect(getModelRoutes('openai/gpt-image-2.5-flare')[0]?.id).toBe(

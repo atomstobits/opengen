@@ -56,12 +56,13 @@ const wideRatios = [
   '8:1',
   '1:8',
 ];
-const source = (url: string) => ({ url, checkedAt: '2026-11-03' });
+const source = (url: string, checkedAt = '2026-11-03') => ({ url, checkedAt });
 const defs: Record<string, ModelDefinition> = {};
 function video(
   id: string,
   options: {
     sources: string[];
+    checkedAt?: string;
     resolutions: string[];
     minimum?: number;
     maximum?: number;
@@ -118,7 +119,7 @@ function video(
     promptRequired: true,
     promptMaximum: options.promptMax ?? null,
     verification: options.verification ?? 'documented',
-    sources: options.sources.map(source),
+    sources: options.sources.map((url) => source(url, options.checkedAt)),
     notices: options.notices ?? [
       'Documented capabilities are not live account access. Route and adapter restrictions may narrow this schema.',
     ],
@@ -128,6 +129,7 @@ function image(
   id: string,
   options: {
     sources: string[];
+    checkedAt?: string;
     resolutions?: string[];
     defaultResolution?: string;
     maxReferences?: number;
@@ -164,7 +166,7 @@ function image(
     promptRequired: true,
     promptMaximum: options.promptMax ?? null,
     verification: options.verification ?? 'documented',
-    sources: options.sources.map(source),
+    sources: options.sources.map((url) => source(url, options.checkedAt)),
     notices: options.notices ?? [
       'Model-specific controls and route support must both be qualified. Delivery representation is broker-owned, not a generation argument.',
     ],
@@ -183,6 +185,25 @@ video('bytedance/seedance-2.5', {
   operations: [...videoOps, 'video-edit', 'video-extend'],
   notices: [
     'Strict first/last-frame mode and omni references are mutually exclusive on native BytePlus. Supplier wrappers can expose different controls; seed/codec/bitrate are not universal native controls. Draft/finalization is deployment-bound.',
+  ],
+});
+video('bytedance/seedance-2.5-flash', {
+  sources: [
+    byteplus,
+    'https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5',
+    'https://fal.ai/models/bytedance/seedance-2.5/flash/image-to-video/api',
+  ],
+  checkedAt: '2026-11-27',
+  resolutions: ['480p', '720p'],
+  minimum: 4,
+  maximum: 30,
+  auto: true,
+  referenceMaximum: { image: 10, video: 5, audio: 5 },
+  totalMaximum: 20,
+  extra: ['codec', 'bitrateMode', 'watermark'],
+  operations: [...videoOps, 'video-edit', 'video-extend'],
+  notices: [
+    'Seedance 2.5 Flash supports 480p and 720p (no 1080p, 4K or Draft mode), 4–30s duration and up to 10 images, 5 videos and 5 audio clips (20 combined assets). Strict first/last-frame mode and omni references are mutually exclusive on native BytePlus. Supplier wrappers can expose different controls; seed/codec/bitrate are not universal native controls.',
   ],
 });
 for (const [id, resolutions] of [

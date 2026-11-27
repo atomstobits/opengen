@@ -58,37 +58,52 @@ const seedanceEndpoints = new Map<
     operation: 'text-to-video' | 'image-to-video' | 'reference-to-video';
     minimumDuration: number;
     maximumDuration: number;
-    referenceLimit: number;
+    imageLimit: number;
+    videoLimit: number;
+    audioLimit: number;
+    totalLimit: number;
     resolutions: readonly string[];
+    is25?: boolean;
+    draft?: boolean;
+    seed?: boolean;
     v1?: boolean;
     v1Fast?: boolean;
   }
 >([
   ...[
     'bytedance/seedance-2.5',
+    'bytedance/seedance-2.5/flash',
     'bytedance/seedance-2.0',
     'bytedance/seedance-2.0/fast',
     'bytedance/seedance-2.0/mini',
-  ].flatMap((prefix) =>
-    (['text-to-video', 'image-to-video', 'reference-to-video'] as const).map(
+  ].flatMap((prefix) => {
+    const is25 = prefix.startsWith('bytedance/seedance-2.5');
+    const is25Flash = prefix === 'bytedance/seedance-2.5/flash';
+    return (['text-to-video', 'image-to-video', 'reference-to-video'] as const).map(
       (operation) =>
         [
           `${prefix}/${operation}`,
           {
             operation,
             minimumDuration: 4,
-            maximumDuration: prefix.includes('2.5') ? 30 : 15,
-            referenceLimit: prefix.includes('2.5') ? 30 : 9,
+            maximumDuration: is25 ? 30 : 15,
+            imageLimit: is25Flash ? 10 : is25 ? 30 : 9,
+            videoLimit: is25Flash ? 5 : is25 ? 10 : 3,
+            audioLimit: is25Flash ? 5 : is25 ? 10 : 3,
+            totalLimit: is25Flash ? 20 : is25 ? 50 : 12,
             resolutions:
-              prefix.endsWith('/fast') || prefix.endsWith('/mini')
+              prefix.endsWith('/flash') || prefix.endsWith('/fast') || prefix.endsWith('/mini')
                 ? ['480p', '720p']
-                : prefix.includes('2.5')
+                : is25
                   ? ['480p', '720p', '1080p']
                   : ['480p', '720p', '1080p', '4k'],
+            is25,
+            draft: is25 && !is25Flash,
+            seed: is25 && operation === 'reference-to-video',
           },
         ] as const,
-    ),
-  ),
+    );
+  }),
   ...['fal-ai/bytedance/seedance/v1/pro', 'fal-ai/bytedance/seedance/v1/pro/fast'].flatMap(
     (prefix) =>
       (['text-to-video', 'image-to-video'] as const).map(
@@ -99,7 +114,10 @@ const seedanceEndpoints = new Map<
               operation,
               minimumDuration: 2,
               maximumDuration: 12,
-              referenceLimit: 0,
+              imageLimit: 0,
+              videoLimit: 0,
+              audioLimit: 0,
+              totalLimit: 0,
               resolutions: ['480p', '720p', '1080p'],
               v1: true,
               v1Fast: prefix.endsWith('/fast'),
@@ -309,8 +327,8 @@ export function createFalAdapter(
         'count',
         'outputFormat',
         ...(!model.includes('/mini/') ? ['bitrateMode' as const] : []),
-        ...(model.includes('2.5') ? ['draft' as const] : []),
-        ...(model.includes('2.5/reference') ? ['seed' as const] : []),
+        ...(seedance.draft ? ['draft' as const] : []),
+        ...(seedance.seed ? ['seed' as const] : []),
       ];
     }
     if (wanEndpoints.has(model))
@@ -498,15 +516,14 @@ export function createFalAdapter(
         return 'Seedance references cannot mix first/last frames.';
       if (args.references?.some((reference) => reference.type === 'document'))
         return 'Seedance does not accept document references.';
-      const latest = model.includes('2.5');
       for (const [type, limit] of [
-        ['image', latest ? 30 : 9],
-        ['video', latest ? 10 : 3],
-        ['audio', latest ? 10 : 3],
+        ['image', seedance.imageLimit],
+        ['video', seedance.videoLimit],
+        ['audio', seedance.audioLimit],
       ] as const)
         if ((args.references ?? []).filter((ref) => ref.type === type).length > limit)
           return `Too many ${type} references.`;
-      if ((args.references?.length ?? 0) > (latest ? 50 : 12))
+      if ((args.references?.length ?? 0) > seedance.totalLimit)
         return 'Combined Seedance reference limit exceeded.';
       if (args.aspectRatio === 'source' && !args.firstFrame)
         return 'Source ratio requires firstFrame.';
@@ -514,7 +531,7 @@ export function createFalAdapter(
         return 'First-frame output preserves source ratio; choose source.';
       if (args.aspectRatio && !['source', 'auto', ...ratios].includes(args.aspectRatio))
         return 'Unsupported Seedance aspect ratio.';
-      if (args.draft && (!latest || args.resolution?.toLowerCase() !== '480p'))
+      if (args.draft && (!seedance.draft || args.resolution?.toLowerCase() !== '480p'))
         return 'Draft generation requires Seedance 2.5 at480p.';
       return null;
     }
@@ -995,7 +1012,7 @@ export function createFalAdapter(
                   image_urls: referenceUrls(context.input),
                   video_urls: referenceUrls(context.input, 'video'),
                   audio_urls: referenceUrls(context.input, 'audio'),
-                  ...(model.includes('2.5') ? { task: 'reference' } : {}),
+                  ...(seedance.is25 ? { task: 'reference' } : {}),
                 }
               : {}),
         };

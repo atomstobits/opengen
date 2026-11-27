@@ -6,6 +6,7 @@ type PublishedQuality = NonNullable<PublishedOutputRate['quality']>;
 const checkedAt = '2026-11-02';
 const recheckedAt = '2026-11-14';
 const officialCheckedAt = '2026-11-26';
+const flashCheckedAt = '2026-11-27';
 const regionUnknown = 'No region-specific tariff or inference/storage residency was verified.';
 const tariff = (
   summary: string,
@@ -275,6 +276,20 @@ const falSeedance25 = tariff(
   ]),
 );
 
+const falSeedance25Flash = tariff(
+  '$0.014 per 1,000 video tokens at 480p / 720p (0.614× multiplier with video inputs).',
+  'https://fal.ai/models/bytedance/seedance-2.5/flash/text-to-video',
+  [
+    'With video inputs, the token rate is multiplied by 0.614 across combined input and output video duration (roughly $0.1857 / second at 720p).',
+    'The source labels per-second figures approximate ($0.1345/s at 480p; $0.3024/s at 720p); exact request pricing depends on actual frame dimensions and token usage.',
+  ],
+  flashCheckedAt,
+  approxVideoRates([
+    ['480p', 134_500],
+    ['720p', 302_400],
+  ]),
+);
+
 const falSeedance1Pro = tariff(
   '$0.0025 per 1,000 video tokens at 480p / 720p / 1080p.',
   'https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/text-to-video',
@@ -371,6 +386,20 @@ const published: Record<string, PublishedPricing> = {
       ['720p', 231_000],
       ['1080p', 569_000],
     ]).map((rate) => ({ ...rate, approximate: true })),
+  ),
+  'byteplus-modelark-ap-southeast-1|bytedance/seedance-2.5-flash': regionalTariff(
+    'Without video input, ModelArk charges $7.00 per million tokens at 480p and 720p ($4.30 with video input).',
+    byteplusPricingDocs,
+    [
+      'Per-second figures are ModelArk 16:9 5-second worked examples without video input ($0.34 at 480p; $0.76 at 720p; $0.07 and $0.15 per second).',
+      'Non-video-input managed quotes reserve a conservative max-token bound and settle exact reported completion_tokens; video-reference tasks ($0.37–$1.45 at 480p; $0.84–$3.25 at 720p for 5s output with 2–30s input) remain unpriced.',
+      'Singapore API endpoint; processing and storage residency commitments remain unqualified.',
+    ],
+    flashCheckedAt,
+    approxVideoRates([
+      ['480p', 70_000],
+      ['720p', 150_000],
+    ]),
   ),
   'byteplus-modelark-ap-southeast-1|bytedance/seedance-2.0': regionalTariff(
     'Without video input, ModelArk charges $7.00 per million tokens at 480p/720p, $7.70 at 1080p and $4.00 at 4K. With video input, the rates are $4.30, $4.70 and $2.40.',
@@ -1241,6 +1270,7 @@ const published: Record<string, PublishedPricing> = {
   'fal-undisclosed|bytedance/seedance-2.0-fast': falSeedanceFast,
   'fal-undisclosed|bytedance/seedance-2.0-mini': falSeedanceMini,
   'fal-undisclosed|bytedance/seedance-2.5': falSeedance25,
+  'fal-undisclosed|bytedance/seedance-2.5-flash': falSeedance25Flash,
   'fal-undisclosed|bytedance/seedance-1.0-pro': falSeedance1Pro,
   'fal-undisclosed|bytedance/seedance-1.0-pro-fast': falSeedance1ProFast,
   'fal-seedance-us-account-enabled|bytedance/seedance-2.0': regionalTariff(
@@ -1674,6 +1704,21 @@ const published: Record<string, PublishedPricing> = {
         ['480p', 107_900],
         ['720p', 242_700],
         ['1080p', 597_100],
+      ],
+      '16:9 token-formula equivalent without video input (width × height × 24 ÷ 1,024). Actual billing follows generated video tokens.',
+    ),
+  ),
+  'pika-undisclosed|bytedance/seedance-2.5-flash': tariff(
+    'Per 1M video output tokens: $7.35 at 480p and 720p ($4.515 with video input).',
+    'https://dev.pika.art/models/bytedance/seedance-2.5-flash/text-to-video',
+    [
+      'Billed from actual video output token consumption (width × height × 24 × duration ÷ 1,024); reference-to-video with video input bills $4.515 per 1M combined video tokens.',
+    ],
+    flashCheckedAt,
+    approxVideoRates(
+      [
+        ['480p', 70_600],
+        ['720p', 158_800],
       ],
       '16:9 token-formula equivalent without video input (width × height × 24 ÷ 1,024). Actual billing follows generated video tokens.',
     ),
@@ -2297,6 +2342,23 @@ const published: Record<string, PublishedPricing> = {
         ['1080p', 680_000],
       ],
       '20 / 30 / 68 Runway credits ($0.01/credit) per output second, subject to an 80-credit ($0.80) minimum and input-video charges.',
+    ),
+  ),
+  'runway-undisclosed|bytedance/seedance-2.5-flash': tariff(
+    'Output video: $0.13 / second at 480p; $0.20 at 720p ($0.52 minimum).',
+    runwayPricing,
+    [
+      'Runway credits equal $0.01 USD (13 / 20 credits per second; 52-credit minimum per generation).',
+      'Input or reference videos add $0.07 / $0.10 per input second at 480p / 720p (combined video capped at 30 seconds); reference images and audio are free.',
+    ],
+    flashCheckedAt,
+    outputRates(
+      'output-second',
+      [
+        ['480p', 130_000],
+        ['720p', 200_000],
+      ],
+      '13 / 20 Runway credits ($0.01/credit) per output second, subject to a 52-credit ($0.52) minimum and input-video charges.',
     ),
   ),
   'runway-undisclosed|bytedance/seedance-2.0': tariff(

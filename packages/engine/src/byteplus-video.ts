@@ -16,6 +16,7 @@ import { pollProviderJson, providerObject, submitProviderJson } from './provider
 
 const models = new Set([
   'dreamina-seedance-2-5-260628',
+  'dreamina-seedance-2-5-flash-261115',
   'dreamina-seedance-2-0-260128',
   'dreamina-seedance-2-0-fast-260128',
   'dreamina-seedance-2-0-mini-260615',
@@ -51,6 +52,13 @@ function settledVideoCost(context: AdapterContext, body: Record<string, unknown>
             ? 7_000_000
             : 11_700_000
           : null;
+  } else if (model === 'dreamina-seedance-2-5-flash-261115') {
+    rateMicros =
+      resolution === '480p' || resolution === '720p'
+        ? hasVideoInput
+          ? 4_300_000
+          : 7_000_000
+        : null;
   } else if (model === 'dreamina-seedance-2-0-260128') {
     rateMicros =
       resolution === '480p' || resolution === '720p'
@@ -125,7 +133,9 @@ export function createBytePlusVideoAdapter(
         'seed',
       ];
     }
-    return modelId.includes('2-5-') ? fields : fields.filter((field) => field !== 'draft');
+    return modelId === 'dreamina-seedance-2-5-260628'
+      ? fields
+      : fields.filter((field) => field !== 'draft');
   }
   function preflight(context: Omit<AdapterContext, 'jobId'>): string | null {
     const { route, deployment, input } = context;
@@ -137,11 +147,13 @@ export function createBytePlusVideoAdapter(
       : ['text-to-video', 'image-to-video', 'reference-to-video'];
     if (!supportedOps.includes(input.operation))
       return 'This Seedance adapter supports generation, without implicit edit/extension parameter changes.';
-    const latest = route.upstreamModelId.includes('2-5-');
+    const is25Standard = route.upstreamModelId === 'dreamina-seedance-2-5-260628';
+    const is25Flash = route.upstreamModelId === 'dreamina-seedance-2-5-flash-261115';
+    const is25Series = is25Standard || is25Flash;
     const standard = route.upstreamModelId === 'dreamina-seedance-2-0-260128';
     if (
       !(
-        latest || isV1
+        is25Standard || isV1
           ? ['480p', '720p', '1080p']
           : standard
             ? ['480p', '720p', '1080p', '4k']
@@ -161,7 +173,7 @@ export function createBytePlusVideoAdapter(
       )
         return 'Seedance 1.0 requires 2–12 seconds.';
     } else {
-      const maximum = latest ? 30 : 15;
+      const maximum = is25Series ? 30 : 15;
       if (
         args.duration !== 'auto' &&
         (!Number.isInteger(numericDuration(input)) ||
@@ -191,16 +203,16 @@ export function createBytePlusVideoAdapter(
         return 'Seedance 1.0 Pro supports at most 4 image references.';
     } else {
       for (const [type, limit] of [
-        ['image', latest ? 30 : 9],
-        ['video', latest ? 10 : 3],
-        ['audio', latest ? 10 : 3],
+        ['image', is25Standard ? 30 : is25Flash ? 10 : 9],
+        ['video', is25Standard ? 10 : is25Flash ? 5 : 3],
+        ['audio', is25Standard ? 10 : is25Flash ? 5 : 3],
       ] as const)
         if ((args.references ?? []).filter((ref) => ref.type === type).length > limit)
           return `Seedance supports at most ${limit} ${type} references.`;
-      if ((args.references?.length ?? 0) > (latest ? 50 : 12))
+      if ((args.references?.length ?? 0) > (is25Standard ? 50 : is25Flash ? 20 : 12))
         return 'Seedance combined reference limit exceeded.';
       if (
-        !latest &&
+        !is25Series &&
         args.references?.length &&
         !args.references.some((ref) => ref.type === 'image' || ref.type === 'video')
       )
@@ -217,7 +229,7 @@ export function createBytePlusVideoAdapter(
       !ratios.has(args.aspectRatio)
     )
       return 'Unsupported Seedance aspect ratio.';
-    if (args.draft && (!latest || args.resolution?.toLowerCase() !== '480p'))
+    if (args.draft && (!is25Standard || args.resolution?.toLowerCase() !== '480p'))
       return 'This draft implementation requires Seedance 2.5 at480p.';
     return null;
   }

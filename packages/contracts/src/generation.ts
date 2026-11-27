@@ -795,6 +795,11 @@ export class GenerationValidationError extends Error {
     this.name = 'GenerationValidationError';
   }
 }
+let cachedArgumentJsonSchema: Record<string, unknown> | undefined;
+function baseArgumentJsonSchema(): Record<string, unknown> {
+  cachedArgumentJsonSchema ??= z.toJSONSchema(generationArgumentSchema) as Record<string, unknown>;
+  return structuredClone(cachedArgumentJsonSchema);
+}
 export function getGenerationSchema(
   modelId: string,
   operation: Operation,
@@ -806,7 +811,7 @@ export function getGenerationSchema(
   const keys = new Set([...definition.commonArguments, ...definition.modelSpecificArguments]);
   if (!caps.frames.first) keys.delete('firstFrame');
   if (!caps.frames.last) keys.delete('lastFrame');
-  const json = z.toJSONSchema(generationArgumentSchema) as Record<string, unknown>;
+  const json = baseArgumentJsonSchema();
   const all = json.properties as Record<string, Record<string, unknown>>;
   const properties: Record<string, Record<string, unknown>> = Object.fromEntries(
     [...keys].map((key) => [

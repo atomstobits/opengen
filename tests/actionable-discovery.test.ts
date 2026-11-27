@@ -51,34 +51,48 @@ describe('actionable, compact catalog discovery', () => {
       searchCatalog('', { operation: 'reference-to-video', inputRole: 'references.audio' }).length,
     ).toBeGreaterThan(0);
   });
-  it('derives valid request and read-only quote templates for every registered model operation', () => {
-    const ajv = new Ajv2020({ strict: false });
-    addFormats(ajv);
-    let count = 0;
-    for (const model of catalog.models)
-      for (const profile of generationProfiles(model.id)) {
-        count++;
-        const { examples } = profile;
-        expect(parseGenerationRequest(examples.request)).toEqual(examples.request);
-        const validate = ajv.compile(profile.inputSchema!);
-        expect(
-          validate(examples.request.input),
-          `${model.id}/${profile.operation}: ${ajv.errorsText(validate.errors)}`,
-        ).toBe(true);
-        expect(examples.quote).toEqual({ operationId: 'quotes.single', input: examples.request });
-        expect(examples.request.billing).toBe('managed');
-        expect(JSON.stringify(examples)).not.toContain('https://');
-        expect(examples.notices.join(' ')).toContain('authorizing a separate billable submission');
-        if (profile.operation === 'image-to-video')
-          expect(examples.placeholders.length).toBeGreaterThan(0);
-        if (catalog.routes.some((route) => route.modelId === model.id)) {
-          const result = quote(examples.request);
-          expect(result.selectedRouteId).toBeNull();
-          expect(result.candidates.every((candidate) => candidate.executable === false)).toBe(true);
-        }
-      }
-    expect(count).toBe(129);
+  it('registers all 134 model-operation generation profiles across image and video catalogs', () => {
+    const total = catalog.models.reduce(
+      (sum, model) => sum + generationProfiles(model.id).length,
+      0,
+    );
+    expect(total).toBe(134);
   });
+  it.each(['video', 'image'] as const)(
+    'derives valid request and read-only quote templates for every registered %s model operation',
+    (modality) => {
+      const ajv = new Ajv2020({ strict: false });
+      addFormats(ajv);
+      let count = 0;
+      for (const model of catalog.models.filter((entry) => entry.modality === modality))
+        for (const profile of generationProfiles(model.id)) {
+          count++;
+          const { examples } = profile;
+          expect(parseGenerationRequest(examples.request)).toEqual(examples.request);
+          const validate = ajv.compile(profile.inputSchema!);
+          expect(
+            validate(examples.request.input),
+            `${model.id}/${profile.operation}: ${ajv.errorsText(validate.errors)}`,
+          ).toBe(true);
+          expect(examples.quote).toEqual({ operationId: 'quotes.single', input: examples.request });
+          expect(examples.request.billing).toBe('managed');
+          expect(JSON.stringify(examples)).not.toContain('https://');
+          expect(examples.notices.join(' ')).toContain(
+            'authorizing a separate billable submission',
+          );
+          if (profile.operation === 'image-to-video')
+            expect(examples.placeholders.length).toBeGreaterThan(0);
+          if (catalog.routes.some((route) => route.modelId === model.id)) {
+            const result = quote(examples.request);
+            expect(result.selectedRouteId).toBeNull();
+            expect(result.candidates.every((candidate) => candidate.executable === false)).toBe(
+              true,
+            );
+          }
+        }
+      expect(count).toBeGreaterThan(0);
+    },
+  );
   it('preserves REST/local-fallback/SDK/MCP filter and schema-example parity', async () => {
     const app = await fixture();
     await app.listen({ host: '127.0.0.1', port: 0 });

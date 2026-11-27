@@ -56,7 +56,7 @@ describe('public catalog and quote API', () => {
   it('lists one H3 Max variant while retaining independent provider routes', async () => {
     const app = await setup();
     const models = (await app.inject({ url: '/v1/models' })).json().data;
-    expect(models).toHaveLength(49);
+    expect(models).toHaveLength(50);
     expect(models.filter((model: { id: string }) => model.id === 'minimax/h3-max')).toHaveLength(1);
     expect(models.some((model: { id: string }) => model.id === 'fal/h3-max')).toBe(false);
     const routes = (await app.inject({ url: '/v1/routes?modelId=minimax%2Fh3-max' })).json().data;

@@ -157,6 +157,8 @@ describe('Track 2: BytePlus ModelArk Seedream & Seedance expansion + token billi
   it.each([
     ['bytedance/seedance-2.5', '1080p', false, 108_000, 1_263_600],
     ['bytedance/seedance-2.5', '720p', true, 108_000, 1_155_600],
+    ['bytedance/seedance-2.5-flash', '720p', true, 108_000, 756_000],
+    ['bytedance/seedance-2.5-flash', '480p', false, 48_400, 338_800],
     ['bytedance/seedance-2.0', '720p', false, 100_000, 700_000],
     ['bytedance/seedance-2.0-fast', '720p', true, 100_000, 560_000],
     ['bytedance/seedance-2.0-mini', '720p', false, 100_000, 350_000],

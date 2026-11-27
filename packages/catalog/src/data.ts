@@ -15,6 +15,7 @@ import { unifyRoutes } from './unify-routes';
 const checkedAt = '2026-11-02';
 const recheckedAt = '2026-11-14';
 const officialCheckedAt = '2026-11-26';
+const flashCheckedAt = '2026-11-27';
 const source = (url: string, note?: string, checkedOn = checkedAt): Source => ({
   url,
   checkedAt: checkedOn,
@@ -187,6 +188,23 @@ const models: Model[] = [
     'video',
     'https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5',
     'Native long-form video generation with multimodal references.',
+  ),
+  model(
+    'bytedance/seedance-2.5-flash',
+    'Seedance 2.5 Flash',
+    'ByteDance',
+    'seedance',
+    'video',
+    'https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5',
+    'Faster, lower-cost 480p–720p Seedance 2.5 sibling with native audio and up to 20 multimodal references.',
+    {
+      aliases: ['Dreamina Seedance 2.5 Flash', 'dreamina-seedance-2-5-flash-261115'],
+      source: source(
+        'https://docs.byteplus.com/en/docs/ModelArk/seedance-2-5',
+        undefined,
+        flashCheckedAt,
+      ),
+    },
   ),
   model(
     'bytedance/seedance-2.0',
@@ -785,6 +803,7 @@ function pikaDocRoute(
   operations: Operation[],
   resolutions: string[],
   allowedDurations: number[] = [],
+  checkedOn = recheckedAt,
 ): void {
   routes.push({
     id: `pika-undisclosed/${upstream}`,
@@ -798,11 +817,11 @@ function pikaDocRoute(
     adapter: null,
     status: 'documented',
     rates: [],
-    pricingSource: unknownPrice(`https://dev.pika.art/models/${upstream}`, recheckedAt),
+    pricingSource: unknownPrice(`https://dev.pika.art/models/${upstream}`, checkedOn),
     source: source(
       `https://dev.pika.art/models/${upstream}/api`,
       'Documented Pika catalog endpoint and published tariff verified; adapter schema translation is not yet enabled.',
-      recheckedAt,
+      checkedOn,
     ),
   });
 }
@@ -820,6 +839,19 @@ route(
   durations(4, 30),
   {
     pricingSource: unknownPrice(runwayPricingUrl, recheckedAt),
+  },
+);
+route(
+  'bytedance/seedance-2.5-flash',
+  'runway-undisclosed',
+  'seedance2_5_flash',
+  runwayModelsUrl,
+  [...videoOps],
+  ['480p', '720p'],
+  durations(4, 30),
+  {
+    pricingSource: unknownPrice(runwayPricingUrl, flashCheckedAt),
+    source: source(runwayModelsUrl, undefined, flashCheckedAt),
   },
 );
 route(
@@ -1157,6 +1189,14 @@ for (const [modelId, upstream, minimumDuration, maximumDuration, resolutions, op
     ['text-to-video', 'image-to-video', 'reference-to-video'],
   ],
   [
+    'bytedance/seedance-2.5-flash',
+    'dreamina-seedance-2-5-flash-261115',
+    4,
+    30,
+    ['480p', '720p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
     'bytedance/seedance-2.0',
     'dreamina-seedance-2-0-260128',
     4,
@@ -1197,6 +1237,7 @@ for (const [modelId, upstream, minimumDuration, maximumDuration, resolutions, op
     ['text-to-video', 'image-to-video'],
   ],
 ] as const) {
+  const checkedOn = modelId === 'bytedance/seedance-2.5-flash' ? flashCheckedAt : checkedAt;
   route(
     modelId,
     'byteplus-modelark-ap-southeast-1',
@@ -1205,7 +1246,22 @@ for (const [modelId, upstream, minimumDuration, maximumDuration, resolutions, op
     [...operations],
     [...resolutions],
     durations(minimumDuration, maximumDuration),
-    { adapter: 'byteplus' },
+    {
+      adapter: 'byteplus',
+      ...(checkedOn !== checkedAt
+        ? {
+            pricingSource: unknownPrice(
+              'https://docs.byteplus.com/en/docs/modelark/model-pricing',
+              checkedOn,
+            ),
+            source: source(
+              'https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api',
+              undefined,
+              checkedOn,
+            ),
+          }
+        : {}),
+    },
   );
 }
 
@@ -1217,6 +1273,14 @@ for (const [modelId, prefix, minimumDuration, maximumDuration, resolutions, oper
     4,
     30,
     ['480p', '720p', '1080p'],
+    ['text-to-video', 'image-to-video', 'reference-to-video'],
+  ],
+  [
+    'bytedance/seedance-2.5-flash',
+    'bytedance/seedance-2.5/flash',
+    4,
+    30,
+    ['480p', '720p'],
     ['text-to-video', 'image-to-video', 'reference-to-video'],
   ],
   [
@@ -1260,6 +1324,7 @@ for (const [modelId, prefix, minimumDuration, maximumDuration, resolutions, oper
     ['text-to-video', 'image-to-video'],
   ],
 ] as const) {
+  const falCheckedOn = modelId === 'bytedance/seedance-2.5-flash' ? flashCheckedAt : checkedAt;
   for (const operation of operations) {
     const upstream = `${prefix}/${operation}`;
     routes.push({
@@ -1277,10 +1342,12 @@ for (const [modelId, prefix, minimumDuration, maximumDuration, resolutions, oper
       pricingSource: source(
         `https://fal.ai/models/${upstream}`,
         'Token-based video billing depends on exact frame dimensions and input/output duration. Approximate per-second marketing figures have not been converted into a flat rate.',
+        falCheckedOn,
       ),
       source: source(
         `https://fal.ai/models/${upstream}/api`,
         'Explicit endpoint schema checked; not live-verified. Canonical reference roles and media types are validated per operation; unsupported options are rejected before submission.',
+        falCheckedOn,
       ),
     });
   }
@@ -2439,10 +2506,12 @@ for (const [modelId, prefix, resolutions] of [
 // Documented Pika aggregator endpoints across hosted catalog models.
 for (const [modelId, prefix, maximumDuration, resolutions] of [
   ['bytedance/seedance-2.5', 'bytedance/seedance-2.5', 30, ['480p', '720p', '1080p']],
+  ['bytedance/seedance-2.5-flash', 'bytedance/seedance-2.5-flash', 30, ['480p', '720p']],
   ['bytedance/seedance-2.0', 'bytedance/seedance-2.0', 15, ['480p', '720p', '1080p', '4K']],
   ['bytedance/seedance-2.0-fast', 'bytedance/seedance-2.0-fast', 15, ['480p', '720p']],
   ['bytedance/seedance-2.0-mini', 'bytedance/seedance-2.0-mini', 15, ['480p', '720p']],
 ] as const) {
+  const pikaCheckedOn = modelId === 'bytedance/seedance-2.5-flash' ? flashCheckedAt : recheckedAt;
   for (const operation of ['text-to-video', 'image-to-video', 'reference-to-video'] as const) {
     pikaDocRoute(
       modelId,
@@ -2450,6 +2519,7 @@ for (const [modelId, prefix, maximumDuration, resolutions] of [
       [operation],
       [...resolutions],
       durations(4, maximumDuration),
+      pikaCheckedOn,
     );
   }
 }
