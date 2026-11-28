@@ -260,12 +260,18 @@ test('dedicated agent setup and evidence remain usable on this viewport', async 
   await page.goto('/agents/cli');
   await expect(page.getByRole('heading', { name: 'Create with CLI & API.' })).toBeVisible();
   await expect(
-    page.getByText('No deployed identity-provider test.', { exact: false }),
+    page.getByText('Post-consent browser login remains pending.', { exact: false }),
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   await page.screenshot({ path: testInfo.outputPath('agent-setup.png'), fullPage: true });
+  await page.goto('/agents/muse');
+  await expect(page.getByRole('heading', { name: 'Create with Muse.' })).toBeVisible();
+  await expect(page.getByText('muse mcp add opengen', { exact: false })).toBeVisible();
+  await page.goto('/agents/grok-bot');
+  await expect(page.getByRole('heading', { name: 'Create with Grok Bot.' })).toBeVisible();
+  await expect(page.getByText('Add a custom connector', { exact: false })).toBeVisible();
   await page.goto('/agents/cursor');
   await page.getByText('Preview a project configuration change', { exact: true }).click();
   await expect(

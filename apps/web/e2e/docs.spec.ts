@@ -281,7 +281,7 @@ test('agent setup pages avoid 390px overflow, expose first-prompt copy, billing 
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
-  for (const slug of ['cli', 'codex', 'cursor', 'claude-code', 'pi']) {
+  for (const slug of ['cli', 'codex', 'cursor', 'claude-code', 'muse', 'grok-bot', 'pi']) {
     await page.goto(`/agents/${slug}`);
     await expect(page.getByTestId('first-prompt')).toBeVisible();
     await expect(
