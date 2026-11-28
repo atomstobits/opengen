@@ -1,5 +1,6 @@
 import { catalog } from '@media-router/catalog';
 import { ModelsCatalog } from '../catalog-browser';
+import { isDisclosedRegion } from '../route-identity';
 import { Footer, SiteHeader } from '../ui';
 import { JsonLd, modelsStructuredData, pageMetadata } from '../seo';
 
@@ -22,6 +23,7 @@ export default async function ModelsPage({
   const query = await searchParams;
   const region =
     typeof query.region === 'string' &&
+    isDisclosedRegion(query.region) &&
     catalog.deployments.some((deployment) => deployment.endpointRegion === query.region)
       ? query.region
       : 'all';

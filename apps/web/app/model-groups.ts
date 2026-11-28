@@ -7,6 +7,7 @@ import type {
   ModelSeries,
   Route,
 } from '@media-router/contracts';
+import { formatDisclosedRegion, isDisclosedRegion } from './route-identity';
 
 export interface CatalogModelEntry {
   model: Model;
@@ -48,10 +49,13 @@ export function buildCatalogModelEntries(
       series?.id,
       company?.name,
       ...model.aliases,
-      ...deployments.map(
-        (deployment) =>
-          `${deployment.name} ${regionLabels[deployment.endpointRegion] ?? deployment.endpointRegion}`,
-      ),
+      ...deployments.map((deployment) => {
+        const baseName = deployment.name.replace(/\s*·\s*Region undisclosed$/i, '').trim();
+        const regionLabel = isDisclosedRegion(deployment.endpointRegion)
+          ? (regionLabels[deployment.endpointRegion] ?? deployment.endpointRegion)
+          : '';
+        return `${baseName} ${regionLabel}`.trim();
+      }),
     ]
       .filter(Boolean)
       .join(' ')
@@ -120,22 +124,23 @@ export function groupCatalogModels(
 export function describeEndpointRegions(
   routesCount: number,
   deployments: readonly Deployment[],
-): string {
+): string | null {
   if (routesCount === 0) return 'No hosted routes listed';
-  const disclosedRegions = new Set(
-    deployments
-      .filter(
-        (deployment) => !['undisclosed', 'unknown', 'global'].includes(deployment.endpointRegion),
-      )
-      .map((deployment) => deployment.endpointRegion),
-  );
-  if (disclosedRegions.size > 0) {
-    return `${disclosedRegions.size} disclosed endpoint ${disclosedRegions.size === 1 ? 'region' : 'regions'}`;
+  const disclosedRegions = [
+    ...new Set(
+      deployments
+        .map((deployment) => deployment.endpointRegion)
+        .filter((region) => isDisclosedRegion(region) && region !== 'global')
+        .map((region) => formatDisclosedRegion(region) ?? region),
+    ),
+  ].sort();
+  if (disclosedRegions.length > 0) {
+    return `${disclosedRegions.length === 1 ? 'Endpoint' : 'Endpoints'}: ${disclosedRegions.join(', ')}`;
   }
   if (deployments.some((deployment) => deployment.endpointRegion === 'global')) {
     return 'Global endpoint';
   }
-  return 'Region not disclosed';
+  return null;
 }
 
 export function variantGridColumns(count: number): 1 | 2 | 3 {

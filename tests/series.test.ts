@@ -124,12 +124,12 @@ describe('public company and model-series identity', () => {
 
 describe('models page variant grouping', () => {
   const regionLabels = {
-    'cn-beijing': 'Beijing, China',
-    'ap-southeast-1': 'Singapore',
-    'ap-northeast-1': 'Tokyo, Japan',
-    'eu-central-1': 'Frankfurt, Germany',
-    'us-east-1': 'Virginia, US',
-    'cn-hongkong': 'Hong Kong, China',
+    'cn-beijing': 'CN',
+    'ap-southeast-1': 'SG',
+    'ap-northeast-1': 'JP',
+    'eu-central-1': 'DE',
+    'us-east-1': 'US',
+    'cn-hongkong': 'HK',
   };
 
   it('groups every exact variant under its canonical model series without merging distinct versions', () => {
@@ -236,7 +236,13 @@ describe('models page variant grouping', () => {
         wan.reduce((sum, entry) => sum + entry.routes.length, 0),
         wan.flatMap((entry) => entry.deployments),
       ),
-    ).toBe('6 disclosed endpoint regions');
+    ).toBe('Endpoints: CN, DE, HK, JP, SG, US');
+    const seedance = entries.find((entry) => entry.model.id === 'bytedance/seedance-2.5')!;
+    expect(describeEndpointRegions(seedance.routes.length, seedance.deployments)).toBe(
+      'Endpoint: SG',
+    );
+    const gptImage = entries.find((entry) => entry.model.id === 'openai/gpt-image-2')!;
+    expect(describeEndpointRegions(gptImage.routes.length, gptImage.deployments)).toBeNull();
     expect(describeEndpointRegions(0, [])).toBe('No hosted routes listed');
     expect(variantGridColumns(1)).toBe(1);
     expect(variantGridColumns(2)).toBe(2);

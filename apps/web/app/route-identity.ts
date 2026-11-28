@@ -1,21 +1,51 @@
 import {
   routeFeatureDiscriminator,
   type Catalog,
+  type Deployment,
   type Operation,
+  type Provider,
   type Route,
 } from '@media-router/contracts';
 
 export const regionNames: Record<string, string> = {
-  'cn-beijing': 'Beijing, China',
-  'ap-southeast-1': 'Singapore',
-  'ap-northeast-1': 'Tokyo, Japan',
-  'eu-central-1': 'Frankfurt, Germany',
-  'us-east-1': 'Virginia, US',
-  'cn-hongkong': 'Hong Kong, China',
+  'cn-beijing': 'CN',
+  'ap-southeast-1': 'SG',
+  'ap-northeast-1': 'JP',
+  'eu-central-1': 'DE',
+  'us-east-1': 'US',
+  'cn-hongkong': 'HK',
   global: 'Global endpoint',
-  undisclosed: 'Not disclosed',
-  unknown: 'Not disclosed',
 };
+
+export function isDisclosedRegion(region: string | null | undefined): region is string {
+  if (!region) return false;
+  const normalized = region.trim().toLowerCase();
+  return normalized.length > 0 && normalized !== 'undisclosed' && normalized !== 'unknown';
+}
+
+export function formatDisclosedRegion(region: string | null | undefined): string | null {
+  if (!isDisclosedRegion(region)) return null;
+  return regionNames[region] ?? region;
+}
+
+export function formatRouteLabel(identity: { label: string; region: string | null }): string {
+  return identity.region ? `${identity.label} · ${identity.region}` : identity.label;
+}
+
+export function formatDeploymentLabel(
+  deployment: Pick<Deployment, 'name' | 'endpointRegion'>,
+  provider?: Pick<Provider, 'name'>,
+): string {
+  const baseName = deployment.name.replace(/\s*·\s*Region undisclosed$/i, '').trim();
+  const region = formatDisclosedRegion(deployment.endpointRegion);
+  if (!region) {
+    return baseName || provider?.name || deployment.name;
+  }
+  const service = baseName.split(' · ')[0] || baseName;
+  const head =
+    provider?.name && service !== provider.name ? `${provider.name} · ${service}` : service;
+  return `${head} · ${region}`;
+}
 
 export function routeIdentity(
   catalog: Catalog,
@@ -42,8 +72,6 @@ export function routeIdentity(
         .join(' · ') || route.id,
     feature,
     summary: route.feature?.summary ?? null,
-    region: deployment
-      ? (regionNames[deployment.endpointRegion] ?? deployment.endpointRegion)
-      : 'Not disclosed',
+    region: formatDisclosedRegion(deployment?.endpointRegion),
   };
 }

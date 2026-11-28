@@ -1,6 +1,7 @@
 'use client';
 
 import { catalog } from '@media-router/catalog';
+import { formatDisclosedRegion } from '../route-identity';
 import type { ActivityItem } from './activity-view';
 import { moneyMicros } from './activity-view';
 import { CopyButton, Icon } from '../ui';
@@ -137,42 +138,49 @@ export function WorkspaceOverview({
                   </a>
                 </div>
                 <ul className={styles.activityList}>
-                  {recentActivity.slice(0, 5).map((item) => (
-                    <li className={styles.activityRow} key={item.id}>
-                      <div className={styles.activityMain}>
-                        <div className={styles.activityTitleRow}>
-                          <strong>{item.modelId}</strong>
-                          <span className={styles.opTag}>{item.operation}</span>
+                  {recentActivity.slice(0, 5).map((item) => {
+                    const region = formatDisclosedRegion(item.endpointRegion);
+                    return (
+                      <li className={styles.activityRow} key={item.id}>
+                        <div className={styles.activityMain}>
+                          <div className={styles.activityTitleRow}>
+                            <strong>{item.modelId}</strong>
+                            <span className={styles.opTag}>{item.operation}</span>
+                          </div>
+                          <span className={styles.activityMeta}>
+                            {[
+                              item.providerId ?? 'Unknown provider',
+                              region,
+                              shortDate(item.createdAt),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
                         </div>
-                        <span className={styles.activityMeta}>
-                          {item.providerId ?? 'Unknown provider'} ·{' '}
-                          {item.endpointRegion ?? 'Unknown endpoint region'} ·{' '}
-                          {shortDate(item.createdAt)}
-                        </span>
-                      </div>
-                      <div className={styles.activityCost}>
-                        <span className={statusClass(item.status)}>
-                          {item.status.replaceAll('-', ' ')}
-                        </span>
-                        <span
-                          className={
-                            item.settledMicros !== null ? styles.costSettled : styles.costPending
-                          }
+                        <div className={styles.activityCost}>
+                          <span className={statusClass(item.status)}>
+                            {item.status.replaceAll('-', ' ')}
+                          </span>
+                          <span
+                            className={
+                              item.settledMicros !== null ? styles.costSettled : styles.costPending
+                            }
+                          >
+                            {item.settledMicros !== null
+                              ? moneyMicros(item.settledMicros)
+                              : `${moneyMicros(item.heldMicros)} held`}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.inspectBtn}
+                          onClick={() => onInspectJob(item.id)}
                         >
-                          {item.settledMicros !== null
-                            ? moneyMicros(item.settledMicros)
-                            : `${moneyMicros(item.heldMicros)} held`}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.inspectBtn}
-                        onClick={() => onInspectJob(item.id)}
-                      >
-                        Inspect
-                      </button>
-                    </li>
-                  ))}
+                          Inspect
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
 

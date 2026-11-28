@@ -14,7 +14,8 @@ import {
   summarizeSeriesCardPricing,
   summarizeVariantCardPricing,
 } from './route-pricing-comparison';
-import { Icon, Playground, regionNames } from './ui';
+import { formatDisclosedRegion, isDisclosedRegion, regionNames } from './route-identity';
+import { Icon, Playground } from './ui';
 import type { PlaygroundDraftTransfer } from './private-playground';
 
 function routeCountLabel(count: number, region: string): string {
@@ -38,8 +39,12 @@ export function ModelsCatalog({
   const [region, setRegion] = useState(initialRegion);
   const entries = useMemo(() => buildCatalogModelEntries(catalog, regionNames), [catalog]);
   const regions = [
-    ...new Set(catalog.deployments.map((deployment) => deployment.endpointRegion)),
-  ].sort();
+    ...new Set(
+      catalog.deployments.map((deployment) => deployment.endpointRegion).filter(isDisclosedRegion),
+    ),
+  ].sort((left, right) =>
+    (formatDisclosedRegion(left) ?? left).localeCompare(formatDisclosedRegion(right) ?? right),
+  );
   const filtered = useMemo(
     () =>
       entries.filter(
@@ -87,7 +92,7 @@ export function ModelsCatalog({
             <option value="all">All regions</option>
             {regions.map((value) => (
               <option key={value} value={value}>
-                {regionNames[value] ?? value}
+                {formatDisclosedRegion(value) ?? value}
               </option>
             ))}
           </select>
@@ -176,7 +181,7 @@ export function ModelsCatalog({
                         {matchingRoutes.length}{' '}
                         <span>{routeCountLabel(matchingRoutes.length, region)}</span>
                       </strong>
-                      <p>{regionText}</p>
+                      {regionText && <p>{regionText}</p>}
                     </div>
                     <a href={href}>
                       Compare providers <Icon name="arrow" size={15} />
@@ -251,7 +256,7 @@ export function ModelsCatalog({
                     <strong>
                       {groupRoutesCount} <span>{routeCountLabel(groupRoutesCount, region)}</span>
                     </strong>
-                    <p>{groupRegionText}</p>
+                    {groupRegionText && <p>{groupRegionText}</p>}
                   </div>
                   {group.href && (
                     <a href={group.href}>
@@ -301,7 +306,7 @@ export function ModelsCatalog({
                             {matchingRoutes.length}{' '}
                             <span>{routeCountLabel(matchingRoutes.length, region)}</span>
                           </strong>
-                          <p>{regionText}</p>
+                          {regionText && <p>{regionText}</p>}
                         </div>
                         <a href={href}>
                           Compare providers <Icon name="arrow" size={14} />

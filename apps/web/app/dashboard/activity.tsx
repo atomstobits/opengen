@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatDisclosedRegion } from '../route-identity';
 import { readApiJson } from './api-response';
 import {
   activityFilterFields,
@@ -342,6 +343,7 @@ function ActivityRow({
   item: ActivityItem;
   onSelectJob?: (id: string) => void;
 }) {
+  const region = formatDisclosedRegion(item.endpointRegion);
   return (
     <tr>
       <td>
@@ -351,8 +353,9 @@ function ActivityRow({
         </small>
         <code>{item.routeId}</code>
         <small>
-          {item.providerId ?? 'Unknown provider'} ·{' '}
-          {item.endpointRegion ?? 'Unknown endpoint region'}
+          {region
+            ? `${item.providerId ?? 'Unknown provider'} · ${region}`
+            : (item.providerId ?? 'Unknown provider')}
         </small>
         <small title={item.deploymentId}>{item.deploymentId}</small>
       </td>

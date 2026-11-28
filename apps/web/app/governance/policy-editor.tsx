@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatDisclosedRegion } from '../route-identity';
 import type { GovernanceContext } from './key-editor';
 import {
   governanceName,
@@ -354,7 +355,13 @@ function PolicyEditor({
             <dt>Deployments</dt>
             <dd>{list(constraints.deploymentIds)}</dd>
             <dt>Endpoint regions</dt>
-            <dd>{list(constraints.endpointRegions)}</dd>
+            <dd>
+              {list(
+                constraints.endpointRegions?.map(
+                  (region) => formatDisclosedRegion(region) ?? region,
+                ),
+              )}
+            </dd>
             <dt>Processing regions</dt>
             <dd>{list(constraints.processingRegions)}</dd>
             <dt>Fidelity</dt>

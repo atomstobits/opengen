@@ -5,6 +5,7 @@ import { catalog } from '@media-router/catalog';
 import { keyScopes as permissionScopes, type RoutingPolicy } from '@media-router/contracts';
 import { CopyButton } from '../ui';
 import { notifyBrowserSessionChanged } from '../gateway-access';
+import { formatDeploymentLabel, formatDisclosedRegion, isDisclosedRegion } from '../route-identity';
 import { readApiJson } from './api-response';
 import {
   hasWorkspaceAuthority,
@@ -218,7 +219,11 @@ function SettingsRecords({
   }
   const selectedDeployment = catalog.deployments.find((item) => item.id === deployment);
   const allowedScopes = scopes.filter((scope) => !permissions || permissions.includes(scope));
-  const endpointRegions = [...new Set(catalog.deployments.map((item) => item.endpointRegion))];
+  const endpointRegions = [
+    ...new Set(catalog.deployments.map((item) => item.endpointRegion).filter(isDisclosedRegion)),
+  ].sort((left, right) =>
+    (formatDisclosedRegion(left) ?? left).localeCompare(formatDisclosedRegion(right) ?? right),
+  );
   return (
     <section className="workspace-settings">
       {(!embedded || views.length > 1) && (
@@ -503,7 +508,7 @@ function SettingsRecords({
                         )
                       }
                     />
-                    {region}
+                    {formatDisclosedRegion(region) ?? region}
                   </label>
                 ))}
               </div>
@@ -526,8 +531,10 @@ function SettingsRecords({
                 <div>
                   <strong>{policy.name}</strong>
                   <p>
-                    {policy.policy.endpointRegions?.join(', ') ?? 'Any endpoint region'} ·{' '}
-                    {policy.policy.preference ?? 'cost'}
+                    {policy.policy.endpointRegions
+                      ?.map((region) => formatDisclosedRegion(region) ?? region)
+                      .join(', ') ?? 'Any endpoint region'}{' '}
+                    · {policy.policy.preference ?? 'cost'}
                   </p>
                   <small>
                     {policy.max_cost_micros === null
@@ -587,7 +594,10 @@ function SettingsRecords({
                   .filter((item) => item.credentialEnv)
                   .map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} · {item.endpointRegion}
+                      {formatDeploymentLabel(
+                        item,
+                        catalog.providers.find((provider) => provider.id === item.providerId),
+                      )}
                     </option>
                   ))}
               </select>
@@ -629,33 +639,40 @@ function SettingsRecords({
             </button>
           </form>
           <div className="settings-records">
-            {connections.map((connection) => (
-              <article key={connection.deployment_id}>
-                <div>
-                  <strong>
-                    {catalog.deployments.find((item) => item.id === connection.deployment_id)
-                      ?.name ?? connection.deployment_id}
-                  </strong>
-                  <p>{connection.deployment_id}</p>
-                  <small>Saved {new Date(connection.created_at).toLocaleString()}</small>
-                </div>
-                <button
-                  className="button button-outline button-sm"
-                  disabled={busy}
-                  onClick={() =>
-                    act(async () => {
-                      await request(
-                        `/api/connections/${encodeURIComponent(connection.deployment_id)}`,
-                        'DELETE',
-                      );
-                      setNotice('Provider connection removed.');
-                    })
-                  }
-                >
-                  Remove
-                </button>
-              </article>
-            ))}
+            {connections.map((connection) => {
+              const item = catalog.deployments.find(
+                (entry) => entry.id === connection.deployment_id,
+              );
+              const provider = item
+                ? catalog.providers.find((entry) => entry.id === item.providerId)
+                : undefined;
+              return (
+                <article key={connection.deployment_id}>
+                  <div>
+                    <strong>
+                      {item ? formatDeploymentLabel(item, provider) : connection.deployment_id}
+                    </strong>
+                    <p>{connection.deployment_id}</p>
+                    <small>Saved {new Date(connection.created_at).toLocaleString()}</small>
+                  </div>
+                  <button
+                    className="button button-outline button-sm"
+                    disabled={busy}
+                    onClick={() =>
+                      act(async () => {
+                        await request(
+                          `/api/connections/${encodeURIComponent(connection.deployment_id)}`,
+                          'DELETE',
+                        );
+                        setNotice('Provider connection removed.');
+                      })
+                    }
+                  >
+                    Remove
+                  </button>
+                </article>
+              );
+            })}
             {!connections.length && (
               <p className="detail-note">No workspace provider connections saved.</p>
             )}

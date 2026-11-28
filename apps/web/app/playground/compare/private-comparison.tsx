@@ -23,7 +23,7 @@ import {
   writeRecovery,
   type RecoveryContext,
 } from '../../playground-recovery';
-import { regionNames } from '../../ui';
+import { formatDisclosedRegion } from '../../route-identity';
 import styles from './comparison.module.css';
 
 const usd = (micros: number) =>
@@ -56,7 +56,6 @@ function routeChoice(catalog: Catalog, route: Route) {
   const official = Boolean(
     model && deployment && model.authorProviderIds.includes(deployment.providerId),
   );
-  const endpoint = deployment?.endpointRegion ?? 'unknown';
   const modelName = model?.name ?? route.modelId;
   const providerLabel = [
     provider?.name ?? 'Provider',
@@ -67,7 +66,7 @@ function routeChoice(catalog: Catalog, route: Route) {
   ]
     .filter(Boolean)
     .join(' · ');
-  const region = regionNames[endpoint] ?? endpoint;
+  const region = formatDisclosedRegion(deployment?.endpointRegion);
   const resolution = getGenerationDefinition(route.modelId, 'text-to-image')?.defaults.resolution;
   const rate = route.rates.find(
     (entry) =>
@@ -518,7 +517,9 @@ function ComparisonWorkspace({
                       {routeId && !selected[index] && <option value={routeId}>{routeId}</option>}
                       {choices.map((choice) => (
                         <option key={choice.route.id} value={choice.route.id}>
-                          {choice.modelName} · {choice.providerLabel} · {choice.region}
+                          {[choice.modelName, choice.providerLabel, choice.region]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </option>
                       ))}
                     </select>
@@ -753,7 +754,7 @@ function RouteRate({ choice }: { choice: Choice }) {
   return (
     <>
       <p className={styles.routeLabel}>
-        {choice.providerLabel} · {choice.region}
+        {choice.region ? `${choice.providerLabel} · ${choice.region}` : choice.providerLabel}
       </p>
       <p className={styles.note}>
         {choice.rate
@@ -788,13 +789,14 @@ function ChildCard({
   onCheck: (job: Job) => void;
   onPlayground: (job: Job) => void;
 }) {
+  const childRegion = formatDisclosedRegion(child.endpointRegion);
+  const childProviderLabel = choice?.providerLabel ?? child.providerId;
   return (
     <article className={styles.child}>
       <span className="eyebrow">MODEL {position + 1}</span>
       <h3>{choice?.modelName ?? child.input.modelId}</h3>
       <p className={styles.routeLabel}>
-        {choice?.providerLabel ?? child.providerId} ·{' '}
-        {regionNames[child.endpointRegion] ?? child.endpointRegion}
+        {childRegion ? `${childProviderLabel} · ${childRegion}` : childProviderLabel}
       </p>
       <dl className={styles.money}>
         <div>

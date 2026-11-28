@@ -146,7 +146,7 @@ test('MiniMax H3 groups one Max variant across providers and retains the other v
   await page.goto('/fal/h3-max');
   await expect(page).toHaveURL(/\/minimax\/h3\?variant=minimax%2Fh3-max/);
   const falTry = variant(page, 'minimax/h3-max')
-    .getByRole('link', { name: /Use fal .* route/ })
+    .getByRole('link', { name: 'Use fal route', exact: true })
     .first();
   await falTry.click();
   await expect(page.getByLabel('Choose generation model')).toHaveValue('minimax/h3-max');
@@ -174,12 +174,12 @@ test('Wan keeps Standard and Prime in separate provider tables with all regional
     await expect(section.locator('.provider-name .official-tag')).toHaveCount(6);
     await expect(section.locator('.unknown-price')).toHaveCount(0);
     for (const location of [
-      'Beijing, China',
-      'Singapore',
-      'Tokyo, Japan',
-      'Frankfurt, Germany',
-      'Virginia, US',
-      'Hong Kong, China',
+      'Endpoint: CN',
+      'Endpoint: SG',
+      'Endpoint: JP',
+      'Endpoint: DE',
+      'Endpoint: US',
+      'Endpoint: HK',
     ]) {
       await expect(section.locator('.route-table')).toContainText(location);
     }
@@ -240,7 +240,7 @@ test('provider region labels show only disclosed fields and explain missing deta
   await expect(tooltip).toBeHidden();
 
   const endpointOnly = row('byteplus-modelark-ap-southeast-1/bytedance-seedance-2.5');
-  await expect(endpointOnly.locator('.endpoint-region')).toHaveText('Endpoint: Singapore');
+  await expect(endpointOnly.locator('.endpoint-region')).toHaveText('Endpoint: SG');
   await expect(endpointOnly.locator('svg')).toHaveCount(1);
   await expect(endpointOnly.locator('.scope-tag')).toHaveCount(0);
 
@@ -251,7 +251,7 @@ test('provider region labels show only disclosed fields and explain missing deta
 
   await page.goto('/alibaba/wan-3.0');
   const disclosed = row('alibaba/eu-central-1/wan-3.0');
-  await expect(disclosed.locator('.endpoint-region')).toHaveText('Endpoint: Frankfurt, Germany');
+  await expect(disclosed.locator('.endpoint-region')).toHaveText('Endpoint: DE');
   await expect(disclosed.locator('.scope-tag')).toHaveText('Inference scope: Global');
   await expect(disclosed.locator('svg')).toHaveCount(1);
   await expect(disclosed.locator('.route-state')).toHaveCount(0);
@@ -268,7 +268,7 @@ test('provider Try handoff preserves the exact model variant and regional route'
 }) => {
   await page.goto('/alibaba/wan-3.0');
   await variant(page, 'alibaba/wan-3.0-prime')
-    .getByRole('link', { name: 'Use Alibaba Cloud Singapore route', exact: true })
+    .getByRole('link', { name: 'Use Alibaba Cloud SG route', exact: true })
     .click();
   await expect(page).toHaveURL(/model=alibaba%2Fwan-3\.0-prime/);
   await expect(page).toHaveURL(/route=alibaba%2Fap-southeast-1%2Fwan-3\.0-prime/);
@@ -478,17 +478,16 @@ test('unified official-standard routes filter by feature, switch operations clea
   ).toHaveCount(1);
 
   await filter.getByRole('button', { name: 'Image to video', exact: true }).click();
-  await falRow
-    .getByRole('link', { name: 'Use fal Not disclosed Image to video route', exact: true })
-    .click();
+  await falRow.getByRole('link', { name: 'Use fal Image to video route', exact: true }).click();
   await expect(page).toHaveURL(/operation=image-to-video/);
   await expect(page).toHaveURL(/route=fal-undisclosed%2Fbytedance-seedance-2\.5/);
   await expect(page.getByRole('combobox', { name: 'Operation' })).toHaveValue('image-to-video');
   await expect(page.getByLabel('Provider route', { exact: true })).toHaveValue(
     'fal-undisclosed/bytedance-seedance-2.5',
   );
-  await expect(page.getByRole('region', { name: 'Seedance 2.5 pricing' })).toContainText(
-    'fal · Not disclosed',
+  await expect(page.getByRole('region', { name: 'Seedance 2.5 pricing' })).toContainText('fal');
+  await expect(page.getByRole('region', { name: 'Seedance 2.5 pricing' })).not.toContainText(
+    'Not disclosed',
   );
 
   // Switching operation while pinned to a unified route keeps the exact same canonical route ID pinned.
@@ -580,7 +579,7 @@ test('cheapest route highlight shows xx% off vs highest priced route with hover 
   await frankfurt.locator('.cheapest-trigger').hover();
   await expect(frankfurt.locator('.cheapest-tooltip')).toBeVisible();
   await expect(frankfurt.locator('.cheapest-tooltip')).toContainText(
-    'Alibaba Cloud · Model Studio · Singapore',
+    'Alibaba Cloud · Model Studio · SG',
   );
   await page.keyboard.press('Escape');
   await wan

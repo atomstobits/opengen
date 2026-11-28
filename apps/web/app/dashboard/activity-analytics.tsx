@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatDisclosedRegion } from '../route-identity';
 import { readApiJson } from './api-response';
 import {
   activityQuery,
@@ -281,39 +282,42 @@ function AnalyticsRecords({
                 </tr>
               </thead>
               <tbody>
-                {report.cohorts.map((cohort, index) => (
-                  <tr key={`${cohort.routeId}:${cohort.configurationFingerprint}:${index}`}>
-                    <td>
-                      <strong>{cohort.modelId}</strong>
-                      <code>{cohort.routeId}</code>
-                      <small>
-                        {cohort.deploymentId} · {cohort.endpointRegion ?? 'Unknown endpoint region'}
-                      </small>
-                      <small>
-                        {cohort.operation} · {activityConfigurationLabel(cohort.configuration)}
-                      </small>
-                    </td>
-                    <td>
-                      {cohort.sampleCount} samples
-                      <small>
-                        {cohort.succeeded} succeeded · {cohort.failed} failed
-                      </small>
-                      <small>
-                        {cohort.cancelled} cancelled · {cohort.unresolved} unresolved
-                      </small>
-                    </td>
-                    <td>
-                      {cohort.delivered} available
-                      <small>{cohort.unverifiedDelivery} unknown or unverified</small>
-                      <small>Generation success is separate from output availability.</small>
-                    </td>
-                    <td>
-                      P50 {latency(cohort.providerOutcomeLatency.p50Ms)}
-                      <small>P95 {latency(cohort.providerOutcomeLatency.p95Ms)}</small>
-                      <small>{cohort.providerOutcomeLatency.sampleCount} recorded samples</small>
-                    </td>
-                  </tr>
-                ))}
+                {report.cohorts.map((cohort, index) => {
+                  const region = formatDisclosedRegion(cohort.endpointRegion);
+                  return (
+                    <tr key={`${cohort.routeId}:${cohort.configurationFingerprint}:${index}`}>
+                      <td>
+                        <strong>{cohort.modelId}</strong>
+                        <code>{cohort.routeId}</code>
+                        <small>
+                          {region ? `${cohort.deploymentId} · ${region}` : cohort.deploymentId}
+                        </small>
+                        <small>
+                          {cohort.operation} · {activityConfigurationLabel(cohort.configuration)}
+                        </small>
+                      </td>
+                      <td>
+                        {cohort.sampleCount} samples
+                        <small>
+                          {cohort.succeeded} succeeded · {cohort.failed} failed
+                        </small>
+                        <small>
+                          {cohort.cancelled} cancelled · {cohort.unresolved} unresolved
+                        </small>
+                      </td>
+                      <td>
+                        {cohort.delivered} available
+                        <small>{cohort.unverifiedDelivery} unknown or unverified</small>
+                        <small>Generation success is separate from output availability.</small>
+                      </td>
+                      <td>
+                        P50 {latency(cohort.providerOutcomeLatency.p50Ms)}
+                        <small>P95 {latency(cohort.providerOutcomeLatency.p95Ms)}</small>
+                        <small>{cohort.providerOutcomeLatency.sampleCount} recorded samples</small>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {!report.cohorts.length && (

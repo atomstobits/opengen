@@ -104,6 +104,9 @@ for (const width of [1440, 390]) {
     await page.goto('/playground/compare');
     await page.getByLabel('Model 1 and route').selectOption(ids[0]);
     await page.getByLabel('Model 2 and route').selectOption(ids[1]);
+    await expect(page.getByLabel('Model 1 and route')).not.toContainText(/not disclosed/i);
+    await expect(page.locator('main')).toContainText('BytePlus · SG');
+    await expect(page.locator('main')).not.toContainText(/not disclosed/i);
     const prompt = page.getByRole('textbox', { name: 'Shared prompt' });
     await prompt.fill(privatePrompt);
     await page.getByRole('button', { name: 'Get comparison quote' }).click();

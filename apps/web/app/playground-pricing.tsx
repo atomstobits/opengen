@@ -15,7 +15,7 @@ import {
   type Route,
 } from '@media-router/contracts';
 import { Icon } from './ui';
-import { routeIdentity } from './route-identity';
+import { formatRouteLabel, routeIdentity } from './route-identity';
 export { routeIdentity };
 import { eligibleReuseRoutes } from './playground-request';
 import styles from './playground-pricing.module.css';
@@ -375,9 +375,7 @@ export function PlaygroundPricing({
         <span className={styles.term}>Published {displayRoute ? 'route rate' : 'model rates'}</span>
         {displayRoute ? (
           <>
-            <p className={styles.routeLabel}>
-              {displayIdentity!.label} · {displayIdentity!.region}
-            </p>
+            <p className={styles.routeLabel}>{formatRouteLabel(displayIdentity!)}</p>
             <PublishedRate route={displayRoute} model={model} draft={draft} details />
           </>
         ) : (
@@ -402,9 +400,7 @@ export function PlaygroundPricing({
                     const identity = routeIdentity(catalog, route, draft.operation, routes);
                     return (
                       <li key={route.id}>
-                        <b>
-                          {identity.label} · {identity.region}
-                        </b>
+                        <b>{formatRouteLabel(identity)}</b>
                         <PublishedRate route={route} model={model} draft={draft} details />
                       </li>
                     );
@@ -420,7 +416,7 @@ export function PlaygroundPricing({
           <dt>{selected ? 'Quoted route' : 'Active route selection'}</dt>
           <dd>
             {activeIdentity
-              ? `${activeIdentity.label} · ${activeIdentity.region}`
+              ? formatRouteLabel(activeIdentity)
               : 'Automatic · selected at quote time'}
           </dd>
         </div>
@@ -476,7 +472,7 @@ export function PlaygroundPricing({
               const identity = route && routeIdentity(catalog, route, quote.operation);
               return (
                 <li key={candidate.routeId}>
-                  <b>{identity ? `${identity.label} · ${identity.region}` : candidate.routeId}</b>
+                  <b>{identity ? formatRouteLabel(identity) : candidate.routeId}</b>
                   <strong>
                     {candidate.estimatedCostMicros === null
                       ? 'Price unavailable'
