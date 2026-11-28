@@ -483,12 +483,23 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('customer prepaid ledger reconci
         id: created.id,
         status: 'expired',
       });
+      // A stale checkout request after local cancellation must be rejected without calling Stripe.
+      await expect(f.store.checkout(f.workspace, created.id, f.transport)).rejects.toMatchObject({
+        code: 'order_expired',
+        statusCode: 409,
+      });
+      expect(f.requests).toHaveLength(0);
+      expect((await f.store.getOrder(f.workspace, created.id)).status).toBe('expired');
 
       // Open checkout expires via transport.expireSession and clears checkoutUrl.
       const open = await f.order();
       expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('checkout_open');
       const cancelled = await f.store.cancelOrder(f.workspace, open.id, f.transport);
       expect(cancelled).toMatchObject({ id: open.id, status: 'expired', checkoutUrl: null });
+      await expect(f.store.checkout(f.workspace, open.id, f.transport)).rejects.toMatchObject({
+        code: 'order_expired',
+        statusCode: 409,
+      });
 
       // Uncertain checkout_pending order cannot be cancelled blindly.
       const pendingOrder = await f.store.createOrder(f.workspace, 1500, randomUUID());

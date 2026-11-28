@@ -780,6 +780,12 @@ export class PaymentStore {
           'Payment request needs operator reconciliation.',
           409,
         );
+      if (row.status === 'expired')
+        throw new PaymentError(
+          'order_expired',
+          'This payment order has expired or was cancelled and cannot be checked out.',
+          409,
+        );
       // An old/unknown POST keeps its original serializer and retry key. Known
       // sessions still use GET/reconciliation; never reinterpret an unbound key.
       if (
