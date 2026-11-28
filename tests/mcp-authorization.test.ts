@@ -108,16 +108,108 @@ describe('MCP OAuth protocol boundaries', () => {
       }
       const consentPrompt = await app.inject({
         method: 'GET',
-        url: `/oauth/authorize?client_id=c1&redirect_uri=${encodeURIComponent('https://client.example/callback')}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&prompt=consent`,
+        url: `/oauth/authorize?client_id=c1&redirect_uri=${encodeURIComponent('https://client.example/callback')}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&prompt=consent&ui_locales=en-US`,
       });
-      // Passes authorizationSchema validation and reaches the unconfigured store boundary (503).
+      // Passes authorizationSchema validation (ignoring ui_locales per RFC 6749 §4.1.1) and reaches the unconfigured store boundary (503).
       expect(consentPrompt.statusCode).toBe(503);
-      const silentPrompt = await app.inject({
-        method: 'GET',
-        url: `/oauth/authorize?client_id=c1&redirect_uri=${encodeURIComponent('https://client.example/callback')}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&prompt=none`,
+      for (const disallowed of [
+        'prompt=none',
+        'response_mode=fragment',
+        'client_secret=forbidden',
+        'code_verifier=forbidden',
+        'request=jwt',
+        'request_uri=https%3A%2F%2Fclient.example%2Freq',
+      ]) {
+        const rejected = await app.inject({
+          method: 'GET',
+          url: `/oauth/authorize?client_id=c1&redirect_uri=${encodeURIComponent('https://client.example/callback')}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&${disallowed}`,
+        });
+        expect(rejected.statusCode, disallowed).toBe(400);
+        expect(rejected.json().error, disallowed).toBe('invalid_request');
+      }
+    } finally {
+      await app.close();
+    }
+  });
+  it('ignores unrecognized RFC 6749 params on token and revoke while rejecting public-client secrets', async () => {
+    const app = Fastify();
+    const unauthenticated = async (): Promise<Principal> => {
+      throw new Error('No session');
+    };
+    const stubStore = {
+      rateLimit: async () => {},
+      exchangeCode: async () => ({
+        access_token: 'og_mcp_a_stub',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        refresh_token: 'og_mcp_r_stub',
+        scope: 'read generate',
+        workspace_id: 'ws-stub',
+      }),
+      revoke: async () => {},
+    } as unknown as McpOAuthStore;
+    await registerMcpAuthorization(app, {
+      store: stubStore,
+      publicUrl: issuer,
+      signInEnabled: false,
+      authenticateBrowser: unauthenticated,
+      authenticate: unauthenticated,
+    });
+    try {
+      const tokenExtraParam = await app.inject({
+        method: 'POST',
+        url: '/oauth/token',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: 'c1',
+          code: 'og_code_fixture',
+          redirect_uri: 'https://client.example/callback',
+          code_verifier: verifier,
+          scope: 'read generate',
+          client_secret: '',
+        }).toString(),
       });
-      expect(silentPrompt.statusCode).toBe(400);
-      expect(silentPrompt.json().error).toBe('invalid_request');
+      expect(tokenExtraParam.statusCode).toBe(200);
+      const tokenWithSecret = await app.inject({
+        method: 'POST',
+        url: '/oauth/token',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: 'c1',
+          code: 'og_code_fixture',
+          redirect_uri: 'https://client.example/callback',
+          code_verifier: verifier,
+          client_secret: 'not-supported-for-public-clients',
+        }).toString(),
+      });
+      expect(tokenWithSecret.statusCode).toBe(400);
+      expect(tokenWithSecret.json().error).toBe('invalid_request');
+      const revokeExtraParam = await app.inject({
+        method: 'POST',
+        url: '/oauth/revoke',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({
+          client_id: 'c1',
+          token: 'og_mcp_r_stub',
+          client_secret: '',
+          extra_hint: 'ignored',
+        }).toString(),
+      });
+      expect(revokeExtraParam.statusCode).toBe(200);
+      const revokeWithSecret = await app.inject({
+        method: 'POST',
+        url: '/oauth/revoke',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({
+          client_id: 'c1',
+          token: 'og_mcp_r_stub',
+          client_secret: 'not-supported',
+        }).toString(),
+      });
+      expect(revokeWithSecret.statusCode).toBe(400);
+      expect(revokeWithSecret.json().error).toBe('invalid_request');
     } finally {
       await app.close();
     }
