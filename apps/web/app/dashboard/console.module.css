@@ -1,0 +1,596 @@
+/* Scoped styles for the redesigned /app workspace console overview. */
+
+.overview {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.fundingStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.fundingCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fundingCopy strong {
+  color: var(--ink);
+  font-family: var(--heading);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.fundingCopy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 68ch;
+}
+
+.fundingStrip > a {
+  flex-shrink: 0;
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(270px, 1fr);
+  gap: 20px;
+  align-items: start;
+  min-width: 0;
+}
+
+.primaryCol,
+.sideCol {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-subtle);
+  background: rgba(246, 243, 236, 0.025);
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  line-height: 1.4;
+}
+
+.panelAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.panelAction:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.panelIntro {
+  padding: 16px 18px 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 64ch;
+}
+
+/* Recent generations list */
+.activityList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-subtle);
+  transition: background 0.15s ease;
+}
+
+.activityRow:last-child {
+  border-bottom: 0;
+}
+
+.activityRow:hover {
+  background: rgba(246, 243, 236, 0.03);
+}
+
+.activityMain {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.activityTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.activityTitleRow strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.opTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(246, 243, 236, 0.07);
+  border: 1px solid var(--line-subtle);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.activityMeta {
+  color: var(--subtle);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.activityCost {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.costSettled {
+  color: var(--panel-stat);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.costPending {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--line-subtle);
+  background: rgba(246, 243, 236, 0.06);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusSucceeded {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 38%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.statusFailed {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.statusPending {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.inspectBtn {
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.inspectBtn:hover {
+  border-color: var(--control-line-hover);
+  background: var(--raised);
+}
+
+/* First-run / Quick launch instrument rows */
+.launchList {
+  display: grid;
+  padding: 16px 18px 18px;
+  gap: 12px;
+}
+
+.launchRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-subtle);
+  border-left: 3px solid var(--launch-accent, var(--panel-video));
+  border-radius: 6px;
+  background: var(--canvas);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.launchRow:hover {
+  border-color: color-mix(in srgb, var(--launch-accent, var(--panel-video)) 45%, transparent);
+  border-left-color: var(--launch-accent, var(--panel-video));
+  background: var(--raised);
+}
+
+.launchPlayground {
+  --launch-accent: var(--panel-image);
+}
+
+.launchAgent {
+  --launch-accent: var(--panel-agent);
+}
+
+.launchApi {
+  --launch-accent: var(--panel-video);
+}
+
+.launchIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  background: var(--launch-accent, var(--panel-video));
+  color: var(--on-light);
+}
+
+.launchBody {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.launchBody h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--heading);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.launchBody p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.launchActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cliStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line-subtle);
+  background: var(--surface-code);
+}
+
+.cliCommand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.cliPrompt {
+  color: var(--panel-stat);
+  user-select: none;
+}
+
+.cliStrip :global(.copy-button) {
+  flex-shrink: 0;
+}
+
+/* Compact quick-launch bar shown beneath live activity */
+.quickBar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.quickBar a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 16px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border-right: 1px solid var(--line-subtle);
+  transition: background 0.15s ease;
+}
+
+.quickBar a:last-child {
+  border-right: 0;
+}
+
+.quickBar a:hover {
+  background: var(--raised);
+}
+
+.quickBar a span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Right rail shortcut list */
+.shortcutList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shortcutList li {
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.shortcutList li:last-child {
+  border-bottom: 0;
+}
+
+.shortcutLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: background 0.15s ease;
+}
+
+.shortcutLink:hover {
+  background: var(--raised);
+}
+
+.shortcutLead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.shortcutIcon {
+  color: var(--subtle);
+  flex-shrink: 0;
+}
+
+.shortcutLink:hover .shortcutIcon {
+  color: var(--panel-stat);
+}
+
+.shortcutText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shortcutText strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.shortcutText span {
+  color: var(--subtle);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.shortcutChevron {
+  color: var(--subtle);
+  flex-shrink: 0;
+}
+
+/* Recent ledger mini-list */
+.ledgerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ledgerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.ledgerRow:last-child {
+  border-bottom: 0;
+}
+
+.ledgerKind {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ledgerKind strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+  line-height: 1.35;
+}
+
+.ledgerKind small {
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ledgerAmount {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.ledgerAmountCredit {
+  color: var(--success);
+}
+
+.emptyWell {
+  padding: 18px;
+  color: var(--subtle);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.overview :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1020px) {
+  .workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .fundingStrip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .launchRow {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+  .launchActions {
+    grid-column: 1 / -1;
+  }
+  .activityRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .inspectBtn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .quickBar {
+    grid-template-columns: 1fr;
+  }
+  .quickBar a {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+  .quickBar a:last-child {
+    border-bottom: 0;
+  }
+  .cliStrip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activityRow,
+  .inspectBtn,
+  .launchRow,
+  .quickBar a,
+  .shortcutLink {
+    transition: none;
+  }
+}

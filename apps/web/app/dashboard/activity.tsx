@@ -23,6 +23,7 @@ export interface PrivateActivityProps {
   recoveryScope?: string | null;
   permissions: readonly string[];
   onSelectJob?: (id: string) => void;
+  embedded?: boolean;
 }
 /** The identity boundary remounts before a previous workspace's records can render. */
 export function PrivateActivity(props: PrivateActivityProps) {
@@ -48,7 +49,12 @@ export function PrivateActivity(props: PrivateActivityProps) {
     />
   );
 }
-function ActivityRecords({ workspaceId, recoveryScope, onSelectJob }: PrivateActivityProps) {
+function ActivityRecords({
+  workspaceId,
+  recoveryScope,
+  onSelectJob,
+  embedded = false,
+}: PrivateActivityProps) {
   const [draft, setDraft] = useState<ActivityFilters>({});
   const [filters, setFilters] = useState<ActivityFilters>({});
   const [cursor, setCursor] = useState<string | null>(null);
@@ -104,25 +110,27 @@ function ActivityRecords({ workspaceId, recoveryScope, onSelectJob }: PrivateAct
   }
   return (
     <section className={styles.section} aria-label="Private activity">
-      <div className={styles.heading}>
-        <div>
-          <span className="eyebrow">PRIVATE ACTIVITY</span>
-          <h2>Every generation. A clear record.</h2>
-          <p>
-            Filter exact models and regional deployments. Costs come from your workspace ledger.
-          </p>
+      {!embedded && (
+        <div className={styles.heading}>
+          <div>
+            <span className="eyebrow">PRIVATE ACTIVITY</span>
+            <h2>Every generation. A clear record.</h2>
+            <p>
+              Filter exact models and regional deployments. Costs come from your workspace ledger.
+            </p>
+          </div>
+          <button
+            className="button button-outline button-sm"
+            disabled={loading}
+            onClick={() => {
+              setPage(null);
+              setRefresh((n) => n + 1);
+            }}
+          >
+            Refresh
+          </button>
         </div>
-        <button
-          className="button button-outline button-sm"
-          disabled={loading}
-          onClick={() => {
-            setPage(null);
-            setRefresh((n) => n + 1);
-          }}
-        >
-          Refresh
-        </button>
-      </div>
+      )}
       <form
         className={styles.filters}
         onSubmit={(event) => {
@@ -194,30 +202,52 @@ function ActivityRecords({ workspaceId, recoveryScope, onSelectJob }: PrivateAct
           {error}
         </p>
       )}
-      <div className={styles.stats} aria-label="Current page totals">
-        <div>
-          <span>Generations on this page</span>
-          <strong>{page ? items.length : '—'}</strong>
+      {embedded ? (
+        <div className={styles.compactStats} aria-label="Current page totals">
+          <span>
+            This page:<strong>{page ? items.length : '—'}</strong>
+          </span>
+          <span>
+            Settled:
+            <strong>
+              {page ? moneyMicros(sumMicros(observed.map((item) => item.settledMicros!))) : '—'}
+            </strong>
+          </span>
+          <span>
+            Still held:
+            <strong>
+              {page && held.length === items.length
+                ? moneyMicros(sumMicros(held.map((item) => item.heldMicros!)))
+                : 'Unknown'}
+            </strong>
+          </span>
         </div>
-        <div>
-          <span>Settled on this page</span>
-          <strong>
-            {page ? moneyMicros(sumMicros(observed.map((item) => item.settledMicros!))) : '—'}
-          </strong>
-          <small>
-            {observed.length} confirmed · {items.length - observed.length} pending or unknown
-          </small>
+      ) : (
+        <div className={styles.stats} aria-label="Current page totals">
+          <div>
+            <span>Generations on this page</span>
+            <strong>{page ? items.length : '—'}</strong>
+          </div>
+          <div>
+            <span>Settled on this page</span>
+            <strong>
+              {page ? moneyMicros(sumMicros(observed.map((item) => item.settledMicros!))) : '—'}
+            </strong>
+            <small>
+              {observed.length} confirmed · {items.length - observed.length} pending or unknown
+            </small>
+          </div>
+          <div>
+            <span>Still held on this page</span>
+            <strong>
+              {page && held.length === items.length
+                ? moneyMicros(sumMicros(held.map((item) => item.heldMicros!)))
+                : 'Unknown'}
+            </strong>
+            <small>Temporary holds, separate from settled spend</small>
+          </div>
         </div>
-        <div>
-          <span>Still held on this page</span>
-          <strong>
-            {page && held.length === items.length
-              ? moneyMicros(sumMicros(held.map((item) => item.heldMicros!)))
-              : 'Unknown'}
-          </strong>
-          <small>Temporary holds, separate from settled spend</small>
-        </div>
-      </div>
+      )}
       <div className={styles.tableWrap} aria-busy={loading}>
         <table className={styles.table}>
           <caption className={styles.srOnly}>
@@ -327,7 +357,19 @@ function ActivityRow({
         <small title={item.deploymentId}>{item.deploymentId}</small>
       </td>
       <td>
-        <span className={styles.status}>{item.status.replaceAll('-', ' ')}</span>
+        <span
+          className={`${styles.status} ${
+            item.status === 'succeeded'
+              ? styles.statusSucceeded
+              : item.status === 'failed' ||
+                  item.status === 'cancelled' ||
+                  item.status === 'submission-unknown'
+                ? styles.statusFailed
+                : styles.statusPending
+          }`}
+        >
+          {item.status.replaceAll('-', ' ')}
+        </span>
         <small>Delivery: {item.deliveryStatus ?? 'Unverified'}</small>
         {item.progress && (
           <small>

@@ -59,6 +59,7 @@ interface SettingsProps {
   workspaceId?: string;
   recoveryScope?: string | null;
   keysOnly?: boolean;
+  embedded?: boolean;
 }
 export function WorkspaceSettings(props: SettingsProps = {}) {
   const authority = { workspaceId: props.workspaceId ?? null, recoveryScope: props.recoveryScope };
@@ -95,6 +96,7 @@ function SettingsRecords({
   workspaceId,
   recoveryScope,
   keysOnly = false,
+  embedded = false,
 }: SettingsProps) {
   const active = useRef(true);
   const mutation = useRef<AbortController | null>(null);
@@ -219,26 +221,28 @@ function SettingsRecords({
   const endpointRegions = [...new Set(catalog.deployments.map((item) => item.endpointRegion))];
   return (
     <section className="workspace-settings">
-      <div className="settings-navigation" aria-label="Settings section">
-        {views.map(({ id: value }) => (
-          <button
-            key={value}
-            className={view === value ? 'selected' : ''}
-            onClick={() => {
-              setView(value);
-              setError('');
-              setNotice('');
-              if (value !== view) setCreatedKey('');
-            }}
-          >
-            {value === 'keys'
-              ? 'API keys'
-              : value === 'policies'
-                ? 'Routing profiles'
-                : 'Provider connections'}
-          </button>
-        ))}
-      </div>
+      {(!embedded || views.length > 1) && (
+        <div className="settings-navigation" aria-label="Settings section">
+          {views.map(({ id: value }) => (
+            <button
+              key={value}
+              className={view === value ? 'selected' : ''}
+              onClick={() => {
+                setView(value);
+                setError('');
+                setNotice('');
+                if (value !== view) setCreatedKey('');
+              }}
+            >
+              {value === 'keys'
+                ? 'API keys'
+                : value === 'policies'
+                  ? 'Routing profiles'
+                  : 'Provider connections'}
+            </button>
+          ))}
+        </div>
+      )}
       {error && (
         <p className="error-notice" role="alert">
           {error}

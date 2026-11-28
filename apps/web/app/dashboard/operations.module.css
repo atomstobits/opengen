@@ -231,6 +231,41 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.statusSucceeded {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 38%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+.statusFailed {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.statusPending {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.compactStats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 11px 16px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 6px;
+  background: rgba(246, 243, 236, 0.03);
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.compactStats strong {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 6px;
+}
 .identity {
   font-size: 14px;
   line-height: 1.45;
