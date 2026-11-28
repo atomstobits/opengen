@@ -127,6 +127,7 @@ export interface PaymentTransport {
   assertProcessorEnvironment?(): void;
   createSession(order: CheckoutOrder): Promise<CheckoutSession>;
   retrieveSession(id: string): Promise<CheckoutSession>;
+  expireSession?(id: string): Promise<CheckoutSession>;
 }
 export interface VerifiedPaymentEvent {
   /** Server-owned context from the verified ingress, never from event metadata. */
@@ -926,6 +927,145 @@ export class PaymentStore {
       ).rows[0]!;
       await this.pendingHolds(client, updated, paymentIntentId(session.payment_intent));
       return this.orderView(updated); // Even a paid retrieve never grants credit here.
+    });
+    if (result instanceof PaymentError || result instanceof PaymentOwnershipError) throw result;
+    return result;
+  }
+
+  /** Expire an open unpaid Checkout session so the customer can start a top-up with another amount.
+   * Never cancels an uncertain checkout_pending request or overwrites an already-paid/credited order. */
+  async cancelOrder(
+    workspaceId: string,
+    id: string,
+    transport: PaymentTransport,
+    authorize?: PaymentAuthority,
+  ): Promise<PaymentOrder> {
+    const environment = this.processorEnvironment;
+    const attempt = await this.transaction(async (client) => {
+      const installation = await this.lockLimits(client);
+      const workspace = (
+        await client.query<RateRow>('SELECT * FROM mr_workspaces WHERE id=$1 FOR UPDATE', [
+          workspaceId,
+        ])
+      ).rows[0];
+      await authorize?.(client, { newFunding: false });
+      const row = await this.owned(client, workspaceId, id, true);
+      if (row.livemode !== this.options.livemode || !this.matchesEnvironment(row))
+        throw new PaymentError(
+          'environment_mismatch',
+          'This payment belongs to another environment.',
+          409,
+        );
+      if (row.status === 'expired') return { row, external: false as const };
+      if (await this.held(client, workspaceId))
+        throw new PaymentError(
+          'billing_hold',
+          'Billing needs review before changing payment orders.',
+          409,
+        );
+      if (row.status === 'created' && !row.session_id && !row.checkout_started_at) {
+        const updated = (
+          await client.query<OrderRow>(
+            "UPDATE mr_payment_orders SET status='expired',checkout_url=NULL,checkout_lease_until=NULL,updated_at=now() WHERE id=$1 RETURNING *",
+            [id],
+          )
+        ).rows[0]!;
+        return { row: updated, external: false as const };
+      }
+      if (row.status !== 'checkout_open' || !row.session_id)
+        throw new PaymentError(
+          'order_not_cancellable',
+          'Only an open unpaid checkout can be cancelled.',
+          409,
+        );
+      this.requireTransport(transport);
+      if (!transport.expireSession)
+        throw new PaymentError(
+          'cancel_unavailable',
+          'Checkout cancellation is unavailable on this installation.',
+          503,
+        );
+      if (environment) await assertBillingProcessorEnvironmentInTransaction(client, environment);
+      const now = await this.now(client);
+      await this.consumeLimit(client, workspaceId, installation, workspace!, 'checkout', now);
+      return { row, external: true as const };
+    });
+    if (!attempt.external) return this.orderView(attempt.row);
+    const sessionId = attempt.row.session_id!;
+    let session: CheckoutSession;
+    try {
+      session = await transport.expireSession!(sessionId);
+    } catch {
+      // Stripe rejects expire if the session already completed or expired upstream; retrieve truth.
+      try {
+        session = await transport.retrieveSession(sessionId);
+      } catch {
+        throw new PaymentError(
+          'cancel_uncertain',
+          'Checkout could not be cancelled. Refresh its status before trying again.',
+          503,
+        );
+      }
+    }
+    const result = await this.transaction(async (client) => {
+      await this.lockIntent(client, paymentIntentId(session.payment_intent));
+      await client.query('SELECT id FROM mr_workspaces WHERE id=$1 FOR UPDATE', [workspaceId]);
+      const current = await this.owned(client, workspaceId, id, true);
+      let url: string | null = null;
+      try {
+        if (!validSession(current, session))
+          throw new PaymentError('session_mismatch', 'Payment session requires review.', 409);
+        if (session.status === 'open') url = checkoutUrl(session.url);
+      } catch (error) {
+        if (!(error instanceof PaymentError)) throw error;
+        await client.query(
+          "UPDATE mr_payment_orders SET status='review',checkout_lease_until=NULL,updated_at=now() WHERE id=$1 AND credited_at IS NULL",
+          [id],
+        );
+        return error;
+      }
+      const nextStatus: PaymentStatus = current.credited_at
+        ? 'credited'
+        : current.status === 'review'
+          ? 'review'
+          : current.status === 'payment_failed' && session.payment_status !== 'paid'
+            ? 'payment_failed'
+            : session.status === 'expired' && session.payment_status !== 'paid'
+              ? 'expired'
+              : session.status === 'complete' || session.payment_status === 'paid'
+                ? 'payment_pending'
+                : 'checkout_open';
+      try {
+        await this.qualifyOrder(client, current, session);
+      } catch (error) {
+        if (!(error instanceof PaymentOwnershipError)) throw error;
+        if (!current.credited_at)
+          await client.query(
+            "UPDATE mr_payment_orders SET status='review',checkout_lease_until=NULL,updated_at=now() WHERE id=$1",
+            [id],
+          );
+        return error;
+      }
+      const updated = (
+        await client.query<OrderRow>(
+          `UPDATE mr_payment_orders SET
+            payment_intent_id=COALESCE(payment_intent_id,$2),
+            checkout_url=CASE WHEN $3='checkout_open' THEN COALESCE($4,checkout_url) ELSE NULL END,
+            status=$3,
+            checkout_lease_until=NULL,
+            updated_at=now()
+          WHERE id=$1 RETURNING *`,
+          [id, paymentIntentId(session.payment_intent), nextStatus, url],
+        )
+      ).rows[0]!;
+      await this.pendingHolds(client, updated, paymentIntentId(session.payment_intent));
+      if (nextStatus === 'checkout_open')
+        return new PaymentError(
+          'cancel_uncertain',
+          'Checkout could not be cancelled. Refresh its status before trying again.',
+          503,
+        );
+      return this.orderView(updated);
     });
     if (result instanceof PaymentError || result instanceof PaymentOwnershipError) throw result;
     return result;

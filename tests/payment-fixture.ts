@@ -105,6 +105,12 @@ export async function paymentFixture(
       if (!session || id !== session.id) throw new Error('Unknown fixture session.');
       return { ...session };
     },
+    async expireSession(id: string) {
+      if (!session || id !== session.id) throw new Error('Unknown fixture session.');
+      if (session.status !== 'open') throw new Error('Checkout Session is no longer open.');
+      session = { ...session, status: 'expired', url: null };
+      return { ...session };
+    },
   };
   return {
     pool,

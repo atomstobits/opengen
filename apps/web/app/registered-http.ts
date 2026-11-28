@@ -23,6 +23,7 @@ const protocolTargets = [
   { method: 'POST', path: '/v1/billing/orders' },
   { method: 'GET', path: '/v1/billing/orders/:id' },
   { method: 'POST', path: '/v1/billing/orders/:id/checkout' },
+  { method: 'POST', path: '/v1/billing/orders/:id/cancel' },
   { method: 'GET', path: '/v1/comparisons' },
   { method: 'POST', path: '/v1/comparisons/quote' },
   { method: 'GET', path: '/v1/comparisons/:id' },

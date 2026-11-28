@@ -168,6 +168,10 @@ export class StripeBillingTransport
         this.assertProcessorEnvironment();
         return legacy.retrieveSession(id);
       },
+      expireSession: async (id) => {
+        this.assertProcessorEnvironment();
+        return legacy.expireSession(id);
+      },
     };
   }
   async createCustomer(request: CustomerRequest): Promise<StripeCustomerReference> {

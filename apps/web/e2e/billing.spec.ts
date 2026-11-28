@@ -45,10 +45,12 @@ async function billingFixture(
     summaryIncludesOrders: true,
     abortNextCreate: false,
     checkoutStatus: 'checkout_open' as PaymentOrder['status'],
+    cancelStatus: 'expired' as PaymentOrder['status'],
     orders: new Map<string, PaymentOrder>(),
     keys: new Map<string, string>(),
     creates: [] as { key: string; amountCents: number; persisted: PendingTopUp | null }[],
     checkouts: [] as string[],
+    cancels: [] as string[],
     reads: [] as string[],
     summaries: 0,
     hostedVisits: 0,
@@ -285,7 +287,7 @@ async function billingFixture(
       } else await route.fulfill({ status: 201, json: state.orders.get(id) });
       return;
     }
-    const match = /^\/api\/billing\/orders\/([0-9a-f-]+)(\/checkout)?$/.exec(url.pathname);
+    const match = /^\/api\/billing\/orders\/([0-9a-f-]+)(\/checkout|\/cancel)?$/.exec(url.pathname);
     const order = match ? state.orders.get(match[1]!) : undefined;
     if (order && match) {
       if (!match[2] && request.method() === 'GET') {
@@ -293,13 +295,25 @@ async function billingFixture(
         await route.fulfill({ json: order });
         return;
       }
-      if (match[2] && request.method() === 'POST') {
+      if (match[2] === '/checkout' && request.method() === 'POST') {
         expect(request.postDataJSON()).toEqual({});
         state.checkouts.push(order.id);
         const next = {
           ...order,
           status: state.checkoutStatus,
           checkoutUrl: state.checkoutStatus === 'checkout_open' ? checkoutUrl : null,
+        };
+        state.orders.set(order.id, next);
+        await route.fulfill({ json: next });
+        return;
+      }
+      if (match[2] === '/cancel' && request.method() === 'POST') {
+        expect(request.postDataJSON()).toEqual({});
+        state.cancels.push(order.id);
+        const next: PaymentOrder = {
+          ...order,
+          status: state.cancelStatus,
+          checkoutUrl: state.cancelStatus === 'checkout_open' ? checkoutUrl : null,
         };
         state.orders.set(order.id, next);
         await route.fulfill({ json: next });
@@ -780,6 +794,52 @@ for (const viewport of [
         () => document.documentElement.scrollWidth > window.innerWidth,
       );
       expect(overflow).toBe(false);
+    });
+
+    test('window focus with an unchanged session preserves form edits without remounting /billing', async ({
+      page,
+      baseURL,
+    }) => {
+      const f = await billingFixture(page, baseURL);
+      await page.goto('/billing');
+      const amountInput = page.getByLabel('Choose your credit amount');
+      await expect(amountInput).toBeEnabled();
+      await amountInput.fill('42');
+      const summariesBefore = f.summaries;
+      await page.evaluate(() => {
+        window.dispatchEvent(new Event('focus'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await page.waitForTimeout(150);
+      await expect(amountInput).toHaveValue('42');
+      await expect(page.getByText('Checking your session…')).toHaveCount(0);
+      expect(f.summaries).toBe(summariesBefore);
+      expect(f.unexpected).toEqual([]);
+    });
+
+    test('cancelling an open unpaid checkout unlocks the amount input for a new top-up', async ({
+      page,
+      baseURL,
+    }) => {
+      const f = await billingFixture(page, baseURL);
+      f.orders.set(orderId, payment('checkout_open'));
+      await seedRecovery(page, baseURL);
+      await page.goto(`/billing?checkout=cancel&order=${orderId}`);
+      const amountInput = page.getByLabel('Choose your credit amount');
+      await expect(amountInput).toBeDisabled();
+      await page.getByRole('button', { name: 'Cancel open top-up & change amount' }).click();
+      await expect(
+        page.getByText('Open checkout cancelled. Choose a new amount to start another top-up.'),
+      ).toBeVisible();
+      await expect(amountInput).toBeEnabled();
+      expect(f.cancels).toEqual([orderId]);
+      expect(await page.evaluate((key) => localStorage.getItem(key), recoveryKey)).toBeNull();
+      await amountInput.fill('5');
+      await page.getByRole('button', { name: /Continue to Stripe · \$5\.46 ↗/ }).click();
+      await expect(page).toHaveURL(checkoutUrl);
+      expect(f.creates).toHaveLength(1);
+      expect(f.creates[0]!.amountCents).toBe(500);
+      expect(f.unexpected).toEqual([]);
     });
   });
 }
