@@ -1,7 +1,7 @@
 /** Primary documentation reviewed 2026-11-03. Documentation is not an interoperability test. */
 export const AGENT_REVIEW_DATE = '2026-11-03';
 /** Latest live client interoperability evidence recorded on /agents. */
-export const AGENT_EVIDENCE_DATE = '2026-11-27';
+export const AGENT_EVIDENCE_DATE = '2026-11-28';
 export type AgentClient = {
   slug: string;
   name: string;
@@ -29,15 +29,24 @@ export const agentClients: AgentClient[] = [
     name: 'ChatGPT',
     monogram: 'Cg',
     kind: 'Hosted assistant',
+    reviewedAt: '2026-11-28',
     summary: 'Add a custom MCP plugin and authorize a paying workspace in your browser.',
     approach: 'Hosted MCP with OAuth',
     steps: [
-      'On ChatGPT web, open Plugins, select the plus button and Add custom MCP server. Workspace permissions can restrict this option.',
+      'On ChatGPT web, open Plugins (chatgpt.com/plugins), select Add → Add custom MCP server. Workspace permissions can restrict this option.',
       'Name it OpenGen, enter https://opengen.dev/mcp (or your self-hosted gateway’s /mcp URL) and select OAuth. Use dynamic client registration (DCR); OpenGen does not advertise Client ID Metadata Documents.',
-      'Review the plugin, install it and complete OpenGen’s workspace consent. Invoke the installed plugin with @ in a new conversation.',
+      'Select Create as a plugin, choose Continue connecting app to complete OpenGen’s workspace consent, and invoke the installed plugin with @ in a new conversation.',
     ],
     caution:
-      'Hosted OAuth is live on https://opengen.dev; self-hosted gateways need public HTTPS and configured sign-in. Creating a plugin does not verify end-to-end ChatGPT client interoperability.',
+      'Hosted OAuth is live on https://opengen.dev; self-hosted gateways need public HTTPS and configured sign-in. ChatGPT web completed live OAuth DCR + PKCE consent, 7-tool discovery, and read-only balance, catalog_search, and catalog_get calls against https://opengen.dev/mcp on 2026-11-28; billable generation and token refresh remain separately unverified.',
+    verification: {
+      cardLabel: 'Live read-only OAuth MCP verified',
+      badge: 'LIVE READ-ONLY VERIFIED',
+      matrixEvidence:
+        'ChatGPT web (2026-11-28): live OAuth DCR + PKCE consent, 7 tools discovered, and read-only balance, catalog_search, catalog_get verified; generation not run',
+      detailEvidence:
+        'ChatGPT web (2026-11-28): verified live OAuth DCR + PKCE consent, 7-tool discovery, and read-only balance, catalog_search, and catalog_get against https://opengen.dev/mcp. Billable generation not exercised.',
+    },
     source: {
       label: 'Official OpenAI documentation',
       url: 'https://developers.openai.com/api/docs/guides/custom-mcp-server',
@@ -48,15 +57,24 @@ export const agentClients: AgentClient[] = [
     name: 'Claude',
     monogram: 'Cl',
     kind: 'Hosted assistant',
+    reviewedAt: '2026-11-28',
     summary: 'Use a remote connector, with no local installer or provider credentials.',
     approach: 'Remote connector with OAuth',
     steps: [
-      'Open Customize → Connectors and add a custom connector with https://opengen.dev/mcp (or your self-hosted gateway’s /mcp URL). Team and Enterprise setup may require an owner.',
+      'Open Customize → Connectors (or Plugins at claude.ai/plugins/yours) and add a custom connector with https://opengen.dev/mcp (or your self-hosted gateway’s /mcp URL). Team and Enterprise setup may require an owner.',
       'Choose sign-in authentication and Register automatically for the OAuth client. OpenGen supports dynamic registration, not Claude’s published CIMD identity.',
       'Connect, review the OpenGen consent screen and enable the connector for your conversation.',
     ],
     caution:
-      'Remote Claude connections originate from Anthropic’s servers. A gateway reachable only on your laptop or private network cannot serve this path.',
+      'Remote Claude connections originate from Anthropic’s servers. A gateway reachable only on your laptop or private network cannot serve this path. Claude web completed live OAuth DCR + PKCE consent, 7-tool discovery (including the interactive job_get MCP App), and read-only balance, catalog_search, and catalog_get calls against https://opengen.dev/mcp on 2026-11-28; billable generation and token refresh remain separately unverified.',
+    verification: {
+      cardLabel: 'Live read-only OAuth MCP verified',
+      badge: 'LIVE READ-ONLY VERIFIED',
+      matrixEvidence:
+        'Claude web (2026-11-28): live OAuth DCR + PKCE consent, 7 tools discovered (including job_get MCP App), and read-only balance, catalog_search, catalog_get verified; generation not run',
+      detailEvidence:
+        'Claude web (2026-11-28): verified live OAuth DCR + PKCE consent, 7-tool discovery (including job_get MCP App), and read-only balance, catalog_search, and catalog_get against https://opengen.dev/mcp. Billable generation not exercised.',
+    },
     source: {
       label: 'Claude custom connector guide',
       url: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
@@ -67,22 +85,23 @@ export const agentClients: AgentClient[] = [
     name: 'Claude Code',
     monogram: 'Cc',
     kind: 'Local agent',
+    reviewedAt: '2026-11-28',
     summary: 'Register an HTTP MCP server, then use the client’s browser authorization.',
     approach: 'Remote HTTP MCP or OpenGen CLI',
     steps: [
       'Review the HTTP registration command below before running it. It changes Claude Code’s MCP configuration.',
-      'Open /mcp inside Claude Code, choose OpenGen and complete browser sign-in and workspace consent.',
-      'Check connection status and ask for catalog discovery before requesting a generation.',
+      'Run claude mcp login opengen (or open /mcp inside Claude Code), choose OpenGen and complete browser sign-in and workspace consent.',
+      'Check connection status with claude mcp get opengen and ask for catalog discovery before requesting a generation.',
     ],
     caution:
-      'OpenGen accepts registered localhost callbacks with explicit ports, as documented by Claude Code. The complete callback URI must match registration. Claude Code 2.1.301 completed live DCR + S256 PKCE redirect through OpenGen’s consent screen on 2026-11-27; post-consent tool execution and billable generation remain pending.',
+      'OpenGen accepts registered localhost callbacks with explicit ports, as documented by Claude Code. The complete callback URI must match registration. Claude Code 2.1.301 completed live OAuth DCR + S256 PKCE browser login, a Connected MCP status check, and logout against https://opengen.dev/mcp on 2026-11-28; LLM tool execution, token refresh, and billable generation remain pending.',
     verification: {
-      cardLabel: 'Live DCR + consent preflight verified',
-      badge: 'OAUTH PREFLIGHT VERIFIED',
+      cardLabel: 'Live OAuth login + MCP connected',
+      badge: 'LIVE OAUTH CONNECTED',
       matrixEvidence:
-        'Claude Code 2.1.301 (2026-11-27): live DCR + S256 PKCE reached workspace consent; post-consent tool calls pending',
+        'Claude Code 2.1.301 (2026-11-28): live OAuth DCR + PKCE login, Connected MCP health check, and logout verified; LLM tool turn and generation pending',
       detailEvidence:
-        'Claude Code 2.1.301 (2026-11-27): live DCR + S256 PKCE against https://opengen.dev/mcp reached OpenGen workspace consent. Post-consent tool execution and paid generation are pending.',
+        'Claude Code 2.1.301 (2026-11-28): verified live OAuth DCR + S256 PKCE browser login, Connected MCP status check (claude mcp get), and logout against https://opengen.dev/mcp. LLM tool execution, token refresh, and billable generation remain pending.',
     },
     source: { label: 'Claude Code MCP documentation', url: 'https://code.claude.com/docs/en/mcp' },
     snippet: (origin) => ({
@@ -209,7 +228,7 @@ export const agentClients: AgentClient[] = [
     name: 'Hermes Agent',
     monogram: 'He',
     kind: 'Local agent',
-    reviewedAt: '2026-11-27',
+    reviewedAt: '2026-11-28',
     summary: 'Register the remote OAuth MCP server with the Hermes CLI or config.yaml.',
     approach: 'HTTP MCP with OAuth or OpenGen CLI',
     steps: [
@@ -218,14 +237,14 @@ export const agentClients: AgentClient[] = [
       'Check connection and tool discovery with hermes mcp test opengen before allowing generation. Remote or headless sessions may need a different callback arrangement.',
     ],
     caution:
-      'Hermes Agent v0.16.0 completed live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE loopback authorization initiation against https://opengen.dev/mcp on 2026-11-27; post-consent token refresh, tool execution, and billable generation remain pending.',
+      'Hermes Agent v0.16.0 completed live OAuth 2.1 PKCE browser login (hermes mcp add --auth oauth) and live tool discovery via hermes mcp test opengen (7/7 tools discovered) against https://opengen.dev/mcp on 2026-11-28; tool invocation, token refresh, and billable generation remain pending.',
     verification: {
-      cardLabel: 'Live DCR + PKCE preflight verified',
-      badge: 'OAUTH PREFLIGHT VERIFIED',
+      cardLabel: 'Live OAuth + 7/7 tools discovered',
+      badge: 'LIVE OAUTH + TOOLS VERIFIED',
       matrixEvidence:
-        'Hermes Agent v0.16.0 (2026-11-27): live discovery + DCR + S256 PKCE loopback auth initiated; post-consent tool calls pending',
+        'Hermes Agent v0.16.0 (2026-11-28): live OAuth 2.1 PKCE login and hermes mcp test opengen verified 7/7 tools discovered; tool invocation and generation pending',
       detailEvidence:
-        'Hermes Agent v0.16.0 (2026-11-27): live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE authorization initiated against https://opengen.dev/mcp. Post-consent token refresh, tool execution, and paid generation remain pending.',
+        'Hermes Agent v0.16.0 (2026-11-28): verified live OAuth 2.1 PKCE browser login (hermes mcp add --auth oauth) and hermes mcp test opengen (Connected, 7/7 tools discovered) against https://opengen.dev/mcp. Tool invocation, token refresh, and billable generation remain pending.',
     },
     source: {
       label: 'Hermes MCP documentation',
@@ -312,7 +331,7 @@ export const agentClients: AgentClient[] = [
     name: 'CLI & API',
     monogram: '>_',
     kind: 'CLI / API',
-    reviewedAt: '2026-11-27',
+    reviewedAt: '2026-11-28',
     summary: 'Use the portable CLI with browser login, or create one scoped workspace API key.',
     approach: 'OpenGen browser PKCE login / scoped API key',
     steps: [
@@ -321,14 +340,14 @@ export const agentClients: AgentClient[] = [
       'For a backend API integration, create a separate expiring read/generate key in Workspace → API keys (/app#keys). Save it once as OPENGEN_API_KEY in your secret manager and send it only in the Authorization header.',
     ],
     caution:
-      '@opengen-dev/cli 0.1.2 is published on npm and verified from a clean isolated install on 2026-11-27 for unauthenticated catalog search, doctor, and opengen login live DCR + S256 PKCE initiation against https://opengen.dev; post-consent browser login remains pending. New personal workspaces start with $0 managed credit. Do not pass tokens in command arguments, URLs or checked-in files.',
+      '@opengen-dev/cli 0.1.2 is published on npm and completed live read-only verification from a clean isolated install on 2026-11-28: browser opengen login (read/generate), authenticated opengen doctor, balance, catalog search, and opengen logout with server revocation against https://opengen.dev; billable generation was not run. New personal workspaces start with $0 managed credit. Do not pass tokens in command arguments, URLs or checked-in files.',
     verification: {
-      cardLabel: 'Live npm install + DCR preflight verified',
-      badge: 'OAUTH PREFLIGHT VERIFIED',
+      cardLabel: 'Live read-only browser login verified',
+      badge: 'LIVE READ-ONLY VERIFIED',
       matrixEvidence:
-        '@opengen-dev/cli 0.1.2 (2026-11-27): npm clean install, unauthenticated catalog search/doctor, and opengen login DCR + S256 PKCE preflight verified; post-consent browser login pending',
+        '@opengen-dev/cli 0.1.2 (2026-11-28): clean npm install, live browser login, authenticated doctor, balance, catalog search, and logout + revocation verified; generation not run',
       detailEvidence:
-        '@opengen-dev/cli 0.1.2 (2026-11-27): published on npm and verified from a clean isolated install for --version, catalog search, doctor, and opengen login live discovery + DCR (HTTP 201) + S256 PKCE loopback initiation against https://opengen.dev. Post-consent browser login remains pending.',
+        '@opengen-dev/cli 0.1.2 (2026-11-28): verified clean npm install, live browser opengen login, authenticated doctor, balance, catalog search, and opengen logout (server revocation + post-logout 401 check) against https://opengen.dev. Billable generation not exercised.',
     },
     source: { label: 'OpenGen CLI guide', url: '/docs#agents' },
     snippet: (origin) => ({
