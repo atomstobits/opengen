@@ -306,6 +306,26 @@ describe('frontend proxy authorization and media negotiation', () => {
       expect(response.headers.get('access-control-allow-methods')).toBe('POST, OPTIONS');
     }
     expect(registeredBackendPath('/.well-known/oauth-authorization-server', 'GET')).toBe(true);
+    expect(registeredBackendPath('/.well-known/oauth-authorization-server', 'HEAD')).toBe(true);
+    expect(registeredBackendPath('/.well-known/oauth-authorization-server', 'OPTIONS')).toBe(true);
+    expect(registeredBackendPath('/.well-known/oauth-protected-resource', 'OPTIONS')).toBe(true);
+    expect(registeredBackendPath('/.well-known/oauth-protected-resource/mcp', 'OPTIONS')).toBe(
+      true,
+    );
+    expect(registeredBackendPath('/.well-known/oauth-authorization-server', 'POST')).toBe(false);
+    for (const path of [
+      '/.well-known/oauth-authorization-server',
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-protected-resource/mcp',
+    ]) {
+      const preflight = await forward(
+        new Request(`https://opengen.example${path}`, { method: 'OPTIONS' }),
+        path,
+      );
+      expect(preflight.status).toBe(204);
+      expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+      expect(preflight.headers.has('access-control-allow-credentials')).toBe(false);
+    }
     expect(registeredBackendPath('/oauth/authorize?client_id=public-client', 'GET')).toBe(true);
     expect(nativeRoute('/v1/oauth/grants')?.methods).toContain('GET');
     const count = calls.length;

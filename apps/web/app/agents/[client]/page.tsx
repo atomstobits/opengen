@@ -21,6 +21,7 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
   const client = findAgentClient((await params).client);
   if (!client) notFound();
   const origin = siteOrigin();
+  const reviewedAt = client.reviewedAt ?? AGENT_REVIEW_DATE;
   const snippet = client.snippet?.(origin);
   const secondarySnippet = client.secondarySnippet?.(origin);
   const bindingCommand = ['cursor', 'claude-code'].includes(client.slug)
@@ -88,7 +89,10 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
                 <pre>
                   <code>{secondarySnippet.code}</code>
                 </pre>
-                <CopyButton text={secondarySnippet.code} label="Copy quote & generate" />
+                <CopyButton
+                  text={secondarySnippet.code}
+                  label={client.slug === 'cli' ? 'Copy quote & generate' : 'Copy configuration'}
+                />
               </div>
             )}
             {bindingCommand && (
@@ -115,7 +119,7 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
             </div>
             <p className={styles.source}>
               Instructions based on <a href={client.source.url}>{client.source.label} ↗</a>,
-              reviewed {AGENT_REVIEW_DATE}. Client interfaces and permissions can change.
+              reviewed {reviewedAt}. Client interfaces and permissions can change.
             </p>
             {client.slug === 'cli' ? (
               <p>
@@ -142,7 +146,7 @@ export default async function AgentSetupPage({ params }: { params: Promise<{ cli
             <dl className={styles.evidence}>
               <div>
                 <dt>Documentation reviewed</dt>
-                <dd>{AGENT_REVIEW_DATE}</dd>
+                <dd>{reviewedAt}</dd>
               </div>
               <div>
                 <dt>Actual client / version / test date</dt>

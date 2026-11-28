@@ -7,6 +7,7 @@ export type AgentClient = {
   name: string;
   monogram: string;
   kind: 'Hosted assistant' | 'Local agent' | 'CLI / API';
+  reviewedAt?: string;
   summary: string;
   approach: string;
   steps: string[];
@@ -141,6 +142,52 @@ export const agentClients: AgentClient[] = [
     }),
   },
   {
+    slug: 'muse',
+    name: 'Muse',
+    monogram: 'Mu',
+    kind: 'Local agent',
+    reviewedAt: '2026-11-27',
+    summary:
+      'Add a Streamable HTTP MCP server in Muse Code with native OAuth, or connect in Meta Muse.',
+    approach: 'Streamable HTTP MCP (OAuth DCR)',
+    steps: [
+      'In Muse Code, run the add and login commands below (or merge the mcpServers entry with "schema_version": 1 into ~/.config/muse/settings.json). Use --headless on remote or SSH sessions.',
+      'Complete OpenGen browser sign-in and workspace consent, then run muse mcp list or /mcp inside Muse Code to confirm tools load.',
+      'In hosted Meta Muse, open Settings → Connectors → Add custom connector, choose remote Streamable HTTP with https://opengen.dev/mcp, and complete OAuth sign-in.',
+    ],
+    caution:
+      'Muse Code settings.json requires top-level "schema_version": 1 alongside mcpServers. Muse Code 1.4.25 completed live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE loopback authorization initiation against https://opengen.dev/mcp on 2026-11-27; post-consent tool execution, hosted Meta Muse connectors, and billable generation remain pending.',
+    verification: {
+      cardLabel: 'Live DCR + PKCE preflight verified',
+      badge: 'OAUTH PREFLIGHT VERIFIED',
+      matrixEvidence:
+        'Muse Code 1.4.25 (2026-11-27): live discovery + DCR + S256 PKCE loopback auth initiated; post-consent tool calls and hosted Meta Muse pending',
+      detailEvidence:
+        'Muse Code 1.4.25 (2026-11-27): live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE authorization initiated against https://opengen.dev/mcp. Post-consent tool execution, hosted Meta Muse connector, and paid generation remain pending.',
+    },
+    source: { label: 'Meta AI developer documentation', url: 'https://dev.meta.ai/docs' },
+    snippet: (origin) => ({
+      label: 'Muse Code CLI commands · review before running',
+      code: `muse mcp add opengen --url ${origin}/mcp --user\nmuse mcp login opengen`,
+    }),
+    secondarySnippet: (origin) => ({
+      label: 'Equivalent ~/.config/muse/settings.json entry',
+      code: JSON.stringify(
+        {
+          schema_version: 1,
+          mcpServers: {
+            opengen: {
+              type: 'streamable-http',
+              url: `${origin}/mcp`,
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    }),
+  },
+  {
     slug: 'openclaw',
     name: 'OpenClaw',
     monogram: 'Oc',
@@ -162,21 +209,34 @@ export const agentClients: AgentClient[] = [
     name: 'Hermes Agent',
     monogram: 'He',
     kind: 'Local agent',
-    summary: 'Use the documented remote OAuth configuration and a browser sign-in.',
+    reviewedAt: '2026-11-27',
+    summary: 'Register the remote OAuth MCP server with the Hermes CLI or config.yaml.',
     approach: 'HTTP MCP with OAuth or OpenGen CLI',
     steps: [
-      'Review a change to Hermes config.yaml under mcp_servers. Merge the URL and auth: oauth entry below without replacing other configuration.',
-      'From a fresh terminal, run hermes mcp login opengen and complete OpenGen’s browser consent.',
-      'Check connection and tool discovery before allowing generation. Remote or headless sessions may need a different callback arrangement.',
+      'Run the Hermes CLI command below (or merge the mcp_servers entry into Hermes config.yaml without replacing other configuration).',
+      'Complete OpenGen’s browser sign-in and workspace consent when prompted, or run hermes mcp login opengen from a fresh terminal.',
+      'Check connection and tool discovery with hermes mcp test before allowing generation. Remote or headless sessions may need a different callback arrangement.',
     ],
     caution:
-      'Hermes documents automatic DCR fallback when CIMD is absent. This is a candidate integration; callback handling, token refresh and tool calls have not been tested with OpenGen.',
+      'Hermes Agent v0.16.0 completed live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE loopback authorization initiation against https://opengen.dev/mcp on 2026-11-27; post-consent token refresh, tool execution, and billable generation remain pending.',
+    verification: {
+      cardLabel: 'Live DCR + PKCE preflight verified',
+      badge: 'OAUTH PREFLIGHT VERIFIED',
+      matrixEvidence:
+        'Hermes Agent v0.16.0 (2026-11-27): live discovery + DCR + S256 PKCE loopback auth initiated; post-consent tool calls pending',
+      detailEvidence:
+        'Hermes Agent v0.16.0 (2026-11-27): live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE authorization initiated against https://opengen.dev/mcp. Post-consent token refresh, tool execution, and paid generation remain pending.',
+    },
     source: {
       label: 'Hermes MCP documentation',
       url: 'https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp',
     },
     snippet: (origin) => ({
-      label: 'Entry to merge into your existing YAML settings',
+      label: 'Client configuration command · review before running',
+      code: `hermes mcp add opengen --url ${origin}/mcp --auth oauth`,
+    }),
+    secondarySnippet: (origin) => ({
+      label: 'Equivalent config.yaml entry to merge into your settings',
       code: `mcp_servers:\n  opengen:\n    url: "${origin}/mcp"\n    auth: oauth`,
     }),
   },
@@ -224,25 +284,35 @@ export const agentClients: AgentClient[] = [
     name: 'Grok Bot',
     monogram: 'Gb',
     kind: 'Hosted assistant',
-    summary: 'A documented custom MCP path, pending OpenGen-specific verification.',
-    approach: 'Custom remote MCP, unverified',
+    reviewedAt: '2026-11-27',
+    summary: 'Add OpenGen as a custom Remote HTTPS MCP connector in Grok Bot or Grok CLI.',
+    approach: 'Custom Remote HTTPS MCP (OAuth DCR)',
     steps: [
-      'Use the client’s custom MCP setup to add your configured gateway’s /mcp URL. The official guide also allows asking a Bot to add a server by URL.',
-      'Review any configuration change, then use the client’s authentication card to sign in and choose the OpenGen workspace.',
-      'Check tool discovery before generation. Installing an app and completing authorization are separate steps.',
+      'In Grok Bot, open Connect apps, scroll to the bottom, and select Add a custom connector — or ask a Bot in chat to add a custom remote MCP server named OpenGen at https://opengen.dev/mcp.',
+      'Enter OpenGen as the name, choose Remote HTTPS, set Server URL to https://opengen.dev/mcp (or your self-hosted gateway’s /mcp URL), leave Client ID and Client secret blank for OAuth dynamic client registration, and select Add plugin.',
+      'Click Authenticate on the OpenGen card to complete sign-in and workspace consent, then test read-only catalog discovery before requesting any generation.',
     ],
     caution:
-      'Treg references Grok Bot, but that does not establish OpenGen compatibility. OAuth registration, callback, scopes and billable-tool confirmations need a real client test. No OpenGen marketplace plugin is published.',
+      'No OpenGen marketplace plugin is published for Grok Bot. Live OAuth registration, callback handling, token refresh, tool discovery, and billable-tool confirmations remain pending a real Grok Bot desktop or Grok CLI client test.',
     source: {
       label: 'Grok Bot app documentation',
       url: 'https://docs.x.ai/grok-bot/computer-and-apps',
     },
+    snippet: (origin) => ({
+      label: 'Grok CLI registration command · review before running',
+      code: `grok mcp add --transport http opengen ${origin}/mcp`,
+    }),
+    secondarySnippet: (origin) => ({
+      label: 'Equivalent ~/.grok/config.toml entry',
+      code: `[mcp_servers.opengen]\nurl = "${origin}/mcp"`,
+    }),
   },
   {
     slug: 'cli',
     name: 'CLI & API',
     monogram: '>_',
     kind: 'CLI / API',
+    reviewedAt: '2026-11-27',
     summary: 'Use the portable CLI with browser login, or create one scoped workspace API key.',
     approach: 'OpenGen browser PKCE login / scoped API key',
     steps: [
@@ -251,7 +321,15 @@ export const agentClients: AgentClient[] = [
       'For a backend API integration, create a separate expiring read/generate key in Workspace → API keys (/app#keys). Save it once as OPENGEN_API_KEY in your secret manager and send it only in the Authorization header.',
     ],
     caution:
-      'Local protocol fixtures cover login and private-profile behavior, not a deployed identity provider. New personal workspaces start with $0 managed credit. Do not pass tokens in command arguments, URLs or checked-in files.',
+      '@opengen-dev/cli 0.1.2 is published on npm and verified from a clean isolated install on 2026-11-27 for unauthenticated catalog search, doctor, and opengen login live DCR + S256 PKCE initiation against https://opengen.dev; post-consent browser login remains pending. New personal workspaces start with $0 managed credit. Do not pass tokens in command arguments, URLs or checked-in files.',
+    verification: {
+      cardLabel: 'Live npm install + DCR preflight verified',
+      badge: 'OAUTH PREFLIGHT VERIFIED',
+      matrixEvidence:
+        '@opengen-dev/cli 0.1.2 (2026-11-27): npm clean install, unauthenticated catalog search/doctor, and opengen login DCR + S256 PKCE preflight verified; post-consent browser login pending',
+      detailEvidence:
+        '@opengen-dev/cli 0.1.2 (2026-11-27): published on npm and verified from a clean isolated install for --version, catalog search, doctor, and opengen login live discovery + DCR (HTTP 201) + S256 PKCE loopback initiation against https://opengen.dev. Post-consent browser login remains pending.',
+    },
     source: { label: 'OpenGen CLI guide', url: '/docs#agents' },
     snippet: (origin) => ({
       label: 'Sign in, diagnose your workspace, and search the catalog',
