@@ -142,54 +142,79 @@ function AppAuthorizations({
   }
   return (
     <section className="workspace-settings" aria-label="Connected apps">
-      <div className="settings-section-heading">
-        <h2>Your connected apps.</h2>
-        <p>
-          Review the apps authorized for this workspace. Revoking an app stops its access and
-          refresh tokens; it does not cancel accepted generations. API keys are managed separately.
+      <div className="settings-section-heading apps-section-header">
+        <div>
+          <h2>Your connected apps.</h2>
+          <p>
+            Review the apps authorized for this workspace. Revoking an app stops its access and
+            refresh tokens; it does not cancel accepted generations. API keys are managed
+            separately.
+          </p>
+        </div>
+        <div className="apps-header-actions">
+          <a href="/agents" className="button button-outline button-sm">
+            Connect an agent ↗
+          </a>
+          <button
+            className="button button-outline button-sm"
+            disabled={loading || Boolean(busy)}
+            onClick={() => setRefresh((value) => value + 1)}
+          >
+            Refresh apps
+          </button>
+        </div>
+      </div>
+      {error && (
+        <p className="error-notice" role="alert">
+          {error}
         </p>
-      </div>
-      <a href="/agents" className="text-link">
-        Connect an agent ↗
-      </a>
-      {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
-      {loading && <p role="status">Loading app authorizations…</p>}
-      <div className="settings-records">
-        {grants.map((grant) => (
-          <article key={grant.id}>
-            <div>
-              <strong>{grant.client_name}</strong>
-              <p>{grant.scopes.join(' · ')}</p>
-              <small>
-                {grant.revoked_at
-                  ? 'Revoked'
-                  : `Expires ${new Date(grant.expires_at).toLocaleString()}`}
-              </small>
-            </div>
-            {!grant.revoked_at && (
-              <button
-                className="button button-outline button-sm"
-                disabled={Boolean(busy)}
-                onClick={() => revoke(grant.id)}
-                aria-label={`Revoke ${grant.client_name}`}
-              >
-                {busy === grant.id ? 'Revoking…' : 'Revoke access'}
-              </button>
-            )}
-          </article>
-        ))}
-      </div>
-      {!loading && !grants.length && (
-        <p>No connected apps yet. Start with your agent’s setup guide.</p>
       )}
-      <button
-        className="button button-outline button-sm"
-        disabled={loading || Boolean(busy)}
-        onClick={() => setRefresh((value) => value + 1)}
-      >
-        Refresh apps
-      </button>
+      {notice && (
+        <p className="recovery-notice" role="status">
+          {notice}
+        </p>
+      )}
+      {loading && (
+        <p className="detail-note" role="status">
+          Loading app authorizations…
+        </p>
+      )}
+      {grants.length > 0 && (
+        <div className="settings-records">
+          {grants.map((grant) => (
+            <article key={grant.id}>
+              <div>
+                <strong>{grant.client_name}</strong>
+                <p>{grant.scopes.join(' · ')}</p>
+                <small>
+                  {grant.revoked_at
+                    ? 'Revoked'
+                    : `Expires ${new Date(grant.expires_at).toLocaleString()}`}
+                </small>
+              </div>
+              {!grant.revoked_at && (
+                <button
+                  className="button button-outline button-sm"
+                  disabled={Boolean(busy)}
+                  onClick={() => revoke(grant.id)}
+                  aria-label={`Revoke ${grant.client_name}`}
+                >
+                  {busy === grant.id ? 'Revoking…' : 'Revoke access'}
+                </button>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+      {!loading && !grants.length && (
+        <div className="workspace-empty">
+          <h3>No connected apps yet.</h3>
+          <p>Start with your agent’s setup guide to authorize Claude Code, Codex, or Cursor.</p>
+          <a href="/agents" className="text-link">
+            Open agent setup guide ↗
+          </a>
+        </div>
+      )}
     </section>
   );
 }

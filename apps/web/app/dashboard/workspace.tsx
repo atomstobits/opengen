@@ -2,19 +2,20 @@
 
 import { GovernanceSettings } from '../governance/settings';
 
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import type { Job } from '@media-router/contracts';
 import { GatewayAccess, type BrowserSession } from '../gateway-access';
 import { FirstSteps } from '../onboarding/journey';
 import { WorkspaceSettings } from './settings';
 import { PrivateActivity } from './activity';
 import { readApiJson } from './api-response';
-import { hasWorkspaceAuthority, privateWorkspaceHeaders } from './activity-view';
+import { hasWorkspaceAuthority, privateWorkspaceHeaders, type ActivityItem } from './activity-view';
 import { WorkspaceOperations } from './operations';
 import { ConnectedApps } from './connected-apps';
+import { WorkspaceOverview } from './overview';
 import onboarding from '../onboarding/onboarding.module.css';
 import { WorkspaceAdministration } from './team';
-import { Footer, Icon, SiteHeader } from '../ui';
+import { CopyButton, Footer, Icon, SiteHeader } from '../ui';
 
 const money = (value: number | string) =>
   `$${(Number(value) / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
@@ -25,6 +26,8 @@ type Entry = {
   job_id?: string;
   kind: string;
   amount_micros: string;
+  available_delta_micros?: string | number | null;
+  reserved_delta_micros?: string | number | null;
   created_at: string;
 };
 type WorkspaceView = 'start' | 'generations' | 'ledger' | 'team' | 'settings' | 'keys' | 'apps';
@@ -61,20 +64,49 @@ const workspaceNavigation: {
   },
 ];
 const appTitles: Record<WorkspaceView, string> = {
-  start: 'Start',
+  start: 'Overview',
   generations: 'Activity',
   ledger: 'Activity',
-  team: 'Team',
-  settings: 'Team',
+  team: 'Team & workspaces',
+  settings: 'Team & workspaces',
   keys: 'API keys',
   apps: 'Connected apps',
 };
 
+function workspaceDescriptor(workspaceId?: string) {
+  if (!workspaceId)
+    return { label: 'Workspace', badge: 'O', kind: 'default' as const, shortId: '' };
+  if (workspaceId.startsWith('user-')) {
+    const shortId =
+      workspaceId.length > 18
+        ? `${workspaceId.slice(0, 10)}…${workspaceId.slice(-4)}`
+        : workspaceId;
+    return { label: 'Personal workspace', badge: 'P', kind: 'personal' as const, shortId };
+  }
+  if (workspaceId.startsWith('team-')) {
+    const shortId =
+      workspaceId.length > 18
+        ? `${workspaceId.slice(0, 10)}…${workspaceId.slice(-4)}`
+        : workspaceId;
+    return { label: 'Team workspace', badge: 'T', kind: 'team' as const, shortId };
+  }
+  const shortId =
+    workspaceId.length > 20 ? `${workspaceId.slice(0, 12)}…${workspaceId.slice(-4)}` : workspaceId;
+  return {
+    label: workspaceId,
+    badge: workspaceId.slice(0, 1).toUpperCase() || 'W',
+    kind: 'default' as const,
+    shortId,
+  };
+}
+
 export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
   const [authenticated, setAuthenticated] = useState(false);
   const [session, setSession] = useState<BrowserSession | null>(null);
-  const [hasGenerations, setHasGenerations] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [hasMoreActivity, setHasMoreActivity] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const pendingInspectId = useRef<{ jobId: string; authority: string } | null>(null);
   const [balance, setBalance] = useState<Balance | null>(null);
   const [ledger, setLedger] = useState<Entry[]>([]);
   const [tab, setTab] = useState<WorkspaceView>(appMode ? 'start' : 'generations');
@@ -85,6 +117,7 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(false);
   const workspaceId = session?.workspaceId;
+  const hasGenerations = recentActivity.length > 0;
   const authority = authenticated
     ? (session?.recoveryScope ??
       JSON.stringify([workspaceId, session?.membershipId, session?.scopes]))
@@ -106,6 +139,7 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
   const currentData = canLoadData && loadedWorkspaceId === authority;
   const currentBalance = currentData ? balance : null;
   const currentLedger = currentData ? ledger : [];
+  const currentRecent = currentData ? recentActivity : [];
   const selectedJob =
     currentData && tab === 'generations' && selected && selected.authority === authority
       ? selected.job
@@ -125,6 +159,20 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
     return () => window.removeEventListener('hashchange', update);
   }, [appMode]);
   useEffect(() => {
+    if (
+      authenticated &&
+      hasReadPermission &&
+      tab === 'generations' &&
+      pendingInspectId.current &&
+      pendingInspectId.current.authority === authority
+    ) {
+      const nextId = pendingInspectId.current.jobId;
+      pendingInspectId.current = null;
+      setSelected(null);
+      setSelectedId(nextId);
+      return;
+    }
+    pendingInspectId.current = null;
     setSelected(null);
     setSelectedId(null);
   }, [authenticated, authority, tab, hasReadPermission]);
@@ -132,7 +180,8 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
     setError('');
     setLoadedWorkspaceId(null);
     if (!canLoadData || !workspaceId) {
-      setHasGenerations(false);
+      setRecentActivity([]);
+      setHasMoreActivity(false);
       setBalance(null);
       setLedger([]);
       setLoading(false);
@@ -151,13 +200,14 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
       });
     }
     Promise.all([
-      load<{ items: unknown[] }>('/api/activity?limit=1'),
+      load<{ items: ActivityItem[]; nextCursor?: string | null }>('/api/activity?limit=5'),
       load<Balance>('/api/balance'),
       load<Entry[]>('/api/ledger'),
     ])
       .then(([nextJobs, nextBalance, nextLedger]) => {
         if (controller.signal.aborted) return;
-        setHasGenerations(Array.isArray(nextJobs.items) && nextJobs.items.length > 0);
+        setRecentActivity(Array.isArray(nextJobs.items) ? nextJobs.items : []);
+        setHasMoreActivity(Boolean(nextJobs.nextCursor));
         setBalance(nextBalance);
         setLedger(Array.isArray(nextLedger) ? nextLedger : []);
         setLoadedWorkspaceId(authority);
@@ -194,21 +244,62 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
       });
     return () => controller.abort();
   }, [selectedId, canLoadData, workspaceId, authority]);
+
+  const wsInfo = workspaceDescriptor(workspaceId);
+  const isZeroCredit = currentBalance !== null && currentBalance.availableMicros <= 0;
+
+  const inspectFromOverview = (jobId: string) => {
+    pendingInspectId.current = { jobId, authority };
+    setTab('generations');
+    if (appMode) window.location.hash = 'activity';
+  };
+
   const summary = (
     <div className="workspace-stats">
       <div>
         <span>Available credit</span>
         <strong>{currentBalance ? money(currentBalance.availableMicros) : '—'}</strong>
+        {appMode && (
+          <a className="workspace-stat-link" href="/billing">
+            {isZeroCredit ? '+ Add credit →' : 'Manage billing →'}
+          </a>
+        )}
       </div>
       <div>
         <span>Reserved for jobs</span>
         <strong>{currentBalance ? money(currentBalance.reservedMicros) : '—'}</strong>
+        {appMode && (
+          <small className="workspace-stat-note">
+            {currentBalance === null
+              ? loading
+                ? 'Loading hold status…'
+                : 'Hold status unavailable'
+              : currentBalance.reservedMicros > 0
+                ? 'Active hold on pending jobs'
+                : 'No active holds'}
+          </small>
+        )}
       </div>
       <div>
         <span>Recent generations</span>
-        <strong>
-          <a href="/app#activity">View history</a>
-        </strong>
+        {appMode ? (
+          <>
+            <strong>
+              {currentData ? `${currentRecent.length}${hasMoreActivity ? '+' : ''}` : '—'}
+            </strong>
+            {tab === 'start' ? (
+              <a className="workspace-stat-link" href="/app#activity">
+                View activity →
+              </a>
+            ) : (
+              <small className="workspace-stat-note">Private to this workspace</small>
+            )}
+          </>
+        ) : (
+          <strong>
+            <a href="/app#activity">View history</a>
+          </strong>
+        )}
       </div>
     </div>
   );
@@ -226,61 +317,107 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
       >
         <div className={appMode && authenticated ? 'account-layout' : undefined}>
           {appMode && authenticated && (
-            <nav className="account-sidebar" aria-label="Account navigation">
+            <aside className="account-sidebar">
               <div className="account-context">
-                <span className="account-context-mark" aria-hidden="true">
-                  O
+                <span
+                  className={`account-context-mark account-context-mark-${wsInfo.kind}`}
+                  aria-hidden="true"
+                >
+                  {wsInfo.badge}
                 </span>
-                <div>
-                  <strong>Workspace</strong>
-                  <span>Private to your team</span>
+                <div className="account-context-meta">
+                  <div className="account-context-title">
+                    <strong>{wsInfo.label}</strong>
+                    {session?.role && (
+                      <span className="account-role-tag">{session.role.toUpperCase()}</span>
+                    )}
+                  </div>
+                  {workspaceId && (
+                    <div className="account-context-id-row">
+                      {wsInfo.shortId !== wsInfo.label && (
+                        <code title={workspaceId}>{wsInfo.shortId}</code>
+                      )}
+                      <CopyButton text={workspaceId} label="Copy ID" />
+                    </div>
+                  )}
                 </div>
               </div>
-              {workspaceNavigation.map((group) => (
-                <div className="account-nav-group" key={group.label}>
-                  <span>{group.label}</span>
-                  {group.links.map((link) => (
-                    <a
-                      key={link.path}
-                      href={link.path}
-                      aria-current={link.views.includes(tab) ? 'page' : undefined}
-                    >
-                      <Icon name={link.icon} size={16} />
-                      {link.label}
-                    </a>
-                  ))}
-                </div>
-              ))}
-              {workspaceId && (
-                <p className="account-workspace-id">
-                  <span>Selected workspace</span>
-                  <strong>{workspaceId}</strong>
-                </p>
-              )}
-            </nav>
+              <nav className="account-nav-groups" aria-label="Account navigation">
+                {workspaceNavigation.map((group) => (
+                  <div className="account-nav-group" key={group.label}>
+                    <span>{group.label}</span>
+                    {group.links.map((link) => (
+                      <a
+                        key={link.path}
+                        href={link.path}
+                        aria-current={link.views.includes(tab) ? 'page' : undefined}
+                      >
+                        <Icon name={link.icon} size={16} />
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                ))}
+              </nav>
+              <div className="account-sidebar-footer">
+                <a href="/playground">
+                  <Icon name="spark" size={14} /> Playground
+                </a>
+                <a href="/models">
+                  <Icon name="globe" size={14} /> Models
+                </a>
+                <a href="/docs/api">
+                  <Icon name="code" size={14} /> API docs
+                </a>
+              </div>
+            </aside>
           )}
           <div className={appMode ? 'account-content' : undefined}>
             <header className={appMode ? 'account-view-header' : 'workspace-heading'}>
               <div>
                 <span className="eyebrow">
-                  {appMode ? 'Workspace / ' + appTitles[tab] : 'YOUR WORKSPACE'}
+                  {appMode ? 'WORKSPACE / ' + appTitles[tab].toUpperCase() : 'YOUR WORKSPACE'}
                 </span>
                 <h1>{appMode ? appTitles[tab] : 'From idea to output.'}</h1>
                 <p>
                   {appMode && tab === 'start'
-                    ? 'Connect your tools, create in your browser and keep your work together.'
+                    ? 'Balance, recent generations, and quick access across browser, agents, and API.'
                     : appMode && (tab === 'team' || tab === 'settings')
-                      ? 'Manage your workspace, invitations and team access.'
+                      ? 'Switch workspaces, invite teammates, and configure webhooks or alerts.'
                       : appMode && tab === 'keys'
-                        ? 'Create a separate, scoped key for each application or workflow.'
+                        ? 'Create scoped API keys, set monthly spend caps, and pin routing rules.'
                         : appMode && tab === 'apps'
-                          ? 'Review the agents and applications connected to your workspace.'
-                          : 'Your generations, reserved credit and the record behind every charge.'}
+                          ? 'Review or revoke OAuth and MCP agents authorized for this workspace.'
+                          : 'Your private generation history, active holds, and itemized usage ledger.'}
                 </p>
               </div>
-              <a className="button button-dark" href="/playground">
-                Create something <Icon name="arrow" size={17} />
-              </a>
+              <div className="account-header-actions">
+                {appMode && tab === 'keys' ? (
+                  <>
+                    <a className="button button-outline button-sm" href="/docs/api">
+                      API docs
+                    </a>
+                    <a className="button button-dark button-sm" href="/agents">
+                      Agent &amp; CLI setup <Icon name="arrow" size={15} />
+                    </a>
+                  </>
+                ) : appMode && tab === 'apps' ? (
+                  <a className="button button-dark button-sm" href="/agents">
+                    Connect an agent <Icon name="arrow" size={15} />
+                  </a>
+                ) : (
+                  <>
+                    {appMode && (
+                      <a className="button button-outline button-sm" href="/billing">
+                        <Icon name="plus" size={14} /> Add credit
+                      </a>
+                    )}
+                    <a className="button button-dark button-sm" href="/playground">
+                      Create in Playground <Icon name="arrow" size={15} />
+                    </a>
+                  </>
+                )}
+              </div>
             </header>
             <GatewayAccess onChange={setAuthenticated} onSession={setSession} />
             {authenticated && canLoadData && error && (
@@ -293,9 +430,14 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
                 <>
                   {summary}
                   {!hasReadPermission && activityPermission}
-                  <FirstSteps
-                    hasGenerations={currentData && hasGenerations}
-                    hasCredit={(currentBalance?.availableMicros ?? 0) > 0}
+                  <WorkspaceOverview
+                    availableMicros={currentBalance ? currentBalance.availableMicros : null}
+                    hasReadPermission={hasReadPermission}
+                    canManageKeys={Boolean(session?.scopes?.includes('keys:write'))}
+                    recentActivity={currentRecent}
+                    recentLedger={currentLedger}
+                    loading={loading}
+                    onInspectJob={inspectFromOverview}
                   />
                 </>
               ) : appMode && (tab === 'team' || tab === 'settings') ? (
@@ -372,6 +514,7 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
                           recoveryScope={session.recoveryScope}
                           permissions={session.scopes}
                           keysOnly
+                          embedded={appMode}
                         />
                         <GovernanceSettings
                           workspaceId={authenticated ? (session.workspaceId ?? null) : null}
@@ -394,6 +537,7 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
                       key={`${authority}:${refresh}`}
                       {...privateIdentity}
                       onSelectJob={setSelectedId}
+                      embedded={appMode}
                     />
                   ) : (
                     <div className="workspace-table-wrap">
