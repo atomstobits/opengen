@@ -9,7 +9,7 @@ import {
   type Route,
 } from '@media-router/contracts';
 import { previewProcessingFee, type ProcessingFeePreview } from '../billing/billing-client';
-import { regionNames } from '../route-identity';
+import { formatDisclosedRegion } from '../route-identity';
 import { formatRouteUnitPrice, resolveDisplayedRouteRate } from '../route-pricing-comparison';
 import { canonicalUrl } from '../seo';
 
@@ -37,7 +37,7 @@ export interface PricingHighlightRow {
   readonly href: string;
   readonly providerName: string;
   readonly official: boolean;
-  readonly region: string;
+  readonly region: string | null;
   readonly status: 'live-verified' | 'documented';
   readonly scopeLabel: string;
   readonly priceLabel: string;
@@ -168,7 +168,7 @@ export function formatRoutePricingHighlight(
     href: seriesHref(model.id) ?? '/models',
     providerName: provider.name,
     official: model.authorProviderIds.includes(deployment.providerId),
-    region: regionNames[deployment.endpointRegion] ?? deployment.endpointRegion,
+    region: formatDisclosedRegion(deployment.endpointRegion),
     status: route.status === 'live-verified' ? 'live-verified' : 'documented',
     scopeLabel: scopeParts.join(' · ') || 'See route details',
     priceLabel,

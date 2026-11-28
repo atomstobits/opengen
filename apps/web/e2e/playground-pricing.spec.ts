@@ -85,7 +85,7 @@ for (const viewport of [
       await expect(page.getByRole('link', { name: 'Result', exact: true })).toBeInViewport();
     }
     await expect(pricing).toContainText('$0.10 USD / output second · 720p');
-    await expect(pricing).toContainText('Alibaba Cloud · Model Studio · Singapore');
+    await expect(pricing).toContainText('Alibaba Cloud · Model Studio · SG');
     await expect(pricing.getByRole('link', { name: 'Price source ↗' })).toHaveAttribute(
       'href',
       /wan3-0-video/,
@@ -173,12 +173,20 @@ for (const viewport of [
     const pricing = page.getByRole('region', { name: 'GPT Image 2 pricing' });
     const quoteButton = page.getByRole('button', { name: 'Get a quote', exact: true });
     await expect(pricing).toContainText('≈$0.047–$0.0527 USD / output image · 1K');
+    await expect(page.getByRole('combobox', { name: 'Endpoint region' })).toHaveCount(0);
+    await expect(page.getByLabel('Provider route', { exact: true }).locator('option')).toHaveText([
+      'Automatic routing',
+      'OpenAI',
+      'fal',
+      'Pika',
+      'Replicate',
+      'Runway',
+    ]);
     await pricing.locator('summary', { hasText: 'View 5 regional route prices' }).click();
     await expect(pricing).toContainText('≈$0.0527 USD / output image · 1K');
+    await expect(pricing).not.toContainText(/not disclosed/i);
     await expect(
-      pricing
-        .locator('li', { hasText: 'OpenAI · Not disclosed' })
-        .getByRole('link', { name: 'Price source ↗' }),
+      pricing.locator('li', { hasText: 'OpenAI' }).getByRole('link', { name: 'Price source ↗' }),
     ).toHaveAttribute('href', /image-generation-models/);
     const example = page
       .locator('details')
@@ -227,7 +235,7 @@ test('a region setup link restores operation and narrows routing without a pinne
   await expect(page.getByRole('combobox', { name: 'Endpoint region' })).toHaveValue('eu-central-1');
   await expect(page.getByRole('combobox', { name: 'Provider route' })).toHaveValue('auto');
   await expect(page.getByRole('region', { name: 'Wan 3.0 pricing' })).toContainText(
-    'Frankfurt, Germany',
+    'Alibaba Cloud · Model Studio · DE',
   );
   await page.reload();
   await expect(page).toHaveURL(href);
@@ -282,7 +290,7 @@ test('published pricing follows the current model provider exception in both dir
   await editor.fill(JSON.stringify(request, null, 2));
   await apply.click();
   await expect(page.getByRole('combobox', { name: 'Provider route' })).toHaveValue('auto');
-  await expect(pricing).toContainText('Alibaba Cloud · Model Studio · Singapore');
+  await expect(pricing).toContainText('Alibaba Cloud · Model Studio · SG');
   await expect(pricing).toContainText('$0.10 USD / output second · 720p');
   await expect(pricing.getByRole('link', { name: 'Price source ↗' })).toHaveAttribute(
     'href',
@@ -297,7 +305,7 @@ test('published pricing follows the current model provider exception in both dir
   await editor.fill(JSON.stringify(request, null, 2));
   await apply.click();
   await expect(pricing).toContainText('Price unavailable for these settings');
-  await expect(pricing).not.toContainText('Alibaba Cloud · Model Studio · Singapore');
+  await expect(pricing).not.toContainText('Alibaba Cloud · Model Studio · SG');
   await expect(pricing.getByRole('link', { name: 'Price source ↗' })).toHaveCount(0);
 
   request.routing = {
@@ -307,7 +315,7 @@ test('published pricing follows the current model provider exception in both dir
   };
   await editor.fill(JSON.stringify(request, null, 2));
   await apply.click();
-  await expect(pricing).toContainText('Alibaba Cloud · Model Studio · Singapore');
+  await expect(pricing).toContainText('Alibaba Cloud · Model Studio · SG');
   await expect(pricing).toContainText('$0.10 USD / output second · 720p');
   await expect(pricing.getByRole('link', { name: 'Price source ↗' })).toHaveAttribute(
     'href',

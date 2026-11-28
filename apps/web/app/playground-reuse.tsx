@@ -12,6 +12,7 @@ import type {
 } from '@media-router/contracts';
 import { getGenerationDefinition } from '@media-router/contracts/generation';
 import { eligibleReuseRoutes, initialPlaygroundRequest } from './playground-request';
+import { formatRouteLabel, routeIdentity } from './route-identity';
 import styles from './private-playground.module.css';
 
 type Destination = {
@@ -147,8 +148,8 @@ export function OutputReuse({
         outputIndex={outputIndex}
         output={output}
         draft={draft}
+        catalog={catalog}
         {...selected}
-        deployments={catalog.deployments}
         recoveryNamespace={recoveryNamespace}
         expectedHeaders={expectedHeaders}
         onApply={onApply}
@@ -161,10 +162,10 @@ function ReuseAction({
   sourceJobId,
   outputIndex,
   draft,
+  catalog,
   model,
   routes,
   destinations,
-  deployments,
   recoveryNamespace,
   expectedHeaders,
   onApply,
@@ -173,10 +174,10 @@ function ReuseAction({
   outputIndex: number;
   output: OutputAsset;
   draft: GenerateInput;
+  catalog: Catalog;
   model: Catalog['models'][number];
   routes: Route[];
   destinations: Destination[];
-  deployments: Catalog['deployments'];
   recoveryNamespace: string;
   expectedHeaders: Record<string, string>;
   onApply: (
@@ -198,7 +199,13 @@ function ReuseAction({
   }, []);
   const target = destinations[selected]!;
   const sameModel = model.id === draft.modelId;
-  const candidates = eligibleReuseRoutes(model, routes, deployments, draft, target.operation);
+  const candidates = eligibleReuseRoutes(
+    model,
+    routes,
+    catalog.deployments,
+    draft,
+    target.operation,
+  );
   const routeId =
     (selectedRoute && candidates.some((route) => route.id === selectedRoute)
       ? selectedRoute
@@ -322,8 +329,7 @@ function ReuseAction({
             <option value="">Cheapest eligible route</option>
             {candidates.map((route) => (
               <option key={route.id} value={route.id}>
-                {deployments.find((deployment) => deployment.id === route.deploymentId)?.name ??
-                  route.id}
+                {formatRouteLabel(routeIdentity(catalog, route, target.operation, candidates))}
               </option>
             ))}
           </select>

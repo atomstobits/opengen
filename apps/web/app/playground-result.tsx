@@ -9,7 +9,8 @@ import {
   type OutputAsset,
 } from '@media-router/contracts';
 import { routeIdentity } from './playground-pricing';
-import { regionNames, OutputCredentials } from './ui';
+import { formatDeploymentLabel, formatRouteLabel } from './route-identity';
+import { OutputCredentials } from './ui';
 import { OutputReuse } from './playground-reuse';
 import styles from './private-playground.module.css';
 
@@ -122,12 +123,13 @@ export function PlaygroundResult({
           <dt>Provider route</dt>
           <dd>
             {identity
-              ? `${identity.label} · ${identity.region}`
-              : `${deployment?.name ?? job.deploymentId}${
-                  deployment
-                    ? ` · ${regionNames[deployment.endpointRegion] ?? deployment.endpointRegion}`
-                    : ''
-                }`}
+              ? formatRouteLabel(identity)
+              : deployment
+                ? formatDeploymentLabel(
+                    deployment,
+                    catalog.providers.find(({ id }) => id === deployment.providerId),
+                  )
+                : job.deploymentId}
           </dd>
         </div>
         <div>

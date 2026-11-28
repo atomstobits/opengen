@@ -23,7 +23,8 @@ import { PlaygroundResult } from './playground-result';
 import { CanonicalControls } from './playground-controls';
 import { PlaygroundExample } from './playground-example';
 import { PlaygroundPricing, routeIdentity, usd } from './playground-pricing';
-import { CopyButton, Icon, PlaygroundWorkflow, regionNames } from './ui';
+import { formatDisclosedRegion, formatRouteLabel, isDisclosedRegion } from './route-identity';
+import { CopyButton, Icon, PlaygroundWorkflow } from './ui';
 import { playgroundHref } from './links';
 import {
   clearConflictingRoutingFilters,
@@ -1044,6 +1045,14 @@ export function Playground({
   const regions = [
     ...new Set(operationRoutes.map(regionOf).filter((region): region is string => !!region)),
   ];
+  const disclosedRegions = regions
+    .filter(isDisclosedRegion)
+    .sort((left, right) =>
+      (formatDisclosedRegion(left) ?? left).localeCompare(formatDisclosedRegion(right) ?? right),
+    );
+  const pinnedRegion = draft.routeId
+    ? regionOf(routes.find((route) => route.id === draft.routeId))
+    : undefined;
   const requestedRegion = singleRegion(draft);
   const selectedRegion =
     requestedRegion && regions.includes(requestedRegion) ? requestedRegion : undefined;
@@ -1243,35 +1252,41 @@ export function Playground({
                 ))}
               </select>
             </label>
-            <label>
-              Endpoint region
-              <select
-                value={
-                  draft.routeId
-                    ? (regionOf(routes.find((route) => route.id === draft.routeId)) ?? '')
-                    : (selectedRegion ?? '')
-                }
-                onChange={(event) => {
-                  const { routeId: _, ...rest } = draft;
-                  const { endpointRegions: __, ...routing } = draft.routing ?? {};
-                  update({
-                    ...rest,
-                    routing: {
-                      ...routing,
-                      ...(event.target.value ? { endpointRegions: [event.target.value] } : {}),
-                    },
-                  });
-                }}
-              >
-                <option value="">Any eligible region</option>
-                {regions.map((region) => (
-                  <option key={region} value={region}>
-                    {regionNames[region] ?? region}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={styles.routeSelect}>
+            {disclosedRegions.length > 0 && (
+              <label>
+                Endpoint region
+                <select
+                  value={
+                    draft.routeId
+                      ? isDisclosedRegion(pinnedRegion)
+                        ? pinnedRegion
+                        : ''
+                      : isDisclosedRegion(selectedRegion)
+                        ? selectedRegion
+                        : ''
+                  }
+                  onChange={(event) => {
+                    const { routeId: _, ...rest } = draft;
+                    const { endpointRegions: __, ...routing } = draft.routing ?? {};
+                    update({
+                      ...rest,
+                      routing: {
+                        ...routing,
+                        ...(event.target.value ? { endpointRegions: [event.target.value] } : {}),
+                      },
+                    });
+                  }}
+                >
+                  <option value="">Any eligible region</option>
+                  {disclosedRegions.map((region) => (
+                    <option key={region} value={region}>
+                      {formatDisclosedRegion(region) ?? region}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className={disclosedRegions.length > 0 ? styles.routeSelect : undefined}>
               Provider route
               <select
                 aria-label="Provider route"
@@ -1302,7 +1317,7 @@ export function Playground({
                     const identity = routeIdentity(catalog, route, draft.operation);
                     return (
                       <option key={route.id} value={route.id}>
-                        {identity.label} · {identity.region}
+                        {formatRouteLabel(identity)}
                       </option>
                     );
                   })}

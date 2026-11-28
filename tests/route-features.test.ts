@@ -30,7 +30,12 @@ import { buildApp } from '../apps/server/src/app';
 import { openApiDocument } from '../apps/server/src/openapi';
 import { localCatalog } from '../apps/web/app/native-gateway';
 import { buildProviderRouteRows } from '../apps/web/app/provider-order';
-import { routeIdentity } from '../apps/web/app/route-identity';
+import {
+  formatDeploymentLabel,
+  formatDisclosedRegion,
+  formatRouteLabel,
+  routeIdentity,
+} from '../apps/web/app/route-identity';
 import {
   computeCheapestRouteHighlights,
   isDisplayedRateCheapest,
@@ -457,18 +462,38 @@ describe('UI grouping, SSR table markup, and Playground operation switching', ()
 
   it('builds clean provider identities and Playground deep links for unified routes', () => {
     const qwen = getRoute('alibaba-model-studio-ap-southeast-1/qwen-image-2.1-turbo')!;
-    expect(routeIdentity(catalog, qwen, 'image-edit')).toMatchObject({
+    const qwenIdentity = routeIdentity(catalog, qwen, 'image-edit');
+    expect(qwenIdentity).toMatchObject({
       label: 'Alibaba Cloud · Model Studio',
       feature: null,
-      region: 'Singapore',
+      region: 'SG',
     });
+    expect(formatRouteLabel(qwenIdentity)).toBe('Alibaba Cloud · Model Studio · SG');
 
     const falSeedance = getRoute('fal-undisclosed/bytedance-seedance-2.5')!;
-    expect(routeIdentity(catalog, falSeedance, 'image-to-video')).toMatchObject({
+    const falIdentity = routeIdentity(catalog, falSeedance, 'image-to-video');
+    expect(falIdentity).toMatchObject({
       label: 'fal',
       feature: null,
-      region: 'Not disclosed',
+      region: null,
     });
+    expect(formatRouteLabel(falIdentity)).toBe('fal');
+    expect(formatDisclosedRegion('undisclosed')).toBeNull();
+    expect(formatDisclosedRegion('unknown')).toBeNull();
+    expect(formatDisclosedRegion('eu-central-1')).toBe('DE');
+    expect(formatDisclosedRegion('cn-hongkong')).toBe('HK');
+    expect(
+      formatDeploymentLabel(
+        catalog.deployments.find((entry) => entry.id === 'openai-undisclosed')!,
+        catalog.providers.find((entry) => entry.id === 'openai'),
+      ),
+    ).toBe('OpenAI');
+    expect(
+      formatDeploymentLabel(
+        catalog.deployments.find((entry) => entry.id === 'alibaba-model-studio-eu-central-1')!,
+        catalog.providers.find((entry) => entry.id === 'alibaba'),
+      ),
+    ).toBe('Alibaba Cloud · Model Studio · DE');
     expect(playgroundHref(falSeedance.modelId, falSeedance.id, 'image-to-video')).toBe(
       '/playground?model=bytedance%2Fseedance-2.5&operation=image-to-video&route=fal-undisclosed%2Fbytedance-seedance-2.5',
     );
@@ -670,7 +695,7 @@ describe('cheapest route highlight per model variant', () => {
     expect(frankfurt.comparisons[0]).toMatchObject({
       resolution: '480p',
       operations: ['video-edit'],
-      mostExpensiveLabels: ['Alibaba Cloud · Model Studio · Singapore'],
+      mostExpensiveLabels: ['Alibaba Cloud · Model Studio · SG'],
       tiedCheapestCount: 5,
     });
 

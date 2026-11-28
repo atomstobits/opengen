@@ -27,6 +27,7 @@ function HighlightTable({
   caption: string;
   rows: readonly PricingHighlightRow[];
 }) {
+  const hasRegions = rows.some((row) => row.region !== null);
   return (
     <div className={styles.tableWrap}>
       <table className={styles.catalogTable}>
@@ -34,7 +35,7 @@ function HighlightTable({
         <thead>
           <tr>
             <th scope="col">Model</th>
-            <th scope="col">Provider &amp; region</th>
+            <th scope="col">{hasRegions ? 'Provider & region' : 'Provider'}</th>
             <th scope="col">Scope</th>
             <th scope="col">Status</th>
             <th scope="col">Published rate</th>
@@ -59,7 +60,7 @@ function HighlightTable({
               <td>
                 <span>{row.providerName}</span>
                 {row.official && <span className={styles.officialTag}>Official</span>}
-                <span className={styles.cellMeta}>{row.region}</span>
+                {row.region && <span className={styles.cellMeta}>{row.region}</span>}
               </td>
               <td>
                 <span>{row.scopeLabel}</span>

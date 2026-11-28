@@ -129,6 +129,15 @@ describe('starter trial credit configuration and public /pricing contract', () =
       true,
     );
     expect(summary.documentedHighlights.every((row) => row.status === 'documented')).toBe(true);
+    expect(
+      summary.liveVerifiedHighlights.find(
+        (row) => row.routeId === 'openai-undisclosed/openai-gpt-image-2',
+      )?.region,
+    ).toBeNull();
+    expect(
+      summary.liveVerifiedHighlights.find((row) => row.routeId === 'alibaba/ap-southeast-1/wan-3.0')
+        ?.region,
+    ).toBe('SG');
 
     // Unknown / unpriced routes must display "Price unavailable", never $0 or free.
     const sampleModel = catalog.models[0]!;

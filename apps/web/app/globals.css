@@ -4929,6 +4929,9 @@ select option {
 .model-directory-pricing.is-compact .card-price strong {
   font-size: 15px;
 }
+.model-directory-route-stat {
+  margin-bottom: 18px;
+}
 .model-directory-route-stat strong,
 .model-directory-offerings > strong {
   display: block;
@@ -4951,7 +4954,7 @@ select option {
   color: var(--subtle);
   font-size: 13px;
   line-height: 1.45;
-  margin: 7px 0 18px;
+  margin: 7px 0 0;
 }
 .model-series-summary > a,
 .model-directory-offerings > a {
@@ -5017,6 +5020,9 @@ select option {
   gap: 10px 14px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+.model-series-variants:not([data-columns='1']) .variant-card .model-directory-route-stat {
+  margin-bottom: 0;
 }
 .model-series-variants:not([data-columns='1']) .variant-card .model-directory-route-stat strong {
   font-size: 20px;
@@ -5324,6 +5330,9 @@ select option {
     justify-content: space-between;
     padding-bottom: 10px;
     margin-bottom: 2px;
+  }
+  .model-directory-route-stat {
+    margin-bottom: 0;
   }
   .model-directory-route-stat strong,
   .model-directory-offerings > strong {

@@ -10,7 +10,7 @@ import {
   type Rate,
   type Route,
 } from '@media-router/contracts';
-import { routeIdentity } from './route-identity';
+import { formatRouteLabel, routeIdentity } from './route-identity';
 
 export type PublishedOutputRate = NonNullable<
   NonNullable<Route['publishedPricing']>['outputRates']
@@ -148,10 +148,7 @@ function compareRouteLabel(
   operation: Operation,
   variantRoutes: readonly Route[],
 ): string {
-  const identity = routeIdentity(catalog, route, operation, variantRoutes);
-  return identity.region === 'Not disclosed'
-    ? identity.label
-    : `${identity.label} · ${identity.region}`;
+  return formatRouteLabel(routeIdentity(catalog, route, operation, variantRoutes));
 }
 
 /**

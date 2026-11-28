@@ -8,7 +8,7 @@ import { HeroMedia, HeroSplitMedia } from './hero-media';
 import { HeroComparisonModal } from './hero-comparison-modal';
 import type { HeroComparisonItem, HeroModelPricing } from './hero-comparisons';
 import { buildProviderRouteRows } from './provider-order';
-import { regionNames } from './route-identity';
+import { formatDisclosedRegion, isDisclosedRegion, regionNames } from './route-identity';
 import {
   computeCheapestRouteHighlights,
   formatComparisonScope,
@@ -49,8 +49,7 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 6,
 });
 const usd = (micros: number) => `$${usdFormatter.format(micros / 1_000_000)}`;
-const regionName = (deployment: Deployment) =>
-  regionNames[deployment.endpointRegion] ?? deployment.endpointRegion;
+const regionName = (deployment: Deployment) => formatDisclosedRegion(deployment.endpointRegion);
 
 export function Icon({
   name,
@@ -1257,6 +1256,9 @@ export function ProviderTable({
   const visibleRoutes = activeOperation
     ? routes.filter((route) => route.operations.includes(activeOperation))
     : routes;
+  const hasDisclosedRegions = visibleRoutes.some((route) =>
+    isDisclosedRegion(deployments.get(route.deploymentId)?.endpointRegion),
+  );
   const groupedRows = buildProviderRouteRows(visibleRoutes, deployments, model.authorProviderIds);
   const cheapestHighlights = computeCheapestRouteHighlights(
     visibleRoutes,
@@ -1319,7 +1321,11 @@ export function ProviderTable({
           <thead>
             <tr>
               <th>
-                {hasFeatureDistinctions ? 'Provider / feature route' : 'Provider / endpoint region'}
+                {hasFeatureDistinctions
+                  ? 'Provider / feature route'
+                  : hasDisclosedRegions
+                    ? 'Provider / endpoint region'
+                    : 'Provider'}
               </th>
               <th>Published price</th>
               {showCompletion && <th>Attempt completion</th>}
@@ -1348,10 +1354,11 @@ export function ProviderTable({
               const actionFeature = activeOperation
                 ? (route.feature?.label ?? operationLabel(activeOperation))
                 : discriminator;
-              const actionLabel = actionFeature
-                ? `Use ${provider.name} ${regionName(deployment)} ${actionFeature} route`
-                : `Use ${provider.name} ${regionName(deployment)} route`;
-              const endpointKnown = !['undisclosed', 'unknown'].includes(deployment.endpointRegion);
+              const disclosedRegion = regionName(deployment);
+              const actionLabel = ['Use', provider.name, disclosedRegion, actionFeature, 'route']
+                .filter(Boolean)
+                .join(' ');
+              const endpointKnown = disclosedRegion !== null;
               const scope =
                 deployment.scope === 'undisclosed' ? null : scopeNames[deployment.scope];
               const regionTooltip = !endpointKnown
@@ -1476,7 +1483,7 @@ export function ProviderTable({
                                 <Icon name="globe" size={12} />
                                 {deployment.endpointRegion === 'global'
                                   ? 'Global endpoint'
-                                  : `Endpoint: ${regionName(deployment)}`}
+                                  : `Endpoint: ${disclosedRegion}`}
                               </span>
                             )}
                             {scope && <span className="scope-tag">Inference scope: {scope}</span>}

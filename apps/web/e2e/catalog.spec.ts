@@ -39,6 +39,17 @@ test('the model catalog filters discovery while model pages preserve every regio
   await expect(page.locator('.playground-view')).toHaveCount(0);
   await mkdir(evidenceDir, { recursive: true });
   await page.screenshot({ path: path.join(evidenceDir, 'catalog-desktop.png') });
+  await expect(page.getByLabel('Filter endpoint region').locator('option')).toHaveText([
+    'All regions',
+    'CN',
+    'DE',
+    'HK',
+    'JP',
+    'SG',
+    'US',
+  ]);
+  await expect(card(page, 'openai/gpt-image-2')).not.toContainText(/not disclosed/i);
+  await expect(card(page, 'alibaba/wan-3.0')).toContainText('Endpoints: CN, DE, HK, JP, SG, US');
   await page.getByLabel('Search models, providers or regions').fill('Wan 3.0');
   await expect(seriesGroups(page)).toHaveCount(1);
   await expect(cards(page)).toHaveCount(2);
@@ -60,12 +71,12 @@ test('the model catalog filters discovery while model pages preserve every regio
   const standard = page.locator('[data-testid="series-variant"][data-model-id="alibaba/wan-3.0"]');
   await expect(standard.locator('.route-table tbody tr')).toHaveCount(10);
   for (const region of [
-    'Beijing, China',
-    'Singapore',
-    'Tokyo, Japan',
-    'Frankfurt, Germany',
-    'Virginia, US',
-    'Hong Kong, China',
+    'Endpoint: CN',
+    'Endpoint: SG',
+    'Endpoint: JP',
+    'Endpoint: DE',
+    'Endpoint: US',
+    'Endpoint: HK',
   ])
     await expect(standard.locator('.route-table')).toContainText(region);
   await expect(standard.locator('.route-table')).toContainText('$0.082513');
@@ -172,7 +183,7 @@ test('the separate playground quotes comparison-only routes and preserves a sele
     .selectOption('alibaba/ap-southeast-1/wan-3.0');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   await expect(pricing.getByText('Quote details · 1 route')).toBeVisible();
-  await expect(pricing).toContainText('Singapore');
+  await expect(pricing).toContainText('Alibaba Cloud · Model Studio · SG');
   expect(inputs).toHaveLength(3);
   expect(inputs[0]).toMatchObject({ modelId: 'openai/gpt-image-2', operation: 'text-to-image' });
   expect(inputs[2]).toMatchObject({
