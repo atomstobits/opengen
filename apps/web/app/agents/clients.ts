@@ -215,7 +215,7 @@ export const agentClients: AgentClient[] = [
     steps: [
       'Run the Hermes CLI command below (or merge the mcp_servers entry into Hermes config.yaml without replacing other configuration).',
       'Complete OpenGen’s browser sign-in and workspace consent when prompted, or run hermes mcp login opengen from a fresh terminal.',
-      'Check connection and tool discovery with hermes mcp test before allowing generation. Remote or headless sessions may need a different callback arrangement.',
+      'Check connection and tool discovery with hermes mcp test opengen before allowing generation. Remote or headless sessions may need a different callback arrangement.',
     ],
     caution:
       'Hermes Agent v0.16.0 completed live OAuth discovery, dynamic client registration (HTTP 201), and S256 PKCE loopback authorization initiation against https://opengen.dev/mcp on 2026-11-27; post-consent token refresh, tool execution, and billable generation remain pending.',
