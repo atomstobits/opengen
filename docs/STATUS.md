@@ -4,6 +4,19 @@ Core integration snapshot from **2026-11-04** with Playground, billing, catalog 
 
 All user generations, prompts, inputs, outputs, receipts, tags and comparisons remain private to their workspace and authorized identities/scopes. There is no generation gallery, share/publish operation, visibility toggle or private-content SEO. Public catalog/company/model SEO remains. SDK distribution, new SDKs/language bindings and framework adapters are deferred; raw HTTP/MCP documentation and executable examples are the adoption deliverable. Existing internal clients receive necessary compatibility maintenance.
 
+## Live MCP & CLI client verification and OAuth interoperability — 2026-11-28
+
+- **Hosted OAuth interoperability fixes (`https://opengen.dev`, `2ee70ff` & `fff46fb`)**: OAuth discovery endpoints (`/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/mcp`) serve `Access-Control-Allow-Origin: *` (`GET`/`HEAD`) and `204` `OPTIONS` preflight, and `GET /oauth/authorize`, `POST /oauth/token`, and `POST /oauth/revoke` ignore unrecognized benign RFC 6749 parameters (such as ChatGPT web's `ui_locales=en-US`) while continuing to reject unsupported protocol-altering parameters (`prompt` other than `consent`, `response_mode` other than `query`, `client_secret`, `code_verifier`, `request`, and `request_uri` on `GET /oauth/authorize`, and non-empty `client_secret` on `POST /oauth/token` and `POST /oauth/revoke`).
+- **Live read-only verified clients (zero billable calls)**:
+  - **ChatGPT web (`https://chatgpt.com/plugins`)**: Live OAuth DCR + PKCE consent, 7/7 MCP tools discovered (5 read, 2 write), and live `@OpenGen` calls to `balance`, `catalog_search`, and `catalog_get` against `https://opengen.dev/mcp`.
+  - **Claude web (`https://claude.ai/plugins/yours`)**: Live OAuth DCR + PKCE consent, 7/7 MCP tools discovered (including the interactive `job_get` MCP App), and live chat calls to `balance`, `catalog_search`, and `catalog_get` against `https://opengen.dev/mcp`.
+  - **`@opengen-dev/cli@0.1.2`**: Clean isolated npm install, live browser `opengen login` (`read generate`), authenticated `opengen doctor`, `opengen balance`, `opengen catalog search`, `opengen logout` (revoking the server grant and removing the local profile), and post-logout `opengen doctor` (`401 credential_missing`).
+  - _(Plus `codex-cli 0.155.1` `LIVE READ-ONLY VERIFIED` on `2026-11-27`.)_
+- **Live OAuth + MCP connection/discovery verified clients**:
+  - **`Hermes Agent v0.16.0`**: Isolated `hermes mcp add opengen --url https://opengen.dev/mcp --auth oauth` completed browser OAuth 2.1 PKCE login, and `hermes mcp test opengen` verified `Connected` with `7/7` tools discovered; tool invocation, token refresh, and billable generation remain pending.
+  - **`Claude Code 2.1.301`**: Live `claude mcp add --transport http` + `claude mcp login` browser OAuth, `claude mcp get` (`Connected`), and `claude mcp logout` verified; LLM tool turn execution, token refresh, and billable generation remain pending.
+- **Remaining pending boundaries**: `Muse Code 1.4.25` (remains `OAUTH PREFLIGHT VERIFIED` from `2026-11-27`), hosted `Meta Muse`, `Grok Bot`, `Cursor`, `OpenClaw`, `OpenCode`, `pi`, long-lived refresh-token rotation across real third-party clients, and billable agent generation runs remain pending. See [agent support evidence](AGENT-SUPPORT.md).
+
 ## Hosted auth, npm CLI & client verification — 2026-11-27
 
 - **Production `0.1.2` rollout (`https://opengen.dev`)**: Web and Cloud Run API/worker run on the `0.1.2` line (`/health` and `/openapi.json` report `0.1.2`), with Google OIDC, GitHub OAuth, and Resend Email OTP enabled on `/auth/login` (shared `OPENGEN_PROXY_CLIENT_SECRET` active; `OPENGEN_TRIAL_CREDIT_MICROS` intentionally unset / `$0` per owner decision, and worker remains isolated from API-only auth/billing secrets).

@@ -260,12 +260,21 @@ test('dedicated agent setup and evidence remain usable on this viewport', async 
   await page.goto('/agents/cli');
   await expect(page.getByRole('heading', { name: 'Create with CLI & API.' })).toBeVisible();
   await expect(
-    page.locator('aside dd').filter({ hasText: 'Post-consent browser login remains pending.' }),
+    page.locator('aside dd').filter({ hasText: 'Billable generation not exercised.' }),
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   await page.screenshot({ path: testInfo.outputPath('agent-setup.png'), fullPage: true });
+  await page.goto('/agents/chatgpt');
+  await expect(page.getByRole('heading', { name: 'Create with ChatGPT.' })).toBeVisible();
+  await expect(page.locator('aside')).toContainText('LIVE READ-ONLY VERIFIED');
+  await page.goto('/agents/claude');
+  await expect(page.getByRole('heading', { name: 'Create with Claude.' })).toBeVisible();
+  await expect(page.locator('aside')).toContainText('LIVE READ-ONLY VERIFIED');
+  await page.goto('/agents/hermes');
+  await expect(page.getByRole('heading', { name: 'Create with Hermes Agent.' })).toBeVisible();
+  await expect(page.locator('aside')).toContainText('LIVE OAUTH + TOOLS VERIFIED');
   await page.goto('/agents/muse');
   await expect(page.getByRole('heading', { name: 'Create with Muse.' })).toBeVisible();
   await expect(page.locator('pre code').filter({ hasText: 'muse mcp add opengen' })).toBeVisible();

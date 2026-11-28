@@ -73,13 +73,15 @@ export default function AgentsPage() {
             Hosted sign-in, workspace billing, and live-verified official routes are live on{' '}
             <code>https://opengen.dev</code> (self-hosted gateways need their own configured
             identity and provider credentials). Third-party client guides were reviewed{' '}
-            {AGENT_REVIEW_DATE}–{AGENT_EVIDENCE_DATE} from official documentation; live checks on{' '}
-            {AGENT_EVIDENCE_DATE} verified read-only OAuth MCP in <code>codex-cli 0.155.1</code> and
-            live OAuth discovery, dynamic client registration, and S256 PKCE preflight in{' '}
-            <code>Claude Code 2.1.301</code>, <code>Muse Code 1.4.25</code>,{' '}
-            <code>Hermes Agent v0.16.0</code>, and <code>@opengen-dev/cli 0.1.2</code>, while
-            post-consent runs for those clients, other clients (including <code>Grok Bot</code> and
-            hosted <code>Meta Muse</code>), and billable agent runs remain unverified.
+            {AGENT_REVIEW_DATE}–{AGENT_EVIDENCE_DATE} from official documentation; live checks
+            through {AGENT_EVIDENCE_DATE} verified read-only OAuth access in{' '}
+            <code>ChatGPT web</code>, <code>Claude web</code>, <code>codex-cli 0.155.1</code>, and{' '}
+            <code>@opengen-dev/cli 0.1.2</code>, live OAuth login and MCP connection/discovery in{' '}
+            <code>Hermes Agent v0.16.0</code> (7/7 tools) and <code>Claude Code 2.1.301</code>, and
+            live OAuth DCR + S256 PKCE preflight in <code>Muse Code 1.4.25</code>. Unexercised tool
+            calls, other clients (including <code>Grok Bot</code>, hosted <code>Meta Muse</code>,{' '}
+            <code>Cursor</code>, <code>OpenClaw</code>, <code>OpenCode</code>, and <code>pi</code>),
+            token refresh, and billable agent runs remain unverified.
           </p>
           <p>
             New personal workspaces start with $0 managed credit — discovery and quotes are free.{' '}
