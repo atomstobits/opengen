@@ -66,6 +66,7 @@ const statusLabels: Record<PaymentOrder['status'], string> = {
 };
 const resumable = (order: PaymentOrder) =>
   ['created', 'checkout_pending', 'checkout_open'].includes(order.status);
+const cancellable = (order: PaymentOrder) => ['created', 'checkout_open'].includes(order.status);
 const terminal = (order: PaymentOrder) =>
   ['credited', 'payment_failed', 'expired'].includes(order.status);
 const pending = (order: PaymentOrder) =>
@@ -73,44 +74,73 @@ const pending = (order: PaymentOrder) =>
 const orderIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const message = (cause: unknown) =>
   cause instanceof Error ? cause.message : 'Billing is unavailable. Please try again.';
+const billingSessionKey = (session: BrowserSession | null) =>
+  session
+    ? JSON.stringify([
+        session.authenticated,
+        session.workspaceId ?? null,
+        session.recoveryScope ?? null,
+        Boolean(session.oidcEnabled),
+      ])
+    : null;
 
 /** Standalone entry point; the dashboard may instead mount Billing with its selected workspace ID. */
 export function BillingPage() {
   const legal = useLegalPresentation();
   const [session, setSession] = useState<BrowserSession | null>(null);
   const [error, setError] = useState('');
+  const verifiedSession = useRef<BrowserSession | null>(null);
   useEffect(() => {
     let pendingSession: AbortController | undefined;
-    const refresh = () => {
+    let pendingPassive = false;
+    const refresh = (clearCurrent: boolean) => {
+      if (!clearCurrent && pendingPassive) return;
       pendingSession?.abort();
       const controller = new AbortController();
       pendingSession = controller;
-      setSession(null);
+      pendingPassive = !clearCurrent;
+      if (clearCurrent) {
+        verifiedSession.current = null;
+        setSession(null);
+      }
       setError('');
       void fetch('/api/session', { cache: 'no-store', signal: controller.signal })
         .then(async (response) => {
           if (!response.ok) throw new Error('Your session could not be checked.');
           const result = await response.json();
-          const current = result.data ?? result;
+          const current = (result.data ?? result) as BrowserSession;
           if (typeof current?.authenticated !== 'boolean')
             throw new Error('Your session could not be checked.');
-          if (!controller.signal.aborted) setSession(current);
+          if (controller.signal.aborted) return;
+          const next =
+            billingSessionKey(verifiedSession.current) === billingSessionKey(current)
+              ? verifiedSession.current!
+              : current;
+          verifiedSession.current = next;
+          setSession(next);
         })
         .catch((cause) => {
-          if (!controller.signal.aborted) setError(message(cause));
+          if (controller.signal.aborted) return;
+          verifiedSession.current = null;
+          setSession(null);
+          setError(message(cause));
+        })
+        .finally(() => {
+          if (pendingSession === controller) pendingPassive = false;
         });
     };
     const refreshVisible = () => {
-      if (!document.hidden) refresh();
+      if (!document.hidden) refresh(false);
     };
+    const onSessionChanged = () => refresh(true);
     const onStorage = (event: StorageEvent) => {
-      if (event.key === 'opengen:session-signal') refresh();
+      if (event.key === 'opengen:session-signal') refresh(true);
     };
     let channel: BroadcastChannel | undefined;
     try {
       channel = new BroadcastChannel('opengen-session');
       channel.onmessage = (event) => {
-        if (event.data?.type === 'changed') refresh();
+        if (event.data?.type === 'changed') refresh(true);
       };
     } catch {
       /* Focus and storage signals also recheck the session. */
@@ -118,15 +148,15 @@ export function BillingPage() {
     window.addEventListener('focus', refreshVisible);
     document.addEventListener('visibilitychange', refreshVisible);
     window.addEventListener('storage', onStorage);
-    window.addEventListener('opengen:session-changed', refresh);
-    refresh();
+    window.addEventListener('opengen:session-changed', onSessionChanged);
+    refresh(true);
     return () => {
       pendingSession?.abort();
       channel?.close();
       window.removeEventListener('focus', refreshVisible);
       document.removeEventListener('visibilitychange', refreshVisible);
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('opengen:session-changed', refresh);
+      window.removeEventListener('opengen:session-changed', onSessionChanged);
     };
   }, []);
   return (
@@ -393,6 +423,38 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
     }
   }
 
+  async function cancelCheckout(order: PaymentOrder) {
+    if (!mounted.current || !cancellable(order)) return;
+    selection.current = order.id;
+    const next = await billingRequest<PaymentOrder>(
+      workspaceId,
+      `/api/billing/orders/${encodeURIComponent(order.id)}/cancel`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+      scopedFetch,
+    );
+    if (!mounted.current) return;
+    if (next.id !== order.id || next.amountCents !== order.amountCents)
+      throw new Error('The cancelled order does not match. Refresh its status.');
+    if (next.status === 'expired') {
+      if (recovery?.orderId === next.id) {
+        finishTopUp(window.localStorage, workspaceId, next);
+        setRecovery(null);
+      }
+      selection.current = null;
+      setActive(null);
+      setNotice('Open checkout cancelled. Choose a new amount to start another top-up.');
+      await load();
+      return;
+    }
+    setActive(next);
+    setNotice(
+      next.status === 'payment_pending' || next.status === 'credited'
+        ? 'This payment is already processing and cannot be cancelled. Review its status below.'
+        : 'Order status updated. Review the status below before starting another top-up.',
+    );
+    await load();
+  }
+
   async function enrollAndCheckout(targetCents: number) {
     if (acting.current || !recoveryScope) return;
     const enrollment = capabilities?.ownerEnrollment;
@@ -501,6 +563,12 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
   const feePreview = cents !== null ? previewProcessingFee(cents, null) : null;
   const blocked =
     !canReadOrders || busy || !summary?.enabled || summary.billingHold || !!storageError;
+  const cancelBlocked =
+    !canReadOrders ||
+    busy ||
+    !(summary?.cancelEnabled ?? summary?.enabled) ||
+    summary.billingHold ||
+    !!storageError;
   const newFundingDenied = summary?.newFunding?.allowed === false;
   const topUpBlocked =
     blocked || (newFundingDenied && !(recovery && active && active.status !== 'created'));
@@ -740,6 +808,16 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
                   ? `Continue to Stripe · ${usd(feePreview.totalChargeCents)} ↗`
                   : 'Continue to Stripe ↗'}
           </button>
+          {recovery && active && active.id === recovery.orderId && cancellable(active) && (
+            <button
+              className={styles.cancelTopUp}
+              type="button"
+              disabled={cancelBlocked}
+              onClick={() => void act(() => cancelCheckout(active))}
+            >
+              Cancel open top-up &amp; change amount
+            </button>
+          )}
           <p className={styles.finePrint}>One-time payment · Secure hosted checkout</p>
           <p className={`${styles.finePrint} legal-review-links`}>
             {legal.mode === 'published' ? (
@@ -817,7 +895,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
             </p>
             {active && <code className={styles.reference}>{active.id}</code>}
           </div>
-          {terminalRecovery && (
+          {terminalRecovery ? (
             <button
               className={styles.secondary}
               disabled={busy}
@@ -841,7 +919,16 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
             >
               Start another top-up
             </button>
-          )}
+          ) : active && cancellable(active) ? (
+            <button
+              className={styles.secondary}
+              type="button"
+              disabled={cancelBlocked}
+              onClick={() => void act(() => cancelCheckout(active))}
+            >
+              Cancel checkout
+            </button>
+          ) : null}
         </section>
       )}
       <section className={styles.history} aria-labelledby="history-title">
@@ -907,13 +994,25 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
                     </td>
                     <td>
                       {resumable(order) ? (
-                        <button
-                          className={styles.rowAction}
-                          disabled={blocked || (newFundingDenied && order.status === 'created')}
-                          onClick={() => void act(() => checkout(order))}
-                        >
-                          Resume ↗
-                        </button>
+                        <div className={styles.rowActions}>
+                          <button
+                            className={styles.rowAction}
+                            disabled={blocked || (newFundingDenied && order.status === 'created')}
+                            onClick={() => void act(() => checkout(order))}
+                          >
+                            Resume ↗
+                          </button>
+                          {cancellable(order) && (
+                            <button
+                              className={styles.rowActionMuted}
+                              type="button"
+                              disabled={cancelBlocked}
+                              onClick={() => void act(() => cancelCheckout(order))}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <button
                           className={styles.rowAction}

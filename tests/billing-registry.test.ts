@@ -183,12 +183,14 @@ it('relays only fixed private billing paths and retains session, Origin and rate
     ['POST', '/v1/billing/portal'],
     ['POST', '/v1/billing/documents/sync'],
     ['POST', '/v1/billing/recharges/fixture/authentication'],
+    ['POST', '/v1/billing/orders/fixture/cancel'],
     ['GET', '/v1/operator/billing'],
     ['POST', '/v1/operator/billing/holds/resolve'],
     ['POST', '/v1/operator/billing/recharges/resolve'],
   ];
   for (const [method, path] of paths)
     expect(registeredBackendPath(path!, method!), path).toBe(true);
+  expect(registeredBackendPath('/v1/billing/orders/fixture/cancel', 'GET')).toBe(false);
   expect(registeredBackendPath('/v1/billing/access', 'PUT')).toBe(false);
   expect(registeredBackendPath('/v1/billing/trial-credit', 'PUT')).toBe(false);
   expect(registeredBackendPath('/v1/billing/trial-credit', 'DELETE')).toBe(false);

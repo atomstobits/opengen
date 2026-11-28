@@ -470,4 +470,134 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('customer prepaid ledger reconci
       await f.close();
     }
   });
+  it('cancels created orders locally, expires open checkouts via transport, and refuses uncertain or paid orders', async () => {
+    const f = await paymentFixture();
+    try {
+      // Local 'created' order expires without any external Stripe call.
+      const created = await f.store.createOrder(f.workspace, 1000, randomUUID());
+      const expiredLocal = await f.store.cancelOrder(f.workspace, created.id, f.transport);
+      expect(expiredLocal).toMatchObject({ id: created.id, status: 'expired', checkoutUrl: null });
+      expect(f.requests).toHaveLength(0);
+      // Idempotent repeat returns expired without hitting transport.
+      expect(await f.store.cancelOrder(f.workspace, created.id, f.transport)).toMatchObject({
+        id: created.id,
+        status: 'expired',
+      });
+      // A stale checkout request after local cancellation must be rejected without calling Stripe.
+      await expect(f.store.checkout(f.workspace, created.id, f.transport)).rejects.toMatchObject({
+        code: 'order_expired',
+        statusCode: 409,
+      });
+      expect(f.requests).toHaveLength(0);
+      expect((await f.store.getOrder(f.workspace, created.id)).status).toBe('expired');
+
+      // Open checkout expires via transport.expireSession and clears checkoutUrl.
+      const open = await f.order();
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('checkout_open');
+      const cancelled = await f.store.cancelOrder(f.workspace, open.id, f.transport);
+      expect(cancelled).toMatchObject({ id: open.id, status: 'expired', checkoutUrl: null });
+      await expect(f.store.checkout(f.workspace, open.id, f.transport)).rejects.toMatchObject({
+        code: 'order_expired',
+        statusCode: 409,
+      });
+
+      // Uncertain checkout_pending order cannot be cancelled blindly.
+      const pendingOrder = await f.store.createOrder(f.workspace, 1500, randomUUID());
+      await expect(
+        f.store.checkout(f.workspace, pendingOrder.id, {
+          ...f.transport,
+          async createSession() {
+            throw new Error('timeout');
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'checkout_uncertain' });
+      await expect(
+        f.store.cancelOrder(f.workspace, pendingOrder.id, f.transport),
+      ).rejects.toMatchObject({ code: 'order_not_cancellable', statusCode: 409 });
+    } finally {
+      await f.close();
+    }
+  });
+  it('reconciles a raced payment on cancel into payment_pending without crediting or expiring', async () => {
+    const f = await paymentFixture();
+    try {
+      const open = await f.order();
+      await f.paid();
+      // Customer finished paying right before clicking Cancel; expire rejects, retrieve sees complete+paid.
+      const raced = await f.store.cancelOrder(f.workspace, open.id, f.transport);
+      expect(raced).toMatchObject({
+        id: open.id,
+        status: 'payment_pending',
+        checkoutUrl: null,
+        creditedAt: null,
+      });
+      expect(
+        (await f.pool.query("SELECT count(*) FROM mr_ledger WHERE kind='credit'")).rows[0].count,
+      ).toBe('0');
+      // Signed webhook still credits exactly once afterwards.
+      await f.store.reconcile(f.event(), f.transport);
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('credited');
+      await expect(f.store.cancelOrder(f.workspace, open.id, f.transport)).rejects.toMatchObject({
+        code: 'order_not_cancellable',
+        statusCode: 409,
+      });
+    } finally {
+      await f.close();
+    }
+  });
+  it('returns cancel_uncertain if expire fails while Stripe session remains open', async () => {
+    const f = await paymentFixture();
+    try {
+      const open = await f.order();
+      await expect(
+        f.store.cancelOrder(f.workspace, open.id, {
+          ...f.transport,
+          async expireSession() {
+            throw new Error('transient stripe outage');
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'cancel_uncertain', statusCode: 503 });
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('checkout_open');
+    } finally {
+      await f.close();
+    }
+  });
+  it('never moves an async payment_pending order to review when a stale cancel retrieve lags a concurrent webhook', async () => {
+    const f = await paymentFixture();
+    try {
+      const open = await f.order();
+      const staleOpenSnapshot = await f.transport.retrieveSession(f.session().id);
+      expect(staleOpenSnapshot.status).toBe('open');
+      expect(staleOpenSnapshot.payment_intent).toBeNull();
+      // Interleave: expire fails, fallback retrieve returns the pre-webhook open snapshot,
+      // and right before cancelOrder acquires the completion DB lock a webhook binds the PI and moves
+      // the order to payment_pending.
+      const raced = await f.store.cancelOrder(f.workspace, open.id, {
+        ...f.transport,
+        async expireSession() {
+          throw new Error('transient stripe error');
+        },
+        async retrieveSession() {
+          f.setSession({
+            status: 'complete',
+            payment_status: 'unpaid',
+            payment_intent: `pi_async_${f.workspace}`,
+          });
+          await f.store.reconcile(f.event('checkout.session.completed'), f.transport);
+          return { ...staleOpenSnapshot };
+        },
+      });
+      expect(raced).toMatchObject({ id: open.id, status: 'payment_pending', creditedAt: null });
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('payment_pending');
+      // Later async payment confirmation still credits the workspace cleanly.
+      f.setSession({ payment_status: 'paid' });
+      await f.store.reconcile(f.event('checkout.session.async_payment_succeeded'), f.transport);
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('credited');
+      expect(
+        (await f.pool.query("SELECT count(*) FROM mr_ledger WHERE kind='credit'")).rows[0].count,
+      ).toBe('1');
+    } finally {
+      await f.close();
+    }
+  });
 });

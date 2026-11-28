@@ -23,6 +23,7 @@ export type PaymentOrder = {
 };
 export type BillingSummary = {
   enabled: boolean;
+  cancelEnabled?: boolean;
   newFunding?: { allowed: boolean; reason?: 'terms-required' | 'terms-inactive' };
   workspaceId: string;
   currency: 'USD';

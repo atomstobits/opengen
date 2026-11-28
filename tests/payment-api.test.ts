@@ -61,6 +61,11 @@ function setupStore() {
     listOrders: vi.fn(async () => [payment]),
     hasBillingHold: vi.fn(async () => false),
     checkout: vi.fn(owned),
+    cancelOrder: vi.fn(async (workspace: string, id: string) => ({
+      ...(await owned(workspace, id)),
+      status: 'expired' as const,
+      checkoutUrl: null,
+    })),
     reconcile: vi.fn(async () => ({ received: true as const })),
   };
   return { store, payment };
@@ -500,6 +505,7 @@ it('pauses customer Checkout writes while reading orders and accepting signed fu
   const { app, stripe, store, payment } = await setup({ checkoutWritesEnabled: false });
   expect((await app.inject({ url: '/v1/billing', headers })).json()).toMatchObject({
     enabled: false,
+    cancelEnabled: true,
     orders: [expect.objectContaining({ id: payment.id })],
   });
   expect((await app.inject({ url: `/v1/billing/orders/${payment.id}`, headers })).statusCode).toBe(
@@ -534,4 +540,41 @@ it('pauses customer Checkout writes while reading orders and accepting signed fu
   });
   expect(webhook.statusCode).toBe(200);
   expect(store.reconcile).toHaveBeenCalledTimes(1);
+});
+
+it('cancels an open unpaid order only with browser session, origin, strict empty body and transport', async () => {
+  const { app, store, payment } = await setup();
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url: `/v1/billing/orders/${payment.id}/cancel`,
+        headers,
+        payload: {},
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url: `/v1/billing/orders/${payment.id}/cancel`,
+        headers: mutations,
+        payload: { extra: true },
+      })
+    ).statusCode,
+  ).toBe(400);
+  const cancelled = await app.inject({
+    method: 'POST',
+    url: `/v1/billing/orders/${payment.id}/cancel`,
+    headers: mutations,
+    payload: {},
+  });
+  expect(cancelled.statusCode).toBe(200);
+  expect(cancelled.json()).toMatchObject({ id: payment.id, status: 'expired', checkoutUrl: null });
+  expect(store.cancelOrder).toHaveBeenCalledWith(
+    workspaceId,
+    payment.id,
+    expect.any(StripeCheckoutTransport),
+  );
 });

@@ -124,12 +124,17 @@ export class StripeCheckoutTransport implements PaymentTransport {
   async retrieveSession(id: string): Promise<CheckoutSession> {
     return this.stripe.checkout.sessions.retrieve(id);
   }
+
+  async expireSession(id: string): Promise<CheckoutSession> {
+    return this.stripe.checkout.sessions.expire(id, {}, { apiVersion: STRIPE_API_VERSION });
+  }
 }
 
 type BillingStore = Pick<
   PaymentStore,
   'createOrder' | 'getOrder' | 'listOrders' | 'hasBillingHold' | 'checkout' | 'reconcile'
->;
+> &
+  Partial<Pick<PaymentStore, 'cancelOrder'>>;
 export interface PaymentsOptions {
   store?: BillingStore;
   authenticate(request: Pick<FastifyRequest, 'headers' | 'cookies'>): Promise<Principal>;
@@ -226,9 +231,12 @@ export async function registerPayments(
         : ((await options.store?.listOrders(p.workspaceId)) ?? []);
       const enabledForWorkspace =
         enabled && options.checkoutWritesEnabled !== false && (access?.manual ?? true);
+      const cancelEnabledForWorkspace =
+        enabled && Boolean(options.store?.cancelOrder) && (access?.manual ?? true);
       const billingHold = options.store ? await options.store.hasBillingHold(p.workspaceId) : false;
       return {
         enabled: enabledForWorkspace,
+        cancelEnabled: cancelEnabledForWorkspace,
         newFunding: {
           allowed: enabledForWorkspace && !billingHold && (access?.newFunding?.allowed ?? true),
           ...(access?.newFunding?.reason ? { reason: access.newFunding.reason } : {}),
@@ -285,6 +293,24 @@ export async function registerPayments(
       );
       // Keep the original external binding durable if billing read was revoked in flight.
       return store().getOrder(p.workspaceId, id, await options.scoped.authorize(p, 'read'));
+    });
+    billing.post<{ Params: { id: string } }>('/v1/billing/orders/:id/cancel', async (request) => {
+      const p = await browser(request, true);
+      emptyBody.parse(request.body ?? {});
+      const id = orderId.parse(request.params.id);
+      const active = store();
+      if (!active.cancelOrder)
+        throw denied('cancel_unavailable', 'Checkout cancellation is unavailable.', 503);
+      if (!enabled || !transport)
+        throw denied('payments_unavailable', 'Top-ups are not configured.', 503);
+      if (!options.scoped) return active.cancelOrder(p.workspaceId, id, transport);
+      await active.cancelOrder(
+        p.workspaceId,
+        id,
+        transport,
+        await options.scoped.authorize(p, 'mutate'),
+      );
+      return active.getOrder(p.workspaceId, id, await options.scoped.authorize(p, 'read'));
     });
   });
 

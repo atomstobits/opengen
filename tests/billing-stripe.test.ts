@@ -74,6 +74,9 @@ describe('injectable Stripe billing lifecycle transport', () => {
     const retrieve = vi
       .spyOn(sdk.checkout.sessions, 'retrieve')
       .mockResolvedValue({ id: 'cs_fixture' } as never);
+    const expire = vi
+      .spyOn(sdk.checkout.sessions, 'expire')
+      .mockResolvedValue({ id: 'cs_fixture', status: 'expired' } as never);
     const transport = new StripeBillingTransport(sdk, gate);
     const legacy = transport.verifiedLegacyCheckoutTransport();
     const order = {
@@ -104,14 +107,27 @@ describe('injectable Stripe billing lifecycle transport', () => {
     await expect(legacy.retrieveSession('cs_fixture')).rejects.toMatchObject({
       code: 'processor_environment_unverified',
     });
+    await expect(legacy.expireSession!('cs_fixture')).rejects.toMatchObject({
+      code: 'processor_environment_unverified',
+    });
     expect(create).not.toHaveBeenCalled();
     expect(retrieve).not.toHaveBeenCalled();
+    expect(expire).not.toHaveBeenCalled();
     await transport.verifyProcessorEnvironment(() => {});
     legacy.assertProcessorEnvironment();
     await legacy.createSession(order);
     await new StripeCheckoutTransport(sdk, gate.publicUrl).createSession(order);
     expect(create.mock.calls[0]).toEqual(create.mock.calls[1]);
     expect(await legacy.retrieveSession('cs_fixture')).toMatchObject({ id: 'cs_fixture' });
+    expect(await legacy.expireSession!('cs_fixture')).toMatchObject({
+      id: 'cs_fixture',
+      status: 'expired',
+    });
+    expect(expire).toHaveBeenCalledWith(
+      'cs_fixture',
+      {},
+      { apiVersion: BILLING_STRIPE_API_VERSION },
+    );
     expect(account).toHaveBeenCalledTimes(1);
   });
   it('requires live charges readiness from the same verified account read', async () => {
