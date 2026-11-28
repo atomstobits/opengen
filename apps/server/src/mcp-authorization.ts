@@ -11,39 +11,42 @@ interface Context {
   authenticate(request: FastifyRequest): Promise<Principal>;
 }
 const scalar = z.string().max(4096);
-const authorizationSchema = z
-  .object({
-    client_id: scalar,
-    redirect_uri: scalar,
-    response_type: z.literal('code'),
-    code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    code_challenge_method: z.literal('S256'),
-    scope: z.string().max(200).optional(),
-    state: scalar.optional(),
-    resource: scalar.optional(),
-    prompt: z.literal('consent').optional(),
-  })
-  .strict();
+// RFC 6749 §4.1.1 / OAuth 2.1 requires ignoring unrecognized authorization parameters
+// (such as ui_locales), while explicitly rejecting unsupported protocol-altering fields.
+const authorizationSchema = z.object({
+  client_id: scalar,
+  redirect_uri: scalar,
+  response_type: z.literal('code'),
+  code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  code_challenge_method: z.literal('S256'),
+  scope: z.string().max(200).optional(),
+  state: scalar.optional(),
+  resource: scalar.optional(),
+  prompt: z.literal('consent').optional(),
+  response_mode: z.literal('query').optional(),
+  client_secret: z.never().optional(),
+  code_verifier: z.never().optional(),
+  request: z.never().optional(),
+  request_uri: z.never().optional(),
+});
 const tokenSchema = z.discriminatedUnion('grant_type', [
-  z
-    .object({
-      grant_type: z.literal('authorization_code'),
-      client_id: scalar,
-      code: scalar,
-      redirect_uri: scalar,
-      code_verifier: scalar,
-      resource: scalar.optional(),
-    })
-    .strict(),
-  z
-    .object({
-      grant_type: z.literal('refresh_token'),
-      client_id: scalar,
-      refresh_token: scalar,
-      scope: z.string().max(200).optional(),
-      resource: scalar.optional(),
-    })
-    .strict(),
+  z.object({
+    grant_type: z.literal('authorization_code'),
+    client_id: scalar,
+    code: scalar,
+    redirect_uri: scalar,
+    code_verifier: scalar,
+    resource: scalar.optional(),
+    client_secret: z.literal('').optional(),
+  }),
+  z.object({
+    grant_type: z.literal('refresh_token'),
+    client_id: scalar,
+    refresh_token: scalar,
+    scope: z.string().max(200).optional(),
+    resource: scalar.optional(),
+    client_secret: z.literal('').optional(),
+  }),
 ]);
 function protocolError(error: unknown, reply: FastifyReply) {
   if (error instanceof McpOAuthError) {
@@ -347,8 +350,8 @@ export async function registerMcpAuthorization(app: FastifyInstance, context: Co
           client_id: scalar,
           token: scalar,
           token_type_hint: z.enum(['access_token', 'refresh_token']).optional(),
+          client_secret: z.literal('').optional(),
         })
-        .strict()
         .parse(request.body);
       await store().revoke(input.client_id, input.token);
       return reply.code(200).send();
