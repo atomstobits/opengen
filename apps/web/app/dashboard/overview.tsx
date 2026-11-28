@@ -11,6 +11,8 @@ export interface LedgerPreviewEntry {
   job_id?: string;
   kind: string;
   amount_micros: string;
+  available_delta_micros?: string | number | null;
+  reserved_delta_micros?: string | number | null;
   created_at: string;
 }
 
@@ -42,14 +44,55 @@ function shortDate(value: string): string {
   });
 }
 
-function formatAmount(value: string, showPlus = false): string {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return value;
-  const sign = num < 0 ? '-' : showPlus && num > 0 ? '+' : '';
-  return `${sign}$${(Math.abs(num) / 1_000_000).toLocaleString('en-US', {
+function parseMicros(value: string | number | null | undefined): number | null {
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function formatSignedMicros(value: number, showPlus = false): string {
+  if (!Number.isSafeInteger(value)) return 'Unknown';
+  const sign = value < 0 ? '-' : showPlus && value > 0 ? '+' : '';
+  return `${sign}$${(Math.abs(value) / 1_000_000).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
   })}`;
+}
+
+const creditFallbackKinds = new Set(['credit', 'opening', 'release', 'refund-restore']);
+const debitFallbackKinds = new Set(['refund']);
+
+function ledgerDisplay(entry: LedgerPreviewEntry): { text: string; isCredit: boolean } {
+  const rawAmount = parseMicros(entry.amount_micros);
+  const availDelta = parseMicros(entry.available_delta_micros);
+  const resDelta = parseMicros(entry.reserved_delta_micros);
+
+  if (availDelta !== null) {
+    if (availDelta > 0) return { text: formatSignedMicros(availDelta, true), isCredit: true };
+    if (availDelta < 0) {
+      // Reservations move credit from available to reserved rather than removing it from the workspace.
+      if (resDelta !== null && resDelta === -availDelta) {
+        return { text: formatSignedMicros(Math.abs(availDelta), false), isCredit: false };
+      }
+      return { text: formatSignedMicros(availDelta, false), isCredit: false };
+    }
+    return {
+      text: rawAmount !== null ? formatSignedMicros(Math.abs(rawAmount), false) : 'Unknown',
+      isCredit: false,
+    };
+  }
+
+  if (rawAmount === null) return { text: 'Unknown', isCredit: false };
+  if (creditFallbackKinds.has(entry.kind)) {
+    return { text: formatSignedMicros(rawAmount, true), isCredit: rawAmount > 0 };
+  }
+  if (debitFallbackKinds.has(entry.kind)) {
+    return { text: formatSignedMicros(-Math.abs(rawAmount), false), isCredit: false };
+  }
+  return { text: formatSignedMicros(rawAmount, false), isCredit: false };
 }
 
 export function WorkspaceOverview({
@@ -102,7 +145,8 @@ export function WorkspaceOverview({
                           <span className={styles.opTag}>{item.operation}</span>
                         </div>
                         <span className={styles.activityMeta}>
-                          {item.providerId ?? 'Provider'} · {item.endpointRegion ?? 'undisclosed'} ·{' '}
+                          {item.providerId ?? 'Unknown provider'} ·{' '}
+                          {item.endpointRegion ?? 'Unknown endpoint region'} ·{' '}
                           {shortDate(item.createdAt)}
                         </span>
                       </div>
@@ -117,7 +161,7 @@ export function WorkspaceOverview({
                         >
                           {item.settledMicros !== null
                             ? moneyMicros(item.settledMicros)
-                            : `${moneyMicros(item.reservedMicros)} held`}
+                            : `${moneyMicros(item.heldMicros)} held`}
                         </span>
                       </div>
                       <button
@@ -321,32 +365,26 @@ export function WorkspaceOverview({
               </div>
               {recentLedger.length > 0 ? (
                 <ul className={styles.ledgerList}>
-                  {recentLedger.slice(0, 5).map((entry) => (
-                    <li className={styles.ledgerRow} key={entry.id}>
-                      <div className={styles.ledgerKind}>
-                        <strong>{entry.kind}</strong>
-                        <small>{shortDate(entry.created_at)}</small>
-                      </div>
-                      <span
-                        className={
-                          entry.kind === 'credit' ||
-                          entry.kind === 'opening' ||
-                          entry.kind === 'release' ||
-                          entry.kind === 'refund'
-                            ? `${styles.ledgerAmount} ${styles.ledgerAmountCredit}`
-                            : styles.ledgerAmount
-                        }
-                      >
-                        {formatAmount(
-                          entry.amount_micros,
-                          entry.kind === 'credit' ||
-                            entry.kind === 'opening' ||
-                            entry.kind === 'release' ||
-                            entry.kind === 'refund',
-                        )}
-                      </span>
-                    </li>
-                  ))}
+                  {recentLedger.slice(0, 5).map((entry) => {
+                    const display = ledgerDisplay(entry);
+                    return (
+                      <li className={styles.ledgerRow} key={entry.id}>
+                        <div className={styles.ledgerKind}>
+                          <strong>{entry.kind}</strong>
+                          <small>{shortDate(entry.created_at)}</small>
+                        </div>
+                        <span
+                          className={
+                            display.isCredit
+                              ? `${styles.ledgerAmount} ${styles.ledgerAmountCredit}`
+                              : styles.ledgerAmount
+                          }
+                        >
+                          {display.text}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className={styles.emptyWell}>

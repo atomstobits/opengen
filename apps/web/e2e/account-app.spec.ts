@@ -341,6 +341,8 @@ test('account entry gates avoid private reads before sign-in or without read per
   await expect(
     page.getByText(/Your workspace permissions do not include activity access/),
   ).toBeVisible();
+  await expect(page.locator('.workspace-stats')).toContainText('Hold status unavailable');
+  await expect(page.locator('.workspace-stats')).not.toContainText('No active holds');
   expect(
     state.requests.filter(({ path }) =>
       ['/api/activity', '/api/generations', '/api/balance', '/api/ledger'].includes(path),
@@ -513,6 +515,66 @@ test('overview console shows live recent generations with inspect handoff and cl
   await expect(page.locator('.settings-navigation')).toHaveCount(0);
   await mkdir(evidenceDir, { recursive: true });
   await page.screenshot({ path: path.join(evidenceDir, 'keys-1440.png'), fullPage: true });
+
+  // Verify overview preserves unknown ledger holds and treats cash refunds as debits (not credits)
+  await page.route(/\/api\/activity(?:\?|$)/, (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            ...compactActivity(studioJobs['studio-a']!),
+            id: '00000000-0000-4000-8000-000000000199',
+            status: 'running',
+            settledMicros: null,
+            heldMicros: null,
+            ledgerReservedMicros: null,
+            reservedMicros: 500000,
+            accountingState: 'unknown',
+          },
+        ],
+        nextCursor: null,
+      },
+    }),
+  );
+  await page.route('**/api/ledger', (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            id: 'ledger-refund-debit',
+            kind: 'refund',
+            amount_micros: '5000000',
+            available_delta_micros: '-5000000',
+            reserved_delta_micros: '0',
+            created_at: '2026-11-03T12:05:00Z',
+          },
+          {
+            id: 'ledger-refund-restore',
+            kind: 'refund-restore',
+            amount_micros: '5000000',
+            available_delta_micros: '5000000',
+            reserved_delta_micros: '0',
+            created_at: '2026-11-03T12:06:00Z',
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/app#start');
+  await page.reload();
+  await expect(recent).toContainText('Unknown held');
+  await expect(recent).not.toContainText('$0.50 held');
+  const recentLedger = page.getByRole('region', { name: 'Recent ledger', exact: true });
+  const refundRow = recentLedger.locator('li').nth(0);
+  await expect(refundRow).toContainText('refund');
+  await expect(refundRow).not.toContainText('refund-restore');
+  await expect(refundRow).toContainText('-$5.00');
+  await expect(refundRow).not.toContainText('+$5.00');
+  await expect(refundRow.locator('span').last()).not.toHaveClass(/ledgerAmountCredit/);
+  const restoreRow = recentLedger.locator('li').nth(1);
+  await expect(restoreRow).toContainText('refund-restore');
+  await expect(restoreRow).toContainText('+$5.00');
+  await expect(restoreRow.locator('span').last()).toHaveClass(/ledgerAmountCredit/);
 
   // Empty $0 workspace renders zero-credit callout + quick-start launchpad cleanly across split-pane and mobile widths
   await page.route(/\/api\/activity(?:\?|$)/, (route) =>

@@ -26,6 +26,8 @@ type Entry = {
   job_id?: string;
   kind: string;
   amount_micros: string;
+  available_delta_micros?: string | number | null;
+  reserved_delta_micros?: string | number | null;
   created_at: string;
 };
 type WorkspaceView = 'start' | 'generations' | 'ledger' | 'team' | 'settings' | 'keys' | 'apps';
@@ -104,7 +106,7 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [hasMoreActivity, setHasMoreActivity] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const pendingInspectId = useRef<string | null>(null);
+  const pendingInspectId = useRef<{ jobId: string; authority: string } | null>(null);
   const [balance, setBalance] = useState<Balance | null>(null);
   const [ledger, setLedger] = useState<Entry[]>([]);
   const [tab, setTab] = useState<WorkspaceView>(appMode ? 'start' : 'generations');
@@ -157,8 +159,14 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
     return () => window.removeEventListener('hashchange', update);
   }, [appMode]);
   useEffect(() => {
-    if (tab === 'generations' && pendingInspectId.current) {
-      const nextId = pendingInspectId.current;
+    if (
+      authenticated &&
+      hasReadPermission &&
+      tab === 'generations' &&
+      pendingInspectId.current &&
+      pendingInspectId.current.authority === authority
+    ) {
+      const nextId = pendingInspectId.current.jobId;
       pendingInspectId.current = null;
       setSelected(null);
       setSelectedId(nextId);
@@ -241,7 +249,7 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
   const isZeroCredit = currentBalance !== null && currentBalance.availableMicros <= 0;
 
   const inspectFromOverview = (jobId: string) => {
-    pendingInspectId.current = jobId;
+    pendingInspectId.current = { jobId, authority };
     setTab('generations');
     if (appMode) window.location.hash = 'activity';
   };
@@ -262,9 +270,13 @@ export function Dashboard({ appMode = false }: { appMode?: boolean } = {}) {
         <strong>{currentBalance ? money(currentBalance.reservedMicros) : '—'}</strong>
         {appMode && (
           <small className="workspace-stat-note">
-            {(currentBalance?.reservedMicros ?? 0) > 0
-              ? 'Active hold on pending jobs'
-              : 'No active holds'}
+            {currentBalance === null
+              ? loading
+                ? 'Loading hold status…'
+                : 'Hold status unavailable'
+              : currentBalance.reservedMicros > 0
+                ? 'Active hold on pending jobs'
+                : 'No active holds'}
           </small>
         )}
       </div>
