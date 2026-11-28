@@ -306,7 +306,14 @@ export function createForwarder(
             ...(ownedVideo
               ? ['content-range', 'accept-ranges', 'content-length', 'etag', 'last-modified']
               : []),
-            ...(['/oauth/token', '/oauth/register', '/oauth/revoke'].includes(path.split('?')[0]!)
+            ...([
+              '/.well-known/oauth-authorization-server',
+              '/.well-known/oauth-protected-resource',
+              '/.well-known/oauth-protected-resource/mcp',
+              '/oauth/token',
+              '/oauth/register',
+              '/oauth/revoke',
+            ].includes(path.split('?')[0]!)
               ? [
                   'access-control-allow-origin',
                   'access-control-allow-methods',

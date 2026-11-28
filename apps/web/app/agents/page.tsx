@@ -52,7 +52,7 @@ export default function AgentsPage() {
             <span className={styles.number}>02</span>
             <h2>Local agent</h2>
             <p>
-              Use the client’s MCP OAuth support, or OpenGen’s source CLI with browser login and a
+              Use the client’s MCP OAuth support, or OpenGen’s portable CLI with browser login and a
               private local profile.
             </p>
           </div>
@@ -73,10 +73,13 @@ export default function AgentsPage() {
             Hosted sign-in, workspace billing, and live-verified official routes are live on{' '}
             <code>https://opengen.dev</code> (self-hosted gateways need their own configured
             identity and provider credentials). Third-party client guides were reviewed{' '}
-            {AGENT_REVIEW_DATE} from official documentation; live read-only OAuth MCP checks on
-            2026-11-27 verified <code>codex-cli 0.155.1</code> and reached consent in{' '}
-            <code>Claude Code 2.1.301</code>, while other client versions and end-to-end billable
-            agent runs remain unverified.
+            {AGENT_REVIEW_DATE}–{AGENT_EVIDENCE_DATE} from official documentation; live checks on{' '}
+            {AGENT_EVIDENCE_DATE} verified read-only OAuth MCP in <code>codex-cli 0.155.1</code> and
+            live OAuth discovery, dynamic client registration, and S256 PKCE preflight in{' '}
+            <code>Claude Code 2.1.301</code>, <code>Muse Code 1.4.25</code>,{' '}
+            <code>Hermes Agent v0.16.0</code>, and <code>@opengen-dev/cli 0.1.2</code>, while
+            post-consent runs for those clients, other clients (including <code>Grok Bot</code> and
+            hosted <code>Meta Muse</code>), and billable agent runs remain unverified.
           </p>
           <p>
             New personal workspaces start with $0 managed credit — discovery and quotes are free.{' '}
@@ -125,8 +128,9 @@ export default function AgentsPage() {
         >
           <h2 id="matrix-title">What has actually been checked?</h2>
           <p>
-            Documentation reviewed {AGENT_REVIEW_DATE}. “Protocol fixtures” means synthetic requests
-            against local code, without a real client, identity provider or generation charge.
+            Documentation reviewed {AGENT_REVIEW_DATE}–{AGENT_EVIDENCE_DATE}. “Protocol fixtures”
+            means synthetic requests against local code, without a real client, identity provider or
+            generation charge.
           </p>
           <div className={styles.tableWrap}>
             <table className={styles.matrix}>

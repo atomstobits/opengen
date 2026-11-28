@@ -21,6 +21,7 @@ const authorizationSchema = z
     scope: z.string().max(200).optional(),
     state: scalar.optional(),
     resource: scalar.optional(),
+    prompt: z.literal('consent').optional(),
   })
   .strict();
 const tokenSchema = z.discriminatedUnion('grant_type', [
@@ -101,27 +102,40 @@ export async function registerMcpAuthorization(app: FastifyInstance, context: Co
       );
     return context.store;
   };
-  app.get('/.well-known/oauth-authorization-server', async () => metadata());
-  app.get(
+  const discoveryPaths = [
+    '/.well-known/oauth-authorization-server',
     '/.well-known/oauth-protected-resource',
-    async () =>
-      context.store?.resourceMetadata() ?? {
-        resource: `${issuer}/mcp`,
-        authorization_servers: [issuer],
-        scopes_supported: [...mcpOAuthScopes],
-        bearer_methods_supported: ['header'],
-      },
-  );
-  app.get(
     '/.well-known/oauth-protected-resource/mcp',
-    async () =>
-      context.store?.resourceMetadata() ?? {
-        resource: `${issuer}/mcp`,
-        authorization_servers: [issuer],
-        scopes_supported: [...mcpOAuthScopes],
-        bearer_methods_supported: ['header'],
-      },
-  );
+  ] as const;
+  for (const path of discoveryPaths)
+    app.options(path, async (_request, reply) =>
+      reply
+        .header('Access-Control-Allow-Origin', '*')
+        .header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+        .header('Access-Control-Allow-Headers', 'Content-Type, MCP-Protocol-Version')
+        .header('Access-Control-Max-Age', '600')
+        .code(204)
+        .send(),
+    );
+  const resourceMetadata = () =>
+    context.store?.resourceMetadata() ?? {
+      resource: `${issuer}/mcp`,
+      authorization_servers: [issuer],
+      scopes_supported: [...mcpOAuthScopes],
+      bearer_methods_supported: ['header'],
+    };
+  app.get('/.well-known/oauth-authorization-server', async (_request, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    return metadata();
+  });
+  app.get('/.well-known/oauth-protected-resource', async (_request, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    return resourceMetadata();
+  });
+  app.get('/.well-known/oauth-protected-resource/mcp', async (_request, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    return resourceMetadata();
+  });
   if (!app.hasContentTypeParser('application/x-www-form-urlencoded'))
     app.addContentTypeParser(
       'application/x-www-form-urlencoded',

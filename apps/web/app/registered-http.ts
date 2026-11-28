@@ -76,15 +76,18 @@ export function registeredBackendPath(path: string, method: string): boolean {
       ? path === '/webhooks/stripe' && method === 'POST'
       : native.methods.includes(method === 'HEAD' ? 'GET' : method);
   return (
+    (['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+      [
+        '/.well-known/oauth-protected-resource',
+        '/.well-known/oauth-protected-resource/mcp',
+        '/.well-known/oauth-authorization-server',
+      ].includes(url.pathname)) ||
     (method === 'GET' &&
       [
         '/auth/login',
         '/auth/callback',
         '/openapi.json',
         '/health',
-        '/.well-known/oauth-protected-resource',
-        '/.well-known/oauth-protected-resource/mcp',
-        '/.well-known/oauth-authorization-server',
         '/oauth/authorize',
         '/oauth/login',
         '/oauth/consent',

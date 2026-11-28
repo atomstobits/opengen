@@ -90,6 +90,34 @@ describe('MCP OAuth protocol boundaries', () => {
       expect(malformed.body).not.toContain('private-token-do-not-echo');
       expect(malformed.headers['cache-control']).toBe('no-store');
       expect(malformed.headers['access-control-allow-origin']).toBe('*');
+      for (const discoveryPath of [
+        '/.well-known/oauth-authorization-server',
+        '/.well-known/oauth-protected-resource',
+        '/.well-known/oauth-protected-resource/mcp',
+      ]) {
+        const getDiscovery = await app.inject({ method: 'GET', url: discoveryPath });
+        expect(getDiscovery.statusCode).toBe(200);
+        expect(getDiscovery.headers['access-control-allow-origin']).toBe('*');
+        const headDiscovery = await app.inject({ method: 'HEAD', url: discoveryPath });
+        expect(headDiscovery.statusCode).toBe(200);
+        expect(headDiscovery.headers['access-control-allow-origin']).toBe('*');
+        const optionsDiscovery = await app.inject({ method: 'OPTIONS', url: discoveryPath });
+        expect(optionsDiscovery.statusCode).toBe(204);
+        expect(optionsDiscovery.headers['access-control-allow-origin']).toBe('*');
+        expect(optionsDiscovery.headers['access-control-allow-methods']).toContain('GET');
+      }
+      const consentPrompt = await app.inject({
+        method: 'GET',
+        url: `/oauth/authorize?client_id=c1&redirect_uri=${encodeURIComponent('https://client.example/callback')}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&prompt=consent`,
+      });
+      // Passes authorizationSchema validation and reaches the unconfigured store boundary (503).
+      expect(consentPrompt.statusCode).toBe(503);
+      const silentPrompt = await app.inject({
+        method: 'GET',
+        url: `/oauth/authorize?client_id=c1&redirect_uri=${encodeURIComponent('https://client.example/callback')}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&prompt=none`,
+      });
+      expect(silentPrompt.statusCode).toBe(400);
+      expect(silentPrompt.json().error).toBe('invalid_request');
     } finally {
       await app.close();
     }

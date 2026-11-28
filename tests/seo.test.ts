@@ -29,6 +29,7 @@ import sitemap from '../apps/web/app/sitemap';
 import robots from '../apps/web/app/robots';
 import { GET as llms } from '../apps/web/app/llms.txt/route';
 import { groupRoutesByProvider } from '../apps/web/app/provider-order';
+import { agentClients } from '../apps/web/app/agents/clients';
 
 beforeEach(() => vi.stubEnv('OPENGEN_PUBLIC_URL', 'https://opengen.dev'));
 afterEach(() => vi.unstubAllEnvs());
@@ -184,7 +185,7 @@ describe('crawler discovery', () => {
   it('lists canonical public paths once and excludes operational URLs', () => {
     const paths = sitemapPaths();
     expect(new Set(paths).size).toBe(paths.length);
-    expect(paths).toHaveLength(55);
+    expect(paths).toHaveLength(56);
     expect(paths).toEqual(
       expect.arrayContaining([
         '/',
@@ -195,9 +196,12 @@ describe('crawler discovery', () => {
         '/docs',
         '/guides/image-to-video',
         '/agents',
+        '/agents/muse',
+        '/agents/grok-bot',
         '/agents/cli',
       ]),
     );
+    expect(JSON.stringify(agentClients).toLowerCase()).not.toContain('treg');
     expect(
       paths.every((path) => !path.includes('?') && !path.includes('#') && !path.startsWith('/api')),
     ).toBe(true);
