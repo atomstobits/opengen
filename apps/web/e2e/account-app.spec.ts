@@ -279,6 +279,10 @@ async function accountFixture(page: Page) {
       });
       return;
     }
+    if (method === 'GET' && path === '/api/catalog') {
+      await route.fulfill({ json: { models: [], providers: [] } });
+      return;
+    }
     if (
       method === 'GET' &&
       [
@@ -287,10 +291,18 @@ async function accountFixture(page: Page) {
         '/api/policies',
         '/api/connections',
         '/api/oauth/grants',
+        '/api/governance/keys',
+        '/api/governance/policies',
       ].includes(path)
     ) {
       const permission =
-        path === '/api/members' ? 'members:write' : path === '/api/keys' ? 'keys:write' : 'read';
+        path === '/api/members'
+          ? 'members:write'
+          : path === '/api/keys' || path === '/api/governance/keys'
+            ? 'keys:write'
+            : path === '/api/governance/policies'
+              ? 'policies:write'
+              : 'read';
       if (!scopes.includes(permission)) {
         state.unexpected.push(`${method} ${path} in ${workspaceId}`);
         await route.fulfill({ status: 403, json: { error: 'Permission required.' } });
@@ -329,6 +341,8 @@ test('account entry gates avoid private reads before sign-in or without read per
   await expect(
     page.getByText(/Your workspace permissions do not include activity access/),
   ).toBeVisible();
+  await expect(page.locator('.workspace-stats')).toContainText('Hold status unavailable');
+  await expect(page.locator('.workspace-stats')).not.toContainText('No active holds');
   expect(
     state.requests.filter(({ path }) =>
       ['/api/activity', '/api/generations', '/api/balance', '/api/ledger'].includes(path),
@@ -473,5 +487,123 @@ test('team invitation acceptance and switching clear the previous workspace and 
         ['/api/members', '/api/keys', '/api/policies', '/api/connections'].includes(path),
     ),
   ).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test('overview console shows live recent generations with inspect handoff and clean empty-workspace launchpad', async ({
+  page,
+}) => {
+  const state = await accountFixture(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/app#start');
+  const recent = page.getByRole('region', { name: 'Recent generations', exact: true });
+  await expect(recent).toContainText('alibaba/wan-3.0');
+  await expect(page.getByRole('region', { name: 'Recent ledger', exact: true })).toContainText(
+    '$0.40',
+  );
+  await expect(page.locator('.workspace-stats')).toContainText('1');
+  await recent.getByRole('button', { name: 'Inspect', exact: true }).click();
+  await expect(page).toHaveURL(/\/app#activity$/);
+  await expect(page.locator('.workspace-job-detail')).toContainText(
+    studioJobs['studio-a']!.input.input.prompt!,
+  );
+  expect(state.unexpected).toEqual([]);
+
+  // Verify /app#keys omits the redundant single-section tab bar
+  await page.goto('/app#keys');
+  await expect(page.getByRole('button', { name: 'Create API key', exact: true })).toBeVisible();
+  await expect(page.locator('.settings-navigation')).toHaveCount(0);
+  await mkdir(evidenceDir, { recursive: true });
+  await page.screenshot({ path: path.join(evidenceDir, 'keys-1440.png'), fullPage: true });
+
+  // Verify overview preserves unknown ledger holds and treats cash refunds as debits (not credits)
+  await page.route(/\/api\/activity(?:\?|$)/, (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            ...compactActivity(studioJobs['studio-a']!),
+            id: '00000000-0000-4000-8000-000000000199',
+            status: 'running',
+            settledMicros: null,
+            heldMicros: null,
+            ledgerReservedMicros: null,
+            reservedMicros: 500000,
+            accountingState: 'unknown',
+          },
+        ],
+        nextCursor: null,
+      },
+    }),
+  );
+  await page.route('**/api/ledger', (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            id: 'ledger-refund-debit',
+            kind: 'refund',
+            amount_micros: '5000000',
+            available_delta_micros: '-5000000',
+            reserved_delta_micros: '0',
+            created_at: '2026-11-03T12:05:00Z',
+          },
+          {
+            id: 'ledger-refund-restore',
+            kind: 'refund-restore',
+            amount_micros: '5000000',
+            available_delta_micros: '5000000',
+            reserved_delta_micros: '0',
+            created_at: '2026-11-03T12:06:00Z',
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/app#start');
+  await page.reload();
+  await expect(recent).toContainText('Unknown held');
+  await expect(recent).not.toContainText('$0.50 held');
+  const recentLedger = page.getByRole('region', { name: 'Recent ledger', exact: true });
+  const refundRow = recentLedger.locator('li').nth(0);
+  await expect(refundRow).toContainText('refund');
+  await expect(refundRow).not.toContainText('refund-restore');
+  await expect(refundRow).toContainText('-$5.00');
+  await expect(refundRow).not.toContainText('+$5.00');
+  await expect(refundRow.locator('span').last()).not.toHaveClass(/ledgerAmountCredit/);
+  const restoreRow = recentLedger.locator('li').nth(1);
+  await expect(restoreRow).toContainText('refund-restore');
+  await expect(restoreRow).toContainText('+$5.00');
+  await expect(restoreRow.locator('span').last()).toHaveClass(/ledgerAmountCredit/);
+
+  // Empty $0 workspace renders zero-credit callout + quick-start launchpad cleanly across split-pane and mobile widths
+  await page.route(/\/api\/activity(?:\?|$)/, (route) =>
+    route.fulfill({ json: { items: [], nextCursor: null } }),
+  );
+  await page.route('**/api/balance', (route) =>
+    route.fulfill({ json: { data: { availableMicros: 0, reservedMicros: 0 } } }),
+  );
+  await page.route('**/api/ledger', (route) => route.fulfill({ json: { data: [] } }));
+  for (const width of [1440, 800, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/app#start');
+    await page.reload();
+    await expect(
+      page.getByRole('region', { name: 'Workspace credit status', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Start generating', exact: true })).toContainText(
+      'npx @opengen-dev/cli login',
+    );
+    await expect(
+      page.getByRole('region', { name: 'Workspace controls', exact: true }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    if (width === 1440 || width === 800) {
+      await page.screenshot({
+        path: path.join(evidenceDir, `start-empty-${width}.png`),
+        fullPage: true,
+      });
+    }
+  }
   expect(state.unexpected).toEqual([]);
 });
