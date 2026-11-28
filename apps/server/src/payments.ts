@@ -231,9 +231,12 @@ export async function registerPayments(
         : ((await options.store?.listOrders(p.workspaceId)) ?? []);
       const enabledForWorkspace =
         enabled && options.checkoutWritesEnabled !== false && (access?.manual ?? true);
+      const cancelEnabledForWorkspace =
+        enabled && Boolean(options.store?.cancelOrder) && (access?.manual ?? true);
       const billingHold = options.store ? await options.store.hasBillingHold(p.workspaceId) : false;
       return {
         enabled: enabledForWorkspace,
+        cancelEnabled: cancelEnabledForWorkspace,
         newFunding: {
           allowed: enabledForWorkspace && !billingHold && (access?.newFunding?.allowed ?? true),
           ...(access?.newFunding?.reason ? { reason: access.newFunding.reason } : {}),

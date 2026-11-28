@@ -562,4 +562,42 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('customer prepaid ledger reconci
       await f.close();
     }
   });
+  it('never moves an async payment_pending order to review when a stale cancel retrieve lags a concurrent webhook', async () => {
+    const f = await paymentFixture();
+    try {
+      const open = await f.order();
+      const staleOpenSnapshot = await f.transport.retrieveSession(f.session().id);
+      expect(staleOpenSnapshot.status).toBe('open');
+      expect(staleOpenSnapshot.payment_intent).toBeNull();
+      // Interleave: expire fails, fallback retrieve returns the pre-webhook open snapshot,
+      // and right before cancelOrder acquires the completion DB lock a webhook binds the PI and moves
+      // the order to payment_pending.
+      const raced = await f.store.cancelOrder(f.workspace, open.id, {
+        ...f.transport,
+        async expireSession() {
+          throw new Error('transient stripe error');
+        },
+        async retrieveSession() {
+          f.setSession({
+            status: 'complete',
+            payment_status: 'unpaid',
+            payment_intent: `pi_async_${f.workspace}`,
+          });
+          await f.store.reconcile(f.event('checkout.session.completed'), f.transport);
+          return { ...staleOpenSnapshot };
+        },
+      });
+      expect(raced).toMatchObject({ id: open.id, status: 'payment_pending', creditedAt: null });
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('payment_pending');
+      // Later async payment confirmation still credits the workspace cleanly.
+      f.setSession({ payment_status: 'paid' });
+      await f.store.reconcile(f.event('checkout.session.async_payment_succeeded'), f.transport);
+      expect((await f.store.getOrder(f.workspace, open.id)).status).toBe('credited');
+      expect(
+        (await f.pool.query("SELECT count(*) FROM mr_ledger WHERE kind='credit'")).rows[0].count,
+      ).toBe('1');
+    } finally {
+      await f.close();
+    }
+  });
 });

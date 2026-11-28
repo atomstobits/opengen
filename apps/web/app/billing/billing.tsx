@@ -563,6 +563,12 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
   const feePreview = cents !== null ? previewProcessingFee(cents, null) : null;
   const blocked =
     !canReadOrders || busy || !summary?.enabled || summary.billingHold || !!storageError;
+  const cancelBlocked =
+    !canReadOrders ||
+    busy ||
+    !(summary?.cancelEnabled ?? summary?.enabled) ||
+    summary.billingHold ||
+    !!storageError;
   const newFundingDenied = summary?.newFunding?.allowed === false;
   const topUpBlocked =
     blocked || (newFundingDenied && !(recovery && active && active.status !== 'created'));
@@ -806,7 +812,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
             <button
               className={styles.cancelTopUp}
               type="button"
-              disabled={blocked}
+              disabled={cancelBlocked}
               onClick={() => void act(() => cancelCheckout(active))}
             >
               Cancel open top-up &amp; change amount
@@ -917,7 +923,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
             <button
               className={styles.secondary}
               type="button"
-              disabled={blocked}
+              disabled={cancelBlocked}
               onClick={() => void act(() => cancelCheckout(active))}
             >
               Cancel checkout
@@ -1000,7 +1006,7 @@ function WorkspaceBilling({ workspaceId, recoveryScope, initialCapabilities }: B
                             <button
                               className={styles.rowActionMuted}
                               type="button"
-                              disabled={blocked}
+                              disabled={cancelBlocked}
                               onClick={() => void act(() => cancelCheckout(order))}
                             >
                               Cancel

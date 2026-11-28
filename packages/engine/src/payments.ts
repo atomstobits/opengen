@@ -1017,6 +1017,21 @@ export class PaymentStore {
       await this.lockIntent(client, paymentIntentId(session.payment_intent));
       await client.query('SELECT id FROM mr_workspaces WHERE id=$1 FOR UPDATE', [workspaceId]);
       const current = await this.owned(client, workspaceId, id, true);
+      // If a concurrent webhook or cancellation already advanced this order out of checkout_open,
+      // never regress its state or mark it for review from a stale pre-payment snapshot.
+      if (current.status !== 'checkout_open') return this.orderView(current);
+      // If expire failed and the fallback retrieve returned an open snapshot predating a bound PI,
+      // report uncertainty rather than falsely flagging an ownership mismatch.
+      if (
+        session.status === 'open' &&
+        !paymentIntentId(session.payment_intent) &&
+        current.payment_intent_id
+      )
+        return new PaymentError(
+          'cancel_uncertain',
+          'Checkout could not be cancelled. Refresh its status before trying again.',
+          503,
+        );
       let url: string | null = null;
       try {
         if (!validSession(current, session))
@@ -1032,15 +1047,11 @@ export class PaymentStore {
       }
       const nextStatus: PaymentStatus = current.credited_at
         ? 'credited'
-        : current.status === 'review'
-          ? 'review'
-          : current.status === 'payment_failed' && session.payment_status !== 'paid'
-            ? 'payment_failed'
-            : session.status === 'expired' && session.payment_status !== 'paid'
-              ? 'expired'
-              : session.status === 'complete' || session.payment_status === 'paid'
-                ? 'payment_pending'
-                : 'checkout_open';
+        : session.status === 'expired' && session.payment_status !== 'paid'
+          ? 'expired'
+          : session.status === 'complete' || session.payment_status === 'paid'
+            ? 'payment_pending'
+            : 'checkout_open';
       try {
         await this.qualifyOrder(client, current, session);
       } catch (error) {

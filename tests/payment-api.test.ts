@@ -505,6 +505,7 @@ it('pauses customer Checkout writes while reading orders and accepting signed fu
   const { app, stripe, store, payment } = await setup({ checkoutWritesEnabled: false });
   expect((await app.inject({ url: '/v1/billing', headers })).json()).toMatchObject({
     enabled: false,
+    cancelEnabled: true,
     orders: [expect.objectContaining({ id: payment.id })],
   });
   expect((await app.inject({ url: `/v1/billing/orders/${payment.id}`, headers })).statusCode).toBe(
